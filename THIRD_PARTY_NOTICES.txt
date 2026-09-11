@@ -20,12 +20,17 @@ This package includes the publisher's signed, custom build reporting 1.37.0.
 Copyright (C) 2006-2019 Tatsuhiro Tsujikawa and contributors.
 License: GNU GPL version 2 or later; text: app/assets/licenses/aria2/COPYING.
 Upstream: https://github.com/aria2/aria2
-The publisher must provide corresponding source for this custom build before
-public distribution; the stock 1.37.0 source does not describe its modifications.
+Publisher statement (2026-09-11): the publisher reports compiling aria2
+without modifying its source, but did not retain the source tree. The exact
+source revision and correspondence to this binary have not been verified.
+The upstream link is a project reference, not a claim of matching source.
 Build-reported libraries: zlib 1.3.2, expat 2.8.1, SQLite 3.53.2,
 OpenSSL 1.1.1w, c-ares 1.34.6, libssh2 1.11.1 and nghttp2 1.64.0.
-Their applicable notices and corresponding build/source material must accompany
-the public release. This local signing candidate is not a published release.
+The exact dependency build/source records are also unavailable. These
+components retain their respective licenses. This release does not claim
+that unavailable corresponding source has been supplied or verified.
+This status supersedes the source-request note embedded at build time; the
+user-signed EXE was preserved byte for byte after signing.
 
 The optional Native 0.2.4 payload follows upstream commit
 5f62ff44a9c08f9841fa605e7b7160f79ccd2c40 at
