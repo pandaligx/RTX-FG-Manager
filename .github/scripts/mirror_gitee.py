@@ -82,6 +82,20 @@ def verify_remote(url,expected):
         raise RuntimeError('Mirror asset differs: '+expected.name)
 
 
+def tag_push_required(remote_refs,tag,local_commit):
+    """Accept annotated or lightweight tags only when their commits agree."""
+    refs={}
+    for line in remote_refs.splitlines():
+        sha,ref=line.split()
+        if not re.fullmatch('[0-9a-f]{40}',sha):raise RuntimeError('Invalid remote tag')
+        refs[ref]=sha
+    ref='refs/tags/'+tag
+    if ref not in refs:return True
+    if refs.get(ref+'^{}',refs[ref])!=local_commit:
+        raise RuntimeError('Existing Gitee tag points to a different commit; refusing overwrite')
+    return False
+
+
 def main():
     if not os.environ.get('GITEE_TOKEN'):
         raise RuntimeError('Configure repository secret GITEE_TOKEN; mirror has NOT completed')
@@ -98,7 +112,11 @@ def main():
         askpass.chmod(0o700)
         env=dict(os.environ,GIT_ASKPASS=str(askpass),GIT_TERMINAL_PROMPT='0')
         args=['git','-c','credential.helper=','push','https://gitee.com/'+REPO+'.git','refs/heads/main:refs/heads/main']
-        if tag:args.append(f'refs/tags/{tag}:refs/tags/{tag}')
+        if tag:
+            remote_refs=subprocess.check_output(['git','-c','credential.helper=','ls-remote',
+                'https://gitee.com/'+REPO+'.git',f'refs/tags/{tag}',f'refs/tags/{tag}^{{}}'],env=env,text=True,timeout=60)
+            commit=subprocess.check_output(['git','rev-parse',f'{tag}^{{commit}}'],text=True).strip()
+            if tag_push_required(remote_refs,tag,commit):args.append(f'refs/tags/{tag}:refs/tags/{tag}')
         subprocess.run(args,env=env,check=True,timeout=300)
         if not tag:
             print('Documentation mirror completed.');return
