@@ -108,6 +108,20 @@ def verify_manual_exe(existing,exe):
     return True
 
 
+def ensure_release(tag,release,commit):
+    try:remote=api('/releases/tags/'+tag)
+    except urllib.error.HTTPError as exc:
+        if exc.code!=404:raise
+        remote=None
+    # Gitee can return HTTP 200 with JSON null for a tag without a release.
+    if remote is None:
+        remote=api('/releases',{'tag_name':tag,'name':release['name'],'body':release['body'],
+                               'prerelease':'false','target_commitish':commit})
+    if not isinstance(remote,dict) or type(remote.get('id')) is not int:
+        raise RuntimeError('Invalid Gitee release response')
+    return remote
+
+
 def main():
     if not os.environ.get('GITEE_TOKEN'):
         raise RuntimeError('Configure repository secret GITEE_TOKEN; mirror has NOT completed')
@@ -137,12 +151,8 @@ def main():
         files=validate_assets(assets,tag)
         release=json.loads(subprocess.check_output(['gh','release','view',tag,'--repo',REPO,'--json','name,body,isDraft,isPrerelease']))
         if release['isDraft'] or release['isPrerelease']:raise RuntimeError('Only stable published releases are mirrored')
-        try:remote=api('/releases/tags/'+tag)
-        except urllib.error.HTTPError as exc:
-            if exc.code!=404:raise
-            commit=subprocess.check_output(['git','rev-list','-n','1',tag],text=True).strip()
-            remote=api('/releases',{'tag_name':tag,'name':release['name'],'body':release['body'],
-                                   'prerelease':'false','target_commitish':commit})
+        commit=subprocess.check_output(['git','rev-list','-n','1',tag],text=True).strip()
+        remote=ensure_release(tag,release,commit)
         rid=remote.get('id')
         if type(rid) is not int:raise RuntimeError('Invalid Gitee release response')
         endpoint=f'/releases/{rid}/attach_files'
