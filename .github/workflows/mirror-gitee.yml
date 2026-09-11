@@ -1,0 +1,37 @@
+name: Mirror documentation and releases to Gitee
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Optional stable release tag, for example v3.7.0'
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: gitee-mirror
+  cancel-in-progress: false
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+      GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
+      GH_TOKEN: ${{ github.token }}
+      TAG_NAME: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Mirror allowlisted publication files and verify release downloads
+        run: python .github/scripts/mirror_gitee.py
