@@ -96,6 +96,18 @@ def tag_push_required(remote_refs,tag,local_commit):
     return False
 
 
+def verify_manual_exe(existing,exe):
+    matches=[a for a in existing if a.get('name')==exe.name]
+    if len(matches)>1:raise RuntimeError('Duplicate mirror EXE')
+    if not matches:
+        print('Waiting for publisher local EXE upload to Gitee; update manifest withheld. Rerun with this tag after upload.')
+        return False
+    asset=matches[0]
+    verify_remote(asset.get('browser_download_url') or asset.get('download_url') or asset.get('url',''),exe)
+    print('Verified locally uploaded mirror EXE: '+exe.name)
+    return True
+
+
 def main():
     if not os.environ.get('GITEE_TOKEN'):
         raise RuntimeError('Configure repository secret GITEE_TOKEN; mirror has NOT completed')
@@ -136,7 +148,11 @@ def main():
         endpoint=f'/releases/{rid}/attach_files'
         existing=api(endpoint+'?per_page=100')
         if not isinstance(existing,list):raise RuntimeError('Invalid Gitee attachments')
+        # Large EXEs are uploaded from the publisher machine, never from Actions.
+        exe=assets/f'RTXManager-{tag}-x64.exe'
+        if not verify_manual_exe(existing,exe):return
         for file in files:
+            if file.suffix.lower()=='.exe':continue
             matches=[a for a in existing if a.get('name')==file.name]
             if len(matches)>1:raise RuntimeError('Duplicate mirror asset')
             if not matches:api(endpoint,{},file)
