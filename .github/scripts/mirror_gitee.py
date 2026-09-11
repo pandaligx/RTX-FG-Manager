@@ -83,8 +83,9 @@ def verify_remote(url,expected):
 
 
 def main():
-    if not os.environ.get('GITEE_TOKEN') or not os.environ.get('GITEE_USERNAME'):
-        raise RuntimeError('Configure repository secrets GITEE_TOKEN and GITEE_USERNAME; mirror has NOT completed')
+    if not os.environ.get('GITEE_TOKEN'):
+        raise RuntimeError('Configure repository secret GITEE_TOKEN; mirror has NOT completed')
+    os.environ.setdefault('GITEE_USERNAME',REPO.split('/')[0])
     tracked=set(subprocess.check_output(['git','ls-files','-z']).decode().split('\0'))-{''}
     if tracked!=ALLOWED:raise RuntimeError('Publication repository allowlist mismatch')
     tag=os.environ.get('TAG_NAME','')
