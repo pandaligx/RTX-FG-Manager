@@ -3,8 +3,11 @@
 [English](README.md) · [简体中文](README.zh-CN.md)
 
 <p align="center">
-  <img src="docs/screenshot-home-zh.png" alt="RTX 帧生成管理器主界面" width="820" />
+  <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png" alt="RTX 帧生成管理器主界面" width="820" />
 </p>
+
+图片无法显示？[在 Gitee 查看原图](https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png) · [国内文档镜像](https://gitee.com/pandaligx/RTX-FG-Manager/blob/main/README.zh-CN.md)
+
 <p align="center">
   <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="版本" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
   <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="下载量" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
