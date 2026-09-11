@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import time
+import http.client
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -72,12 +74,29 @@ def verify_remote(url,expected):
     parsed=urllib.parse.urlsplit(url)
     if parsed.scheme!='https' or parsed.username or parsed.password or parsed.hostname not in ('gitee.com','gitee.cn') and not (parsed.hostname or '').endswith('.gitee.com'):
         raise RuntimeError('Unsafe mirror asset URL')
-    h=hashlib.sha256();size=0
-    with urllib.request.urlopen(url,timeout=60) as response:
-        if not response.url.startswith('https://'):raise RuntimeError('Insecure mirror redirect')
-        while chunk:=response.read(1024*1024):
-            h.update(chunk);size+=len(chunk)
-            if size>expected.stat().st_size:raise RuntimeError('Mirror asset too large')
+    h=hashlib.sha256();size=0;expected_size=expected.stat().st_size
+    for attempt in range(4):
+        headers={'User-Agent':'RTXFG-Publication-Mirror','Accept-Encoding':'identity'}
+        if size:headers['Range']=f'bytes={size}-'
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=60) as response:
+                if not response.url.startswith('https://'):raise RuntimeError('Insecure mirror redirect')
+                if response.status==206:
+                    match=re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)',response.headers.get('Content-Range',''))
+                    if not match or tuple(map(int,match.groups()))!=(size,expected_size-1,expected_size):
+                        raise RuntimeError('Invalid mirror resume range')
+                elif response.status==200:
+                    h=hashlib.sha256();size=0
+                else:raise RuntimeError('Unexpected mirror download status')
+                while chunk:=response.read(256*1024):
+                    h.update(chunk);size+=len(chunk)
+                    if size>expected_size:raise RuntimeError('Mirror asset too large')
+                if size!=expected_size:raise ConnectionError('Incomplete mirror download')
+            break
+        except (TimeoutError,ConnectionError,urllib.error.URLError,http.client.IncompleteRead):
+            if attempt==3:raise
+            print(f'Mirror download interrupted at {size} bytes; retry {attempt+1}/3',flush=True)
+            time.sleep(2)
     if size!=expected.stat().st_size or h.hexdigest()!=digest(expected):
         raise RuntimeError('Mirror asset differs: '+expected.name)
 
@@ -122,6 +141,15 @@ def ensure_release(tag,release,commit):
     return remote
 
 
+def read_remote_tag(args,env):
+    for attempt in range(3):
+        try:return subprocess.check_output(args,env=env,text=True,timeout=60)
+        except subprocess.TimeoutExpired:
+            if attempt==2:raise
+            print('Gitee tag lookup timed out; retrying read-only query',flush=True)
+            time.sleep(2)
+
+
 def main():
     if not os.environ.get('GITEE_TOKEN'):
         raise RuntimeError('Configure repository secret GITEE_TOKEN; mirror has NOT completed')
@@ -139,8 +167,8 @@ def main():
         env=dict(os.environ,GIT_ASKPASS=str(askpass),GIT_TERMINAL_PROMPT='0')
         args=['git','-c','credential.helper=','push','https://gitee.com/'+REPO+'.git','refs/heads/main:refs/heads/main']
         if tag:
-            remote_refs=subprocess.check_output(['git','-c','credential.helper=','ls-remote',
-                'https://gitee.com/'+REPO+'.git',f'refs/tags/{tag}',f'refs/tags/{tag}^{{}}'],env=env,text=True,timeout=60)
+            remote_refs=read_remote_tag(['git','-c','credential.helper=','ls-remote',
+                'https://gitee.com/'+REPO+'.git',f'refs/tags/{tag}',f'refs/tags/{tag}^{{}}'],env)
             commit=subprocess.check_output(['git','rev-parse',f'{tag}^{{commit}}'],text=True).strip()
             if tag_push_required(remote_refs,tag,commit):args.append(f'refs/tags/{tag}:refs/tags/{tag}')
         subprocess.run(args,env=env,check=True,timeout=300)
