@@ -1,16 +1,18 @@
 Helper libraries used by this project
 
-Manager 3.7.0 distribution notes (2026-09-11)
+Manager 3.7.2 distribution notes (2026-09-12)
 The one-file Windows application includes CPython 3.12.14, Tcl/Tk, and the
 PyInstaller 6.22.2 bootloader. Their notices are included under
-app/assets/licenses inside the executable. Microsoft Fluent UI System Icons
-are used under MIT; notice: app/assets/FLUENT_LICENSE.txt.
-Icon source: https://github.com/microsoft/fluentui-system-icons
-GitHub mark: Primer Octicons (MIT), https://github.com/primer/octicons .
-Notice: app/assets/OCTICONS_LICENSE.txt. SVG source is retained alongside
-theme/DPI-specific PNG renderings; use of the mark does not imply endorsement.
+app/assets/licenses inside the executable.
+Interface and application icons now use Font Awesome Free 6.7.2 by Fonticons, Inc.
+https://fontawesome.com/ ; https://github.com/FortAwesome/Font-Awesome/tree/6.7.2
+SVG icons are licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Selected icons are recolored, centered and rendered to offline PNG/ICO resources.
+Checkbox indicators combine a rounded box with the Font Awesome check glyph.
+License copy: app/assets/FONTAWESOME_LICENSE.txt. Brand icons identify their services.
+Legacy Fluent UI System Icons / Primer Octicons assets and their MIT notices remain
+bundled for compatibility; they are not the active navigation icon set.
 
-The new left-navigation SVGs are original artwork distributed with the manager.
 The manager application is licensed under the accompanying MIT LICENSE.
 The following native-payload GPL notices describe separate payload code, not
 the Python manager. Third-party components retain their respective licenses.
@@ -29,8 +31,6 @@ OpenSSL 1.1.1w, c-ares 1.34.6, libssh2 1.11.1 and nghttp2 1.64.0.
 The exact dependency build/source records are also unavailable. These
 components retain their respective licenses. This release does not claim
 that unavailable corresponding source has been supplied or verified.
-This status supersedes the source-request note embedded at build time; the
-user-signed EXE was preserved byte for byte after signing.
 
 The optional Native 0.2.4 payload follows upstream commit
 5f62ff44a9c08f9841fa605e7b7160f79ccd2c40 at
@@ -85,3 +85,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+Experimental 5X/6X capability extension
+Based on the DLSSG-X6-experimental attachment by pipotoufikxyz-lgtm:
+https://github.com/sdli1995/dlssg_for_sm86/discussions/95
+Original repository: https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86
+This distribution combines its CPU frame-count extension with our Native024 Fix1 texture-view correction. The original model and GPU kernels are unchanged. Original authors and third-party rights remain unchanged. Experimental support is an upper limit requested by the game, not a new DLSS model or a guarantee of game compatibility.

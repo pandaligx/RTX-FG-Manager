@@ -28,6 +28,7 @@ Download the signed `RTXManager-v<version>-x64.exe` from a published release and
 - Left-side icon navigation with tooltips, light/dark/system themes and adaptable window layout.
 - Add game EXEs or scan a folder, drive or all drives. Game library and operation log stay together.
 - Native 0.2.4 Fix1 and the legacy R2/SM86 modes. Native supports `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`. Default: Native test mode with `version.dll`.
+- Optional separate Fix1 + 5X/6X experimental profile. 6X is a capability limit requested by the game, not an automatic game-menu addition; see release notes for validation scope.
 - Install and remove recognized project files, retaining unrelated or unidentified game files. INI edits do not prevent normal cleanup. Incomplete operations show a warning and remain in the log.
 - Background update checks and optional automatic downloads through embedded aria2. Installation needs confirmation. Download integrity and the manager publisher's Windows signature are verified before replacement; the previous EXE is retained as a rollback copy.
 
