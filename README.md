@@ -27,12 +27,26 @@ Download the signed `RTXManager-v<version>-x64.exe` from a published release and
 - Chinese, English, Russian, Japanese and Korean. First launch follows Windows language; a manual choice is saved. Change it with the globe button or in Settings.
 - Left-side icon navigation with tooltips, light/dark/system themes and adaptable window layout.
 - Add game EXEs or scan a folder, drive or all drives. Game library and operation log stay together.
-- Native 0.2.4 Fix1 and the legacy R2/SM86 modes. Native supports `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`. Default: Native test mode with `version.dll`.
-- Optional separate Fix1 + 5X/6X experimental profile. 6X is a capability limit requested by the game, not an automatic game-menu addition; see release notes for validation scope.
+- Default: **0.2.5 · DX12/Vulkan (Stable)** with `version.dll`. The legacy R2/SM86 modes remain as **Initial · First GitHub version**. Native supports `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`; select one proxy at a time.
+- Optional **0.2.4 · 5X/6X · DX12/Vulkan (Experimental)** profile. 6X is a capability limit requested by the game, not an automatic game-menu addition; see release notes for validation scope.
+- Help in five languages and hardware-accelerated GPU scheduling detection. Confirmed disabled systems receive a reminder; enabled systems receive no popup. Open Windows graphics settings directly from the app.
 - Install and remove recognized project files, retaining unrelated or unidentified game files. INI edits do not prevent normal cleanup. Incomplete operations show a warning and remain in the log.
 - Background update checks and optional automatic downloads through embedded aria2. Installation needs confirmation. Download integrity and the manager publisher's Windows signature are verified before replacement; the previous EXE is retained as a rollback copy.
 
+## Our additions, fixes and optimizations to the DLLs
+
+Based on `dlssg_for_sm86`, with these extensions maintained by 小南瓜:
+
+- **Compatibility fixes:** retain the RTX20 R2 adaptation. Native Fix1 corrects view formats for typeless textures, addressing the reproduced Naraka crash when entering a match with frame generation enabled.
+- **Vulkan support:** connect Vulkan resources to the DX12 inference backend with resource interoperability and synchronization. Each of the five proxies integrates the bridge into a single DLL.
+- **Transfer and scheduling optimizations:** GPU shared transfers, cached resource reuse and combined submissions reduce CPU image staging, repeated allocations and waits. A fallback remains when sharing requirements are unavailable.
+- **Experimental multipliers:** combine the community 5X/6X extension with Fix1 and Vulkan. Games must request these multipliers; Naraka's menu still stops at 4X.
+
+**0.2.5 is this project's extended compatibility version**, not an upstream release. The 310.1 model and native inference kernels are unchanged. Results depend on the game, GPU and driver; no fixed frame rate or universal compatibility is promised.
+
 ## Quick start
+
+First check hardware-accelerated GPU scheduling on Windows 10/11 using the app. If disabled, use **Open graphics settings** to enable it; restart Windows when prompted before testing frame generation.
 
 1. Completely exit the game. Add its actual EXE using **Add game**, or use the **Scan** arrow.
 2. Select the game, choose its GPU series and compatibility mode, and install the patch.
