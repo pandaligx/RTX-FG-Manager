@@ -34,7 +34,7 @@ Run the signed `RTXManager-v<version>-x64.exe` directly on Windows 10/11 x64. No
 - Single-game deployment avoids redundant confirmations; batch confirmation lists numbered targets. Errors and running-game blockers produce clear warnings.
 - Change/restore Windows GPU display names, with backup migration after driver updates on the same device, fresh driver-value preservation and rollback protection.
 - Help in five languages, shown on first use, and a Graphics settings shortcut. No recurring HAGS detection popup when selecting games.
-- Background update checks, optional automatic downloads through bundled aria2, checksum and publisher-signature verification, confirmed installation and a backup of the previous EXE.
+- Startup update checks with a centered new-version prompt. Bundled aria2 provides resumable downloads, a compact ring, size, speed and ETA. After choosing Download and update, the verified file replaces the app in its current folder under the new release filename and restarts it, retaining an old-version backup. Optional automatic downloads only prefetch; replacement still requires accepting the update.
 
 ## Frame-generation schemes
 
@@ -60,6 +60,8 @@ Based on [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86) Native 0.2
 
 The **310.1 model and native inference kernels are unchanged**. The scheme number does not mean a newer NVIDIA model. No fixed FPS or universal game compatibility is promised. See [Release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) for changes, validation scope and outstanding issues.
 
+**User-tested compatibility:** RTX20-series GPUs can now enable frame generation in Where Winds Meet; the previously missing option is confirmed resolved by the user. This feedback does not validate every GPU, driver or game version.
+
 ## Quick start
 
 1. Enable Hardware-accelerated GPU scheduling in Windows Settings → System → Display → Graphics → Change default graphics settings. Labels vary by Windows version. Use the app's Graphics settings shortcut and restart when Windows requests it.
@@ -74,7 +76,7 @@ GPU renaming only changes Windows display-name fields, not the actual GPU or CUD
 
 ## Upgrading from 3.7.4
 
-Upgrade directly to 4.0.8; intermediate builds are not required. Existing games, preferences and deployment records are retained. Old deployment badges are not falsely relabeled as 0.2.6. Diagnostic and compatibility-self-test panels have been removed; the activity log remains.
+Upgrade directly to the latest release; intermediate builds are not required. Existing games, preferences and deployment records are retained. Old deployment badges are not falsely relabeled as 0.2.6. Diagnostic and compatibility-self-test panels have been removed; the activity log remains.
 
 Preferences and games are stored in `%LOCALAPPDATA%\RTXFGManager`. Change language, theme and update source in Settings. Automatic checks are enabled by default; automatic downloads are off. Automatic routing uses the **Windows system region**: Gitee first for China, GitHub elsewhere, with manual selection and fallback for unavailable/outdated endpoints. This is not IP geolocation.
 
