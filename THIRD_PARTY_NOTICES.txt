@@ -1,21 +1,19 @@
 Helper libraries used by this project
 
-Manager 3.7.2 distribution notes (2026-09-12)
-The one-file Windows application includes CPython 3.12.14, Tcl/Tk, and the
-PyInstaller 6.22.2 bootloader. Their notices are included under
-app/assets/licenses inside the executable.
-Interface and application icons now use Font Awesome Free 6.7.2 by Fonticons, Inc.
-https://fontawesome.com/ ; https://github.com/FortAwesome/Font-Awesome/tree/6.7.2
-SVG icons are licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
-Selected icons are recolored, centered and rendered to offline PNG/ICO resources.
-Checkbox indicators combine a rounded box with the Font Awesome check glyph.
-License copy: app/assets/FONTAWESOME_LICENSE.txt. Brand icons identify their services.
-Legacy Fluent UI System Icons / Primer Octicons assets and their MIT notices remain
-bundled for compatibility; they are not the active navigation icon set.
-
-The manager application is licensed under the accompanying MIT LICENSE.
-The following native-payload GPL notices describe separate payload code, not
-the Python manager. Third-party components retain their respective licenses.
+Manager 4.0.8 distribution notes (2026-09-13)
+The manager is now a Rust native application using GPUI and gpui-component.
+It does not bundle a Python interpreter, Tcl/Tk or a PyInstaller bootloader.
+GPUI: https://github.com/zed-industries/zed (GPUI crate license: Apache-2.0).
+gpui-component and gpui-component-assets: https://github.com/longbridge/gpui-component
+(Apache-2.0). Component icons use the supplied Lucide assets (ISC).
+Service brand artwork identifies the corresponding service; it does not imply endorsement.
+Retained application/brand artwork derived from Font Awesome Free 6.7.2
+remains attributed to Fonticons, Inc. (SVG artwork: CC BY 4.0).
+https://github.com/FortAwesome/Font-Awesome/tree/6.7.2
+https://creativecommons.org/licenses/by/4.0/
+The manager application remains covered by the accompanying MIT LICENSE;
+dependencies retain their own licenses. Native payload notices apply to the
+separate payloads, not to the Rust manager.
 
 aria2 is a separate command-line downloader, called without an RPC server.
 This package includes the publisher's signed, custom build reporting 1.37.0.
@@ -92,3 +90,11 @@ Based on the DLSSG-X6-experimental attachment by pipotoufikxyz-lgtm:
 https://github.com/sdli1995/dlssg_for_sm86/discussions/95
 Original repository: https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86
 This distribution combines its CPU frame-count extension with our Native024 Fix1 texture-view correction. The original model and GPU kernels are unchanged. Original authors and third-party rights remain unchanged. Experimental support is an upper limit requested by the game, not a new DLSS model or a guarantee of game compatibility.
+
+
+Native 0.2.6 is a local compatibility-scheme version, based on Native 0.2.4,
+not an upstream model update. Stable and experimental proxies include local
+Fix1 texture handling, Vulkan resource interoperability/synchronization,
+shared-transfer and reuse optimizations, lazy D3D12 loading and process-lifetime
+retention. The embedded 310.1 model and inference kernels are unchanged.
+The initial R2/SM86 payloads are retained unchanged.
