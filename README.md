@@ -38,7 +38,7 @@ Run the signed `RTXManager-v<version>-x64.exe` directly on Windows 10/11 x64. No
 
 ## Cloud DLL resources
 
-Game DLLs are downloaded on demand for the selected scheme and proxy instead of embedded in the EXE. The China HTTPS file server is tried first, with GitHub fallback. Verified cached files work offline. Files are fully validated before deployment; uninstall does not require a network connection.
+Game DLLs are downloaded on demand for the selected scheme and proxy instead of embedded in the EXE. The China HTTPS file server is tried first. Bundled aria2 handles parallel transfers and download-host redirects, including a China-mirror compatibility retry before GitHub fallback. Verified cached files work offline. Files are fully validated before deployment; uninstall does not require a network connection.
 
 The catalog can update scheme names, versions, DLLs and INIs independently when using a supported deployment protocol. Updating the manager does not replace patches already installed in games: uninstall the previous patch before installing another version.
 
