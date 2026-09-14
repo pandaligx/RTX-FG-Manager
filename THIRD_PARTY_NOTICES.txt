@@ -1,6 +1,6 @@
 Helper libraries used by this project
 
-Manager 4.0.8 distribution notes (2026-09-13)
+Manager 4.1.0 distribution notes (2026-09-15)
 The manager is now a Rust native application using GPUI and gpui-component.
 It does not bundle a Python interpreter, Tcl/Tk or a PyInstaller bootloader.
 GPUI: https://github.com/zed-industries/zed (GPUI crate license: Apache-2.0).
@@ -30,14 +30,21 @@ The exact dependency build/source records are also unavailable. These
 components retain their respective licenses. This release does not claim
 that unavailable corresponding source has been supplied or verified.
 
-The optional Native 0.2.4 payload follows upstream commit
+The cloud-delivered Native 0.2.6 compatibility schemes are based on Native
+0.2.4 and follow upstream commit
 5f62ff44a9c08f9841fa605e7b7160f79ccd2c40 at
 https://github.com/sdli1995/dlssg_for_sm86 . Its additional attribution,
 including Coldwood1026 SM75 assets, is included under licenses/native.
 Native 0.2.4 Fix1 adds local host-side SRV/UAV format compatibility changes
 to five individually maintained proxies. Embedded models and kernels remain
 unchanged; the local modifications do not imply upstream endorsement.
-The original RTX20 SM75 R2 and RTX30 payloads remain separate choices.
+The original RTX20 SM75 R2 and RTX30 payloads remain separate cloud choices.
+The separately available upstream 0.3.0 / 310.9 packages are reproduced
+unchanged from the user-supplied upstream tree and keep the upstream
+self-signature. They are offered as SM86 / D3D12-only packages and do not
+include this project's SM75 or Vulkan compatibility changes. The 310.1
+upstream alternative is intentionally excluded.
+
 This manager update does not claim ownership of NVIDIA runtime/kernel/model
 material and does not grant new distribution rights to that material.
 

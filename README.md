@@ -36,17 +36,26 @@ Run the signed `RTXManager-v<version>-x64.exe` directly on Windows 10/11 x64. No
 - Help in five languages, shown on first use, and a Graphics settings shortcut. No recurring HAGS detection popup when selecting games.
 - Startup update checks with a centered new-version prompt. Bundled aria2 provides resumable downloads, a compact ring, size, speed and ETA. After choosing Download and update, the verified file replaces the app in its current folder under the new release filename and restarts it, retaining an old-version backup. Optional automatic downloads only prefetch; replacement still requires accepting the update.
 
+## Cloud DLL resources
+
+Game DLLs are downloaded on demand for the selected scheme and proxy instead of embedded in the EXE. The China HTTPS file server is tried first, with GitHub fallback. Verified cached files work offline. Files are fully validated before deployment; uninstall does not require a network connection.
+
+The catalog can update scheme names, versions, DLLs and INIs independently when using a supported deployment protocol. Updating the manager does not replace patches already installed in games: uninstall the previous patch before installing another version.
+
 ## Frame-generation schemes
 
 | Scheme | Graphics API | Maximum multiplier | Proxy choices |
 | --- | --- | --- | --- |
 | **0.2.6 Stable (default)** | DX12 / Vulkan | 4X | Five; version.dll selected by default |
 | **0.2.6 5X/6X Experimental** | DX12 / Vulkan | 6X | Five; version.dll selected by default |
+| **0.3.0 · github-9.14** | D3D12 / SM86 only | 6X, game-dependent | Six choices, single selection; 310.1 variant excluded |
 | Initial · First GitHub version | Original R2/SM86 capabilities | Depends on the original scheme/game | Only the supplied entries are shown |
 
-The five proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`. Test one at a time; selecting several can conflict and does not guarantee better compatibility. Each proxy includes the bridge, so no external `rtxfg_vk_bridge.dll` is needed. RTX 20 uses SM75; RTX 30 uses SM86.
+The five proxies in this project's 0.2.6 schemes are `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`. Test one at a time; selecting several can conflict and does not guarantee better compatibility. Each proxy includes the bridge, so no external `rtxfg_vk_bridge.dll` is needed. RTX 20 uses SM75; RTX 30 uses SM86.
 
 6X is a capability limit requested by the game; it **does not add game-menu options**. Naraka's menu remains limited to 4X even with the experimental scheme.
+
+Upstream 0.3.0 uses runtime 310.9 and retains its original self-signature. It does not include our SM75, Vulkan or game-specific fixes and is not offered as an RTX20/Vulkan scheme. Its proxies are `version.dll`, `winmm.dll`, `dbghelp.dll`, `dinput8.dll`, `dxgi.dll` and `d3d12.dll`. No DLL binaries were modified in this update.
 
 ## Changes to the upstream DLLs
 
@@ -58,7 +67,7 @@ Based on [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86) Native 0.2
 - **0.2.6 startup compatibility:** load D3D12 on demand to avoid premature access to uninitialized host Agility SDK information, addressing the Where Winds Meet startup regression. Process-lifetime protection also addresses immediate-unload crashes found in isolated tests.
 - **Experimental multipliers:** combine the community 5X/6X extension with Fix1, Vulkan and the new startup changes. The initial GitHub scheme remains unchanged.
 
-The **310.1 model and native inference kernels are unchanged**. The scheme number does not mean a newer NVIDIA model. No fixed FPS or universal game compatibility is promised. See [Release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) for changes, validation scope and outstanding issues.
+For this project's 0.2.6 schemes, the **310.1 model and native inference kernels are unchanged**. The scheme number does not mean a newer NVIDIA model. No fixed FPS or universal game compatibility is promised. See [Release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) for changes, validation scope and outstanding issues.
 
 **User-tested compatibility:** RTX20-series GPUs can now enable frame generation in Where Winds Meet; the previously missing option is confirmed resolved by the user. This feedback does not validate every GPU, driver or game version.
 
