@@ -48,14 +48,16 @@ The catalog can update scheme names, versions, DLLs and INIs independently when 
 | --- | --- | --- | --- |
 | **0.2.6 Stable (default)** | DX12 / Vulkan | 4X | Five; version.dll selected by default |
 | **0.2.6 5X/6X Experimental** | DX12 / Vulkan | 6X | Five; version.dll selected by default |
-| **0.3.0 · github-9.14** | D3D12 / SM86 only | 6X, game-dependent | Six choices, single selection; 310.1 variant excluded |
+| **0.3.1 · GitHub 9.15** | D3D12 / SM75 / SM86 | 6X, game-dependent | Six choices with multi-select; 310.1 variant excluded |
 | Initial · First GitHub version | Original R2/SM86 capabilities | Depends on the original scheme/game | Only the supplied entries are shown |
 
 The five proxies in this project's 0.2.6 schemes are `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`. Test one at a time; selecting several can conflict and does not guarantee better compatibility. Each proxy includes the bridge, so no external `rtxfg_vk_bridge.dll` is needed. RTX 20 uses SM75; RTX 30 uses SM86.
 
 6X is a capability limit requested by the game; it **does not add game-menu options**. Naraka's menu remains limited to 4X even with the experimental scheme.
 
-Upstream 0.3.0 uses runtime 310.9 and retains its original self-signature. It does not include our SM75, Vulkan or game-specific fixes and is not offered as an RTX20/Vulkan scheme. Its proxies are `version.dll`, `winmm.dll`, `dbghelp.dll`, `dinput8.dll`, `dxgi.dll` and `d3d12.dll`. No DLL binaries were modified in this update.
+Upstream 0.3.1 uses runtime 310.9 and fixes the upstream 0.3.0 failure to enable frame generation on RTX20/Turing. It supports SM75 and SM86 on D3D12, but does not include this project's Vulkan fixes. Its six proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `dbghelp.dll`, `dxgi.dll` and `d3d12.dll`. Multiple entries may be selected: the first loaded proxy is active and the rest only forward. The cloud DLLs were re-signed by this project's publisher.
+
+After selecting one game, Patch Settings can store its optimization mode, multiplier ceiling, UI recomposition preset and logging level independently. For an already deployed game, fully exit it and click Install again to update only these managed settings while retaining other advanced INI keys. A small question-mark button explains each setting.
 
 ## Changes to the upstream DLLs
 
