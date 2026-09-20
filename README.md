@@ -46,15 +46,15 @@ The catalog can update scheme names, versions, DLLs and INIs independently when 
 
 | Scheme | Graphics API | Parameters and proxies |
 | --- | --- | --- |
-| **0.3.5 · Github-9.20 (default)** | D3D12, SM75/SM86 | Six selectable proxies; default 4X, up to 6X where the game supports it |
+| **0.3.5 · DX12/Vulkan (default)** | DX12 / Vulkan, SM75/SM86 | This project's extension with the upstream 310.9 model; six selectable proxies, default 4X ceiling |
 | **0.2.6 · DX12/Vulkan** | DX12 / Vulkan | This project's stable scheme; five proxies, up to 4X |
 | **Initial · First GitHub release** | Original R2/SM86 capabilities | One scheme selects the correct version.dll and INI for RTX20/RTX30 |
 
 Upstream 0.3.5 uses model 310.9 and fixes selection of the wrong optimized kernel after feature recreation, which could corrupt frames or crash. It includes the 0.3.4 RTX30 architecture-reporting fix and the four optimization tiers introduced in 0.3.2. `Optimized=1` defaults to bit-exact optimization; 0 uses stock numerics, while 2/3 trade image quality for additional speed. These are [upstream findings](https://github.com/sdli1995/dlssg_for_sm86/releases/tag/0.3.5), not a claim that this project retested every game.
 
-Upstream offers `version.dll`, `winmm.dll`, `dinput8.dll`, `dbghelp.dll`, `dxgi.dll` and `d3d12.dll`. Prefer the first four; use the last two when needed. Only the first loaded proxy is active, with other proxies forwarding. Upstream does not include this project's Vulkan extension. The five 0.2.6 proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`; prefer one at a time. No external bridge DLL is needed.
+The six 0.3.5 proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `dbghelp.dll`, `dxgi.dll` and `d3d12.dll`. Start with `version.dll`. Prefer the first four; use the last two when needed and choose either `dxgi.dll` or `d3d12.dll`. Only the first loaded proxy is active, with other proxies forwarding. **This project's 0.3.5 · DX12/Vulkan adds Vulkan support to upstream 0.3.5; the original upstream version remains D3D12.** All six proxies include the bridge, with no external bridge DLL required. The five 0.2.6 proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`; prefer one at a time.
 
-The **Preset settings** accordion shows parameters for the chosen scheme; **?** opens contextual help. Upstream exposes kernel tiers, multiplier limit, UI recomposition and logs. Native 0.2.6 exposes multiplier, sampling and logs; Initial exposes enable, multiplier and logs. Choices are remembered per game and scheme; defaults are recommended. Exit the game and click Install to apply. If the same DLLs are installed, only managed keys change and other INI content is preserved. **A multiplier limit does not add game menus or guarantee proportional FPS.** The 0.2.6 Vulkan bridge logs remain independent of this setting.
+The **Preset settings** accordion shows parameters for the chosen scheme; **?** opens contextual help. The 0.3.5 scheme retains upstream kernel tiers, multiplier limit, UI recomposition and logs. Native 0.2.6 exposes multiplier, sampling and logs; Initial exposes enable, multiplier and logs. Choices are remembered per game and scheme; defaults are recommended. Exit the game and click Install to apply. If the same DLLs are installed, only managed keys change and other INI content is preserved. **A multiplier limit does not add game menus or guarantee proportional FPS.** The 0.3.5 ceiling can be set to 6X, but the game plugin determines the actual request. Delta Force is currently verified at 2X; raising this ceiling does not force 4X. The 0.2.6 Vulkan bridge logs remain independent of this setting. Detailed 0.3.5 bridge logging follows the configured level, while limited startup diagnostics remain independent.
 
 Downloads default to China first, with GitHub first available. The fixed catalog endpoint is `https://www.lgxng.cn/1814328088/g/new/catalog.json`. A concise catalog selects schemes and defaults; a versioned index supplies integrity metadata. Future releases using the same deployment and parameter protocols can update through the cloud alone. New protocols still require a manager update. Older clients retain their valid cached catalog; upgrading is recommended.
 
@@ -62,7 +62,16 @@ Settings can clear downloaded DLLs and update staging while preserving the libra
 
 ## Changes to the upstream DLLs
 
-Based on [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86) Native 0.2.4. **0.2.6 is this project's compatibility-scheme version, not an upstream release number.**
+**0.3.5 · DX12/Vulkan** builds on [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86) 0.3.5, retaining its **310.9 model and inference optimizations**, with these project additions:
+
+- **Vulkan frame-generation integration:** resource interoperability, GPU shared transfers, synchronization and fallback paths in all six proxies.
+- **Transfer and resource reuse:** shared resources and caches reduce CPU image staging and repeated waits; a compatibility path remains when sharing is unavailable.
+- **Delta Force RTX2070 compatibility:** addresses the disabled frame-generation switch on the tested RTX2070 Max-Q, limited to the confirmed device and game caller. It does not modify the registry or physical CUDA architecture. This game is currently verified at 2X only.
+- **Proxy compatibility guards:** each proxy retains system forwarding, active/standby behavior and disable-switch protection. All DLLs are signed.
+
+This is an independent cloud payload update; **the existing 4.2.0 manager EXE does not need replacing**. Reopen the manager to refresh the catalog, exit the game, uninstall the previous patch, then install the new scheme. See the [0.3.5 · DX12/Vulkan release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads-20260920-dx12-vulkan) for changes and test scope. Developer-machine regression tests do not validate every RTX20/30 GPU and game.
+
+**The retained 0.2.6 · DX12/Vulkan scheme** is based on upstream Native 0.2.4. **0.2.6 is this project's compatibility-scheme version, not an upstream release number.** It continues to provide:
 
 - **Fix1 texture compatibility:** correct typeless SRV/UAV view formats, addressing the reproduced Naraka crash when entering a match with frame generation enabled.
 - **Vulkan integration:** Vulkan resources, DX12 backend interoperability and synchronization, integrated into all five stable proxies.
