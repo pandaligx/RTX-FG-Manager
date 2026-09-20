@@ -34,7 +34,7 @@ Run the signed `RTXManager-v<version>-x64.exe` directly on Windows 10/11 x64. No
 - Single-game deployment avoids redundant confirmations; batch confirmation lists numbered targets. Errors and running-game blockers produce clear warnings.
 - Change/restore Windows GPU display names, with backup migration after driver updates on the same device, fresh driver-value preservation and rollback protection.
 - Help in five languages, shown on first use, and a Graphics settings shortcut. No recurring HAGS detection popup when selecting games.
-- Startup update checks with a centered new-version prompt. Bundled aria2 provides resumable downloads, a compact ring, size, speed and ETA. After choosing Download and update, the verified file replaces the app in its current folder under the new release filename and restarts it, retaining an old-version backup. Optional automatic downloads only prefetch; replacement still requires accepting the update.
+- Startup update checks with a centered new-version prompt. Bundled aria2 provides resumable downloads, a compact ring, size, speed and ETA. After choosing Download and update, the verified file replaces the app in its current folder under the new release filename and restarts it, deleting the old EXE after the new UI starts successfully. Optional automatic downloads only prefetch; replacement still requires accepting the update.
 
 ## Cloud DLL resources
 
@@ -42,32 +42,32 @@ Game DLLs are downloaded on demand for the selected scheme and proxy instead of 
 
 The catalog can update scheme names, versions, DLLs and INIs independently when using a supported deployment protocol. Updating the manager does not replace patches already installed in games: uninstall the previous patch before installing another version.
 
-## Frame-generation schemes
+## Schemes and preset settings
 
-| Scheme | Graphics API | Maximum multiplier | Proxy choices |
-| --- | --- | --- | --- |
-| **0.2.6 Stable (default)** | DX12 / Vulkan | 4X | Five; version.dll selected by default |
-| **0.2.6 5X/6X Experimental** | DX12 / Vulkan | 6X | Five; version.dll selected by default |
-| **0.3.1 · GitHub 9.15** | D3D12 / SM75 / SM86 | 6X, game-dependent | Six choices with multi-select; 310.1 variant excluded |
-| Initial · First GitHub version | Original R2/SM86 capabilities | Depends on the original scheme/game | Only the supplied entries are shown |
+| Scheme | Graphics API | Parameters and proxies |
+| --- | --- | --- |
+| **0.3.5 · Github-9.20 (default)** | D3D12, SM75/SM86 | Six selectable proxies; default 4X, up to 6X where the game supports it |
+| **0.2.6 · DX12/Vulkan** | DX12 / Vulkan | This project's stable scheme; five proxies, up to 4X |
+| **Initial · First GitHub release** | Original R2/SM86 capabilities | One scheme selects the correct version.dll and INI for RTX20/RTX30 |
 
-The five proxies in this project's 0.2.6 schemes are `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`. Test one at a time; selecting several can conflict and does not guarantee better compatibility. Each proxy includes the bridge, so no external `rtxfg_vk_bridge.dll` is needed. RTX 20 uses SM75; RTX 30 uses SM86.
+Upstream 0.3.5 uses model 310.9 and fixes selection of the wrong optimized kernel after feature recreation, which could corrupt frames or crash. It includes the 0.3.4 RTX30 architecture-reporting fix and the four optimization tiers introduced in 0.3.2. `Optimized=1` defaults to bit-exact optimization; 0 uses stock numerics, while 2/3 trade image quality for additional speed. These are [upstream findings](https://github.com/sdli1995/dlssg_for_sm86/releases/tag/0.3.5), not a claim that this project retested every game.
 
-6X is a capability limit requested by the game; it **does not add game-menu options**. Naraka's menu remains limited to 4X even with the experimental scheme.
+Upstream offers `version.dll`, `winmm.dll`, `dinput8.dll`, `dbghelp.dll`, `dxgi.dll` and `d3d12.dll`. Prefer the first four; use the last two when needed. Only the first loaded proxy is active, with other proxies forwarding. Upstream does not include this project's Vulkan extension. The five 0.2.6 proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`; prefer one at a time. No external bridge DLL is needed.
 
-Upstream 0.3.1 uses runtime 310.9 and fixes the upstream 0.3.0 failure to enable frame generation on RTX20/Turing. It supports SM75 and SM86 on D3D12, but does not include this project's Vulkan fixes. Its six proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `dbghelp.dll`, `dxgi.dll` and `d3d12.dll`. Multiple entries may be selected: the first loaded proxy is active and the rest only forward. The cloud DLLs were re-signed by this project's publisher.
+The **Preset settings** accordion shows parameters for the chosen scheme; **?** opens contextual help. Upstream exposes kernel tiers, multiplier limit, UI recomposition and logs. Native 0.2.6 exposes multiplier, sampling and logs; Initial exposes enable, multiplier and logs. Choices are remembered per game and scheme; defaults are recommended. Exit the game and click Install to apply. If the same DLLs are installed, only managed keys change and other INI content is preserved. **A multiplier limit does not add game menus or guarantee proportional FPS.** The 0.2.6 Vulkan bridge logs remain independent of this setting.
 
-After selecting one game, Patch Settings can store its optimization mode, multiplier ceiling, UI recomposition preset and logging level independently. For an already deployed game, fully exit it and click Install again to update only these managed settings while retaining other advanced INI keys. A small question-mark button explains each setting.
+Downloads default to China first, with GitHub first available. The fixed catalog endpoint is `https://www.lgxng.cn/1814328088/g/new/catalog.json`. A concise catalog selects schemes and defaults; a versioned index supplies integrity metadata. Future releases using the same deployment and parameter protocols can update through the cloud alone. New protocols still require a manager update. Older clients retain their valid cached catalog; upgrading is recommended.
+
+Settings can clear downloaded DLLs and update staging while preserving the library, settings and cleanup ownership records. DLLs must be downloaded again before offline installation. App updates delete the old EXE once the new UI starts successfully and restore it on failure; unrelated executables in the same folder are not scanned or removed.
 
 ## Changes to the upstream DLLs
 
 Based on [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86) Native 0.2.4. **0.2.6 is this project's compatibility-scheme version, not an upstream release number.**
 
 - **Fix1 texture compatibility:** correct typeless SRV/UAV view formats, addressing the reproduced Naraka crash when entering a match with frame generation enabled.
-- **Vulkan integration:** Vulkan resources, DX12 backend interoperability and synchronization, integrated into all five stable and experimental proxies.
+- **Vulkan integration:** Vulkan resources, DX12 backend interoperability and synchronization, integrated into all five stable proxies.
 - **Transfer/scheduling improvements:** GPU shared transfers, resource reuse and combined submissions reduce CPU image staging, allocation and waiting; a fallback remains for unavailable sharing capabilities.
 - **0.2.6 startup compatibility:** load D3D12 on demand to avoid premature access to uninitialized host Agility SDK information, addressing the Where Winds Meet startup regression. Process-lifetime protection also addresses immediate-unload crashes found in isolated tests.
-- **Experimental multipliers:** combine the community 5X/6X extension with Fix1, Vulkan and the new startup changes. The initial GitHub scheme remains unchanged.
 
 For this project's 0.2.6 schemes, the **310.1 model and native inference kernels are unchanged**. The scheme number does not mean a newer NVIDIA model. No fixed FPS or universal game compatibility is promised. See [Release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) for changes, validation scope and outstanding issues.
 
