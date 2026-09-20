@@ -1,116 +1,114 @@
 # RTX 帧生成管理器 · by小南瓜
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+**让 RTX 20 / 30 系列的帧生成补丁，更容易安装、调节和管理。**
 
-<p align="center">
-  <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png" alt="RTX 帧生成管理器主界面" width="820" />
-</p>
+Rust 核心 + GPUI 原生界面。一个 EXE，集中管理游戏、云端 DLL、预设参数与卸载恢复。
 
-图片无法显示？[在 Gitee 查看原图](https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png) · [国内文档镜像](https://gitee.com/pandaligx/RTX-FG-Manager/blob/main/README.zh-CN.md)
+[English](README.md) · **简体中文** · [国内下载 · Gitee](https://gitee.com/pandaligx/RTX-FG-Manager/releases) · [GitHub 下载](https://github.com/pandaligx/RTX-FG-Manager/releases/latest)
 
 <p align="center">
   <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="版本" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
   <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="下载量" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
-  <img alt="平台" src="https://img.shields.io/badge/platform-Windows_x64-0078D6?logo=windows&logoColor=white">
-  <img alt="开发语言" src="https://img.shields.io/badge/language-Rust-DEA584?logo=rust&logoColor=white">
-  <a href="LICENSE"><img alt="管理器许可" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-GPUI-DEA584?logo=rust&logoColor=white">
+  <a href="LICENSE"><img alt="管理器许可 MIT" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
 </p>
 
-管理 RTX 20/30 系列帧生成适配补丁的 Windows 工具，采用 **Rust 核心 + GPUI 原生界面**。本仓库是**软件发行仓库**，提供 EXE、文档、截图和更新附件，不公开管理器源码；第三方组件保留各自许可。
+<p align="center">
+  <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png" alt="RTX 帧生成管理器：左侧浅色、右侧深色主题对照" width="980" />
+</p>
 
-## 下载
+<p align="center">浅色 / 深色主题合成示意，基于实际界面与演示游戏列表。支持跟随系统主题。</p>
 
-- [GitHub Releases](https://github.com/pandaligx/RTX-FG-Manager/releases/latest)
-- [Gitee Releases · 国内镜像](https://gitee.com/pandaligx/RTX-FG-Manager/releases)
+## 为什么使用管理器
 
-下载已签名的 `RTXManager-v<版本>-x64.exe`，直接运行，无需安装 Python、Rust、CUDA Toolkit 或独立 aria2。支持 Windows 10/11 x64；帧生成兼容性取决于显卡、驱动和游戏。
+| 你要做的事 | 管理器帮你完成 |
+| --- | --- |
+| 找到游戏并安装补丁 | 目录、磁盘、全盘扫描，手动添加 EXE，单个或批量安装，直观看到已部署方案与入口 |
+| 获取合适的 DLL | 云端按需下载，国内优先、GitHub 备用；校验后缓存，已有缓存可离线复用 |
+| 调整效果与兼容性 | 按方案显示预设，游戏与方案分别记忆，点 **?** 查看说明，无需逐项手填 INI |
+| 更新与还原 | 启动检查更新，aria2 断点下载、速度与圆环进度；补丁按归属卸载，占用时明确提示重试 |
+| 日常使用 | 五语言、明暗主题、高 DPI 布局、后台任务、主页操作日志，关闭管理器后补丁仍生效 |
 
-## 主要功能
+**单文件运行，无需安装 Python、Rust、CUDA Toolkit 或独立 aria2。** 软件与本项目发布的 DLL 均提供数字签名。本仓库是**二进制发行仓库**，提供软件、文档和更新附件，不公开管理器源码；第三方组件保留各自许可。
 
-- 中文、英文、俄文、日文、韩语；默认跟随系统语言，在设置中手动选择后记忆。支持浅色、深色和跟随系统主题。
-- Rust 后台处理扫描、安装卸载、系统操作和更新；GPUI 原生界面及组件图标，支持窗口居中、系统缩放与布局适配。游戏图标优先读取高分辨率资源。
-- 扫描目录、磁盘或全盘，也可手动添加游戏 EXE。补充 Unreal、Unity、DLSS 组件识别线索；扫描结果不代表已经验证帧生成兼容。
-- 游戏库显示部署方案/入口标签，主页直接展示操作日志。点击游戏行选中当前游戏；前方复选框用于批量操作，两者独立。
-- 支持单个与批量安装、卸载、移出游戏库；右键打开目录或移除，双击打开目录。移出游戏库不等于卸载补丁。
-- 单个安装/卸载不再重复确认；批量操作显示编号目标列表。失败或游戏未退出会明确警告，不能当作操作成功。
-- 显卡页面支持修改/还原 Windows 显示名称。同一显卡更新驱动后可迁移备份，保留新驱动名称，并安全处理工具遗留的别名。
-- 五语言使用说明，首次使用自动展示；主页提供“图形设置”按钮。不会在每次选游戏时重复检测或弹出硬件加速 GPU 计划提醒。
-- 启动后台检查更新，有新版时居中提示；内置 aria2，支持断点续传、圆环进度、大小/速度/剩余时间。点击“下载并更新”后，校验摘要与发布者签名，自动在原目录替换、使用新版文件名并重启，新版界面启动成功后删除旧 EXE，启动失败则还原。可选自动下载仅提前下载，仍需确认本次更新后才替换。
+## 本项目在上游基础上增加了什么
 
-## 云端 DLL 资源
+原始帧生成能力来自 [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)。管理器同时保留上游原版和本项目扩展版，让你可以按游戏选择和回退。
 
-管理器不再内置游戏 DLL，首次安装按所选方案和入口下载对应压缩包。默认使用国内 HTTPS 文件服务器，失败后尝试 GitHub；DLL 包使用内置 aria2 处理多连接和下载站跳转，国内线路会先完成兼容重试，再进入 GitHub 回退。验证通过的缓存可离线复用。下载完成并校验后才写入游戏目录，卸载不依赖网络。
+### 0.3.5 · DX12/Vulkan 扩展版
 
-方案清单可独立更新名称、版本、DLL 和 INI；沿用支持的安装协议时，不必重新下载管理器。管理器升级不会自动替换游戏中已安装的补丁，切换版本仍需先卸载再安装。
+- **补上 Vulkan 接入**：增加资源互操作、GPU 共享传输、同步与兼容回退，桥接已合入六个代理，无需额外放一个桥接 DLL。
+- **减少传输开销**：复用共享资源与缓存，减少 CPU 图像中转、重复分配和等待；保留上游 **310.9 模型与推理优化**。
+- **三角洲 RTX20 / CMP40HX 专项**：针对已识别设备 ID 与指定游戏主模块进行资格兼容，保持真实 CUDA 架构、显存、LUID 和注册表不变。
+- **三角洲多帧选择**：在管理器内选跟随游戏、2X、3X、4X；3X/4X 使用匹配的私有运行时组件，**不覆盖游戏原有 `sl.*.dll`**。
+- **更完整的清理**：每个游戏拥有独立版本缓存。卸载同时处理已确认归属的 DLL、INI、日志和组件缓存，保留未知文件与原游戏文件。
 
-## 适配方案与预设参数
+### 保留 0.2.6 · DX12/Vulkan 兼容方案
 
-| 方案 | 图形接口 | 参数与入口 |
+基于上游 Native 0.2.4，保留 **310.1 模型**。包含永劫无间无类型纹理 Fix1、Vulkan 互操作与传输优化，以及针对燕云十六声启动回归的 D3D12 延迟加载和进程生命周期修复。**0.2.6 是本项目方案版本号。**
+
+用户已反馈永劫无间、三角洲、终末地、燕云十六声在相应测试配置下可用；三角洲 RTX2070 测试也反馈了帧率提升。不同显卡、驱动和游戏更新仍可能影响结果，**4X 不代表必然得到四倍 FPS，也不承诺延迟不变**。
+
+## 选择哪个方案
+
+| 方案 | 接口与用途 | DLL 入口 |
 | --- | --- | --- |
-| **0.3.5 · Github-9.20（默认）** | D3D12，SM75/SM86 | 上游原版，由本项目发布者签名；六入口可多选，默认倍率上限 4X |
-| **0.3.5 · DX12/Vulkan** | DX12 / Vulkan，SM75/SM86 | 本项目兼容扩展；独立方案，保留上游 310.9 模型及六个入口 |
-| **0.2.6 · DX12/Vulkan** | DX12 / Vulkan | 本项目正式方案，五入口；最高 4X |
-| **初始方案 · Github 第一版** | 原始 R2/SM86 能力 | 一个方案自动按 RTX20/RTX30 选择对应 version.dll 与 INI |
+| **0.3.5 · Github-9.20（默认）** | 上游原版，D3D12 / SM75、SM86，310.9 模型 | 六入口 |
+| **0.3.5 · DX12/Vulkan** | 本项目扩展；Vulkan 或三角洲专项 | 六入口 |
+| **0.2.6 · DX12/Vulkan** | 保留的兼容方案，310.1 模型 | 五入口 |
+| **初始方案 · Github 第一版** | 原始能力；按 RTX20 / RTX30 选择对应文件 | version.dll |
 
-上游 0.3.5 使用 310.9 模型，修复帧生成特性重建时误用优化内核造成的花屏、崩溃风险；同时包含 0.3.4 的 RTX30 架构识别修复和 0.3.2 起的四档优化。`Optimized=1` 默认逐位一致；0 为原厂数值，2/3 接受画质损失以进一步加速。以上是[上游发布说明](https://github.com/sdli1995/dlssg_for_sm86/releases/tag/0.3.5)及其测试结论，不代表本项目已重新完成所有游戏实测。
+两个 0.3.5 方案分开保留，**首次默认 Github 原版，之后记住你的选择**。“Github”是方案来源，不代表必须走国外下载线路。
 
-两个 0.3.5 方案独立保留，**默认选择 GitHub 原版**；需要 Vulkan 或本项目三角洲专项兼容时，选择 **0.3.5 · DX12/Vulkan**。GitHub 原版不包含这些扩展，下载线路仍可选国内优先，与方案名称无关。软件继续记住手动选择的方案。
+六入口：`version.dll`、`winmm.dll`、`dinput8.dll`、`dbghelp.dll`、`dxgi.dll`、`d3d12.dll`。建议先选一个 `version.dll`；支持多选，先加载的代理工作，其余转发。`dxgi.dll` 与 `d3d12.dll` 二选一。0.2.6 五入口为 version / winmm / dinput8 / winhttp / dxgi。
 
-0.3.5 六入口是 `version.dll`、`winmm.dll`、`dinput8.dll`、`dbghelp.dll`、`dxgi.dll`、`d3d12.dll`。建议先用 `version.dll`；前四种优先，后两种按需使用，`dxgi.dll` 与 `d3d12.dll` 二选一。多个入口中只有先加载的一个工作，其余转发。扩展版六入口均已集成 Vulkan 桥接，无需额外桥接 DLL。0.2.6 五入口为 `version.dll`、`winmm.dll`、`dinput8.dll`、`winhttp.dll`、`dxgi.dll`，建议每次选择一个。
+上游 0.3.5 本身修复了帧生成特性重建时误用优化内核导致的花屏、崩溃风险，详见[上游说明](https://github.com/sdli1995/dlssg_for_sm86/releases/tag/0.3.5)。这部分归功于上游，不是本项目新增 Vulkan 的内容。
 
-右侧 **预设参数** 折叠面板按方案显示选项，点 **?** 查看说明。0.3.5 沿用上游参数：内核档位、倍率上限、UI 重组及日志；0.2.6 提供倍率、采样与日志；初始方案提供启用、倍率与日志。参数按游戏及参数类型记忆；两个 0.3.5 方案采用同一套参数设置，保持默认即可。完全退出游戏后点安装应用；相同 DLL 只更新受管参数，保留其他 INI 内容。**倍率上限不会添加游戏菜单，也不保证帧率按倍数增长。** 0.3.5 可将上限调至 6X，但实际倍率仍由游戏插件请求；《三角洲》当前扩展版实测为 2X，不支持通过修改此上限强制 4X。0.2.6 Vulkan 桥接日志暂不受日志级别控制；0.3.5 扩展版的详细桥接日志遵循级别设置，少量启动诊断独立保留。
+## 三角洲：使用 2X / 3X / 4X
 
-云端默认国内优先，可选择 GitHub 优先。清单入口固定为 `https://www.lgxng.cn/1814328088/g/new/catalog.json`；简明清单负责方案与默认值，版本化索引负责文件完整性。以后同一参数/安装协议的版本可只更新云端，新增协议仍需升级管理器。旧版客户端会继续使用其有效缓存，建议升级管理器。
+使用 **4.2.1 或更新管理器**，完全退出游戏后：
 
-设置可清理已下载 DLL 与更新暂存，不删除游戏列表、参数或清理归属记录。清理后需要重新下载 DLL 才能离线安装。软件自动更新在新版界面成功启动后删除旧 EXE，失败时恢复旧版；不会扫描删除同目录其他 EXE。
+1. 添加实际游戏本体 `DeltaForceClient-Win64-Shipping.exe`，位于 `Binaries/Win64`。
+2. 选择 **0.3.5 · DX12/Vulkan** 与显卡系列，展开 **预设参数**。
+3. 在 **倍率上限** 中选跟随游戏 / 2X / 3X / **4X（默认）**，点击安装应用。
+4. 启动游戏，开启游戏内帧生成开关。切换倍率前先退出游戏，再应用设置。
 
-## 本项目对原有 DLL 的改进
+管理器联动同一份 INI，不需要手填专项键。跟随游戏/2X 保留原运行时；3X/4X 使用独立缓存。若原组件已提前加载，将保留原运行时以避免混版。**其他游戏不会启用此专项**，其通用倍率仍只是上限，不会自动增加游戏菜单。
 
-**0.3.5 · DX12/Vulkan** 基于 [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86) 0.3.5，保留其 **310.9 模型及推理优化**，由本项目增加：
+## 快速开始
 
-- **Vulkan 帧生成接入**：资源互操作、GPU 共享传输、同步与回退路径，集成到全部六个代理。
-- **传输与资源复用**：复用共享资源与缓存，减少 CPU 图像中转和重复等待；共享能力不可用时保留兼容路径。
-- **三角洲 RTX2070 兼容**：修复已测试 RTX2070 Max-Q 的帧生成开关灰色问题，限定于已确认设备和游戏调用范围，不修改注册表或真实 CUDA 架构。该游戏目前只验证到 2X。
-- **入口兼容保护**：各代理分别保留系统转发、主/待机机制及关闭开关保护；全部 DLL 已签名。
+1. 下载 `RTXManager-v<版本>-x64.exe`，在 Windows 10 / 11 x64 上运行，按提示授权所需操作。
+2. 点击主页 **图形设置**，在 Windows 设置 → 系统 → 屏幕 → 显示卡 → 更改默认图形设置中开启 **硬件加速 GPU 计划**，按系统提示重启。不同系统版本名称可能略有差异。
+3. 退出游戏，扫描或手动添加游戏本体 EXE，选择显卡系列、方案及入口，安装补丁。
+4. 在游戏内开启 DLSS 帧生成。点游戏行选择当前游戏，勾选复选框才进入批量操作。
+5. 更换补丁版本、方案或入口时，先卸载旧补丁，再安装新方案。管理器升级不会自动替换游戏中的 DLL。
 
-这是独立云端补丁更新，**现有 4.2.0 管理器无需更换 EXE**。重新打开管理器获取新目录，退出游戏后卸载旧补丁，再选择新方案安装。具体更新与测试范围见 [0.3.5 · DX12/Vulkan 发布说明](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads-20260920-dx12-vulkan)。开发机回归不能替代所有 RTX20/30 显卡与游戏实测。
+参数按 **游戏＋方案** 独立记忆。0.3.5 提供内核档位、倍率、UI 重组及日志；0.2.6 提供倍率、采样与日志；初始方案提供启用、倍率与日志。修改已识别部署的参数时保留其余 INI 内容及注释。0.2.6 的 Vulkan 桥接日志暂不受日志级别控制；0.3.5 扩展版详细日志遵循级别，少量启动诊断独立保留。
 
-**保留的 0.2.6 · DX12/Vulkan** 基于上游 Native 0.2.4；**0.2.6 是本项目方案版本，不是上游版本号**。它继续提供：
+## 卸载、缓存与更新
 
-- **纹理兼容（Fix1）**：修正无类型纹理的 SRV/UAV 视图格式处理，解决已复现的永劫无间开启帧生成后进对局崩溃。
-- **Vulkan 接入**：补充 Vulkan 资源接入、DX12 后端互操作与同步，集成至正式方案的全部五种代理。
-- **传输与调度优化**：GPU 共享传输、资源缓存复用、合并提交，减少 CPU 图像中转、重复分配和等待；不具备共享条件时保留回退路径。
-- **0.2.6 启动兼容修复**：延迟至实际需要时加载 D3D12，避免游戏 Agility SDK 信息尚未初始化时提前触发加载，针对燕云十六声启动回归；增加进程生命周期保护，修复测试中发现的刚加载即卸载崩溃。
+- **卸载补丁**：清理确认属于本项目的文件；支持手改 INI、多入口、重新签名后的已识别组件。游戏仍运行时会警告，不能视为卸载成功。
+- **缓存待清理**：若补丁已移除但缓存占用，保留重试记录，退出相关程序后再次卸载或使用设置中的 **清理缓存**。
+- **保留内容**：游戏文件、未知文件、游戏列表和偏好不随缓存清理删除；历史测试3还原备份不自动删除。移出游戏库也不等于卸载。
+- **独立缓存**：三角洲组件位于 `%LOCALAPPDATA%\RTXFG-Delta4X\games\<游戏标识>\<版本>`；管理器数据在 `%LOCALAPPDATA%\RTXFGManager`。
+- **云端资源**：固定清单为 [catalog.json](https://www.lgxng.cn/1814328088/g/new/catalog.json)，默认国内优先，失败回退 GitHub。相同安装协议的 DLL 可以独立更新。
+- **软件更新**：启动后台检查，下载后校验大小、SHA-256 与发布者签名，再按新版名称替换并重启；新界面启动成功后删除旧 EXE，失败则还原。自动下载仅预先下载，替换前仍需确认本次更新。
 
-**用户实测反馈**：RTX20 系列在《燕云十六声》中已可开启帧生成，此前缺少该选项的问题已确认解决；这是用户测试反馈，不代表所有显卡、驱动和游戏版本均已验收。
+软件更新的自动线路依据 Windows 系统地区：中国优先 Gitee，其他地区优先 GitHub，可在设置中修改；它与 DLL 下载线路独立。从 3.7.4 可直接升级，保留原游戏列表、偏好和部署记录。
 
-本项目 0.2.6 模型仍为 **310.1**，原生推理内核未更新。不能把本项目版本号理解成更新了 NVIDIA 模型，也不承诺固定帧率或所有游戏兼容。完整改动、测试范围与待验证问题见 [Release 更新说明](https://github.com/pandaligx/RTX-FG-Manager/releases/latest)。
+## 使用前了解
 
-## 简单使用
+帧生成需要游戏、驱动、系统和硬件配合；扫描发现游戏不代表已验证兼容。请遵守游戏规则，尤其确认带反作弊的游戏是否允许第三方补丁。显卡名称修改只改变 Windows 显示名称，不改变真实硬件能力，也不保证游戏采用这个名称。
 
-1. 在 Windows 设置 → 系统 → 屏幕 → 显示卡 → 更改默认图形设置中开启“硬件加速 GPU 计划”；不同系统版本名称略有差异。可点击主页“图形设置”，按 Windows 提示重启。
-2. 完全退出游戏，添加游戏本体 EXE，或通过扫描旁的箭头选择范围。手动添加允许更多 EXE 架构，但安装 x64 补丁时仍检查兼容性。
-3. 点击游戏行，选择显卡系列、方案和一个 DLL 入口，再安装补丁。批量处理时勾选多个游戏，核对编号名单。
-4. 启动游戏，在游戏内开启 DLSS 帧生成及其支持的倍率。关闭管理器不会影响已安装补丁。
-5. 切换方案或入口前，退出游戏、卸载旧补丁再安装。若提示游戏仍运行，代表尚未完成卸载，请退出后重试。
-
-卸载可识别本项目新旧补丁、修改过的 INI 和重新签名的已识别 DLL，保留游戏自带和未知文件。更新管理器**不会自动更新游戏中的 DLL**，需自行退出游戏并重新部署。
-
-显卡名称修改只影响 Windows 显示名称字段，不改变真实硬件或 CUDA 能力；游戏是否采用新名称取决于其读取方式，可能需要重启。换卡或无法可靠识别备份时仍保留保护。请遵守游戏规则，带反作弊的游戏应先确认是否允许第三方补丁。
-
-## 从 3.7.4 升级
-
-可直接升级到最新版，无需安装中间版本。保留已有游戏列表、偏好和部署记录；旧补丁标签不会因管理器升级而自动变成 0.2.6。诊断日志与兼容性自检面板已移除，主页操作日志保留。
-
-设置和游戏列表保存在 `%LOCALAPPDATA%\RTXFGManager`。语言、主题、更新线路等在设置页调整；默认自动检查更新、自动下载关闭。自动线路按 **Windows 系统地区**选择：中国优先 Gitee，其余地区优先 GitHub，也可手动指定；可用性或版本异常时尝试另一站点。这不是 IP 定位。
+支持简体中文、英语、俄语、日语、韩语，默认跟随系统并记住手动选择。完整版本变化见 [Release 更新日志](https://github.com/pandaligx/RTX-FG-Manager/releases/latest)。
 
 ## 致谢与联系
 
-- [Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86)：上游项目。
-- [pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86)：社区 5X/6X 扩展。
-- [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component)：原生界面与组件。
-- [aria2](https://github.com/aria2/aria2)：独立下载工具。
-- [哔哩哔哩 · 大大大怪将军阁下](https://space.bilibili.com/608531525)：协助测试。
-- [个人网站](https://lgxng.cn/) · [GitHub](https://github.com/pandaligx) · [哔哩哔哩](https://b23.tv/5mHCHFn)。
+[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [社区扩展 · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86) · [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component) · [aria2](https://github.com/aria2/aria2)
 
-许可与归属见 [第三方声明](THIRD_PARTY_NOTICES.txt)。管理器许可不改变 NVIDIA 或其他第三方材料的权利；本项目与 NVIDIA 或上游项目无官方隶属关系。
+感谢 [哔哩哔哩 · 大大大怪将军阁下](https://space.bilibili.com/608531525) 协助测试，以及提供兼容性反馈的用户。
+
+[个人网站](https://lgxng.cn/) · [GitHub · pandaligx](https://github.com/pandaligx) · [哔哩哔哩](https://b23.tv/5mHCHFn) · [第三方许可与归属](THIRD_PARTY_NOTICES.txt)
+
+本项目与 NVIDIA、游戏厂商或上游项目无官方隶属关系。管理器许可不改变第三方组件的权利。如果它帮到了你，欢迎点一个 **Star**。

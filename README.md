@@ -1,115 +1,114 @@
-# RTX Frame Generation Manager · by小南瓜
+# RTX Frame Generation Manager · by 小南瓜
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+**An easier way to install, tune and manage frame-generation patches for RTX 20 / 30 GPUs.**
 
-The screenshot shows the Chinese interface; English and three other UI languages are available in Settings.
+A Rust core with a native GPUI interface. One executable for your game library, cloud DLLs, per-game presets and patch removal.
 
-<p align="center">
-  <img src="docs/screenshot-home.png" alt="RTX Frame Generation Manager home screen" width="820" />
-</p>
+**English** · [简体中文](README.zh-CN.md) · [Download on GitHub](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) · [Gitee mirror](https://gitee.com/pandaligx/RTX-FG-Manager/releases)
+
 <p align="center">
   <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
   <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="downloads" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
-  <img alt="platform" src="https://img.shields.io/badge/platform-Windows_x64-0078D6?logo=windows&logoColor=white">
-  <img alt="language" src="https://img.shields.io/badge/language-Rust-DEA584?logo=rust&logoColor=white">
-  <a href="LICENSE"><img alt="manager license" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-GPUI-DEA584?logo=rust&logoColor=white">
+  <a href="LICENSE"><img alt="manager license MIT" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
 </p>
 
-A Windows frame-generation patch manager for RTX 20/30 GPUs, built with a **Rust core and native GPUI interface**. This is a **binary distribution repository** containing releases, documentation, screenshots and update assets. Manager source code is not published; third-party components retain their own licenses.
+<p align="center">
+  <img src="docs/screenshot-home.png" alt="RTX Frame Generation Manager: light theme on the left, dark theme on the right" width="980" />
+</p>
 
-## Download
+<p align="center">Composite theme preview based on the actual interface with demo game entries. System theme is also supported.</p>
 
-- [GitHub Releases](https://github.com/pandaligx/RTX-FG-Manager/releases/latest)
-- [Gitee Releases — China mirror](https://gitee.com/pandaligx/RTX-FG-Manager/releases)
+## What the manager handles
 
-Run the signed `RTXManager-v<version>-x64.exe` directly on Windows 10/11 x64. No Python, Rust, CUDA Toolkit or separate aria2 installation is required. Frame-generation compatibility depends on the GPU, driver and game.
+| Your task | Built-in support |
+| --- | --- |
+| Find games and deploy patches | Folder, drive and full-drive scans; manual EXE selection; individual or batch deployment with visible scheme and DLL tags |
+| Get the right DLL | On-demand cloud downloads, domestic-first routing with GitHub fallback, integrity checks and reusable offline cache |
+| Adjust compatibility and quality | Scheme-specific presets, separate settings for each game and scheme, and contextual **?** help |
+| Update or remove a patch | Startup update checks, resumable aria2 downloads, speed and compact circular progress; ownership-based cleanup and clear retry notices |
+| Use it every day | Five languages, light/dark themes, DPI-aware layout, background tasks and a visible operation log |
 
-## Features
+**Portable EXE. No Python, Rust, CUDA Toolkit or separate aria2 installation required.** Manager releases and project-distributed DLLs are digitally signed. This is a **binary distribution repository** containing releases, documentation and update assets; manager source code is not published. Third-party components retain their respective licenses.
 
-- Chinese, English, Russian, Japanese and Korean; follows the system language initially and remembers manual selection in Settings. Light, dark and system themes.
-- Rust background tasks for scanning, deployment, system operations and updates; native GPUI components/icons, centered launch, scaling-aware layout and higher-resolution executable icons.
-- Directory, drive and full-drive scans, plus manual EXE selection. Expanded Unreal, Unity and DLSS component discovery; discovery does not establish frame-generation compatibility.
-- Deployment badges in the game library and a persistent activity log. Clicking a row selects the current game; independent checkboxes select batch targets.
-- Single/batch installation, uninstall and removal from the library. Right-click to open a folder or remove a game; double-click to open its folder. Removing a library entry does not uninstall its patch.
-- Single-game deployment avoids redundant confirmations; batch confirmation lists numbered targets. Errors and running-game blockers produce clear warnings.
-- Change/restore Windows GPU display names, with backup migration after driver updates on the same device, fresh driver-value preservation and rollback protection.
-- Help in five languages, shown on first use, and a Graphics settings shortcut. No recurring HAGS detection popup when selecting games.
-- Startup update checks with a centered new-version prompt. Bundled aria2 provides resumable downloads, a compact ring, size, speed and ETA. After choosing Download and update, the verified file replaces the app in its current folder under the new release filename and restarts it, deleting the old EXE after the new UI starts successfully. Optional automatic downloads only prefetch; replacement still requires accepting the update.
+## What this project adds to upstream
 
-## Cloud DLL resources
+The original frame-generation implementation comes from [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86). The manager keeps both the upstream build and this project's extensions available, so you can select or revert per game.
 
-Game DLLs are downloaded on demand for the selected scheme and proxy instead of embedded in the EXE. The China HTTPS file server is tried first. Bundled aria2 handles parallel transfers and download-host redirects, including a China-mirror compatibility retry before GitHub fallback. Verified cached files work offline. Files are fully validated before deployment; uninstall does not require a network connection.
+### 0.3.5 · DX12/Vulkan extension
 
-The catalog can update scheme names, versions, DLLs and INIs independently when using a supported deployment protocol. Updating the manager does not replace patches already installed in games: uninstall the previous patch before installing another version.
+- **Vulkan integration:** resource interop, GPU-shared transfers, synchronization and compatible fallback paths. The bridge is merged into all six proxies; no separate bridge DLL is needed.
+- **Less transfer overhead:** shared-resource and cache reuse reduce CPU image transfers, repeated allocations and waits, while retaining upstream's **310.9 model and inference optimizations**.
+- **Delta Force RTX20 / CMP40HX compatibility:** eligibility adjustments for identified PCI IDs are scoped to the specified game's main module. Real CUDA architecture, VRAM, LUID and registry remain unchanged.
+- **Delta Force multiplier control:** follow game, 2X, 3X or 4X in the manager. The 3X/4X path uses matching private runtime components and **does not overwrite the game's original `sl.*.dll` files**.
+- **Owned per-game cleanup:** independent versioned caches, with removal of identified DLLs, INIs, logs and runtime components while preserving unknown and original game files.
 
-## Schemes and preset settings
+### Retained 0.2.6 · DX12/Vulkan option
 
-| Scheme | Graphics API | Parameters and proxies |
+Based on upstream Native 0.2.4 and the **310.1 model**. It includes the Naraka typeless-texture Fix1, Vulkan interop and transfer improvements, plus deferred D3D12 loading and lifecycle fixes for the Where Winds Meet startup regression. **0.2.6 is this project's scheme version.**
+
+Users have reported working configurations in Naraka, Delta Force, Arknights: Endfield and Where Winds Meet, including increased FPS in the RTX2070 Delta Force test. Results depend on hardware, drivers and game versions. **4X does not guarantee four times the FPS or unchanged latency.**
+
+## Choose a scheme
+
+| Scheme | API and purpose | Entry DLLs |
 | --- | --- | --- |
-| **0.3.5 · Github-9.20 (default)** | D3D12, SM75/SM86 | Original upstream build, signed by this publisher; six selectable proxies, default 4X ceiling |
-| **0.3.5 · DX12/Vulkan** | DX12 / Vulkan, SM75/SM86 | This project's separate compatibility extension; retains the upstream 310.9 model and six proxies |
-| **0.2.6 · DX12/Vulkan** | DX12 / Vulkan | This project's stable scheme; five proxies, up to 4X |
-| **Initial · First GitHub release** | Original R2/SM86 capabilities | One scheme selects the correct version.dll and INI for RTX20/RTX30 |
+| **0.3.5 · Github-9.20 — default** | Original upstream, D3D12 / SM75 and SM86, 310.9 model | Six |
+| **0.3.5 · DX12/Vulkan** | This project's Vulkan and Delta Force extensions | Six |
+| **0.2.6 · DX12/Vulkan** | Retained compatibility option, 310.1 model | Five |
+| **Initial · GitHub first release** | Original capabilities; files selected for RTX20 or RTX30 | version.dll |
 
-Upstream 0.3.5 uses model 310.9 and fixes selection of the wrong optimized kernel after feature recreation, which could corrupt frames or crash. It includes the 0.3.4 RTX30 architecture-reporting fix and the four optimization tiers introduced in 0.3.2. `Optimized=1` defaults to bit-exact optimization; 0 uses stock numerics, while 2/3 trade image quality for additional speed. These are [upstream findings](https://github.com/sdli1995/dlssg_for_sm86/releases/tag/0.3.5), not a claim that this project retested every game.
+**The original GitHub scheme remains the initial default; manual choices are remembered.** The scheme's name describes its origin, not its download route. A GitHub scheme can still be downloaded from the domestic server.
 
-Both 0.3.5 schemes remain available separately. **The original GitHub build is the default.** Choose **0.3.5 · DX12/Vulkan** for Vulkan or this project's Delta Force compatibility extension; those additions are not in the original build. The download route remains independently selectable, with China first available for either scheme. The app continues to remember manual scheme selections.
+The six entries are `version.dll`, `winmm.dll`, `dinput8.dll`, `dbghelp.dll`, `dxgi.dll` and `d3d12.dll`. Start with one, preferably `version.dll`. Multiple selection is supported; the first loaded proxy leads and the others forward calls. Choose either `dxgi.dll` or `d3d12.dll`, not both. The 0.2.6 entries are version / winmm / dinput8 / winhttp / dxgi.
 
-The six 0.3.5 proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `dbghelp.dll`, `dxgi.dll` and `d3d12.dll`. Start with `version.dll`. Prefer the first four; use the last two when needed and choose either `dxgi.dll` or `d3d12.dll`. Only the first loaded proxy is active, with other proxies forwarding. All six extended proxies include Vulkan bridging, with no external bridge DLL required. The five 0.2.6 proxies are `version.dll`, `winmm.dll`, `dinput8.dll`, `winhttp.dll` and `dxgi.dll`; prefer one at a time.
+Upstream 0.3.5 fixes optimized-kernel selection after feature recreation, which could cause corruption or crashes. See the [upstream release notes](https://github.com/sdli1995/dlssg_for_sm86/releases/tag/0.3.5). That fix belongs to upstream and is distinct from this project's Vulkan additions.
 
-The **Preset settings** accordion shows parameters for the chosen scheme; **?** opens contextual help. Both 0.3.5 schemes retain upstream kernel tiers, multiplier limit, UI recomposition and logs. Native 0.2.6 exposes multiplier, sampling and logs; Initial exposes enable, multiplier and logs. Choices are remembered per game and parameter profile; the two 0.3.5 schemes share the same preset settings. Defaults are recommended. Exit the game and click Install to apply. If the same DLLs are installed, only managed keys change and other INI content is preserved. **A multiplier limit does not add game menus or guarantee proportional FPS.** The 0.3.5 ceiling can be set to 6X, but the game plugin determines the actual request. The extended build is currently verified at 2X in Delta Force; raising this ceiling does not force 4X. The 0.2.6 Vulkan bridge logs remain independent of this setting. Detailed logging in the 0.3.5 Vulkan bridge follows the configured level, while limited startup diagnostics remain independent.
+## Delta Force: 2X / 3X / 4X
 
-Downloads default to China first, with GitHub first available. The fixed catalog endpoint is `https://www.lgxng.cn/1814328088/g/new/catalog.json`. A concise catalog selects schemes and defaults; a versioned index supplies integrity metadata. Future releases using the same deployment and parameter protocols can update through the cloud alone. New protocols still require a manager update. Older clients retain their valid cached catalog; upgrading is recommended.
+Use **Manager 4.2.1 or later** and exit the game first:
 
-Settings can clear downloaded DLLs and update staging while preserving the library, settings and cleanup ownership records. DLLs must be downloaded again before offline installation. App updates delete the old EXE once the new UI starts successfully and restore it on failure; unrelated executables in the same folder are not scanned or removed.
+1. Add the actual `DeltaForceClient-Win64-Shipping.exe` inside `Binaries/Win64`.
+2. Select **0.3.5 · DX12/Vulkan**, choose the GPU series and expand **Preset parameters**.
+3. Set the multiplier to follow game / 2X / 3X / **4X (default)**, then install/apply.
+4. Start the game and enable its frame-generation switch. Exit before applying another multiplier.
 
-## Changes to the upstream DLLs
+The manager updates the same INI automatically. Follow game and 2X retain the original runtime; 3X and 4X use the independent cache. If original components are already loaded, their runtime is retained to avoid mixed versions. **Other games do not enter this special path.** Their generic multiplier is a ceiling and cannot add new menu options.
 
-**0.3.5 · DX12/Vulkan** builds on [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86) 0.3.5, retaining its **310.9 model and inference optimizations**, with these project additions:
+## Get started
 
-- **Vulkan frame-generation integration:** resource interoperability, GPU shared transfers, synchronization and fallback paths in all six proxies.
-- **Transfer and resource reuse:** shared resources and caches reduce CPU image staging and repeated waits; a compatibility path remains when sharing is unavailable.
-- **Delta Force RTX2070 compatibility:** addresses the disabled frame-generation switch on the tested RTX2070 Max-Q, limited to the confirmed device and game caller. It does not modify the registry or physical CUDA architecture. This game is currently verified at 2X only.
-- **Proxy compatibility guards:** each proxy retains system forwarding, active/standby behavior and disable-switch protection. All DLLs are signed.
+1. Download `RTXManager-v<version>-x64.exe` and run it on Windows 10 / 11 x64. Allow permissions required for the requested operation.
+2. Use the home page's **Graphics settings** button. Under Windows Settings → System → Display → Graphics → Change default graphics settings, enable **Hardware-accelerated GPU scheduling** and restart if requested. Labels vary between Windows versions.
+3. Exit the game, scan or add its actual EXE, select the GPU series, scheme and entry DLL, then install.
+4. Enable DLSS frame generation in the game. Clicking a row selects the current game; checkboxes select batch targets.
+5. Uninstall the old patch before changing patch version, scheme or entry DLL. Updating the manager does not automatically replace DLLs already installed in games.
 
-This is an independent cloud payload update; **the existing 4.2.0 manager EXE does not need replacing**. Reopen the manager to refresh the catalog, exit the game, uninstall the previous patch, then install the new scheme. See the [0.3.5 · DX12/Vulkan release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads-20260920-dx12-vulkan) for changes and test scope. Developer-machine regression tests do not validate every RTX20/30 GPU and game.
+Settings are remembered per **game + scheme**. The 0.3.5 presets include kernel mode, multiplier, UI recomposition and logging; 0.2.6 exposes multiplier, sampling and logging; Initial exposes enablement, multiplier and logging. Updating an identified deployment's presets preserves unrelated INI content and comments. The 0.2.6 Vulkan bridge does not yet follow the INI logging level; detailed 0.3.5 bridge logs do, while limited startup diagnostics remain separate.
 
-**The retained 0.2.6 · DX12/Vulkan scheme** is based on upstream Native 0.2.4. **0.2.6 is this project's compatibility-scheme version, not an upstream release number.** It continues to provide:
+## Cleanup, caching and updates
 
-- **Fix1 texture compatibility:** correct typeless SRV/UAV view formats, addressing the reproduced Naraka crash when entering a match with frame generation enabled.
-- **Vulkan integration:** Vulkan resources, DX12 backend interoperability and synchronization, integrated into all five stable proxies.
-- **Transfer/scheduling improvements:** GPU shared transfers, resource reuse and combined submissions reduce CPU image staging, allocation and waiting; a fallback remains for unavailable sharing capabilities.
-- **0.2.6 startup compatibility:** load D3D12 on demand to avoid premature access to uninitialized host Agility SDK information, addressing the Where Winds Meet startup regression. Process-lifetime protection also addresses immediate-unload crashes found in isolated tests.
+- **Uninstall:** removes files identified as belonging to this project, including edited INIs, multiple proxies and recognized re-signed components. A game-running warning means the operation has not completed.
+- **Pending cache cleanup:** locked caches keep a retry record and an explicit partial-completion message. Close the relevant processes and retry uninstall or **Clear cache** in Settings.
+- **Preserved data:** original game files, unknown files, the game list and preferences are retained. Old test-3 restoration backups are not removed automatically. Removing a library entry is not uninstalling its patch.
+- **Independent storage:** Delta Force components use `%LOCALAPPDATA%\RTXFG-Delta4X\games\<game-id>\<version>`. Manager data uses `%LOCALAPPDATA%\RTXFGManager`.
+- **Cloud DLLs:** the fixed [catalog.json](https://www.lgxng.cn/1814328088/g/new/catalog.json) selects domestic-first downloads with GitHub fallback. Compatible payload protocols can update independently.
+- **App updates:** checks run in the background on startup. Downloads are checked for size, SHA-256 and publisher signature, then replace and restart the executable using its new versioned name. The old EXE is removed after successful UI startup; failed startup restores it. Automatic downloading only prefetches a release; applying it still requires confirmation.
 
-For this project's 0.2.6 schemes, the **310.1 model and native inference kernels are unchanged**. The scheme number does not mean a newer NVIDIA model. No fixed FPS or universal game compatibility is promised. See [Release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) for changes, validation scope and outstanding issues.
+Automatic app-update routing uses the Windows region: China prefers Gitee; other regions prefer GitHub. It is configurable and independent of DLL routing. Direct upgrades from 3.7.4 retain game lists, preferences and deployment records.
 
-**User-tested compatibility:** RTX20-series GPUs can now enable frame generation in Where Winds Meet; the previously missing option is confirmed resolved by the user. This feedback does not validate every GPU, driver or game version.
+## Compatibility notes
 
-## Quick start
+Frame generation depends on the game, driver, OS and GPU. Finding a game during scanning is not a compatibility verdict. Follow each game's rules, especially where anti-cheat is involved. GPU renaming changes Windows display-name fields, not hardware capability, and a game may read its device name differently.
 
-1. Enable Hardware-accelerated GPU scheduling in Windows Settings → System → Display → Graphics → Change default graphics settings. Labels vary by Windows version. Use the app's Graphics settings shortcut and restart when Windows requests it.
-2. Exit the game completely, then add its actual EXE or select a scan range using the arrow beside Scan. Manual library addition accepts more EXE architectures; installing an x64 patch still requires a compatible executable.
-3. Select the game row, GPU series, scheme and one proxy, then install. For batches, check the games and review the numbered list.
-4. Launch the game and enable its DLSS frame generation and supported multiplier. Closing the manager does not disable the deployed patch.
-5. Exit the game and uninstall before switching schemes or entries. A running-game warning means the uninstall has not completed.
+Chinese, English, Russian, Japanese and Korean are supported, with system-language detection and remembered manual choices. See [Release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) for version-specific changes.
 
-Cleanup recognizes known project files, edited INIs and re-signed known DLLs, while retaining unrelated and unknown files. **Updating the manager does not update DLLs already installed in games.** Exit the game and redeploy them separately.
+## Credits and links
 
-GPU renaming only changes Windows display-name fields, not the actual GPU or CUDA capabilities. Games may read other names; a restart may be required. Device changes and uncertain backups remain protected. Follow game rules and confirm whether third-party patches are permitted, especially with anti-cheat software.
+[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [Community extension · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86) · [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component) · [aria2](https://github.com/aria2/aria2)
 
-## Upgrading from 3.7.4
+Thanks to [大大大怪将军阁下 on Bilibili](https://space.bilibili.com/608531525) for testing, and to users who provide compatibility feedback.
 
-Upgrade directly to the latest release; intermediate builds are not required. Existing games, preferences and deployment records are retained. Old deployment badges are not falsely relabeled as 0.2.6. Diagnostic and compatibility-self-test panels have been removed; the activity log remains.
+[Website](https://lgxng.cn/) · [GitHub · pandaligx](https://github.com/pandaligx) · [Bilibili](https://b23.tv/5mHCHFn) · [Third-party notices](THIRD_PARTY_NOTICES.txt)
 
-Preferences and games are stored in `%LOCALAPPDATA%\RTXFGManager`. Change language, theme and update source in Settings. Automatic checks are enabled by default; automatic downloads are off. Automatic routing uses the **Windows system region**: Gitee first for China, GitHub elsewhere, with manual selection and fallback for unavailable/outdated endpoints. This is not IP geolocation.
-
-## Credits and contact
-
-- [Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86): upstream project.
-- [pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86): community 5X/6X extension.
-- [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component): native UI and components.
-- [aria2](https://github.com/aria2/aria2): independent downloader.
-- [Bilibili · 大大大怪将军阁下](https://space.bilibili.com/608531525): testing assistance.
-- [Website](https://lgxng.cn/) · [GitHub](https://github.com/pandaligx) · [Bilibili](https://b23.tv/5mHCHFn).
-
-See [third-party notices](THIRD_PARTY_NOTICES.txt). The manager license does not relicense NVIDIA or other third-party material. This project is not officially affiliated with NVIDIA or the upstream projects.
+Not affiliated with NVIDIA, game publishers or the upstream project. The manager's license does not change third-party rights. If this tool helps you, a **Star** is welcome.
