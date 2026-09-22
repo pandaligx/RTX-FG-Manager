@@ -36,7 +36,7 @@ Rust 核心 + GPUI 原生界面。一个 EXE，集中管理游戏、云端 DLL�
 
 原始帧生成能力来自 [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)。管理器同时保留上游原版和本项目扩展版，让你可以按游戏选择和回退。
 
-### 0.3.5 · DX12/Vulkan 扩展版
+### 0.3.5 · 三角洲专用 扩展版
 
 - **补上 Vulkan 接入**：增加资源互操作、GPU 共享传输、同步与兼容回退，桥接已合入六个代理，无需额外放一个桥接 DLL。
 - **减少传输开销**：复用共享资源与缓存，减少 CPU 图像中转、重复分配和等待；保留上游 **310.9 模型与推理优化**。
@@ -50,12 +50,21 @@ Rust 核心 + GPUI 原生界面。一个 EXE，集中管理游戏、云端 DLL�
 
 用户已反馈永劫无间、三角洲、终末地、燕云十六声在相应测试配置下可用；三角洲 RTX2070 测试也反馈了帧率提升。不同显卡、驱动和游戏更新仍可能影响结果，**4X 不代表必然得到四倍 FPS，也不承诺延迟不变**。
 
+## Dlssg-MFG-Vulkan
+
+独立集成 [pipotoufikxyz-lgtm 的 sm86-7 发布版](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-7)，只提供已签名的 `version.dll`。作者宣布新增 Vulkan（例如 RTX Remix），并注明 RTX20 尚未确认；不代表所有 Vulkan 游戏兼容。本方案与 Smooth Motion 分开，也不包含本项目三角洲专项。
+
+预设使用独立 INI 协议：`MaxInterpolatedFrames` 默认5（最高6X），`ForceMultiplier` 默认0（跟随游戏）；提供请求2X—6X、动态多帧及目标FPS、四项优化和日志开关。动态多帧仅适用于兼容DX12路径；请求不能被当作实际呈现倍率。优化保留作者默认，可能影响画质，需实测。
+
+原样保留 RenderScale、热键和其他高级键；不提供作者已记录GPU挂起的 Blackwell 实验开关。手改INI后可正常更新受管参数和卸载，未知文件仍保留。切换方案前先退出游戏并卸载旧补丁。
+
 ## 选择哪个方案
 
 | 方案 | 接口与用途 | DLL 入口 |
 | --- | --- | --- |
-| **0.3.5 · Github-9.20（默认）** | 上游原版，D3D12 / SM75、SM86，310.9 模型 | 六入口 |
-| **0.3.5 · DX12/Vulkan** | 本项目扩展；Vulkan 或三角洲专项 | 六入口 |
+| **0.3.5 · Github-sdli1995（默认）** | 上游原版，D3D12 / SM75、SM86，310.9 模型 | 六入口 |
+| **0.3.5 · 三角洲专用** | 本项目扩展；Vulkan 或三角洲专项 | 六入口 |
+| **Dlssg-MFG-Vulkan** | 上游 sm86-7，新增 Vulkan；RTX20待实测 | version.dll |
 | **0.2.6 · DX12/Vulkan** | 保留的兼容方案，310.1 模型 | 五入口 |
 | **初始方案 · Github 第一版** | 原始能力；按 RTX20 / RTX30 选择对应文件 | version.dll |
 
@@ -70,7 +79,7 @@ Rust 核心 + GPUI 原生界面。一个 EXE，集中管理游戏、云端 DLL�
 使用 **4.2.1 或更新管理器**，完全退出游戏后：
 
 1. 添加实际游戏本体 `DeltaForceClient-Win64-Shipping.exe`，位于 `Binaries/Win64`。
-2. 选择 **0.3.5 · DX12/Vulkan** 与显卡系列，展开 **预设参数**。
+2. 选择 **0.3.5 · 三角洲专用** 与显卡系列，展开 **预设参数**。
 3. 在 **倍率上限** 中选跟随游戏 / 2X / 3X / **4X（默认）**，点击安装应用。
 4. 启动游戏，开启游戏内帧生成开关。切换倍率前先退出游戏，再应用设置。
 
@@ -87,6 +96,8 @@ Rust 核心 + GPUI 原生界面。一个 EXE，集中管理游戏、云端 DLL�
 参数按 **游戏＋方案** 独立记忆。0.3.5 提供内核档位、倍率、UI 重组及日志；0.2.6 提供倍率、采样与日志；初始方案提供启用、倍率与日志。修改已识别部署的参数时保留其余 INI 内容及注释。0.2.6 的 Vulkan 桥接日志暂不受日志级别控制；0.3.5 扩展版详细日志遵循级别，少量启动诊断独立保留。
 
 ## 卸载、缓存与更新
+
+0.3.5原版和三角洲专用保留上游日志目录及空的CacheDirectory（使用用户目录缓存）。如旧版安装后《绝区零》崩溃，退出游戏，在新版中选择原方案和d3d12.dll，点击安装补丁重新应用；只修正管理器旧路径，保留自定义路径。共享运行时缓存不随单个游戏卸载。
 
 - **卸载补丁**：清理确认属于本项目的文件；支持手改 INI、多入口、重新签名后的已识别组件。游戏仍运行时会警告，不能视为卸载成功。
 - **缓存待清理**：若补丁已移除但缓存占用，保留重试记录，退出相关程序后再次卸载或使用设置中的 **清理缓存**。
@@ -105,7 +116,9 @@ Rust 核心 + GPUI 原生界面。一个 EXE，集中管理游戏、云端 DLL�
 
 ## 致谢与联系
 
-[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [社区扩展 · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86) · [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component) · [aria2](https://github.com/aria2/aria2)
+[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [社区扩展 · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version) · [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component) · [aria2](https://github.com/aria2/aria2)
+
+新增致谢：[哔哩哔哩 · 云外逸声](https://space.bilibili.com/256887068)。
 
 感谢 [哔哩哔哩 · 大大大怪将军阁下](https://space.bilibili.com/608531525) 协助测试，以及提供兼容性反馈的用户。
 

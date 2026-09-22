@@ -36,7 +36,7 @@ A Rust core with a native GPUI interface. One executable for your game library, 
 
 The original frame-generation implementation comes from [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86). The manager keeps both the upstream build and this project's extensions available, so you can select or revert per game.
 
-### 0.3.5 · DX12/Vulkan extension
+### 0.3.5 · Delta Force extension
 
 - **Vulkan integration:** resource interop, GPU-shared transfers, synchronization and compatible fallback paths. The bridge is merged into all six proxies; no separate bridge DLL is needed.
 - **Less transfer overhead:** shared-resource and cache reuse reduce CPU image transfers, repeated allocations and waits, while retaining upstream's **310.9 model and inference optimizations**.
@@ -50,12 +50,21 @@ Based on upstream Native 0.2.4 and the **310.1 model**. It includes the Naraka t
 
 Users have reported working configurations in Naraka, Delta Force, Arknights: Endfield and Where Winds Meet, including increased FPS in the RTX2070 Delta Force test. Results depend on hardware, drivers and game versions. **4X does not guarantee four times the FPS or unchanged latency.**
 
+## Dlssg-MFG-Vulkan
+
+An independent integration of [pipotoufikxyz-lgtm's sm86-7 release](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-7), with one signed `version.dll`. Upstream announces Vulkan support, including RTX Remix examples, but explicitly leaves RTX20 unconfirmed. This is not universal Vulkan compatibility, Smooth Motion, or this project's Delta Force integration.
+
+Its separate INI protocol uses `MaxInterpolatedFrames=5` (up to 6X) and `ForceMultiplier=0` (follow game). Presets expose requested 2X–6X, dynamic MFG and target FPS, four optimizations and an on/off log switch. Dynamic MFG requires a compatible DX12 path; requests do not prove actual presentation. Upstream optimization defaults are retained and may affect image quality.
+
+RenderScale, hotkeys and other advanced keys are preserved. Blackwell experimental toggles with upstream GPU-hang reports are not exposed. Managed edits preserve comments and unrelated INI keys; cleanup preserves unknown files. Exit the game and uninstall before switching schemes.
+
 ## Choose a scheme
 
 | Scheme | API and purpose | Entry DLLs |
 | --- | --- | --- |
-| **0.3.5 · Github-9.20 — default** | Original upstream, D3D12 / SM75 and SM86, 310.9 model | Six |
-| **0.3.5 · DX12/Vulkan** | This project's Vulkan and Delta Force extensions | Six |
+| **0.3.5 · Github-sdli1995 — default** | Original upstream, D3D12 / SM75 and SM86, 310.9 model | Six |
+| **0.3.5 · Delta Force** | This project's Vulkan and Delta Force extensions | Six |
+| **Dlssg-MFG-Vulkan** | Upstream sm86-7 adds Vulkan; RTX20 unverified | version.dll |
 | **0.2.6 · DX12/Vulkan** | Retained compatibility option, 310.1 model | Five |
 | **Initial · GitHub first release** | Original capabilities; files selected for RTX20 or RTX30 | version.dll |
 
@@ -70,7 +79,7 @@ Upstream 0.3.5 fixes optimized-kernel selection after feature recreation, which 
 Use **Manager 4.2.1 or later** and exit the game first:
 
 1. Add the actual `DeltaForceClient-Win64-Shipping.exe` inside `Binaries/Win64`.
-2. Select **0.3.5 · DX12/Vulkan**, choose the GPU series and expand **Preset parameters**.
+2. Select **0.3.5 · Delta Force**, choose the GPU series and expand **Preset parameters**.
 3. Set the multiplier to follow game / 2X / 3X / **4X (default)**, then install/apply.
 4. Start the game and enable its frame-generation switch. Exit before applying another multiplier.
 
@@ -87,6 +96,8 @@ The manager updates the same INI automatically. Follow game and 2X retain the or
 Settings are remembered per **game + scheme**. The 0.3.5 presets include kernel mode, multiplier, UI recomposition and logging; 0.2.6 exposes multiplier, sampling and logging; Initial exposes enablement, multiplier and logging. Updating an identified deployment's presets preserves unrelated INI content and comments. The 0.2.6 Vulkan bridge does not yet follow the INI logging level; detailed 0.3.5 bridge logs do, while limited startup diagnostics remain separate.
 
 ## Cleanup, caching and updates
+
+Both 0.3.5 schemes retain the upstream log directory and empty CacheDirectory (user cache). If an older installation crashes in Zenless Zone Zero, exit the game, select the same scheme and d3d12.dll, then install again. Only former manager paths are repaired; custom paths remain. Shared runtime caches are not removed when uninstalling one game.
 
 - **Uninstall:** removes files identified as belonging to this project, including edited INIs, multiple proxies and recognized re-signed components. A game-running warning means the operation has not completed.
 - **Pending cache cleanup:** locked caches keep a retry record and an explicit partial-completion message. Close the relevant processes and retry uninstall or **Clear cache** in Settings.
@@ -105,10 +116,12 @@ Chinese, English, Russian, Japanese and Korean are supported, with system-langua
 
 ## Credits and links
 
-[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [Community extension · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86) · [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component) · [aria2](https://github.com/aria2/aria2)
+[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [Community extension · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version) · [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component) · [aria2](https://github.com/aria2/aria2)
 
 Thanks to [大大大怪将军阁下 on Bilibili](https://space.bilibili.com/608531525) for testing, and to users who provide compatibility feedback.
 
 [Website](https://lgxng.cn/) · [GitHub · pandaligx](https://github.com/pandaligx) · [Bilibili](https://b23.tv/5mHCHFn) · [Third-party notices](THIRD_PARTY_NOTICES.txt)
 
 Not affiliated with NVIDIA, game publishers or the upstream project. The manager's license does not change third-party rights. If this tool helps you, a **Star** is welcome.
+
+Thanks also to [Bilibili · 云外逸声](https://space.bilibili.com/256887068).
