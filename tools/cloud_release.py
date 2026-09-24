@@ -229,10 +229,16 @@ class Publisher:
         self.gitee_token = os.environ.get("GITEE_TOKEN")
         require(self.github_token and self.gitee_token, "Both repository tokens must be supplied through the environment")
 
+    def public_gitee_resource_repository(self):
+        return json.loads(read_url(GT_RESOURCES))
+
     def ensure_gitee_resource_repository(self):
         print("[stage] Check isolated Gitee resource repository", flush=True)
         try:
-            repository = self.api("gitee", GT_RESOURCES)
+            # Public discovery must not be filtered by token-scoped visibility
+            # or a cached authenticated null response. Writes still require the
+            # configured token; this does not broaden its permissions.
+            repository = self.public_gitee_resource_repository()
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise
@@ -267,7 +273,7 @@ class Publisher:
         url = official_url(path if path.startswith("https://") else base + path)
         print("[api] " + (method or ("POST" if fields is not None or file else "GET")) + " " + public_location(url), flush=True)
         headers = {"User-Agent": "RTXFG-cloud-publisher", "Accept": "application/json"}
-        if host == "gitee" and url.startswith("https://gitee.com/api/v5/"):
+        if host == "gitee" and url == "https://gitee.com/api/v5/user":
             headers["Authorization"] = "Bearer " + self.gitee_token
         data = None
         if host == "github":
@@ -383,6 +389,36 @@ def local_archives(spec, folders):
     return result
 
 
+def known_archive_identities(root):
+    """Keep filenames immutable even if an attachment was replaced manually."""
+    paths = list((root / "cloud/indexes").glob("*.json"))
+    require(len(paths) <= 512, "Too many historical indexes to validate")
+    baseline = root / "rust/cloud-catalog.json"
+    if baseline.exists():
+        paths.append(baseline)
+    identities = {}
+    for path in paths:
+        require(path.stat().st_size <= MAX_JSON, "Historical index exceeds size limit")
+        document = json.loads(path.read_text(encoding="utf-8-sig"))
+        packages = document.get("packages")
+        require(isinstance(packages, list) and len(packages) <= 256, "Historical index packages are invalid")
+        for package in packages:
+            name = filename(package["archive"])
+            identity = (package["bytes"], package["sha256"])
+            require(type(identity[0]) is int and 0 < identity[0] <= MAX_ZIP and
+                    re.fullmatch(r"[0-9a-f]{64}", identity[1]), "Historical package identity is invalid")
+            require(name not in identities or identities[name] == identity,
+                    "Historical indexes conflict for immutable archive: " + name)
+            identities[name] = identity
+    return identities
+
+
+def verify_known_archives(archives, known):
+    for name, data in archives.items():
+        require(name not in known or known[name] == (len(data), digest(data)),
+                "Existing archive content changed; upload a new filename: " + name)
+
+
 def write_documents(out, documents):
     path, index, catalog = documents
     destination = out / path
@@ -463,6 +499,7 @@ def publish(args, spec):
                 asset = github_assets.get(name) or seed_assets.get(name)
                 require(asset is not None, "Upload the signed ZIP to the payloads prerelease first: " + name)
                 archives[name] = read_url(asset["browser_download_url"], MAX_ZIP)
+    verify_known_archives(archives, known_archive_identities(root))
     documents = build_documents(spec, archives)
     with tempfile.TemporaryDirectory(prefix="rtxfg-payloads-") as temp:
         for name, data in archives.items():
@@ -644,6 +681,7 @@ class OfflineTests(unittest.TestCase):
     def test_wrong_gitee_owner_does_not_create_repository(self):
         class Fake(Publisher):
             def __init__(self): self.calls = []
+            def public_gitee_resource_repository(self): return None
             def api(self, host, path, fields=None, file=None):
                 self.calls.append((path, fields))
                 return {"login": "someone-else"} if path.endswith("/user") else None
@@ -655,6 +693,7 @@ class OfflineTests(unittest.TestCase):
     def test_existing_private_resource_repository_is_never_changed(self):
         class Fake(Publisher):
             def __init__(self): self.calls = []
+            def public_gitee_resource_repository(self): return self.api("gitee", GT_RESOURCES)
             def api(self, host, path, fields=None, file=None):
                 self.calls.append((path, fields))
                 return {"full_name": GITEE_RESOURCE_REPO, "owner": {"login": "pandaligx"}, "private": True}
@@ -668,6 +707,12 @@ class OfflineTests(unittest.TestCase):
         self.assertFalse(catalog_promotion_allowed(b"generated", b"old", b"generated", lambda: False))
         self.assertTrue(catalog_promotion_allowed(b"generated", b"old", b"generated", lambda: True))
         self.assertTrue(catalog_promotion_allowed(None, None, b"generated", lambda: False))
+
+    def test_seed_cannot_reaccept_replaced_same_name_attachment(self):
+        verify_known_archives({"existing.zip": b"original"}, {"existing.zip": (8, digest(b"original"))})
+        with self.assertRaisesRegex(RuntimeError, "new filename"):
+            verify_known_archives({"existing.zip": b"modified"}, {"existing.zip": (8, digest(b"original"))})
+        verify_known_archives({"new-r2.zip": b"new signed bytes"}, {"existing.zip": (8, digest(b"original"))})
 
 
 def main():
