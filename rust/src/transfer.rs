@@ -297,9 +297,10 @@ fn preflight(url: &str, policy: UrlPolicy, cancel: &AtomicBool) -> Result<reqwes
         .head(initial.clone())
         .send()
         .map_err(checked_response)?;
-    // Some public CDNs reject HEAD while allowing ordinary anonymous GET. Do
+    // Gitee's public release API returns 401 to HEAD but allows anonymous GET.
+    // Some public CDNs likewise reject HEAD. No credentials are added. Do
     // not consume its body; aria2 receives the final checked URL below.
-    if matches!(response.status().as_u16(), 403 | 405 | 501) {
+    if matches!(response.status().as_u16(), 401 | 403 | 405 | 501) {
         response = client.get(initial).send().map_err(checked_response)?;
     }
     check_cancel(cancel)?;

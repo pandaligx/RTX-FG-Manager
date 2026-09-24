@@ -7,6 +7,7 @@ remote releases. No DLL is rebuilt, re-signed, installed in a game or overwritte
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 import hashlib
 import io
 import json
@@ -16,6 +17,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 import urllib.error
@@ -221,7 +223,15 @@ class SafeRedirect(urllib.request.HTTPRedirectHandler):
         return redirected
 
 
-OPENER = urllib.request.build_opener(SafeRedirect())
+HTTP_STATE = threading.local()
+
+
+def http_opener():
+    # urllib handlers keep request state; never share one handler chain between
+    # concurrent assets. Authentication remains scoped to each request.
+    if not hasattr(HTTP_STATE, "opener"):
+        HTTP_STATE.opener = urllib.request.build_opener(SafeRedirect())
+    return HTTP_STATE.opener
 
 
 def read_url(url, limit=MAX_JSON, headers=None):
@@ -229,7 +239,7 @@ def read_url(url, limit=MAX_JSON, headers=None):
     print("[read] GET " + public_location(url), flush=True)
     for retry in range(3):
         try:
-            with OPENER.open(request, timeout=90) as response:
+            with http_opener().open(request, timeout=90) as response:
                 official_url(response.url)
                 data = response.read(limit + 1)
                 require(len(data) <= limit, "Remote file exceeds size limit")
@@ -323,7 +333,8 @@ class Publisher:
         # Never automatically repeat an uncertain POST. A subsequent invocation
         # re-reads assets/releases and checks immutable contents before resuming.
         try:
-            with OPENER.open(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=900) as response:
+            with http_opener().open(urllib.request.Request(url, data=data, headers=headers, method=method),
+                                    timeout=900 if file else 90) as response:
                 body = response.read(MAX_JSON + 1)
                 require(len(body) <= MAX_JSON, "API response too large")
                 return json.loads(body) if body else None
@@ -504,6 +515,54 @@ def push(root, host, publisher):
         git(root, "-c", "credential.helper=", "push", f"https://{host}.com/{REPO}.git", "HEAD:refs/heads/main", env=env)
 
 
+def verify_asset_jobs(paths, verify, after_verified, workers=4):
+    """Bound concurrent *different* archives and promote only after all succeed.
+
+    An uncertain POST is never automatically retried. On error stop scheduling
+    new work, finish the bounded in-flight requests and leave metadata alone.
+    Re-running discovers already uploaded assets and checks their exact bytes.
+    """
+    require(isinstance(workers, int) and 1 <= workers <= 4, "Asset workers must be between 1 and 4")
+    paths = list(paths)
+    require(paths and len({path.name for path in paths}) == len(paths), "Asset jobs require unique filenames")
+    remaining = iter(paths)
+    failures, complete = [], 0
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="rtxfg-asset") as pool:
+        pending = {}
+        def schedule():
+            path = next(remaining, None)
+            if path is not None:
+                pending[pool.submit(verify, path)] = (path, time.monotonic())
+        for _ in range(min(workers, len(paths))):
+            schedule()
+        while pending:
+            done, _ = wait(pending, timeout=20, return_when=FIRST_COMPLETED)
+            if not done:
+                active = ", ".join(f"{path.name} ({int(time.monotonic() - started)}s)"
+                                   for path, started in pending.values())
+                print(f"[progress] Verified {complete}/{len(paths)} ZIPs; waiting: {active}", flush=True)
+                continue
+            for future in done:
+                path, started = pending.pop(future)
+                try:
+                    future.result()
+                    complete += 1
+                    print(f"[progress] Verified {complete}/{len(paths)} ZIPs: {path.name} ({time.monotonic() - started:.1f}s)", flush=True)
+                except Exception as error:
+                    # Exception messages from HTTP clients may contain signed
+                    # URLs; log only safe status/location or exception type.
+                    reason = (f"HTTP {error.code} at {public_location(error.url)}"
+                              if isinstance(error, urllib.error.HTTPError) else type(error).__name__)
+                    failures.append(path.name)
+                    print(f"[asset-error] {path.name}: {reason}; metadata will not be promoted", flush=True)
+            if not failures:
+                for _ in done:
+                    schedule()
+    require(not failures, "ZIP verification failed; rerun to resume immutable assets: " + ", ".join(failures))
+    require(complete == len(paths), "Incomplete asset verification; metadata unchanged")
+    return after_verified()
+
+
 def publish(args, spec):
     root = Path(args.root).resolve()
     require((root / ".git").exists(), "Publish only from the reviewed public repository checkout")
@@ -530,11 +589,18 @@ def publish(args, spec):
     verify_known_archives(archives, known_archive_identities(root))
     documents = build_documents(spec, archives)
     with tempfile.TemporaryDirectory(prefix="rtxfg-payloads-") as temp:
+        paths = []
         for name, data in archives.items():
             path = Path(temp) / name
             path.write_bytes(data)
+            paths.append(path)
+        def verify(path):
             for host in ("github", "gitee"):
                 publisher.ensure_asset(host, releases[host], path)
+        verify_asset_jobs(paths, verify, lambda: publish_metadata(root, publisher, documents), args.workers)
+
+
+def publish_metadata(root, publisher, documents):
     verify_catalog_gate(root, documents)
     # Every referenced ZIP now exists and was anonymously read back from both
     # sites. Only at this boundary may active metadata be written and committed.
@@ -812,6 +878,54 @@ class OfflineTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "only one proxy DLL"):
             validate_probe_zip("disguised-tool.zip", out.getvalue())
 
+    def test_concurrent_assets_are_bounded_and_all_precede_promotion(self):
+        paths = [Path(f"test-{index}.zip") for index in range(8)]
+        lock, barrier = threading.Lock(), threading.Barrier(4)
+        active, maximum, verified, promoted = 0, 0, [], []
+        def verify(path):
+            nonlocal active, maximum
+            with lock:
+                active += 1
+                maximum = max(maximum, active)
+            barrier.wait(timeout=5)
+            with lock:
+                active -= 1
+                verified.append(path.name)
+        def promote():
+            self.assertEqual(len(verified), len(paths))
+            self.assertEqual(active, 0)
+            promoted.append(True)
+        verify_asset_jobs(paths, verify, promote)
+        self.assertEqual(maximum, 4)
+        self.assertEqual(sorted(verified), sorted(path.name for path in paths))
+        self.assertEqual(promoted, [True])
+
+    def test_concurrent_failure_never_promotes_and_can_resume(self):
+        paths = [Path(f"test-{index}.zip") for index in range(4)]
+        barrier, lock, verified, promoted = threading.Barrier(4), threading.Lock(), set(), []
+        def verify(path):
+            barrier.wait(timeout=5)
+            if path == paths[1]:
+                raise RuntimeError("uncertain upload result")
+            with lock:
+                verified.add(path.name)
+        with self.assertRaisesRegex(RuntimeError, "rerun to resume"):
+            verify_asset_jobs(paths, verify, lambda: promoted.append(True))
+        self.assertEqual(promoted, [])
+        self.assertEqual(len(verified), 3)
+        # A rerun checks every immutable asset, including the uncertain upload;
+        # only the successful run reaches the metadata callback.
+        verify_asset_jobs(paths, lambda path: None, lambda: promoted.append(True))
+        self.assertEqual(promoted, [True])
+
+    def test_concurrent_duplicate_or_unbounded_work_is_rejected(self):
+        calls = []
+        for paths, workers in (([Path("same.zip"), Path("same.zip")], 4),
+                               ([Path("test.zip")], 5)):
+            with self.assertRaises(RuntimeError):
+                verify_asset_jobs(paths, lambda path: calls.append(path), lambda: calls.append("promote"), workers)
+        self.assertEqual(calls, [])
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -819,6 +933,8 @@ def main():
     parser.add_argument("--root", default=".")
     parser.add_argument("--schemes", default="cloud/schemes.json")
     parser.add_argument("--archives", action="append", default=[])
+    parser.add_argument("--workers", type=int, choices=range(1, 5), default=4,
+                        help="Maximum concurrent distinct DLL ZIPs (1-4)")
     parser.add_argument("--out", default="cloud-candidate")
     parser.add_argument("--seed-release", help="One-time import from an existing GitHub resource release")
     parser.add_argument("--source-tag")
