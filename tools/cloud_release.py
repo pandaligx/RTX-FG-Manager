@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from contextlib import nullcontext
 import hashlib
 import io
 import json
@@ -20,6 +21,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -214,6 +216,22 @@ def safe_error_fields(body, secrets):
     return result or {"message": "No public error fields"}
 
 
+def safe_exception(error):
+    if isinstance(error, urllib.error.HTTPError):
+        return f"HTTP {error.code} at {public_location(error.url)}"
+    # Our validation exceptions contain controlled diagnostic facts. Sanitize
+    # anyway so a future caller cannot expose a token or signed redirect URL.
+    if isinstance(error, RuntimeError):
+        secrets = tuple(os.environ.get(key) for key in ("GH_TOKEN", "GITHUB_TOKEN", "GITEE_TOKEN"))
+        fields = safe_error_fields(canonical({"message": str(error)}), secrets)
+        return type(error).__name__ + ": " + fields["message"]
+    return type(error).__name__
+
+
+class TransientResponse(RuntimeError):
+    """A bounded read returned a web/error page instead of the requested file."""
+
+
 class SafeRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         official_url(newurl)
@@ -224,6 +242,7 @@ class SafeRedirect(urllib.request.HTTPRedirectHandler):
 
 
 HTTP_STATE = threading.local()
+GITEE_READ_SLOTS = threading.BoundedSemaphore(2)
 
 
 def http_opener():
@@ -236,21 +255,39 @@ def http_opener():
 
 def read_url(url, limit=MAX_JSON, headers=None):
     request = urllib.request.Request(official_url(url), headers={"User-Agent": "RTXFG-cloud-publisher", **(headers or {})})
+    parsed = urllib.parse.urlsplit(url)
+    is_zip = parsed.path.lower().endswith(".zip")
+    is_json = "/api/" in parsed.path or parsed.path.lower().endswith(".json")
     print("[read] GET " + public_location(url), flush=True)
     for retry in range(3):
+        delay = 5 + retry * 10
         try:
-            with http_opener().open(request, timeout=90) as response:
-                official_url(response.url)
-                data = response.read(limit + 1)
-                require(len(data) <= limit, "Remote file exceeds size limit")
-                return data
+            with GITEE_READ_SLOTS if (parsed.hostname or "").endswith("gitee.com") else nullcontext():
+                with http_opener().open(request, timeout=90) as response:
+                    official_url(response.url)
+                    content_type = re.sub(r"[^A-Za-z0-9/;=_. -]", "", response.headers.get("Content-Type", ""))[:80]
+                    data = response.read(limit + 1)
+            prefix = data.lstrip()[:64].lower()
+            html = "text/html" in content_type.lower() or prefix.startswith((b"<!doctype html", b"<html"))
+            json_for_zip = is_zip and prefix.startswith((b"{", b"["))
+            if (html and (is_json or is_zip)) or json_for_zip:
+                raise TransientResponse(f"Received {'HTML' if html else 'JSON'} instead of {'ZIP' if is_zip else 'JSON'}; "
+                                        f"content_type={content_type}, bytes={len(data)}")
+            require(len(data) <= limit, f"Remote file exceeds size limit: limit={limit}, received_at_least={len(data)}")
+            return data
         except urllib.error.HTTPError as error:
             if error.code not in (429, 500, 502, 503, 504) or retry == 2:
                 raise
-        except (TimeoutError, urllib.error.URLError):
+            reason = safe_exception(error)
+            retry_after = error.headers.get("Retry-After", "") if error.headers else ""
+            if retry_after.isdigit():
+                delay = min(60, max(delay, int(retry_after)))
+        except (TimeoutError, urllib.error.URLError, TransientResponse) as error:
             if retry == 2:
                 raise
-        time.sleep(2 + retry * 2)
+            reason = safe_exception(error)
+        print(f"[read-retry] {public_location(url)}: {reason}; retry {retry + 2}/3 after {delay}s", flush=True)
+        time.sleep(delay)
     raise RuntimeError("Download retry limit reached")
 
 
@@ -394,12 +431,20 @@ class Publisher:
     def verify_asset(asset, data):
         url = asset.get("browser_download_url") or asset.get("download_url") or asset.get("url")
         actual = read_url(url, limit=len(data))
-        require(len(actual) == len(data) and digest(actual) == digest(data), "Remote same-name asset differs; refusing overwrite")
+        require(len(actual) == len(data) and digest(actual) == digest(data),
+                f"Remote same-name asset differs; refusing overwrite: expected_bytes={len(data)}, "
+                f"actual_bytes={len(actual)}, expected_sha256={digest(data)}, actual_sha256={digest(actual)}")
 
-    def ensure_asset(self, host, release, path):
+    def ensure_asset(self, host, release, path, snapshot=None):
         print(f"[stage] Check {host} attachment {path.name}", flush=True)
-        current = self.assets(host, release)
+        # One immutable inventory per publication avoids a pagination API call
+        # for every existing ZIP. It is never shared across publication runs.
+        current = self.assets(host, release) if snapshot is None else snapshot
         data = path.read_bytes()
+        if path.name not in current:
+            # Re-check immediately before any POST: an uncertain prior upload
+            # or an external publisher may have added the immutable name.
+            current = self.assets(host, release) if snapshot is not None else current
         if path.name not in current:
             print(f"[stage] Upload {host} attachment {path.name}", flush=True)
             if host == "github":
@@ -551,8 +596,7 @@ def verify_asset_jobs(paths, verify, after_verified, workers=4):
                 except Exception as error:
                     # Exception messages from HTTP clients may contain signed
                     # URLs; log only safe status/location or exception type.
-                    reason = (f"HTTP {error.code} at {public_location(error.url)}"
-                              if isinstance(error, urllib.error.HTTPError) else type(error).__name__)
+                    reason = safe_exception(error)
                     failures.append(path.name)
                     print(f"[asset-error] {path.name}: {reason}; metadata will not be promoted", flush=True)
             if not failures:
@@ -576,6 +620,7 @@ def publish(args, spec):
     # Gitee repository and no longer need a preliminary manager-repo push.
     releases = {host: publisher.ensure_release(host) for host in ("github", "gitee")}
     github_assets = publisher.assets("github", releases["github"])
+    asset_snapshots = {"github": github_assets, "gitee": publisher.assets("gitee", releases["gitee"])}
     seed = publisher.release("github", args.seed_release) if args.seed_release else None
     seed_assets = publisher.assets("github", seed) if seed else {}
     archives = local_archives(spec, args.archives)
@@ -596,7 +641,7 @@ def publish(args, spec):
             paths.append(path)
         def verify(path):
             for host in ("github", "gitee"):
-                publisher.ensure_asset(host, releases[host], path)
+                publisher.ensure_asset(host, releases[host], path, asset_snapshots[host])
         verify_asset_jobs(paths, verify, lambda: publish_metadata(root, publisher, documents), args.workers)
 
 
@@ -926,6 +971,84 @@ class OfflineTests(unittest.TestCase):
                 verify_asset_jobs(paths, lambda path: calls.append(path), lambda: calls.append("promote"), workers)
         self.assertEqual(calls, [])
 
+    def test_asset_snapshot_avoids_repeated_listing_and_never_skips_verification(self):
+        class Fake(Publisher):
+            def __init__(self): self.list_calls, self.verified = 0, []
+            def assets(self, host, release):
+                self.list_calls += 1
+                raise AssertionError("Existing snapshot must not query the API again")
+            def verify_asset(self, asset, data): self.verified.append((asset["name"], data))
+        with tempfile.TemporaryDirectory() as folder:
+            paths = [Path(folder) / f"test-{index}.zip" for index in range(3)]
+            for path in paths:
+                path.write_bytes(b"fixture")
+            snapshot = {path.name: {"name": path.name} for path in paths}
+            publisher = Fake()
+            for path in paths:
+                publisher.ensure_asset("gitee", {"id": 1}, path, snapshot)
+            self.assertEqual(publisher.list_calls, 0)
+            self.assertEqual(len(publisher.verified), 3)
+            self.assertEqual(len(snapshot), 3)
+
+    def test_snapshot_missing_name_is_rechecked_before_post(self):
+        class Fake(Publisher):
+            def __init__(self): self.list_calls, self.verified = 0, False
+            def assets(self, host, release):
+                self.list_calls += 1
+                return {"test.zip": {"name": "test.zip"}}
+            def verify_asset(self, asset, data): self.verified = True
+            def api(self, *args, **kwargs): raise AssertionError("Do not upload an existing same-name asset")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "test.zip"
+            path.write_bytes(b"fixture")
+            publisher = Fake()
+            publisher.ensure_asset("gitee", {"id": 1}, path, {})
+            self.assertEqual(publisher.list_calls, 1)
+            self.assertTrue(publisher.verified)
+
+    def test_real_asset_mismatch_is_not_retried_or_overwritten(self):
+        _, archives = self.fixture()
+        expected = next(iter(archives.values()))
+        different = bytearray(expected)
+        different[-1] ^= 1
+        with patch(__name__ + ".read_url", return_value=bytes(different)) as read:
+            with self.assertRaisesRegex(RuntimeError, "refusing overwrite.*expected_sha256=.*actual_sha256="):
+                Publisher.verify_asset({"url": "https://gitee.com/test.zip"}, expected)
+            self.assertEqual(read.call_count, 1)
+
+    def test_html_challenge_is_bounded_and_never_accepted_as_zip(self):
+        class Response:
+            url = "https://gitee.com/test.zip"
+            def __init__(self, data, content_type):
+                self.data, self.headers = data, {"Content-Type": content_type}
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, limit): return self.data[:limit]
+        class Opener:
+            def __init__(self, responses): self.responses, self.calls = iter(responses), 0
+            def open(self, *args, **kwargs):
+                self.calls += 1
+                return next(self.responses)
+        _, archives = self.fixture()
+        data = next(iter(archives.values()))
+        html = lambda: Response(b"<!DOCTYPE html><html>challenge</html>", "text/html")
+        opener = Opener([html(), Response(data, "application/zip")])
+        with patch(__name__ + ".http_opener", return_value=opener), patch(__name__ + ".time.sleep") as sleep:
+            self.assertEqual(read_url("https://gitee.com/test.zip", len(data)), data)
+            sleep.assert_called_once_with(5)
+        opener = Opener([html(), html(), html()])
+        with patch(__name__ + ".http_opener", return_value=opener), patch(__name__ + ".time.sleep"):
+            with self.assertRaisesRegex(TransientResponse, "Received HTML instead of ZIP"):
+                read_url("https://gitee.com/test.zip", len(data))
+            self.assertEqual(opener.calls, 3)
+
+    def test_runtime_error_diagnostic_redacts_tokens_and_queries(self):
+        with patch.dict(os.environ, {"GITEE_TOKEN": "fixture-token-not-real"}):
+            result = safe_exception(RuntimeError("fixture-token-not-real https://gitee.com/path?signature=private"))
+        self.assertNotIn("fixture-token-not-real", result)
+        self.assertNotIn("signature=", result)
+        self.assertIn("gitee.com/path", result)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -973,5 +1096,5 @@ if __name__ == "__main__":
         print(f"Cloud publication stopped: HTTP {error.code} at {public_location(error.url)}; active metadata was not promoted before asset verification.", file=sys.stderr)
         raise SystemExit(1) from None
     except Exception as error:
-        print(f"Cloud publication stopped: {type(error).__name__}: {error}", file=sys.stderr)
+        print(f"Cloud publication stopped: {safe_exception(error)}", file=sys.stderr)
         raise SystemExit(1) from None

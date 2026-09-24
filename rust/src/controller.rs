@@ -1215,11 +1215,17 @@ impl Controller {
             return;
         }
         let Some(m) = self.update.clone() else { return };
+        let preference = self.choice("download_source", "domestic");
         self.install_requested = install_requested;
         self.update_status = "正在连接下载服务器…".into();
         self.download_progress = updater::DownloadProgress {
             total: m.bytes,
-            source: m.source.clone(),
+            source: if preference == "github" {
+                "github"
+            } else {
+                "gitee"
+            }
+            .into(),
             ..Default::default()
         };
         self.update_busy = true;
@@ -1227,8 +1233,9 @@ impl Controller {
         let cancel = self.update_cancel.clone();
         let data = self.data.clone();
         self.channel.job(move |c| {
-            let result =
-                updater::download(&m, &data, &cancel, |p| c.send(Event::DownloadProgress(p)));
+            let result = updater::download_with_preference(&m, &data, &preference, &cancel, |p| {
+                c.send(Event::DownloadProgress(p))
+            });
             match result {
                 Ok(p) => c.send(Event::Download(p)),
                 Err(_) if cancel.load(Ordering::Relaxed) => {

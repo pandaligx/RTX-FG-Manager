@@ -8,6 +8,10 @@ Cloud migration is promoted only after both download mirrors have been verified.
 
 ### Downloads and updates
 
+- Apply the current route preference when downloading, even after checking on
+  another mirror. Handle public Gitee APIs that reject HEAD but accept anonymous
+  GET, so a working domestic endpoint is not incorrectly skipped.
+
 - Share one download preference across catalogs, patch ZIPs and EXE updates.
   New installations try domestic Gitee first; an explicit GitHub preference is
   remembered. Body downloads use the included aria2 downloader.

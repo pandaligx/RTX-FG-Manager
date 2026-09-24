@@ -136,17 +136,18 @@ fn release_with_cancel(source: &str, cancel: &AtomicBool) -> Result<Manifest> {
 pub fn check(choice: &str) -> Result<Option<Manifest>> {
     check_with_cancel(choice, &AtomicBool::new(false))
 }
-pub fn check_with_cancel(choice: &str, cancel: &AtomicBool) -> Result<Option<Manifest>> {
+fn source_order(choice: &str) -> [&'static str; 2] {
     // An explicit GitHub preference is retained; auto/legacy settings now use
     // domestic first, independent of Windows region or VPN configuration.
-    let first = if choice == "github" {
-        "github"
+    if choice == "github" {
+        ["github", "gitee"]
     } else {
-        "gitee"
-    };
-    let second = if first == "gitee" { "github" } else { "gitee" };
+        ["gitee", "github"]
+    }
+}
+pub fn check_with_cancel(choice: &str, cancel: &AtomicBool) -> Result<Option<Manifest>> {
     let mut errors = Vec::new();
-    for source in [first, second] {
+    for source in source_order(choice) {
         ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
         match release_with_cancel(source, cancel) {
             Ok(m) => return Ok((version(&m.version)? > version(crate::VERSION)?).then_some(m)),
@@ -162,14 +163,21 @@ fn mirror_release(m: &Manifest, source: &str, cancel: &AtomicBool) -> Result<Man
         "https://{source}.com/{REPO}/releases/download/v{}",
         m.version
     );
-    let mut other: Manifest = serde_json::from_value(get_json_with_cancel(
+    let other: Manifest = serde_json::from_value(get_json_with_cancel(
         &format!("{base}/update.json"),
         cancel,
     )?)?;
+    matching_mirror(m, source, other)
+}
+fn matching_mirror(m: &Manifest, source: &str, mut other: Manifest) -> Result<Manifest> {
+    ensure!(["github", "gitee"].contains(&source), "更新来源无效");
     other.validate(&m.version)?;
     ensure!(m.same_file(&other), "更新附件尚未同步完成");
     other.source = source.into();
-    other.url = format!("{base}/{}", m.file);
+    other.url = format!(
+        "https://{source}.com/{REPO}/releases/download/v{}/{}",
+        m.version, m.file
+    );
     Ok(other)
 }
 pub fn verify(path: &Path, m: &Manifest) -> Result<()> {
@@ -255,6 +263,18 @@ pub fn download(
     m: &Manifest,
     data: &Path,
     cancel: &AtomicBool,
+    progress: impl FnMut(DownloadProgress),
+) -> Result<PathBuf> {
+    download_with_preference(m, data, &m.source, cancel, progress)
+}
+/// Apply the current preference to each new download attempt, even when the
+/// checked manifest came from another source. A mirror must identify the same
+/// version, size and hash before any executable is downloaded from it.
+pub fn download_with_preference(
+    m: &Manifest,
+    data: &Path,
+    preference: &str,
+    cancel: &AtomicBool,
     mut progress: impl FnMut(DownloadProgress),
 ) -> Result<PathBuf> {
     m.validate(&m.version)?;
@@ -280,31 +300,33 @@ pub fn download(
         ..Default::default()
     };
     let mut errors = Vec::new();
-    for fallback in [false, true] {
+    for (index, source) in source_order(preference).into_iter().enumerate() {
         ensure!(!cancel.load(Ordering::Relaxed), "更新下载已取消");
-        let active = if fallback {
+        if index > 0 {
             progress(DownloadProgress {
                 phase: DownloadPhase::Switching,
+                source: source.into(),
                 detail: "首选线路下载失败，正在核对备用文件".into(),
                 ..last_progress.clone()
             });
-            match mirror_release(
-                m,
-                if m.source == "gitee" {
-                    "github"
-                } else {
-                    "gitee"
-                },
-                cancel,
-            ) {
+        }
+        let active = if source == m.source {
+            m.clone()
+        } else {
+            if index == 0 {
+                progress(DownloadProgress {
+                    source: source.into(),
+                    phase: DownloadPhase::Connecting,
+                    ..last_progress.clone()
+                });
+            }
+            match mirror_release(m, source, cancel) {
                 Ok(other) => other,
                 Err(_) => {
-                    errors.push("备用线路尚未同步完整".to_owned());
-                    break;
+                    errors.push(format!("{source}: 更新附件尚未同步完成"));
+                    continue;
                 }
             }
-        } else {
-            m.clone()
         };
         let request = crate::transfer::Request {
             sources: vec![crate::transfer::Source {
@@ -598,6 +620,67 @@ mod download_tests {
     use super::*;
     use crate::transfer::Readout;
     use std::io::Write;
+
+    fn checked_github_manifest() -> Manifest {
+        Manifest {
+            schema: 1,
+            version: "4.2.4".into(),
+            file: "RTXManager-v4.2.4-x64.exe".into(),
+            sha256: "a".repeat(64),
+            bytes: 32 * 1024 * 1024,
+            source: "github".into(),
+            url: format!(
+                "https://github.com/{REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
+            ),
+        }
+    }
+
+    #[test]
+    fn changed_preference_selects_domestic_without_rewriting_checked_identity() -> Result<()> {
+        let checked = checked_github_manifest();
+        let original = checked.clone();
+        assert_eq!(source_order("github"), ["github", "gitee"]);
+        // The check has already completed on GitHub. A later source change
+        // (including a cancelled download's retry) must not use checked.source.
+        for current_preference in ["domestic", "gitee", "auto"] {
+            let [first, fallback] = source_order(current_preference);
+            assert_eq!((first, fallback), ("gitee", "github"));
+            let mut mirror_json = checked.clone();
+            mirror_json.source.clear();
+            mirror_json.url.clear();
+            let active = matching_mirror(&checked, first, mirror_json)?;
+            assert_eq!(active.source, "gitee");
+            assert_eq!(
+                active.url,
+                format!(
+                    "https://gitee.com/{REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
+                )
+            );
+            assert!(checked.same_file(&active));
+            assert_eq!(checked, original); // Existing verified cache identity is unchanged.
+        }
+        assert_eq!(source_order("github")[0], "github");
+        Ok(())
+    }
+
+    #[test]
+    fn preferred_mirror_must_match_checked_version_size_and_digest() -> Result<()> {
+        let checked = checked_github_manifest();
+        let mut other = checked.clone();
+        other.sha256 = "b".repeat(64);
+        assert!(matching_mirror(&checked, "gitee", other).is_err());
+        let mut other = checked.clone();
+        other.bytes += 1;
+        assert!(matching_mirror(&checked, "gitee", other).is_err());
+        let mut other = checked.clone();
+        other.version = "4.2.5".into();
+        other.file = "RTXManager-v4.2.5-x64.exe".into();
+        assert!(matching_mirror(&checked, "gitee", other).is_err());
+        let mut other = checked.clone();
+        other.sha256.make_ascii_uppercase();
+        assert!(checked.same_file(&matching_mirror(&checked, "gitee", other)?));
+        Ok(())
+    }
 
     #[test]
     fn readout_tracks_real_bytes_and_speed_with_fragmented_lines() -> Result<()> {
