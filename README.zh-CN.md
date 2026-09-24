@@ -130,4 +130,4 @@
 
 Rust 管理器源码按仓库许可证公开；[构建说明](BUILDING.md) 记录固定工具链、第三方工具校验和检查命令，可在另一台 Windows 电脑拉取后构建。游戏 DLL 保持各自上游归属，本仓库不包含私有 DLL 补丁源码或 NVIDIA SDK。
 
-云端日常维护编辑 [cloud/schemes.json](cloud/schemes.json)，添加资源时使用固定 `payloads` 预发行记录与新的不可变文件名。同步任务校验两站附件后生成索引，最后更新 `cloud/catalog.json`；不用再手工上传私人网盘。步骤见 [云端维护说明](docs/cloud-publishing.md)。旧资源保留给旧客户端，管理器不会自动删除游戏里的补丁。
+云端日常维护编辑 [cloud/schemes.json](cloud/schemes.json)，新资源上传到 GitHub 固定 `payloads` 预发行并使用新的不可变文件名；自动任务同步到 Gitee 独立资源库，避免影响旧客户端查询管理器最新版本。两站回下载验证后生成索引，最后更新 `cloud/catalog.json`；不用再手工上传私人网盘。步骤见 [云端维护说明](docs/cloud-publishing.md)。旧资源保留给旧客户端，管理器不会自动删除游戏里的补丁。
