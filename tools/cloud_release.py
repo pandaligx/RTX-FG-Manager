@@ -25,12 +25,14 @@ import uuid
 import zipfile
 
 REPO = "pandaligx/RTX-FG-Manager"
+GITEE_RESOURCE_REPO = "pandaligx/RTX-FG-Manager-payloads"
 RESOURCE_TAG = "payloads"
 MAX_ZIP = 128 * 1024 * 1024
 MAX_JSON = 1024 * 1024
 PROXIES = {"version.dll", "winmm.dll", "dinput8.dll", "dbghelp.dll", "dxgi.dll", "d3d12.dll", "winhttp.dll"}
 GH = f"https://api.github.com/repos/{REPO}"
 GT = f"https://gitee.com/api/v5/repos/{REPO}"
+GT_RESOURCES = f"https://gitee.com/api/v5/repos/{GITEE_RESOURCE_REPO}"
 GH_RAW = f"https://raw.githubusercontent.com/{REPO}/main/"
 GT_RAW = f"https://gitee.com/{REPO}/raw/main/"
 
@@ -166,7 +168,7 @@ def build_documents(spec, archives):
     revision = "r-" + digest(canonical(spec) + index)[:20]
     index_path = f"cloud/indexes/payload-index-{revision}.json"
     catalog = {"schema": 2, "revision": revision, "default_scheme": spec["default_scheme"],
-               "sources": {"domestic": {"base_url": f"https://gitee.com/{REPO}/releases/download/{RESOURCE_TAG}/"},
+               "sources": {"domestic": {"base_url": f"https://gitee.com/{GITEE_RESOURCE_REPO}/releases/download/{RESOURCE_TAG}/"},
                            "github": {"base_url": f"https://github.com/{REPO}/releases/download/{RESOURCE_TAG}/"}},
                "index": {"url": GT_RAW + index_path, "fallback_url": GH_RAW + index_path,
                          "sha256": digest(index), "bytes": len(index)}, "schemes": schemes}
@@ -218,10 +220,37 @@ class Publisher:
         self.gitee_token = os.environ.get("GITEE_TOKEN")
         require(self.github_token and self.gitee_token, "Both repository tokens must be supplied through the environment")
 
+    def ensure_gitee_resource_repository(self):
+        try:
+            repository = self.api("gitee", GT_RESOURCES)
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+            repository = None
+        if repository is None:
+            owner = self.api("gitee", "https://gitee.com/api/v5/user")
+            require(isinstance(owner, dict) and owner.get("login", "").lower() == "pandaligx", "Gitee token owner does not match the resource namespace")
+            repository = self.api("gitee", "https://gitee.com/api/v5/user/repos", {
+                "name": "RTX-FG-Manager-payloads", "path": "RTX-FG-Manager-payloads",
+                "description": "Immutable DLL ZIPs and build tools for RTX-FG-Manager. Manager updates remain in the main repository.",
+                "private": "false", "auto_init": "true"})
+        require(isinstance(repository, dict) and
+                repository.get("full_name", "").lower() == GITEE_RESOURCE_REPO.lower() and
+                repository.get("owner", {}).get("login", "").lower() == "pandaligx" and
+                repository.get("private") is False,
+                "Resource repository owner/path/visibility mismatch; refusing changes")
+        require(repository.get("default_branch"), "Resource repository has no initialized branch")
+        return repository
+
+    def resource_api(self, host, path, fields=None, file=None):
+        return self.api(host, (GH if host == "github" else GT_RESOURCES) + path, fields, file)
+
     def api(self, host, path, fields=None, file=None, method=None):
         base = GH if host == "github" else GT
         url = official_url(path if path.startswith("https://") else base + path)
         headers = {"User-Agent": "RTXFG-cloud-publisher", "Accept": "application/json"}
+        if host == "gitee" and url == "https://gitee.com/api/v5/user":
+            headers["Authorization"] = "Bearer " + self.gitee_token
         data = None
         if host == "github":
             headers["Authorization"] = "Bearer " + self.github_token
@@ -253,19 +282,21 @@ class Publisher:
             require(len(body) <= MAX_JSON, "API response too large")
             return json.loads(body) if body else None
 
-    def release(self, host, tag):
+    def release(self, host, tag, resource=True):
         try:
-            return self.api(host, "/releases/tags/" + urllib.parse.quote(tag, safe=""))
+            method = self.resource_api if resource else self.api
+            return method(host, "/releases/tags/" + urllib.parse.quote(tag, safe=""))
         except urllib.error.HTTPError as error:
             if error.code == 404:
                 return None
             raise
 
-    def assets(self, host, release):
+    def assets(self, host, release, resource=True):
         result = []
         endpoint = f'/releases/{release["id"]}/' + ("assets" if host == "github" else "attach_files")
         for page in range(1, 101):
-            batch = self.api(host, endpoint + f"?per_page=100&page={page}")
+            method = self.resource_api if resource else self.api
+            batch = method(host, endpoint + f"?per_page=100&page={page}")
             require(isinstance(batch, list), "Invalid attachment response")
             result.extend(batch)
             if len(batch) < 100:
@@ -280,14 +311,15 @@ class Publisher:
         require(tag in {RESOURCE_TAG, "build-tools"}, "Unexpected resource tag")
         previous_latest = self.api(host, "/releases/latest")
         require(isinstance(previous_latest, dict) and re.fullmatch(r"v\d{1,4}\.\d{1,4}\.\d{1,4}", previous_latest.get("tag_name", "")), "Legacy latest endpoint is not a manager release; stop migration")
+        branch = self.ensure_gitee_resource_repository()["default_branch"] if host == "gitee" else "main"
         current = self.release(host, tag)
         if current is None:
             data = {"tag_name": tag, "name": "Resources (not a manager update)",
                     "body": "Immutable, versioned DLL packages. Managed by the cloud publication workflow.",
-                    "prerelease": True if host == "github" else "true", "target_commitish": "main"}
+                    "prerelease": True if host == "github" else "true", "target_commitish": branch}
             if host == "github":
                 data.update(draft=False, make_latest="false")
-            current = self.api(host, "/releases", data)
+            current = self.resource_api(host, "/releases", data)
         require(isinstance(current, dict) and current.get("prerelease") in (True, "true") and current.get("draft", False) in (False, "false"), "Resource release must be a public prerelease")
         latest = self.api(host, "/releases/latest")
         require(isinstance(latest, dict) and latest.get("tag_name") == previous_latest["tag_name"], "Resource release changed legacy latest; stop migration")
@@ -307,7 +339,7 @@ class Publisher:
                 url = release["upload_url"].split("{", 1)[0] + "?name=" + urllib.parse.quote(path.name)
                 self.api(host, url, {}, path)
             else:
-                self.api(host, f'/releases/{release["id"]}/attach_files', {}, path)
+                self.resource_api(host, f'/releases/{release["id"]}/attach_files', {}, path)
             current = self.assets(host, release)
         require(path.name in current, "Uploaded attachment is not visible")
         self.verify_asset(current[path.name], data)
@@ -438,7 +470,7 @@ def probe(args):
     report = {"passed": True, "asset": args.asset, "bytes": len(data), "sha256": digest(data),
               "source_tag": args.source_tag, "destination_tag": args.destination_tag,
               "seconds": round(time.monotonic() - started, 3), "catalog_promoted": False,
-              "url": f"https://gitee.com/{REPO}/releases/download/{args.destination_tag}/{args.asset}"}
+              "url": f"https://gitee.com/{GITEE_RESOURCE_REPO}/releases/download/{args.destination_tag}/{args.asset}"}
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / (args.asset + ".probe.json")).write_bytes(canonical(report))
@@ -450,17 +482,17 @@ def cleanup_probe(args):
     Never deletes a tag, historical release, or any attachment."""
     require(args.destination_tag == "build-tools", "Cleanup only permits the empty build-tools probe release")
     publisher = Publisher()
-    release = publisher.release("gitee", "build-tools")
+    release = publisher.release("gitee", "build-tools", resource=False)
     require(isinstance(release, dict) and release.get("tag_name") == "build-tools", "Probe release is absent or unexpected")
     require(release.get("name") == "Resources (not a manager update)" and
             release.get("body") == "Immutable, versioned DLL packages. Managed by the cloud publication workflow.",
             "Release does not match this probe; refusing removal")
-    require(not publisher.assets("gitee", release), "Probe release has attachments; refusing removal")
+    require(not publisher.assets("gitee", release, resource=False), "Probe release has attachments; refusing removal")
     latest = publisher.api("gitee", "/releases/latest")
     require(latest.get("tag_name") == "build-tools" and latest.get("id") == release.get("id"), "Unexpected latest release; stop cleanup")
     require(isinstance(release.get("id"), int) and release["id"] > 0, "Invalid probe release ID")
     publisher.api("gitee", f'/releases/{release["id"]}', {}, method="DELETE")
-    require(publisher.release("gitee", "build-tools") is None, "Probe release deletion was not confirmed")
+    require(publisher.release("gitee", "build-tools", resource=False) is None, "Probe release deletion was not confirmed")
     latest = publisher.api("gitee", "/releases/latest")
     require(latest.get("tag_name") == "v4.2.2", "Latest did not return to v4.2.2; stop migration")
     print("Removed only the empty Gitee build-tools probe release; latest restored to v4.2.2; tags and assets untouched.")
@@ -541,6 +573,8 @@ class OfflineTests(unittest.TestCase):
     def test_resource_release_cannot_take_latest(self):
         class Fake(Publisher):
             def __init__(self): self.created = False
+            def ensure_gitee_resource_repository(self): return {"default_branch": "main"}
+            def resource_api(self, host, path, fields=None, file=None): return self.api(host, path, fields, file)
             def api(self, host, path, data=None, file=None):
                 if path == "/releases/latest":
                     return {"tag_name": "payloads" if self.created else "v4.2.2"}

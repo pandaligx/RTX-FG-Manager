@@ -45,13 +45,7 @@ jobs:
           python-version: '3.12'
       - name: Validate publication code offline
         run: python tools/cloud_release.py self-test
-      - name: Restore legacy latest after the empty Gitee resource probe
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-        run: python tools/cloud_release.py cleanup-probe --destination-tag build-tools
       - name: Verify one attachment without changing the catalog
-        if: ${{ false }}
         env:
           GH_TOKEN: ${{ github.token }}
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
