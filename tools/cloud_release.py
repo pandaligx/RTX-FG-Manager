@@ -242,10 +242,15 @@ class Publisher:
             owner = self.api("gitee", "https://gitee.com/api/v5/user")
             require(isinstance(owner, dict) and owner.get("login", "").lower() == "pandaligx", "Gitee token owner does not match the resource namespace")
             print("[stage] Create the public resource repository", flush=True)
-            repository = self.api("gitee", "https://gitee.com/api/v5/user/repos", {
-                "name": "RTX-FG-Manager-payloads", "path": "RTX-FG-Manager-payloads",
-                "description": "Immutable DLL ZIPs and build tools for RTX-FG-Manager. Manager updates remain in the main repository.",
-                "private": "false", "auto_init": "true"})
+            try:
+                repository = self.api("gitee", "https://gitee.com/api/v5/user/repos", {
+                    "name": "RTX-FG-Manager-payloads", "path": "RTX-FG-Manager-payloads",
+                    "description": "Immutable DLL ZIPs and build tools for RTX-FG-Manager. Manager updates remain in the main repository.",
+                    "private": "false", "auto_init": "true"})
+            except urllib.error.HTTPError as error:
+                if error.code == 403:
+                    raise RuntimeError("Gitee denied API repository creation (HTTP 403). Create the public pandaligx/RTX-FG-Manager-payloads repository once in the signed-in Gitee website, initialize README, then rerun. Do not change token or repository permissions automatically.") from None
+                raise
         require(isinstance(repository, dict) and
                 repository.get("full_name", "").lower() == GITEE_RESOURCE_REPO.lower() and
                 repository.get("owner", {}).get("login", "").lower() == "pandaligx" and
