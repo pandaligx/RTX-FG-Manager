@@ -191,6 +191,27 @@ def public_location(url):
     return (parsed.hostname or "unknown") + path
 
 
+def safe_error_fields(body, secrets):
+    try:
+        value = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        return {"message": "Non-JSON API error body omitted"}
+    if not isinstance(value, dict):
+        return {"message": "Unexpected API error body omitted"}
+    result = {}
+    for key in ("message", "error", "errors"):
+        item = value.get(key)
+        if item is None:
+            continue
+        text = json.dumps(item, ensure_ascii=True)
+        for secret in secrets:
+            if secret:
+                text = text.replace(secret, "[REDACTED]")
+        text = re.sub(r"https?://[^\s\"<>]+", lambda match: public_location(match.group()), text)
+        result[key] = text[:600]
+    return result or {"message": "No public error fields"}
+
+
 class SafeRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         official_url(newurl)
@@ -301,10 +322,16 @@ class Publisher:
             return json.loads(read_url(url, headers=headers))
         # Never automatically repeat an uncertain POST. A subsequent invocation
         # re-reads assets/releases and checks immutable contents before resuming.
-        with OPENER.open(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=900) as response:
-            body = response.read(MAX_JSON + 1)
-            require(len(body) <= MAX_JSON, "API response too large")
-            return json.loads(body) if body else None
+        try:
+            with OPENER.open(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=900) as response:
+                body = response.read(MAX_JSON + 1)
+                require(len(body) <= MAX_JSON, "API response too large")
+                return json.loads(body) if body else None
+        except urllib.error.HTTPError as error:
+            details = safe_error_fields(error.read(16384), (self.github_token, self.gitee_token))
+            print("[api-error] " + json.dumps({"status": error.code, "location": public_location(error.url),
+                                             "details": details}), flush=True)
+            raise
 
     def release(self, host, tag, resource=True):
         try:
@@ -331,7 +358,7 @@ class Publisher:
         require(len(set(names)) == len(names), "Duplicate remote asset names")
         return {a["name"]: a for a in result}
 
-    def ensure_release(self, host, tag=RESOURCE_TAG):
+    def ensure_release(self, host, tag=RESOURCE_TAG, create=True):
         require(tag in {RESOURCE_TAG, "build-tools"}, "Unexpected resource tag")
         print(f"[stage] Check {host} manager latest before resource release {tag}", flush=True)
         previous_latest = self.api(host, "/releases/latest")
@@ -339,7 +366,8 @@ class Publisher:
         branch = self.ensure_gitee_resource_repository()["default_branch"] if host == "gitee" else "main"
         current = self.release(host, tag)
         if current is None:
-            print(f"[stage] Create {host} resource release {tag}", flush=True)
+            require(create, "Expected existing resource release was not returned by the API; creation is disabled")
+            print(f"[stage] Create {host} resource release {tag} at branch {branch}", flush=True)
             data = {"tag_name": tag, "name": "Resources (not a manager update)",
                     "body": "Immutable, versioned DLL packages. Managed by the cloud publication workflow.",
                     "prerelease": True if host == "github" else "true", "target_commitish": branch}
@@ -549,7 +577,7 @@ def probe(args):
     print("[stage] Download and verify the GitHub source asset", flush=True)
     data = read_url(asset["browser_download_url"], MAX_ZIP)
     require(digest(data) == args.expected_sha256, "Probe source digest mismatch")
-    target = publisher.ensure_release("gitee", args.destination_tag)
+    target = publisher.ensure_release("gitee", args.destination_tag, create=not args.existing_release_only)
     with tempfile.TemporaryDirectory(prefix="rtxfg-cloud-probe-") as folder:
         path = Path(folder) / args.asset
         path.write_bytes(data)
@@ -583,6 +611,37 @@ def cleanup_probe(args):
     latest = publisher.api("gitee", "/releases/latest")
     require(latest.get("tag_name") == "v4.2.2", "Latest did not return to v4.2.2; stop migration")
     print("Removed only the empty Gitee build-tools probe release; latest restored to v4.2.2; tags and assets untouched.")
+
+
+def diagnose_resource_access(args):
+    """Read-only contrast of token identity, repo visibility and target ref."""
+    publisher = Publisher()
+    report = {"read_only": True, "requests": []}
+    targets = [("identity", "https://gitee.com/api/v5/user", True)]
+    for name, base in (("manager", GT), ("resources", GT_RESOURCES)):
+        targets.extend([(name + "_anonymous", base, False), (name + "_authenticated", base, True)])
+    targets.extend([("resource_master_anonymous", GT_RESOURCES + "/branches/master", False),
+                    ("resource_master_authenticated", GT_RESOURCES + "/branches/master", True)])
+    for name, url, authenticated in targets:
+        entry = {"name": name, "location": public_location(url), "authenticated": authenticated}
+        headers = {"Authorization": "Bearer " + publisher.gitee_token} if authenticated else None
+        try:
+            value = json.loads(read_url(url, headers=headers))
+            entry["response_type"] = type(value).__name__
+            if isinstance(value, dict):
+                for key in ("id", "login", "full_name", "private", "default_branch", "permissions", "name"):
+                    if key in value:
+                        entry[key] = value[key]
+                if isinstance(value.get("commit"), dict):
+                    entry["commit_sha"] = value["commit"].get("sha")
+        except urllib.error.HTTPError as error:
+            entry["status"] = error.code
+            entry["details"] = safe_error_fields(error.read(16384), (publisher.github_token, publisher.gitee_token))
+        report["requests"].append(entry)
+        print("[diagnostic] " + json.dumps(entry, ensure_ascii=True), flush=True)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "resource-access.probe.json").write_bytes(canonical(report))
 
 
 class OfflineTests(unittest.TestCase):
@@ -714,10 +773,18 @@ class OfflineTests(unittest.TestCase):
             verify_known_archives({"existing.zip": b"modified"}, {"existing.zip": (8, digest(b"original"))})
         verify_known_archives({"new-r2.zip": b"new signed bytes"}, {"existing.zip": (8, digest(b"original"))})
 
+    def test_api_error_output_is_narrow_and_redacted(self):
+        safe = safe_error_fields(b'{"message":"fake-secret https://gitee.com/api?token=fake-secret","access_token":"fake-secret","headers":{"private":"omit"}}', ("fake-secret",))
+        self.assertEqual(set(safe), {"message"})
+        text = json.dumps(safe)
+        self.assertNotIn("fake-secret", text)
+        self.assertNotIn("?token", text)
+        self.assertNotIn("headers", text)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("prepare", "publish", "probe", "cleanup-probe", "self-test"))
+    parser.add_argument("command", choices=("prepare", "publish", "probe", "cleanup-probe", "diagnose-resource-access", "self-test"))
     parser.add_argument("--root", default=".")
     parser.add_argument("--schemes", default="cloud/schemes.json")
     parser.add_argument("--archives", action="append", default=[])
@@ -727,6 +794,7 @@ def main():
     parser.add_argument("--asset")
     parser.add_argument("--destination-tag", default=RESOURCE_TAG, choices=(RESOURCE_TAG, "build-tools"))
     parser.add_argument("--expected-sha256")
+    parser.add_argument("--existing-release-only", action="store_true")
     args = parser.parse_args()
     if args.command == "self-test":
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(OfflineTests)
@@ -737,6 +805,9 @@ def main():
         return
     if args.command == "cleanup-probe":
         cleanup_probe(args)
+        return
+    if args.command == "diagnose-resource-access":
+        diagnose_resource_access(args)
         return
     spec = json.loads(Path(args.schemes).read_text(encoding="utf-8-sig"))
     validate_spec(spec)

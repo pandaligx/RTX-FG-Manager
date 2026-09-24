@@ -8,6 +8,15 @@ on:
       - .github/workflows/cloud-probe.yml
   workflow_dispatch:
     inputs:
+      mode:
+        description: Read-only permission diagnosis or verified attachment probe
+        type: choice
+        options: [diagnose-resource-access, probe]
+        default: diagnose-resource-access
+      existing_release_only:
+        description: Refuse to create a destination resource release
+        type: boolean
+        default: true
       source_tag:
         description: Existing GitHub resource release
         required: true
@@ -53,11 +62,15 @@ jobs:
           ASSET: ${{ inputs.asset || 'aria2c-1.37.0-35aab6492933.exe' }}
           DESTINATION_TAG: ${{ inputs.destination_tag || 'build-tools' }}
           EXPECTED_SHA256: ${{ inputs.expected_sha256 || '35aab64929331e10015458a81f5d25d9173df554c48ca43b8f15197d5f1943d8' }}
-        run: >-
-          python tools/cloud_release.py probe
-          --source-tag "$SOURCE_TAG" --asset "$ASSET"
-          --destination-tag "$DESTINATION_TAG"
-          --expected-sha256 "$EXPECTED_SHA256" --out probe-reports
+          PROBE_MODE: ${{ inputs.mode || 'diagnose-resource-access' }}
+          EXISTING_RELEASE_ONLY: ${{ inputs.existing_release_only != false }}
+        run: |
+          args=()
+          if [ "$EXISTING_RELEASE_ONLY" = "true" ]; then args+=(--existing-release-only); fi
+          python tools/cloud_release.py "$PROBE_MODE" \
+            --source-tag "$SOURCE_TAG" --asset "$ASSET" \
+            --destination-tag "$DESTINATION_TAG" \
+            --expected-sha256 "$EXPECTED_SHA256" --out probe-reports "${args[@]}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
