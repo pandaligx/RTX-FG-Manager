@@ -218,7 +218,7 @@ class Publisher:
         self.gitee_token = os.environ.get("GITEE_TOKEN")
         require(self.github_token and self.gitee_token, "Both repository tokens must be supplied through the environment")
 
-    def api(self, host, path, fields=None, file=None):
+    def api(self, host, path, fields=None, file=None, method=None):
         base = GH if host == "github" else GT
         url = official_url(path if path.startswith("https://") else base + path)
         headers = {"User-Agent": "RTXFG-cloud-publisher", "Accept": "application/json"}
@@ -248,10 +248,10 @@ class Publisher:
             return json.loads(read_url(url, headers=headers))
         # Never automatically repeat an uncertain POST. A subsequent invocation
         # re-reads assets/releases and checks immutable contents before resuming.
-        with OPENER.open(urllib.request.Request(url, data=data, headers=headers), timeout=900) as response:
+        with OPENER.open(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=900) as response:
             body = response.read(MAX_JSON + 1)
             require(len(body) <= MAX_JSON, "API response too large")
-            return json.loads(body)
+            return json.loads(body) if body else None
 
     def release(self, host, tag):
         try:
@@ -338,6 +338,15 @@ def write_documents(out, documents):
     (out / "cloud/catalog.json").write_bytes(catalog)
 
 
+def promote_documents(documents, write, promote):
+    """Both indexes must be available before either active catalog advances."""
+    index_path, index, catalog = documents
+    write(index_path, index)
+    promote(index_path, index)
+    write("cloud/catalog.json", catalog)
+    promote("cloud/catalog.json", catalog)
+
+
 def git(root, *args, env=None):
     return subprocess.check_output(["git", "-C", str(root), *args], env=env, stderr=subprocess.DEVNULL, text=True).strip()
 
@@ -384,22 +393,26 @@ def publish(args, spec):
                 publisher.ensure_asset(host, releases[host], path)
     # Every referenced ZIP now exists and was anonymously read back from both
     # sites. Only at this boundary may active metadata be written and committed.
-    write_documents(root, documents)
     index_path, index, catalog = documents
-    git(root, "add", "--", index_path, "cloud/catalog.json")
-    if git(root, "diff", "--cached", "--name-only"):
-        git(root, "-c", "user.name=RTXFG Cloud Publisher", "-c", "user.email=actions@users.noreply.github.com",
-            "commit", "-m", "Publish verified DLL catalog " + json.loads(catalog)["revision"])
-    # Distributed git promotion is not atomic across two services. Each commit
-    # contains its index and catalog together and both sites already have ZIPs;
-    # a failed second push leaves an older, still-valid catalog on that mirror.
-    # GitHub first makes a failed mirror resumable from the next clean checkout;
-    # the old Gitee catalog remains valid because its assets are never removed.
-    for host in ("github", "gitee"):
-        push(root, host, publisher)
-        base = GT_RAW if host == "gitee" else GH_RAW
-        for relative, data in ((index_path, index), ("cloud/catalog.json", catalog)):
+    def write(relative, data):
+        destination = root / relative
+        if relative != "cloud/catalog.json" and destination.exists():
+            require(destination.read_bytes() == data, "Immutable index already has different content")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(data)
+    def promote(relative, data):
+        git(root, "add", "--", relative)
+        if git(root, "diff", "--cached", "--name-only"):
+            git(root, "-c", "user.name=RTXFG Cloud Publisher", "-c", "user.email=actions@users.noreply.github.com",
+                "commit", "-m", "Publish verified DLL metadata " + relative)
+        # Distributed git promotion is not atomic. GitHub first makes a failed
+        # Gitee push resumable from the next checkout. Old mirrors stay valid;
+        # every ZIP and both indexes precede the first catalog promotion.
+        for host in ("github", "gitee"):
+            push(root, host, publisher)
+            base = GT_RAW if host == "gitee" else GH_RAW
             require(read_url(base + relative, MAX_JSON) == data, "Catalog/index mirror readback mismatch")
+    promote_documents(documents, write, promote)
     print("Cloud publication completed: " + json.loads(catalog)["revision"], flush=True)
 
 
@@ -430,6 +443,27 @@ def probe(args):
     out.mkdir(parents=True, exist_ok=True)
     (out / (args.asset + ".probe.json")).write_bytes(canonical(report))
     print(json.dumps(report), flush=True)
+
+
+def cleanup_probe(args):
+    """Compensate this experiment's empty Gitee build-tools release only.
+    Never deletes a tag, historical release, or any attachment."""
+    require(args.destination_tag == "build-tools", "Cleanup only permits the empty build-tools probe release")
+    publisher = Publisher()
+    release = publisher.release("gitee", "build-tools")
+    require(isinstance(release, dict) and release.get("tag_name") == "build-tools", "Probe release is absent or unexpected")
+    require(release.get("name") == "Resources (not a manager update)" and
+            release.get("body") == "Immutable, versioned DLL packages. Managed by the cloud publication workflow.",
+            "Release does not match this probe; refusing removal")
+    require(not publisher.assets("gitee", release), "Probe release has attachments; refusing removal")
+    latest = publisher.api("gitee", "/releases/latest")
+    require(latest.get("tag_name") == "build-tools" and latest.get("id") == release.get("id"), "Unexpected latest release; stop cleanup")
+    require(isinstance(release.get("id"), int) and release["id"] > 0, "Invalid probe release ID")
+    publisher.api("gitee", f'/releases/{release["id"]}', {}, method="DELETE")
+    require(publisher.release("gitee", "build-tools") is None, "Probe release deletion was not confirmed")
+    latest = publisher.api("gitee", "/releases/latest")
+    require(latest.get("tag_name") == "v4.2.2", "Latest did not return to v4.2.2; stop migration")
+    print("Removed only the empty Gitee build-tools probe release; latest restored to v4.2.2; tags and assets untouched.")
 
 
 class OfflineTests(unittest.TestCase):
@@ -480,10 +514,47 @@ class OfflineTests(unittest.TestCase):
         for url in ("http://gitee.com/file", "https://github.com@evil.invalid/file", "https://gitee.com.evil.invalid/file"):
             with self.assertRaises(RuntimeError): official_url(url)
 
+    def test_invalid_defaults_stop_publication(self):
+        spec, archives = self.fixture()
+        spec["schemes"][0]["defaults"] = {"optimized": "99"}
+        with self.assertRaises(RuntimeError): build_documents(spec, archives)
+
+    def test_index_mirror_failure_never_writes_catalog(self):
+        events = []
+        def write(path, data): events.append(("write", path))
+        def promote(path, data):
+            events.append(("promote", path))
+            raise RuntimeError("mirror unavailable")
+        with self.assertRaises(RuntimeError):
+            promote_documents(("cloud/indexes/immutable.json", b"index", b"catalog"), write, promote)
+        self.assertEqual(events, [("write", "cloud/indexes/immutable.json"), ("promote", "cloud/indexes/immutable.json")])
+
+    def test_index_precedes_catalog_and_repeat_is_deterministic(self):
+        spec, archives = self.fixture()
+        documents = build_documents(spec, archives)
+        events = []
+        promote_documents(documents, lambda path, data: events.append(("write", path)),
+                          lambda path, data: events.append(("promote", path)))
+        self.assertEqual(events, [("write", documents[0]), ("promote", documents[0]),
+                                  ("write", "cloud/catalog.json"), ("promote", "cloud/catalog.json")])
+
+    def test_resource_release_cannot_take_latest(self):
+        class Fake(Publisher):
+            def __init__(self): self.created = False
+            def api(self, host, path, data=None, file=None):
+                if path == "/releases/latest":
+                    return {"tag_name": "payloads" if self.created else "v4.2.2"}
+                if path == "/releases":
+                    self.created = True
+                    return {"tag_name": "payloads", "prerelease": True}
+                return None
+        with self.assertRaisesRegex(RuntimeError, "changed legacy latest"):
+            Fake().ensure_release("gitee")
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("prepare", "publish", "probe", "self-test"))
+    parser.add_argument("command", choices=("prepare", "publish", "probe", "cleanup-probe", "self-test"))
     parser.add_argument("--root", default=".")
     parser.add_argument("--schemes", default="cloud/schemes.json")
     parser.add_argument("--archives", action="append", default=[])
@@ -500,6 +571,9 @@ def main():
         return
     if args.command == "probe":
         probe(args)
+        return
+    if args.command == "cleanup-probe":
+        cleanup_probe(args)
         return
     spec = json.loads(Path(args.schemes).read_text(encoding="utf-8-sig"))
     validate_spec(spec)
