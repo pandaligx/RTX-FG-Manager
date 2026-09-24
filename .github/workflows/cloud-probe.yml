@@ -62,7 +62,7 @@ jobs:
           ASSET: ${{ inputs.asset || 'aria2c-1.37.0-35aab6492933.exe' }}
           DESTINATION_TAG: ${{ inputs.destination_tag || 'build-tools' }}
           EXPECTED_SHA256: ${{ inputs.expected_sha256 || '35aab64929331e10015458a81f5d25d9173df554c48ca43b8f15197d5f1943d8' }}
-          PROBE_MODE: ${{ inputs.mode || 'diagnose-resource-access' }}
+          PROBE_MODE: ${{ inputs.mode || 'probe' }}
           EXISTING_RELEASE_ONLY: ${{ inputs.existing_release_only != false }}
         run: |
           args=()
