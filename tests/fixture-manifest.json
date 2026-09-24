@@ -1,0 +1,497 @@
+{
+  "schema": 1,
+  "description": "Optional historical binary regression fixtures. Exact files verified by SHA-256; not game/GPU validation. See BUILDING.md.",
+  "resources": [
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/upstream-0.3.5-310-9-version.zip",
+      "bytes": 9115496,
+      "sha256": "62aa29c593f47292d79c6876697c58818a95ffbfac0e199016de03f571da24d8",
+      "outputs": [
+        {
+          "path": "packages/upstream-0.3.5-310-9-version.zip",
+          "bytes": 9115496,
+          "sha256": "62aa29c593f47292d79c6876697c58818a95ffbfac0e199016de03f571da24d8"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/upstream-0.3.5-310-9-d3d12.zip",
+      "bytes": 9116062,
+      "sha256": "6ddebc21b12475a637483e0b28676867593c81c43e1c18451517d2379c19518d",
+      "outputs": [
+        {
+          "path": "packages/upstream-0.3.5-310-9-d3d12.zip",
+          "bytes": 9116062,
+          "sha256": "6ddebc21b12475a637483e0b28676867593c81c43e1c18451517d2379c19518d"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/upstream-0.3.5-310-9-dbghelp.zip",
+      "bytes": 9120830,
+      "sha256": "0319078e33a6ff3b6886b75bb25d75e4f53e23004771e20fd8136fb9a11f51d1",
+      "outputs": [
+        {
+          "path": "packages/upstream-0.3.5-310-9-dbghelp.zip",
+          "bytes": 9120830,
+          "sha256": "0319078e33a6ff3b6886b75bb25d75e4f53e23004771e20fd8136fb9a11f51d1"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/upstream-0.3.5-310-9-dinput8.zip",
+      "bytes": 9115409,
+      "sha256": "b0310b28463dbf5f173e8b1fad2a553b8190acb2e128bf7d8308d8b7cc7abda5",
+      "outputs": [
+        {
+          "path": "packages/upstream-0.3.5-310-9-dinput8.zip",
+          "bytes": 9115409,
+          "sha256": "b0310b28463dbf5f173e8b1fad2a553b8190acb2e128bf7d8308d8b7cc7abda5"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/upstream-0.3.5-310-9-dxgi.zip",
+      "bytes": 9116023,
+      "sha256": "a544cdaa950e0fda2dda0aad09000c9a3b3f24b37fbd611f5e56a30af80da5dd",
+      "outputs": [
+        {
+          "path": "packages/upstream-0.3.5-310-9-dxgi.zip",
+          "bytes": 9116023,
+          "sha256": "a544cdaa950e0fda2dda0aad09000c9a3b3f24b37fbd611f5e56a30af80da5dd"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/upstream-0.3.5-310-9-winmm.zip",
+      "bytes": 9118124,
+      "sha256": "23ad3e899dcf247aa23302af34530350abd49e4dfb1b7c3e0272c9d81eb3a3c0",
+      "outputs": [
+        {
+          "path": "packages/upstream-0.3.5-310-9-winmm.zip",
+          "bytes": 9118124,
+          "sha256": "23ad3e899dcf247aa23302af34530350abd49e4dfb1b7c3e0272c9d81eb3a3c0"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/dlssg-mfg-vulkan-sm86-7-20260922-version.zip",
+      "bytes": 4509186,
+      "sha256": "b6e6769f37c1f3ca338da97d7634f42cedef0124f10e8026fa2ea29e0026af7a",
+      "outputs": [
+        {
+          "path": "packages/dlssg-mfg-vulkan-sm86-7-20260922-version.zip",
+          "bytes": 4509186,
+          "sha256": "b6e6769f37c1f3ca338da97d7634f42cedef0124f10e8026fa2ea29e0026af7a"
+        },
+        {
+          "path": "mfg/version.dll",
+          "member": "version.dll",
+          "bytes": 12319088,
+          "sha256": "9b153c0115441443f9db98ad8da322fdcdd32b123b92cfe8461e4820ef7b5cb7"
+        },
+        {
+          "path": "mfg/dlssg_sm86.ini",
+          "member": "dlssg_sm86.ini",
+          "bytes": 4267,
+          "sha256": "d0f335a65a1eee792756dd482c9e8c078ff0ef17f1659ac90b13be0c0e79daec"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/rtxfg-0.3.5-mfg-v421-version.zip",
+      "bytes": 10553085,
+      "sha256": "a189eb8458217b5f68fb6a571302ffd0c5ca09fdd1eb789bb74ed7fc4eecdf10",
+      "outputs": [
+        {
+          "path": "packages/rtxfg-0.3.5-mfg-v421-version.zip",
+          "bytes": 10553085,
+          "sha256": "a189eb8458217b5f68fb6a571302ffd0c5ca09fdd1eb789bb74ed7fc4eecdf10"
+        },
+        {
+          "path": "extended/version.dll",
+          "member": "version.dll",
+          "bytes": 33943600,
+          "sha256": "42010bd54f40809415473f8071675810e65aac9aae338f610d825351f4c341fd"
+        },
+        {
+          "path": "extended/dlssg_sm86.ini",
+          "member": "dlssg_sm86.ini",
+          "bytes": 4179,
+          "sha256": "6f73656bb436e810564ed786fccc2e5870f16191d99b5a002f55c2f3c12f5fc9"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/rtxfg-0.3.5-mfg-v421-winmm.zip",
+      "bytes": 10556580,
+      "sha256": "c3b30c39e35c8af302e305bec8fe0341b89cac858b6049c8ed22a1831f58403b",
+      "outputs": [
+        {
+          "path": "packages/rtxfg-0.3.5-mfg-v421-winmm.zip",
+          "bytes": 10556580,
+          "sha256": "c3b30c39e35c8af302e305bec8fe0341b89cac858b6049c8ed22a1831f58403b"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/rtxfg-0.3.5-mfg-v421-dinput8.zip",
+      "bytes": 10552812,
+      "sha256": "e178d0384dc9dd690979ed925da55a1228ecc85bc4a1ed48c3907bec75a6be88",
+      "outputs": [
+        {
+          "path": "packages/rtxfg-0.3.5-mfg-v421-dinput8.zip",
+          "bytes": 10552812,
+          "sha256": "e178d0384dc9dd690979ed925da55a1228ecc85bc4a1ed48c3907bec75a6be88"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/rtxfg-0.3.5-mfg-v421-dbghelp.zip",
+      "bytes": 10559657,
+      "sha256": "bc5b42a20d11bcac0e3bfc0eef4276db49d1416b66317d646a92e8a2f881e2dd",
+      "outputs": [
+        {
+          "path": "packages/rtxfg-0.3.5-mfg-v421-dbghelp.zip",
+          "bytes": 10559657,
+          "sha256": "bc5b42a20d11bcac0e3bfc0eef4276db49d1416b66317d646a92e8a2f881e2dd"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/rtxfg-0.3.5-mfg-v421-dxgi.zip",
+      "bytes": 10553669,
+      "sha256": "baf05c2fc0fc8f0ada92a1dc5eb6e1d1762867d7b19d06f7ef40a2d269791fb4",
+      "outputs": [
+        {
+          "path": "packages/rtxfg-0.3.5-mfg-v421-dxgi.zip",
+          "bytes": 10553669,
+          "sha256": "baf05c2fc0fc8f0ada92a1dc5eb6e1d1762867d7b19d06f7ef40a2d269791fb4"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/rtxfg-0.3.5-mfg-v421-d3d12.zip",
+      "bytes": 10553733,
+      "sha256": "a08d4763f8cc9da65fb4407eba272231d6b2a9a2d0234ceb1b31fb69b6bf5a76",
+      "outputs": [
+        {
+          "path": "packages/rtxfg-0.3.5-mfg-v421-d3d12.zip",
+          "bytes": 10553733,
+          "sha256": "a08d4763f8cc9da65fb4407eba272231d6b2a9a2d0234ceb1b31fb69b6bf5a76"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/native-0.2.6-stable-version.zip",
+      "bytes": 5217058,
+      "sha256": "1261f179aae5da7ea8f72c71d4fb7cabba9c4d741b57d49a6703080087b3d655",
+      "outputs": [
+        {
+          "path": "packages/native-0.2.6-stable-version.zip",
+          "bytes": 5217058,
+          "sha256": "1261f179aae5da7ea8f72c71d4fb7cabba9c4d741b57d49a6703080087b3d655"
+        },
+        {
+          "path": "payloads/native/version.dll",
+          "member": "version.dll",
+          "bytes": 16128024,
+          "sha256": "febfd7e5f69f1149c3939e15fbccee2522133128dac62752bda9ad0370bffd00"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/native-0.2.6-stable-winmm.zip",
+      "bytes": 5220293,
+      "sha256": "e59be6966cae49fe54bf9306882788bfd21dfb02dc218eb0530017b064356331",
+      "outputs": [
+        {
+          "path": "packages/native-0.2.6-stable-winmm.zip",
+          "bytes": 5220293,
+          "sha256": "e59be6966cae49fe54bf9306882788bfd21dfb02dc218eb0530017b064356331"
+        },
+        {
+          "path": "payloads/native/winmm.dll",
+          "member": "winmm.dll",
+          "bytes": 16139392,
+          "sha256": "3e55bbf9ad9c62870c49bcef4ac243fe1a6e36d42c0f70708736d746cab824ea"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/native-0.2.6-stable-dinput8.zip",
+      "bytes": 5216999,
+      "sha256": "d0107cb6711952884e863312ed92e31f3f1a84e33a27971114022a573164be05",
+      "outputs": [
+        {
+          "path": "packages/native-0.2.6-stable-dinput8.zip",
+          "bytes": 5216999,
+          "sha256": "d0107cb6711952884e863312ed92e31f3f1a84e33a27971114022a573164be05"
+        },
+        {
+          "path": "payloads/native/dinput8.dll",
+          "member": "dinput8.dll",
+          "bytes": 16127000,
+          "sha256": "36f77a92b3e199cb4d2e666059f3352eb527c9b7575ff12574c7fd4bb3b354f0"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/native-0.2.6-stable-winhttp.zip",
+      "bytes": 5218577,
+      "sha256": "e163daf7f35a10c4b5c8df8b9528546a87b0e6b3310dd36966c505ebb7215574",
+      "outputs": [
+        {
+          "path": "packages/native-0.2.6-stable-winhttp.zip",
+          "bytes": 5218577,
+          "sha256": "e163daf7f35a10c4b5c8df8b9528546a87b0e6b3310dd36966c505ebb7215574"
+        },
+        {
+          "path": "payloads/native/winhttp.dll",
+          "member": "winhttp.dll",
+          "bytes": 16135264,
+          "sha256": "7b250a271881d9fae15437fca31a75780c995c0ed6c254104e7b5b650e83f272"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/native-0.2.6-stable-dxgi.zip",
+      "bytes": 5217363,
+      "sha256": "a1b4aefb2fd9b35d347733be1f957a857aeac07006bbe0a86224fdb740f64e66",
+      "outputs": [
+        {
+          "path": "packages/native-0.2.6-stable-dxgi.zip",
+          "bytes": 5217363,
+          "sha256": "a1b4aefb2fd9b35d347733be1f957a857aeac07006bbe0a86224fdb740f64e66"
+        },
+        {
+          "path": "payloads/native/dlssg_sm86.ini",
+          "member": "dlssg_sm86.ini",
+          "bytes": 581,
+          "sha256": "fd7f0722194e6e8d8c085327d9826effb411925a69a5e7549d70eff26a9f18b5"
+        },
+        {
+          "path": "payloads/native/dxgi.dll",
+          "member": "dxgi.dll",
+          "bytes": 16128536,
+          "sha256": "006aab55a9d08356057bb75f7b6bdacaee328d7613b1d04f364e14fa7695283e"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/initial-rtx20-version.zip",
+      "bytes": 5536900,
+      "sha256": "557fe3446fe37e836cad1932aa7e41b8644a3840e70fa102508f0b5620987662",
+      "outputs": [
+        {
+          "path": "packages/initial-rtx20-version.zip",
+          "bytes": 5536900,
+          "sha256": "557fe3446fe37e836cad1932aa7e41b8644a3840e70fa102508f0b5620987662"
+        },
+        {
+          "path": "payloads/rtx20/dlssg_sm86.ini",
+          "member": "dlssg_sm86.ini",
+          "bytes": 791,
+          "sha256": "106b4877495b6329bf2a085b7c01268a812e45996a140a3bafa27b8a19e8fb45"
+        },
+        {
+          "path": "payloads/rtx20/version.dll",
+          "member": "version.dll",
+          "bytes": 13962712,
+          "sha256": "9e106977214046ddbb26885d65de2944b41eae31fb3d12c69a0cd686c402b07d"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/initial-rtx30-version.zip",
+      "bytes": 4704043,
+      "sha256": "97e47cc39176449646ad7de6c1cfd22926d91d48fd2e35d562daa49675fcbdac",
+      "outputs": [
+        {
+          "path": "packages/initial-rtx30-version.zip",
+          "bytes": 4704043,
+          "sha256": "97e47cc39176449646ad7de6c1cfd22926d91d48fd2e35d562daa49675fcbdac"
+        },
+        {
+          "path": "payloads/rtx30/dlssg_sm86.ini",
+          "member": "dlssg_sm86.ini",
+          "bytes": 1459,
+          "sha256": "77a698310818b90039b72c61331cb50e7fc6692eff220ca9eb14c494998c96b8"
+        },
+        {
+          "path": "payloads/rtx30/version.dll",
+          "member": "version.dll",
+          "bytes": 10630744,
+          "sha256": "0fd91cf32500a640df9eeb7addd6d04a37abce85f368461a8ad8a4d352bb3212"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260915-r2/native-0.2.6-experimental-version.zip",
+      "bytes": 5216933,
+      "sha256": "e46c224c33fcc2b52af0b75f16a1096d0cb8b6498dc39b33d144402beb2e2776",
+      "outputs": [
+        {
+          "path": "payloads/native-x6/version.dll",
+          "member": "version.dll",
+          "bytes": 16128024,
+          "sha256": "59454e84c0f84cf501f09fc319ab87e4967e49d2f504edbca0ec8f445f7fd263"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260915-r2/native-0.2.6-experimental-winmm.zip",
+      "bytes": 5220166,
+      "sha256": "d676a1d4265e6b68c7213c15882b266bdb15bd0eb99a44c82721155cda93b72e",
+      "outputs": [
+        {
+          "path": "payloads/native-x6/winmm.dll",
+          "member": "winmm.dll",
+          "bytes": 16139392,
+          "sha256": "11abf959a8fe082256f27c33fb1cdff7b26ba1edf48bcea730c770684d970cd7"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260915-r2/native-0.2.6-experimental-dinput8.zip",
+      "bytes": 5216879,
+      "sha256": "cf1ccc2bb20e83a69caa5069b132c51007436f0236a1997d2e8bc146761368da",
+      "outputs": [
+        {
+          "path": "payloads/native-x6/dinput8.dll",
+          "member": "dinput8.dll",
+          "bytes": 16127000,
+          "sha256": "2456375f441cfcc254cea0afae852a27ff3dafa7cc03eef2eead1e973ced7ad6"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260915-r2/native-0.2.6-experimental-winhttp.zip",
+      "bytes": 5218452,
+      "sha256": "ec0998315a9351a5f01f25f986b5e373ba8e1724a184f5631f893cddd97d9924",
+      "outputs": [
+        {
+          "path": "payloads/native-x6/winhttp.dll",
+          "member": "winhttp.dll",
+          "bytes": 16135264,
+          "sha256": "56727eb852844c10226675882fbbbfff8a91f41d46c5511703b140a01eb05160"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260915-r2/native-0.2.6-experimental-dxgi.zip",
+      "bytes": 5217237,
+      "sha256": "34ded2faa14303954f0c5f70276143c614a235e288d346185fa40e8dca7f9d08",
+      "outputs": [
+        {
+          "path": "payloads/native-x6/dlssg_sm86.ini",
+          "member": "dlssg_sm86.ini",
+          "bytes": 349,
+          "sha256": "2bc0dfdac484f4a25d78ec3f4e072960c0005e27cf3855ceeb0526266d24ded7"
+        },
+        {
+          "path": "payloads/native-x6/dxgi.dll",
+          "member": "dxgi.dll",
+          "bytes": 16128536,
+          "sha256": "adcf9ef06fe4a33af430bd707ba6f7a29ffcbfe72d4a233319a4aadb1e81cc5f"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.0.8/RTXManager-v4.0.8-x64.exe",
+      "bytes": 90524944,
+      "sha256": "591b3cc670e2b7efb9422840b97632a1ef5b24f75026b9926031f9bdfa5a2588",
+      "outputs": [
+        {
+          "path": "releases/RTXManager-v4.0.8-x64.exe",
+          "bytes": 90524944,
+          "sha256": "591b3cc670e2b7efb9422840b97632a1ef5b24f75026b9926031f9bdfa5a2588"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.2.1/RTXManager-v4.2.1-x64.exe",
+      "bytes": 28601768,
+      "sha256": "0a46be83b9a11b23bd1d90c9123d558f95b013459c3288c6019bcdd114ec6194",
+      "outputs": [
+        {
+          "path": "releases/RTXManager-v4.2.1-x64.exe",
+          "bytes": 28601768,
+          "sha256": "0a46be83b9a11b23bd1d90c9123d558f95b013459c3288c6019bcdd114ec6194"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/NVIDIA-RTX/Streamline/releases/download/v2.7.32/streamline-sdk-v2.7.32.zip",
+      "bytes": 228371562,
+      "outputs": [
+        {
+          "path": "streamline27/sl.interposer.dll",
+          "member": "bin/x64/sl.interposer.dll",
+          "bytes": 543712,
+          "sha256": "e96bb9eb2930f57190a6dc76a24ff354114b8fcc75bff6a3b60fee2fba0bdc40"
+        },
+        {
+          "path": "streamline27/sl.common.dll",
+          "member": "bin/x64/sl.common.dll",
+          "bytes": 675800,
+          "sha256": "b4a38987b3094eaf39ef1237af4436ac5bb77674d6def2cbeabdba062d1b83b8"
+        },
+        {
+          "path": "streamline27/sl.dlss_g.dll",
+          "member": "bin/x64/sl.dlss_g.dll",
+          "bytes": 448472,
+          "sha256": "6197c518273f6ba7b47544289d656cc87613715429b0dd946d8ad2a6656da4d2"
+        },
+        {
+          "path": "streamline27/sl.reflex.dll",
+          "member": "bin/x64/sl.reflex.dll",
+          "bytes": 198104,
+          "sha256": "df054996c2db2250908759b04c06b455b6e1889bcd0d5dc74feaca9d2286ff0d"
+        },
+        {
+          "path": "streamline27/sl.pcl.dll",
+          "member": "bin/x64/sl.pcl.dll",
+          "bytes": 175064,
+          "sha256": "266ef376af886c4c6b74b0e76c66072962f75f976ea90b3d6317c502316249d4"
+        },
+        {
+          "path": "streamline27/sl.dlss.dll",
+          "member": "bin/x64/sl.dlss.dll",
+          "bytes": 237536,
+          "sha256": "4a49d0ff75ef90f38c88c74bf75f6e37edfe8205200c7f73a54ad15138f853ae"
+        },
+        {
+          "path": "streamline27/sl.nis.dll",
+          "member": "bin/x64/sl.nis.dll",
+          "bytes": 966104,
+          "sha256": "2b617388a47d6ae6950b78aa8f7b203006a47e830d4ae5cf900fb5857565c8cc"
+        },
+        {
+          "path": "streamline27/license.txt",
+          "member": "license.txt",
+          "bytes": 1591,
+          "sha256": "7b6f23e7d6f3ad6292f9308d2b42cdc3d82ae4e9b2abb55f230279d83bedd43d"
+        },
+        {
+          "path": "streamline27/3rd-party-licenses.md",
+          "member": "3rd-party-licenses.md",
+          "bytes": 13240,
+          "sha256": "4d5d9b8436d36cee01d27b7607634987618eef970b550f6b7ef03e82f9a6e473"
+        },
+        {
+          "path": "streamline27/reflex.license.txt",
+          "member": "bin/x64/reflex.license.txt",
+          "bytes": 20504,
+          "sha256": "ebf83c07fb3b2939908c3795d887afde3161c89a28ba391724efc784ce1bdabe"
+        },
+        {
+          "path": "streamline27/nis.license.txt",
+          "member": "bin/x64/nis.license.txt",
+          "bytes": 1199,
+          "sha256": "f80ecfbce8a84a5b4c1c59dc5a9f0ee9cf5a989c9fba3a9486ee874f7595a454"
+        }
+      ]
+    }
+  ]
+}

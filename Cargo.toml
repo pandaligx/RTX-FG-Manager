@@ -1,0 +1,82 @@
+[package]
+name = "rtx-fg-manager"
+version = "4.2.3"
+edition = "2024"
+publish = false
+build = "rust/build.rs"
+include = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust/**",
+    "tests/*.rs",
+    "tests/fixture-manifest.json",
+    "tests/fixtures/catalog*/**",
+    "app/assets/**",
+    "app/locales/**",
+    "app/tools/**",
+    "vendor/**",
+    "tools/**",
+    "BUILDING.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.txt",
+]
+
+[features]
+default = []
+# Real signed artifacts are prepared explicitly; never required for a normal build.
+fixture-tests = []
+# Optional native GPU diagnostics require locally supplied licensed SDK headers.
+native-probes = []
+
+[lib]
+path = "rust/src/lib.rs"
+
+[[bin]]
+name = "RTXManager"
+path = "rust/src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+quick-xml = "0.37"
+base64 = "0.22"
+chrono = "0.4"
+gpui = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe", features = ["font-kit"] }
+gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "1505b1487131adbb443f6c69e87847db35bfa2d1" }
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "1505b1487131adbb443f6c69e87847db35bfa2d1" }
+smol = "2"
+flate2 = "1.1"
+image = { version = "0.25", default-features = false, features = ["png", "ico"] }
+libloading = "0.8"
+regex = "1.12"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls-native-roots"] }
+rfd = "0.14"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tempfile = "3.27"
+uuid = { version = "1", features = ["v4"] }
+winreg = "0.55"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Dxgi", "Win32_Graphics_Gdi", "Win32_Graphics_Dxgi_Common", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Security_Cryptography_Catalog", "Win32_Security_Cryptography_Sip", "Win32_Security_WinTrust", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_Debug", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Registry", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_LibraryLoader", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_Globalization"] }
+
+[build-dependencies]
+cc = "1"
+flate2 = "1.1"
+sha2 = "0.10"
+winres = "0.1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "warn"
+
+[patch."https://github.com/zed-industries/zed"]
+gpui_windows = { path = "vendor/gpui_windows" }
+sum_tree = { path = "vendor/sum_tree" }
+
+[patch.crates-io]
+proc-macro-error2 = { git = "https://github.com/GnomedDev/proc-macro-error-2", rev = "53ff94b61c678593158db1a3d50269c6f0de0db7" }

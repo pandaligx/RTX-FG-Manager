@@ -1,4 +1,9 @@
-"""Binary-release repository mirror. Contains no manager implementation or secrets."""
+"""Fast-forward reviewed manager sources and verify stable Gitee release assets.
+
+The source mirror cannot promote cloud catalogs/indexes. Only cloud_release.py
+may do that, after both resource sites have been verified. EXEs are uploaded by
+the publisher from their own machine, never by this Actions script.
+"""
 import hashlib
 import json
 import os
@@ -15,12 +20,183 @@ import uuid
 
 REPO='pandaligx/RTX-FG-Manager'
 API='https://gitee.com/api/v5/repos/'+REPO
-ALLOWED={'README.md','README.zh-CN.md','LICENSE','THIRD_PARTY_NOTICES.txt',
-         'docs/screenshot-home.png','docs/screenshot-home-zh.png',
-         '.github/workflows/mirror-gitee.yml','.github/scripts/mirror_gitee.py'}
+# Keep in step with tools/export-source.ps1. This is deliberately not a recursive
+# copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
+ALLOWED = {
+    'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore',
+    'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
+    'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json',
+    'rust/ui-translations.json', 'app/assets/cleanup-catalog.json',
+    'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',
+    'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json',
+    'app/tools/aria2.conf', 'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1',
+    'tools/prepare-build.ps1', 'tools/prepare-fixtures.ps1', 'tools/export-source.ps1',
+    'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py',
+    'vendor/gpui_windows/Cargo.toml', 'vendor/gpui_windows/build.rs',
+    'vendor/gpui_windows/LICENSE-APACHE', 'vendor/sum_tree/Cargo.toml',
+    'vendor/sum_tree/LICENSE-APACHE', 'vendor/sum_tree/LOCAL_CHANGES.md',
+    'README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md',
+    'CONTRIBUTING.md', 'SECURITY.md', 'cloud/schemes.json', 'cloud/catalog.json',
+    'tools/cloud_release.py', 'docs/cloud-publishing.md', '.github/scripts/mirror_gitee.py',
+    '.github/workflows/build.yml', '.github/workflows/mirror-gitee.yml',
+    '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml',
+    'docs/screenshot-home.png', 'docs/screenshot-home-themes.png',
+    # Existing public history has this screenshot; retaining its history is safe.
+    'docs/screenshot-home-zh.png',
+}
+TREES = (
+    (r'rust/src/.+', {'.rs'}),
+    (r'rust/assets/.+', {'.json', '.svg', '.png', '.ico', '.txt', '.md'}),
+    (r'vendor/gpui_windows/src/.+', {'.rs', '.hlsl'}),
+    (r'vendor/sum_tree/src/.+', {'.rs'}),
+    (r'tests/[^/]+', {'.rs'}),
+    (r'tests/fixtures/catalog(?:420|421|422)/.+', {'.json'}),
+    (r'cloud/indexes/.+', {'.json'}),
+)
+FORBIDDEN = re.compile(
+    r'(^|/)(development|runtime|payloads|log|\.git|\.workspace|target|\.codex|\.agents)(/|$)'
+    r'|^rust/native(/|$)|\.(dll|exe|pfx|p12|key|pml|dmp)$'
+    r'|(^|/)(agent\.md|AGENTS\.md|RELEASE_WORKFLOW\.md|\.env(?:\..*)?)$', re.I)
+CONTENT_RULES = {
+    'private-key material': r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
+    'GitHub credential': r'(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})',
+    'credential-bearing URL': r'''https?://[^\s/"'<>]+:[^\s/"'<>]+@[^\s"'<>]+''',
+    'assigned long credential': r'''(?i)(?:access_token|gitee_token|github_token|token|api_key|auth_token|password|client_secret|secret)["']?\s*[:=]\s*["'][A-Za-z0-9_+/.=-]{20,}["']''',
+    'developer home path': r'''(?i)[A-Z]:[\\/]+Users[\\/]+(?:Administrator|[^\\/\s"']+)[\\/]+(?:Desktop|AppData|Documents)''',
+}
+SYNTHETIC_INPUTS = {
+    'rust/src/cloud.rs': '4f85bc59f748edddacc5e3639f8e3c99362c24cdeaf8adaed0dee75faded566c',
+    'tests/v423_transfer.rs': 'e4b4359e2f12069916814ed61dcde4be96912ac5b4c35b87b2822cf2d4b83972',
+}
+
+
+def allowed_source(path):
+    if not path or '\\' in path or any(p in ('', '.', '..') for p in path.split('/')):
+        return False
+    if FORBIDDEN.search(path):
+        return False
+    return path in ALLOWED or any(re.fullmatch(pattern, path) and Path(path).suffix.lower() in extensions
+                                 for pattern, extensions in TREES)
+
+
+def validate_content(path, data):
+    if len(data) > 20 * 1024 * 1024:
+        raise RuntimeError('Oversized source input: ' + path)
+    if Path(path).suffix.lower() in ('.png', '.ico'):
+        return
+    try:
+        text = data.decode('utf-8-sig')
+    except UnicodeDecodeError as exc:
+        raise RuntimeError('Non-text source input: ' + path) from exc
+    for label, pattern in CONTENT_RULES.items():
+        for match in re.finditer(pattern, text):
+            synthetic = (label == 'credential-bearing URL'
+                         and path in SYNTHETIC_INPUTS
+                         and (path.startswith('tests/') or '#[cfg(test)]' in text[:match.start()])
+                         and hashlib.sha256(match.group().encode()).hexdigest() == SYNTHETIC_INPUTS[path])
+            if not synthetic:
+                # Never print a matched token or private path in workflow logs.
+                raise RuntimeError('Source content requires review: ' + path + ' [' + label + ']')
+
+
+def git(root, *args, env=None, binary=False):
+    output = subprocess.check_output(['git', '-C', str(root), *args], env=env,
+                                     stderr=subprocess.PIPE, timeout=300, text=not binary)
+    return output if binary else output.strip()
+
+
+def tree_entries(root, ref):
+    result = {}
+    for entry in git(root, 'ls-tree', '-r', '-z', ref, binary=True).split(b'\0'):
+        if not entry:
+            continue
+        metadata, path = entry.split(b'\t', 1)
+        mode, kind, oid = metadata.decode('ascii').split()
+        result[path.decode('utf-8')] = (mode, kind, oid)
+    return result
+
+
+def protected_metadata(entries):
+    return {path: entry for path, entry in entries.items()
+            if path == 'cloud/catalog.json' or path.startswith('cloud/indexes/')}
+
+
+def validate_tree(root, entries, seen=None):
+    seen = set() if seen is None else seen
+    for path, (mode, kind, oid) in entries.items():
+        if mode not in ('100644', '100755') or kind != 'blob' or not allowed_source(path):
+            raise RuntimeError('Source publication allowlist rejected: ' + path)
+        if (path, oid) not in seen:
+            validate_content(path, git(root, 'cat-file', 'blob', oid, binary=True))
+            seen.add((path, oid))
+
+
+def ancestor(root, older, newer):
+    result = subprocess.run(['git', '-C', str(root), 'merge-base', '--is-ancestor', older, newer],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=60)
+    if result.returncode not in (0, 1):
+        raise RuntimeError('Could not verify publication history')
+    return result.returncode == 0
+
+
+def assert_source_range(root, source, remote=None):
+    """Gate every newly public commit, including private files later deleted.
+
+    Source-only pushes cannot introduce, change, remove or roll back catalog or
+    index blobs. A partial payload publication must be resumed by cloud_release.
+    """
+    seen = set()
+    entries = tree_entries(root, source)
+    validate_tree(root, entries, seen)
+    baseline = protected_metadata(tree_entries(root, remote)) if remote else {}
+    if protected_metadata(entries) != baseline:
+        raise RuntimeError('Cloud metadata differs from Gitee; run tools/cloud_release.py publish to verify both sites before promotion')
+    revision = remote + '..' + source if remote else source
+    for commit in git(root, 'rev-list', '--reverse', revision).splitlines():
+        entries = tree_entries(root, commit)
+        validate_tree(root, entries, seen)
+        parents = git(root, 'rev-list', '--parents', '-n', '1', commit).split()[1:]
+        diff_args = [parents[0], commit] if parents else ['--root', commit]
+        changed = git(root, 'diff-tree', '--no-commit-id', '--name-only', '--no-renames',
+                      '-r', '-z', *diff_args, binary=True).decode('utf-8').split('\0')
+        # Compare changes to the first parent, not every historical tree to the
+        # current catalog: a normal feature branch can start before a promotion.
+        if any(path == 'cloud/catalog.json' or path.startswith('cloud/indexes/') for path in changed):
+            raise RuntimeError('Source history contains cloud metadata changes; resume tools/cloud_release.py publish first')
+
+
+def sync_main(root, env, remote_url=None):
+    """Push the exact reviewed Git history, never rewrite or synthesize commits."""
+    remote_url = remote_url or 'https://gitee.com/' + REPO + '.git'
+    source = git(root, 'rev-parse', 'refs/heads/main^{commit}')
+    refs = git(root, '-c', 'credential.helper=', 'ls-remote', remote_url, 'refs/heads/main', env=env)
+    remote = None
+    if refs:
+        # Fetch rather than trust a stale ls-remote result during concurrent pushes.
+        git(root, '-c', 'credential.helper=', 'fetch', '--no-tags', remote_url,
+            'refs/heads/main:refs/remotes/rtxfg-mirror/main', env=env)
+        remote = git(root, 'rev-parse', 'refs/remotes/rtxfg-mirror/main^{commit}')
+        if remote == source:
+            validate_tree(root, tree_entries(root, source))
+            return 'already-current'
+        if ancestor(root, source, remote):
+            # An earlier checkout must not roll back a newer catalog/source commit.
+            return 'gitee-ahead'
+        if not ancestor(root, remote, source):
+            raise RuntimeError('GitHub/Gitee main histories diverged; refusing a non-fast-forward mirror')
+    assert_source_range(root, source, remote)
+    git(root, '-c', 'credential.helper=', 'push', remote_url,
+        source + ':refs/heads/main', env=env)
+    # A normal push also rejects any remote advance after the fetch above.
+    refs = git(root, '-c', 'credential.helper=', 'ls-remote', remote_url, 'refs/heads/main', env=env)
+    if not refs or refs.split()[0] != source:
+        raise RuntimeError('Gitee branch readback differs after source push; inspect concurrent publication')
+    return 'fast-forwarded' if remote else 'initialized'
 
 
 def api(path, fields=None, file=None):
+    if file is not None and file.suffix.lower() == '.exe':
+        raise RuntimeError('EXE upload from Actions is prohibited; upload the signed EXE locally')
     headers={'User-Agent':'RTXFG-Publication-Mirror'}
     data=None
     if fields is not None:
@@ -46,6 +222,8 @@ def digest(path):
 
 
 def validate_assets(folder,tag):
+    if any(not p.is_file() or p.is_symlink() for p in folder.iterdir()):
+        raise RuntimeError('Release assets must be regular files')
     manifest=json.loads((folder/'update.json').read_text('utf-8'))
     name=f'RTXManager-{tag}-x64.exe'
     if manifest.get('schema')!=1 or manifest.get('version')!=tag[1:] or manifest.get('file')!=name:
@@ -58,6 +236,8 @@ def validate_assets(folder,tag):
     allowed={name,'update.json','SHA256SUMS.txt','third-party-info.json'}
     files={p.name for p in folder.iterdir() if p.is_file()}
     if files!=allowed:raise RuntimeError('Release assets are missing or unexpected')
+    if any((folder/n).stat().st_size > 2*1024*1024 for n in allowed-{name}):
+        raise RuntimeError('Unexpectedly large release metadata')
     entries={}
     for line in (folder/'SHA256SUMS.txt').read_text('utf-8').splitlines():
         sha,filename=line.split('  ',1)
@@ -150,12 +330,41 @@ def read_remote_tag(args,env):
             time.sleep(2)
 
 
+def mirror_small_assets(existing, files, endpoint, exe):
+    if not isinstance(existing, list):
+        raise RuntimeError('Invalid Gitee attachments')
+    if not verify_manual_exe(existing, exe):
+        return False
+    for file in sorted(files, key=lambda p: p.name == 'update.json'):
+        if file.suffix.lower() == '.exe':
+            continue
+        matches = [a for a in existing if a.get('name') == file.name]
+        if len(matches) > 1:
+            raise RuntimeError('Duplicate mirror asset')
+        if not matches:
+            api(endpoint, {}, file)
+        latest = api(endpoint + '?per_page=100')
+        if not isinstance(latest, list):
+            raise RuntimeError('Invalid Gitee attachments')
+        found = [a for a in latest if a.get('name') == file.name]
+        if len(found) != 1:
+            raise RuntimeError('Attachment not visible after upload')
+        verify_remote(found[0].get('browser_download_url') or found[0].get('download_url')
+                      or found[0].get('url', ''), file)
+        print('Verified mirror asset: ' + file.name)
+    return True
+
+
 def main():
     if not os.environ.get('GITEE_TOKEN'):
         raise RuntimeError('Configure repository secret GITEE_TOKEN; mirror has NOT completed')
     os.environ.setdefault('GITEE_USERNAME',REPO.split('/')[0])
-    tracked=set(subprocess.check_output(['git','ls-files','-z']).decode().split('\0'))-{''}
-    if tracked!=ALLOWED:raise RuntimeError('Publication repository allowlist mismatch')
+    root = Path.cwd()
+    origin = git(root, 'remote', 'get-url', 'origin').removesuffix('.git')
+    if origin not in {'https://github.com/' + REPO, 'git@github.com:' + REPO}:
+        raise RuntimeError('Run only from the reviewed GitHub publication checkout')
+    if git(root, 'status', '--porcelain'):
+        raise RuntimeError('Publication checkout must be clean')
     tag=os.environ.get('TAG_NAME','')
     if tag and not re.fullmatch(r'v\d{1,4}\.\d{1,4}\.\d{1,4}',tag):raise RuntimeError('Invalid stable tag')
     # Gitee repository must be created by its owner before enabling synchronization.
@@ -165,15 +374,19 @@ def main():
         askpass.write_text('#!/usr/bin/env python3\nimport os,sys\nprint(os.environ["GITEE_USERNAME"] if "username" in sys.argv[1].lower() else os.environ["GITEE_TOKEN"])\n')
         askpass.chmod(0o700)
         env=dict(os.environ,GIT_ASKPASS=str(askpass),GIT_TERMINAL_PROMPT='0')
-        args=['git','-c','credential.helper=','push','https://gitee.com/'+REPO+'.git','refs/heads/main:refs/heads/main']
+        result = sync_main(root, env)
+        print('Source/documentation mirror: ' + result)
         if tag:
             remote_refs=read_remote_tag(['git','-c','credential.helper=','ls-remote',
                 'https://gitee.com/'+REPO+'.git',f'refs/tags/{tag}',f'refs/tags/{tag}^{{}}'],env)
             commit=subprocess.check_output(['git','rev-parse',f'{tag}^{{commit}}'],text=True).strip()
-            if tag_push_required(remote_refs,tag,commit):args.append(f'refs/tags/{tag}:refs/tags/{tag}')
-        subprocess.run(args,env=env,check=True,timeout=300)
+            if not ancestor(root, commit, 'refs/heads/main'):
+                raise RuntimeError('Release tag is outside reviewed main history')
+            if tag_push_required(remote_refs,tag,commit):
+                git(root, '-c', 'credential.helper=', 'push', 'https://gitee.com/' + REPO + '.git',
+                    f'refs/tags/{tag}:refs/tags/{tag}', env=env)
         if not tag:
-            print('Documentation mirror completed.');return
+            print('Source/documentation mirror completed; cloud metadata was not promoted.');return
         assets=Path(tmp)/'assets';assets.mkdir()
         subprocess.run(['gh','release','download',tag,'--repo',REPO,'--dir',str(assets)],check=True,timeout=900)
         files=validate_assets(assets,tag)
@@ -185,20 +398,9 @@ def main():
         if type(rid) is not int:raise RuntimeError('Invalid Gitee release response')
         endpoint=f'/releases/{rid}/attach_files'
         existing=api(endpoint+'?per_page=100')
-        if not isinstance(existing,list):raise RuntimeError('Invalid Gitee attachments')
         # Large EXEs are uploaded from the publisher machine, never from Actions.
         exe=assets/f'RTXManager-{tag}-x64.exe'
-        if not verify_manual_exe(existing,exe):return
-        for file in files:
-            if file.suffix.lower()=='.exe':continue
-            matches=[a for a in existing if a.get('name')==file.name]
-            if len(matches)>1:raise RuntimeError('Duplicate mirror asset')
-            if not matches:api(endpoint,{},file)
-            latest=api(endpoint+'?per_page=100')
-            found=[a for a in latest if a.get('name')==file.name]
-            if len(found)!=1:raise RuntimeError('Attachment not visible after upload')
-            verify_remote(found[0].get('browser_download_url') or found[0].get('download_url') or found[0].get('url',''),file)
-            print('Verified mirror asset: '+file.name)
+        if not mirror_small_assets(existing, files, endpoint, exe):return
         print('Release mirror completed; GitHub and Gitee downloads match.')
 
 

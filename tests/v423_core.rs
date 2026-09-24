@@ -1,0 +1,341 @@
+use anyhow::{Result, bail};
+use rtx_fg_manager::{core, preferences, presets, scanner, win};
+use serde_json::{Value, json};
+use std::{
+    fs,
+    path::Path,
+    sync::atomic::AtomicBool,
+    time::{Duration, Instant},
+};
+
+fn exe(path: &Path) -> Result<()> {
+    let mut bytes = vec![0; 512];
+    bytes[..2].copy_from_slice(b"MZ");
+    bytes[60..64].copy_from_slice(&128u32.to_le_bytes());
+    bytes[128..132].copy_from_slice(b"PE\0\0");
+    bytes[132..134].copy_from_slice(&0x8664u16.to_le_bytes());
+    bytes[148..150].copy_from_slice(&240u16.to_le_bytes());
+    bytes[150..152].copy_from_slice(&2u16.to_le_bytes());
+    bytes[152..154].copy_from_slice(&0x20bu16.to_le_bytes());
+    fs::write(path, bytes)?;
+    Ok(())
+}
+
+#[test]
+fn scan_preserves_game_names_containing_tool_words_and_distinct_launch_modes() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    for name in [
+        "CrashBandicoot.exe",
+        "InstallerTycoon.exe",
+        "Game-DX11.exe",
+        "Game-DX12.exe",
+        "CrashReportClient.exe",
+        "unins000.exe",
+        "Launcher.exe",
+        "UE4PrereqSetup_x64.exe",
+        "UnityCrashHandler64.exe",
+        "UE4Editor-Cmd.exe",
+    ] {
+        exe(&dir.path().join(name))?;
+    }
+    fs::write(dir.path().join("nvngx_dlssg.dll"), b"component evidence")?;
+    let report = scanner::scan(
+        &[dir.path().into(), dir.path().into()],
+        &AtomicBool::new(false),
+        |_, _, _| {},
+    )?;
+    let names = report
+        .rows
+        .iter()
+        .map(|g| {
+            Path::new(&g.exe)
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        [
+            "CrashBandicoot.exe",
+            "Game-DX11.exe",
+            "Game-DX12.exe",
+            "InstallerTycoon.exe"
+        ]
+    );
+    assert_eq!(report.candidates, 4);
+    Ok(())
+}
+
+#[test]
+fn scan_skip_details_are_bounded_and_do_not_imply_successful_coverage() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let roots = (0..50)
+        .map(|i| dir.path().join(format!("missing-{i}")))
+        .collect::<Vec<_>>();
+    let report = scanner::scan(&roots, &AtomicBool::new(false), |_, _, _| {})?;
+    assert_eq!(report.skipped, 50);
+    assert_eq!(report.skipped_details.len(), scanner::MAX_SKIP_DETAILS);
+    assert!(
+        report
+            .skipped_details
+            .iter()
+            .all(|s| !s.reason.is_empty() && s.path.chars().count() <= 512)
+    );
+    assert_eq!(report.directories, 0);
+    assert!(report.rows.is_empty());
+    let cancelled = scanner::scan(&roots, &AtomicBool::new(true), |_, _, _| {})?;
+    assert!(cancelled.cancelled);
+    assert_eq!(cancelled.skipped, 0);
+    Ok(())
+}
+
+#[test]
+fn mfg_request_cap_uses_generated_frame_count_and_keeps_inactive_target() -> Result<()> {
+    let mut values = presets::defaults(presets::MFG_VULKAN, &presets::Values::new());
+    values.insert("max_interpolated_frames".into(), "1".into());
+    values.insert("force_multiplier".into(), "6".into());
+    values.insert("dynamic_target_fps".into(), "240".into());
+    assert!(presets::validate(presets::MFG_VULKAN, &values).is_err());
+    assert!(presets::normalize(presets::MFG_VULKAN, &mut values));
+    assert_eq!(values["force_multiplier"], "2");
+    assert!(!presets::normalize(presets::MFG_VULKAN, &mut values));
+    assert!(!presets::parameter_enabled(
+        presets::MFG_VULKAN,
+        "dynamic_target_fps",
+        &values
+    ));
+    assert_eq!(values["dynamic_target_fps"], "240");
+    values.insert("dynamic_mfg".into(), "1".into());
+    assert!(presets::parameter_enabled(
+        presets::MFG_VULKAN,
+        "dynamic_target_fps",
+        &values
+    ));
+    let output = presets::configure(
+        b"[FrameGeneration]\n; preserve\nPrivateValue=9\n",
+        presets::MFG_VULKAN,
+        &values,
+    )?;
+    let text = String::from_utf8(output)?;
+    assert!(text.contains("PrivateValue=9") && text.contains("; preserve"));
+    assert_eq!(
+        presets::read_values(text.as_bytes(), presets::MFG_VULKAN)?,
+        values
+    );
+    values.insert("force_multiplier".into(), "0".into());
+    assert!(!presets::normalize(presets::MFG_VULKAN, &mut values));
+    assert_eq!(values["force_multiplier"], "0");
+    Ok(())
+}
+
+#[test]
+fn legacy_mfg_conflicts_normalize_without_leaking_into_other_protocols() -> Result<()> {
+    let legacy = presets::Values::from([
+        ("max_interpolated_frames".into(), "2".into()),
+        ("force_multiplier".into(), "6".into()),
+        ("dynamic_target_fps".into(), "165".into()),
+    ]);
+    let normalized = presets::defaults(presets::MFG_VULKAN, &legacy);
+    assert_eq!(normalized["force_multiplier"], "3");
+    assert_eq!(normalized["dynamic_target_fps"], "165");
+    let read = presets::read_values(
+        b"[FrameGeneration]\nMaxInterpolatedFrames=2\nForceMultiplier=6\nDynamicTargetFPS=165\n",
+        presets::MFG_VULKAN,
+    )?;
+    assert_eq!(read["force_multiplier"], "3");
+    let mut other = legacy.clone();
+    assert!(!presets::normalize("upstream035", &mut other));
+    assert_eq!(legacy, other);
+    let invalid = presets::Values::from([("force_multiplier".into(), "200".into())]);
+    assert!(presets::configure(b"", presets::MFG_VULKAN, &invalid).is_err());
+    assert_eq!(
+        presets::defaults(presets::MFG_VULKAN, &invalid)["force_multiplier"],
+        "0"
+    );
+    Ok(())
+}
+
+fn settings(n: u64) -> Value {
+    json!({"schema":3,"games":[{"exe":"D:\\游戏\\Game.exe","future":{"value":n}}],"roots":[],"language":"ja","extra":n})
+}
+fn wait_result(store: &preferences::Store, revision: u64) -> Result<preferences::SaveResult> {
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(5) {
+        if let Some(result) = store.try_result()
+            && result.revision == revision
+        {
+            return Ok(result);
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    bail!("settings worker did not report revision {revision}")
+}
+
+#[test]
+fn settings_async_result_reports_real_failure_and_allows_retry() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("games.json");
+    fs::create_dir(&path)?;
+    let store = preferences::Store::new(dir.path().into());
+    let first = store.save_tracked(settings(1))?;
+    assert!(wait_result(&store, first)?.result.is_err());
+    fs::remove_dir(&path)?;
+    let second = store.save_tracked(settings(2))?;
+    assert!(second > first);
+    let result = wait_result(&store, second)?;
+    assert!(result.result.is_ok() && result.backup_warning.is_none());
+    assert_eq!(preferences::load(dir.path())?, settings(2));
+    store.finish()?;
+    assert_eq!(
+        core::read_json(&dir.path().join("games.last-good.json"), 4 * 1024 * 1024)?,
+        settings(2)
+    );
+    Ok(())
+}
+
+#[test]
+fn settings_latest_revision_survives_coalescing_and_close() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let store = preferences::Store::new(dir.path().into());
+    let mut revision = 0;
+    for n in 0..100 {
+        revision = store.save_tracked(settings(n))?;
+    }
+    assert!(wait_result(&store, revision)?.result.is_ok());
+    store.finish()?;
+    assert_eq!(preferences::load(dir.path())?, settings(99));
+    assert_eq!(
+        core::read_json(&dir.path().join("games.last-good.json"), 4 * 1024 * 1024)?,
+        settings(99)
+    );
+    Ok(())
+}
+
+#[test]
+fn corrupted_settings_recover_latest_good_and_preserve_exact_damaged_bytes() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let store = preferences::Store::new(dir.path().into());
+    store.save(settings(7))?;
+    store.finish()?;
+    let path = dir.path().join("games.json");
+    let corrupt = b"{\"schema\":3,\"games\":[";
+    fs::write(&path, corrupt)?;
+    assert!(preferences::load(dir.path()).is_err());
+    assert_eq!(fs::read(&path)?, corrupt);
+    let result = preferences::load_with_recovery(dir.path())?;
+    assert!(result.recovered && result.warning.is_some());
+    assert_eq!(result.value, settings(7));
+    assert_eq!(fs::read(dir.path().join("games.corrupt.json"))?, corrupt);
+    assert_eq!(preferences::load(dir.path())?, settings(7));
+    assert!(!preferences::load_with_recovery(dir.path())?.recovered);
+    Ok(())
+}
+
+#[test]
+fn recovery_never_overwrites_future_schema_invalid_structure_or_old_quarantine() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    core::atomic_json(&dir.path().join("games.last-good.json"), &settings(1))?;
+    let path = dir.path().join("games.json");
+    for invalid in [
+        json!({"schema":4,"games":[]}),
+        json!({"schema":3,"games":{}}),
+    ] {
+        core::atomic_json(&path, &invalid)?;
+        assert!(preferences::load_with_recovery(dir.path()).is_err());
+        assert_eq!(core::read_json(&path, 4 * 1024 * 1024)?, invalid);
+    }
+    fs::write(&path, b"new broken file")?;
+    fs::write(dir.path().join("games.corrupt.json"), b"older broken file")?;
+    assert!(preferences::load_with_recovery(dir.path()).is_err());
+    assert_eq!(fs::read(&path)?, b"new broken file");
+    assert_eq!(
+        fs::read(dir.path().join("games.corrupt.json"))?,
+        b"older broken file"
+    );
+    Ok(())
+}
+
+#[test]
+fn missing_settings_restore_backup_but_do_not_hide_unknown_backup() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    assert!(!preferences::load_with_recovery(dir.path())?.recovered);
+    core::atomic_json(&dir.path().join("games.last-good.json"), &settings(3))?;
+    let report = preferences::load_with_recovery(dir.path())?;
+    assert!(report.recovered);
+    assert_eq!(report.value, settings(3));
+    fs::remove_file(dir.path().join("games.json"))?;
+    let future = json!({"schema":4,"games":[]});
+    core::atomic_json(&dir.path().join("games.last-good.json"), &future)?;
+    assert!(preferences::load_with_recovery(dir.path()).is_err());
+    assert!(!dir.path().join("games.json").exists());
+    Ok(())
+}
+
+#[test]
+fn successful_settings_write_distinguishes_backup_failure() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let future = json!({"schema":4,"games":[]});
+    core::atomic_json(&dir.path().join("games.last-good.json"), &future)?;
+    let store = preferences::Store::new(dir.path().into());
+    let revision = store.save_tracked(settings(4))?;
+    let result = wait_result(&store, revision)?;
+    assert!(result.result.is_ok());
+    assert!(result.backup_warning.is_some());
+    assert_eq!(preferences::load(dir.path())?, settings(4));
+    assert_eq!(
+        core::read_json(&dir.path().join("games.last-good.json"), 4 * 1024 * 1024)?,
+        future
+    );
+    store.finish()?;
+    Ok(())
+}
+
+#[test]
+fn startup_resource_workers_wait_for_each_other_without_changing_game_lock_behavior() -> Result<()>
+{
+    use std::sync::mpsc;
+
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("shared-aria2-resource");
+    let first = win::resource_lock(&path)?;
+    let (started_tx, started_rx) = mpsc::channel();
+    let (acquired_tx, acquired_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    std::thread::scope(|scope| -> Result<()> {
+        let resource_path = &path;
+        let worker = scope.spawn(move || -> Result<(), String> {
+            started_tx.send(()).map_err(|e| e.to_string())?;
+            let lock = win::resource_lock(resource_path).map_err(|e| e.to_string());
+            acquired_tx
+                .send(lock.as_ref().map(|_| ()).map_err(Clone::clone))
+                .map_err(|e| e.to_string())?;
+            let _lock = lock?;
+            release_rx
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?;
+            Ok(())
+        });
+        started_rx.recv_timeout(Duration::from_secs(5))?;
+        assert_eq!(
+            acquired_rx.recv_timeout(Duration::from_millis(100)),
+            Err(mpsc::RecvTimeoutError::Timeout)
+        );
+        drop(first);
+        acquired_rx
+            .recv_timeout(Duration::from_secs(5))?
+            .map_err(anyhow::Error::msg)?;
+        // Resource extraction may wait; a concurrent game mutation still fails
+        // promptly. Different resource paths must not share a global lock.
+        assert!(win::game_lock(&path).is_err());
+        let independent = win::resource_lock(&directory.path().join("other-resource"))?;
+        drop(independent);
+        release_tx.send(())?;
+        worker
+            .join()
+            .map_err(|_| anyhow::anyhow!("resource worker panicked"))?
+            .map_err(anyhow::Error::msg)?;
+        Ok(())
+    })
+}

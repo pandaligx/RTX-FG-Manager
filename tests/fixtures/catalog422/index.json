@@ -1,0 +1,599 @@
+{
+  "schema": 1,
+  "packages": [
+    {
+      "id": "upstream-0.3.5-310-9-version",
+      "scheme_id": "upstream-0.3.5-310-9",
+      "label": "0.3.5 · Github-sdli1995",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "version.dll",
+      "archive": "upstream-0.3.5-310-9-version.zip",
+      "bytes": 9115496,
+      "sha256": "62aa29c593f47292d79c6876697c58818a95ffbfac0e199016de03f571da24d8",
+      "files": [
+        {
+          "name": "version.dll",
+          "bytes": 30293840,
+          "sha256": "682abd18110d4161fbb27a6794da2841346460779bc7fe71be0b8391736ccb45"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 3548,
+          "sha256": "2616857ee29ec61e33c8b52e1b50f4c93cb5339adbb13b73f0ae71a722427a43"
+        }
+      ],
+      "labels": {}
+    },
+    {
+      "id": "upstream-0.3.5-310-9-d3d12",
+      "scheme_id": "upstream-0.3.5-310-9",
+      "label": "0.3.5 · Github-sdli1995",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "d3d12.dll",
+      "archive": "upstream-0.3.5-310-9-d3d12.zip",
+      "bytes": 9116062,
+      "sha256": "6ddebc21b12475a637483e0b28676867593c81c43e1c18451517d2379c19518d",
+      "files": [
+        {
+          "name": "d3d12.dll",
+          "bytes": 30293840,
+          "sha256": "54a1d164a2612a41a72569c158fdb2825844fad3cbfd7d5b330962c146941fbf"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 3548,
+          "sha256": "2616857ee29ec61e33c8b52e1b50f4c93cb5339adbb13b73f0ae71a722427a43"
+        }
+      ],
+      "labels": {}
+    },
+    {
+      "id": "upstream-0.3.5-310-9-dbghelp",
+      "scheme_id": "upstream-0.3.5-310-9",
+      "label": "0.3.5 · Github-sdli1995",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "dbghelp.dll",
+      "archive": "upstream-0.3.5-310-9-dbghelp.zip",
+      "bytes": 9120830,
+      "sha256": "0319078e33a6ff3b6886b75bb25d75e4f53e23004771e20fd8136fb9a11f51d1",
+      "files": [
+        {
+          "name": "dbghelp.dll",
+          "bytes": 30311976,
+          "sha256": "8367686aaedf73ab719fefe8a0ad18ac5ef6ada477b3ea92ca40865baf15cf79"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 3548,
+          "sha256": "2616857ee29ec61e33c8b52e1b50f4c93cb5339adbb13b73f0ae71a722427a43"
+        }
+      ],
+      "labels": {}
+    },
+    {
+      "id": "upstream-0.3.5-310-9-dinput8",
+      "scheme_id": "upstream-0.3.5-310-9",
+      "label": "0.3.5 · Github-sdli1995",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "dinput8.dll",
+      "archive": "upstream-0.3.5-310-9-dinput8.zip",
+      "bytes": 9115409,
+      "sha256": "b0310b28463dbf5f173e8b1fad2a553b8190acb2e128bf7d8308d8b7cc7abda5",
+      "files": [
+        {
+          "name": "dinput8.dll",
+          "bytes": 30293360,
+          "sha256": "490c1a1ddd054f6235e8d310d854134be51e6e5008780d4ecd485f2c0c789a82"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 3548,
+          "sha256": "2616857ee29ec61e33c8b52e1b50f4c93cb5339adbb13b73f0ae71a722427a43"
+        }
+      ],
+      "labels": {}
+    },
+    {
+      "id": "upstream-0.3.5-310-9-dxgi",
+      "scheme_id": "upstream-0.3.5-310-9",
+      "label": "0.3.5 · Github-sdli1995",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "dxgi.dll",
+      "archive": "upstream-0.3.5-310-9-dxgi.zip",
+      "bytes": 9116023,
+      "sha256": "a544cdaa950e0fda2dda0aad09000c9a3b3f24b37fbd611f5e56a30af80da5dd",
+      "files": [
+        {
+          "name": "dxgi.dll",
+          "bytes": 30293840,
+          "sha256": "1bbc5f8f7deca54a14167bf36e9cd983fcfdd1f8f5b17ed93de0207bb6448435"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 3548,
+          "sha256": "2616857ee29ec61e33c8b52e1b50f4c93cb5339adbb13b73f0ae71a722427a43"
+        }
+      ],
+      "labels": {}
+    },
+    {
+      "id": "upstream-0.3.5-310-9-winmm",
+      "scheme_id": "upstream-0.3.5-310-9",
+      "label": "0.3.5 · Github-sdli1995",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "winmm.dll",
+      "archive": "upstream-0.3.5-310-9-winmm.zip",
+      "bytes": 9118124,
+      "sha256": "23ad3e899dcf247aa23302af34530350abd49e4dfb1b7c3e0272c9d81eb3a3c0",
+      "files": [
+        {
+          "name": "winmm.dll",
+          "bytes": 30305248,
+          "sha256": "ddb81d6149ca3787b6015bc922e68c2c1f2048e52cd2b1062340c6669855576f"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 3548,
+          "sha256": "2616857ee29ec61e33c8b52e1b50f4c93cb5339adbb13b73f0ae71a722427a43"
+        }
+      ],
+      "labels": {}
+    },
+    {
+      "id": "pipotoufik-mfg-vulkan-sm86-7-version",
+      "scheme_id": "pipotoufik-mfg-vulkan-sm86-7",
+      "label": "Dlssg-MFG-Vulkan",
+      "version": "1.0.0",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "version.dll",
+      "archive": "dlssg-mfg-vulkan-sm86-7-20260922-version.zip",
+      "bytes": 4509186,
+      "sha256": "b6e6769f37c1f3ca338da97d7634f42cedef0124f10e8026fa2ea29e0026af7a",
+      "files": [
+        {
+          "name": "version.dll",
+          "bytes": 12319088,
+          "sha256": "9b153c0115441443f9db98ad8da322fdcdd32b123b92cfe8461e4820ef7b5cb7"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 4267,
+          "sha256": "d0f335a65a1eee792756dd482c9e8c078ff0ef17f1659ac90b13be0c0e79daec"
+        }
+      ],
+      "labels": {}
+    },
+    {
+      "id": "rtxfg-0.3.5-mfg-v421-version",
+      "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
+      "label": "0.3.5 · 三角洲专用",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "version.dll",
+      "archive": "rtxfg-0.3.5-mfg-v421-version.zip",
+      "bytes": 10553085,
+      "sha256": "a189eb8458217b5f68fb6a571302ffd0c5ca09fdd1eb789bb74ed7fc4eecdf10",
+      "files": [
+        {
+          "name": "version.dll",
+          "bytes": 33943600,
+          "sha256": "42010bd54f40809415473f8071675810e65aac9aae338f610d825351f4c341fd"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 4179,
+          "sha256": "6f73656bb436e810564ed786fccc2e5870f16191d99b5a002f55c2f3c12f5fc9"
+        }
+      ],
+      "labels": {
+        "en": "0.3.5 · Delta Force",
+        "ru": "0.3.5 · Delta Force",
+        "ja": "0.3.5 · デルタフォース専用",
+        "ko": "0.3.5 · 델타 포스 전용"
+      }
+    },
+    {
+      "id": "rtxfg-0.3.5-mfg-v421-winmm",
+      "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
+      "label": "0.3.5 · 三角洲专用",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "winmm.dll",
+      "archive": "rtxfg-0.3.5-mfg-v421-winmm.zip",
+      "bytes": 10556580,
+      "sha256": "c3b30c39e35c8af302e305bec8fe0341b89cac858b6049c8ed22a1831f58403b",
+      "files": [
+        {
+          "name": "winmm.dll",
+          "bytes": 33955520,
+          "sha256": "4cb7b56852ca2512479b07f65e1ac5ebd3c18ab9e6b9096769659fd8d926c76f"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 4179,
+          "sha256": "6f73656bb436e810564ed786fccc2e5870f16191d99b5a002f55c2f3c12f5fc9"
+        }
+      ],
+      "labels": {
+        "en": "0.3.5 · Delta Force",
+        "ru": "0.3.5 · Delta Force",
+        "ja": "0.3.5 · デルタフォース専用",
+        "ko": "0.3.5 · 델타 포스 전용"
+      }
+    },
+    {
+      "id": "rtxfg-0.3.5-mfg-v421-dinput8",
+      "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
+      "label": "0.3.5 · 三角洲专用",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "dinput8.dll",
+      "archive": "rtxfg-0.3.5-mfg-v421-dinput8.zip",
+      "bytes": 10552812,
+      "sha256": "e178d0384dc9dd690979ed925da55a1228ecc85bc4a1ed48c3907bec75a6be88",
+      "files": [
+        {
+          "name": "dinput8.dll",
+          "bytes": 33943120,
+          "sha256": "08764dcb98fe854e3eb296bfca8cdd0aad44693849dec6febe7b0353834c251d"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 4179,
+          "sha256": "6f73656bb436e810564ed786fccc2e5870f16191d99b5a002f55c2f3c12f5fc9"
+        }
+      ],
+      "labels": {
+        "en": "0.3.5 · Delta Force",
+        "ru": "0.3.5 · Delta Force",
+        "ja": "0.3.5 · デルタフォース専用",
+        "ko": "0.3.5 · 델타 포스 전용"
+      }
+    },
+    {
+      "id": "rtxfg-0.3.5-mfg-v421-dbghelp",
+      "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
+      "label": "0.3.5 · 三角洲专用",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "dbghelp.dll",
+      "archive": "rtxfg-0.3.5-mfg-v421-dbghelp.zip",
+      "bytes": 10559657,
+      "sha256": "bc5b42a20d11bcac0e3bfc0eef4276db49d1416b66317d646a92e8a2f881e2dd",
+      "files": [
+        {
+          "name": "dbghelp.dll",
+          "bytes": 33962248,
+          "sha256": "af656f548241e7fe043f636125615be033ce8a5a1a1a60d1dd20c88cd754a4b1"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 4179,
+          "sha256": "6f73656bb436e810564ed786fccc2e5870f16191d99b5a002f55c2f3c12f5fc9"
+        }
+      ],
+      "labels": {
+        "en": "0.3.5 · Delta Force",
+        "ru": "0.3.5 · Delta Force",
+        "ja": "0.3.5 · デルタフォース専用",
+        "ko": "0.3.5 · 델타 포스 전용"
+      }
+    },
+    {
+      "id": "rtxfg-0.3.5-mfg-v421-dxgi",
+      "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
+      "label": "0.3.5 · 三角洲专用",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "dxgi.dll",
+      "archive": "rtxfg-0.3.5-mfg-v421-dxgi.zip",
+      "bytes": 10553669,
+      "sha256": "baf05c2fc0fc8f0ada92a1dc5eb6e1d1762867d7b19d06f7ef40a2d269791fb4",
+      "files": [
+        {
+          "name": "dxgi.dll",
+          "bytes": 33943600,
+          "sha256": "af551c28201a779b5b7f7de3fc645abb7e0289dab33cb6feeeffe51ceaaf91b0"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 4179,
+          "sha256": "6f73656bb436e810564ed786fccc2e5870f16191d99b5a002f55c2f3c12f5fc9"
+        }
+      ],
+      "labels": {
+        "en": "0.3.5 · Delta Force",
+        "ru": "0.3.5 · Delta Force",
+        "ja": "0.3.5 · デルタフォース専用",
+        "ko": "0.3.5 · 델타 포스 전용"
+      }
+    },
+    {
+      "id": "rtxfg-0.3.5-mfg-v421-d3d12",
+      "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
+      "label": "0.3.5 · 三角洲专用",
+      "version": "0.3.5",
+      "backends": [
+        "upstream_sm86"
+      ],
+      "proxy": "d3d12.dll",
+      "archive": "rtxfg-0.3.5-mfg-v421-d3d12.zip",
+      "bytes": 10553733,
+      "sha256": "a08d4763f8cc9da65fb4407eba272231d6b2a9a2d0234ceb1b31fb69b6bf5a76",
+      "files": [
+        {
+          "name": "d3d12.dll",
+          "bytes": 33943600,
+          "sha256": "271e894d6bc2d58ca8fb99fd0b9ff493218e748e782a46e1548158f8308739a7"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 4179,
+          "sha256": "6f73656bb436e810564ed786fccc2e5870f16191d99b5a002f55c2f3c12f5fc9"
+        }
+      ],
+      "labels": {
+        "en": "0.3.5 · Delta Force",
+        "ru": "0.3.5 · Delta Force",
+        "ja": "0.3.5 · デルタフォース専用",
+        "ko": "0.3.5 · 델타 포스 전용"
+      }
+    },
+    {
+      "id": "native-0.2.6-stable-version",
+      "scheme_id": "native-0.2.6-stable",
+      "label": "0.2.6 · DX12/Vulkan",
+      "backends": [
+        "native20",
+        "native30"
+      ],
+      "graphics_apis": [
+        "D3D12",
+        "Vulkan"
+      ],
+      "max_multiplier": 4,
+      "proxy": "version.dll",
+      "archive": "native-0.2.6-stable-version.zip",
+      "bytes": 5217058,
+      "sha256": "1261f179aae5da7ea8f72c71d4fb7cabba9c4d741b57d49a6703080087b3d655",
+      "files": [
+        {
+          "name": "version.dll",
+          "bytes": 16128024,
+          "sha256": "febfd7e5f69f1149c3939e15fbccee2522133128dac62752bda9ad0370bffd00"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 581,
+          "sha256": "fd7f0722194e6e8d8c085327d9826effb411925a69a5e7549d70eff26a9f18b5"
+        }
+      ],
+      "version": "0.2.6",
+      "labels": {}
+    },
+    {
+      "id": "native-0.2.6-stable-winmm",
+      "scheme_id": "native-0.2.6-stable",
+      "label": "0.2.6 · DX12/Vulkan",
+      "backends": [
+        "native20",
+        "native30"
+      ],
+      "graphics_apis": [
+        "D3D12",
+        "Vulkan"
+      ],
+      "max_multiplier": 4,
+      "proxy": "winmm.dll",
+      "archive": "native-0.2.6-stable-winmm.zip",
+      "bytes": 5220293,
+      "sha256": "e59be6966cae49fe54bf9306882788bfd21dfb02dc218eb0530017b064356331",
+      "files": [
+        {
+          "name": "winmm.dll",
+          "bytes": 16139392,
+          "sha256": "3e55bbf9ad9c62870c49bcef4ac243fe1a6e36d42c0f70708736d746cab824ea"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 581,
+          "sha256": "fd7f0722194e6e8d8c085327d9826effb411925a69a5e7549d70eff26a9f18b5"
+        }
+      ],
+      "version": "0.2.6",
+      "labels": {}
+    },
+    {
+      "id": "native-0.2.6-stable-dinput8",
+      "scheme_id": "native-0.2.6-stable",
+      "label": "0.2.6 · DX12/Vulkan",
+      "backends": [
+        "native20",
+        "native30"
+      ],
+      "graphics_apis": [
+        "D3D12",
+        "Vulkan"
+      ],
+      "max_multiplier": 4,
+      "proxy": "dinput8.dll",
+      "archive": "native-0.2.6-stable-dinput8.zip",
+      "bytes": 5216999,
+      "sha256": "d0107cb6711952884e863312ed92e31f3f1a84e33a27971114022a573164be05",
+      "files": [
+        {
+          "name": "dinput8.dll",
+          "bytes": 16127000,
+          "sha256": "36f77a92b3e199cb4d2e666059f3352eb527c9b7575ff12574c7fd4bb3b354f0"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 581,
+          "sha256": "fd7f0722194e6e8d8c085327d9826effb411925a69a5e7549d70eff26a9f18b5"
+        }
+      ],
+      "version": "0.2.6",
+      "labels": {}
+    },
+    {
+      "id": "native-0.2.6-stable-winhttp",
+      "scheme_id": "native-0.2.6-stable",
+      "label": "0.2.6 · DX12/Vulkan",
+      "backends": [
+        "native20",
+        "native30"
+      ],
+      "graphics_apis": [
+        "D3D12",
+        "Vulkan"
+      ],
+      "max_multiplier": 4,
+      "proxy": "winhttp.dll",
+      "archive": "native-0.2.6-stable-winhttp.zip",
+      "bytes": 5218577,
+      "sha256": "e163daf7f35a10c4b5c8df8b9528546a87b0e6b3310dd36966c505ebb7215574",
+      "files": [
+        {
+          "name": "winhttp.dll",
+          "bytes": 16135264,
+          "sha256": "7b250a271881d9fae15437fca31a75780c995c0ed6c254104e7b5b650e83f272"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 581,
+          "sha256": "fd7f0722194e6e8d8c085327d9826effb411925a69a5e7549d70eff26a9f18b5"
+        }
+      ],
+      "version": "0.2.6",
+      "labels": {}
+    },
+    {
+      "id": "native-0.2.6-stable-dxgi",
+      "scheme_id": "native-0.2.6-stable",
+      "label": "0.2.6 · DX12/Vulkan",
+      "backends": [
+        "native20",
+        "native30"
+      ],
+      "graphics_apis": [
+        "D3D12",
+        "Vulkan"
+      ],
+      "max_multiplier": 4,
+      "proxy": "dxgi.dll",
+      "archive": "native-0.2.6-stable-dxgi.zip",
+      "bytes": 5217363,
+      "sha256": "a1b4aefb2fd9b35d347733be1f957a857aeac07006bbe0a86224fdb740f64e66",
+      "files": [
+        {
+          "name": "dxgi.dll",
+          "bytes": 16128536,
+          "sha256": "006aab55a9d08356057bb75f7b6bdacaee328d7613b1d04f364e14fa7695283e"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 581,
+          "sha256": "fd7f0722194e6e8d8c085327d9826effb411925a69a5e7549d70eff26a9f18b5"
+        }
+      ],
+      "version": "0.2.6",
+      "labels": {}
+    },
+    {
+      "id": "initial-rtx20-version",
+      "scheme_id": "initial",
+      "label": "初始方案 · Github 第一版",
+      "backends": [
+        "rtx20"
+      ],
+      "graphics_apis": [],
+      "max_multiplier": null,
+      "proxy": "version.dll",
+      "archive": "initial-rtx20-version.zip",
+      "bytes": 5536900,
+      "sha256": "557fe3446fe37e836cad1932aa7e41b8644a3840e70fa102508f0b5620987662",
+      "files": [
+        {
+          "name": "version.dll",
+          "bytes": 13962712,
+          "sha256": "9e106977214046ddbb26885d65de2944b41eae31fb3d12c69a0cd686c402b07d"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 791,
+          "sha256": "106b4877495b6329bf2a085b7c01268a812e45996a140a3bafa27b8a19e8fb45"
+        }
+      ],
+      "version": "0.1.0",
+      "labels": {
+        "en": "Initial · GitHub first release",
+        "ru": "Исходный · Первый выпуск GitHub",
+        "ja": "初期版 · GitHub 初回リリース",
+        "ko": "초기 버전 · GitHub 첫 릴리스"
+      }
+    },
+    {
+      "id": "initial-rtx30-version",
+      "scheme_id": "initial",
+      "label": "初始方案 · Github 第一版",
+      "backends": [
+        "rtx30"
+      ],
+      "graphics_apis": [],
+      "max_multiplier": null,
+      "proxy": "version.dll",
+      "archive": "initial-rtx30-version.zip",
+      "bytes": 4704043,
+      "sha256": "97e47cc39176449646ad7de6c1cfd22926d91d48fd2e35d562daa49675fcbdac",
+      "files": [
+        {
+          "name": "version.dll",
+          "bytes": 10630744,
+          "sha256": "0fd91cf32500a640df9eeb7addd6d04a37abce85f368461a8ad8a4d352bb3212"
+        },
+        {
+          "name": "dlssg_sm86.ini",
+          "bytes": 1459,
+          "sha256": "77a698310818b90039b72c61331cb50e7fc6692eff220ca9eb14c494998c96b8"
+        }
+      ],
+      "version": "0.1.0",
+      "labels": {
+        "en": "Initial · GitHub first release",
+        "ru": "Исходный · Первый выпуск GitHub",
+        "ja": "初期版 · GitHub 初回リリース",
+        "ko": "초기 버전 · GitHub 첫 릴리스"
+      }
+    }
+  ]
+}

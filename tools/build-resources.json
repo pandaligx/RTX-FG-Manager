@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "description": "Publisher-signed aria2 binary, unchanged. Its exact source build is not available; no reproducible aria2 build is claimed.",
+  "resources": [
+    {
+      "url": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/build-tools/aria2c-1.37.0-35aab6492933.exe",
+      "fallback_urls": [
+        "https://github.com/pandaligx/RTX-FG-Manager/releases/download/build-tools/aria2c-1.37.0-35aab6492933.exe"
+      ],
+      "bytes": 9557464,
+      "sha256": "35aab64929331e10015458a81f5d25d9173df554c48ca43b8f15197d5f1943d8",
+      "outputs": [
+        {
+          "path": "aria2c.exe",
+          "bytes": 9557464,
+          "sha256": "35aab64929331e10015458a81f5d25d9173df554c48ca43b8f15197d5f1943d8"
+        }
+      ]
+    }
+  ]
+}

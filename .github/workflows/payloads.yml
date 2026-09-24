@@ -1,0 +1,46 @@
+name: Publish verified DLL resources
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - cloud/schemes.json
+      - tools/cloud_release.py
+      - .github/workflows/payloads.yml
+  workflow_dispatch:
+    inputs:
+      seed_release:
+        description: Optional existing GitHub resource tag for one-time migration
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+concurrency:
+  group: rtxfg-cloud-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline transaction and package validation tests
+        run: python tools/cloud_release.py self-test
+      - name: Mirror ZIPs, verify both sites, publish index, then catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          SEED_RELEASE: ${{ inputs.seed_release }}
+        run: |
+          args=()
+          if [ -n "$SEED_RELEASE" ]; then args+=(--seed-release "$SEED_RELEASE"); fi
+          python tools/cloud_release.py publish "${args[@]}"

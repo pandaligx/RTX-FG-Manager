@@ -1,0 +1,79 @@
+name: Verify Gitee resource attachments
+
+on:
+  push:
+    branches: [v423-cloud-preflight]
+    paths:
+      - tools/cloud_release.py
+      - .github/workflows/cloud-probe.yml
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Read-only permission diagnosis or verified attachment probe
+        type: choice
+        options: [diagnose-resource-access, probe]
+        default: probe
+      existing_release_only:
+        description: Refuse to create a destination resource release
+        type: boolean
+        default: false
+      source_tag:
+        description: Existing GitHub resource release
+        required: true
+        default: payloads-20260921-v421
+      asset:
+        description: Exact immutable asset filename
+        required: true
+        default: rtxfg-0.3.5-mfg-v421-dbghelp.zip
+      destination_tag:
+        description: Fixed Gitee resource prerelease
+        type: choice
+        options: [payloads]
+        default: payloads
+      expected_sha256:
+        description: Verified source SHA-256
+        required: true
+        default: bc5b42a20d11bcac0e3bfc0eef4276db49d1416b66317d646a92e8a2f881e2dd
+
+permissions:
+  contents: read
+concurrency:
+  group: rtxfg-cloud-publish
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate publication code offline
+        run: python tools/cloud_release.py self-test
+      - name: Verify one attachment without changing the catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          SOURCE_TAG: ${{ inputs.source_tag || 'payloads-20260921-v421' }}
+          ASSET: ${{ inputs.asset || 'rtxfg-0.3.5-mfg-v421-dbghelp.zip' }}
+          DESTINATION_TAG: ${{ inputs.destination_tag || 'payloads' }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 || 'bc5b42a20d11bcac0e3bfc0eef4276db49d1416b66317d646a92e8a2f881e2dd' }}
+          PROBE_MODE: ${{ inputs.mode || 'probe' }}
+          EXISTING_RELEASE_ONLY: ${{ inputs.existing_release_only == true }}
+        run: |
+          args=()
+          if [ "$EXISTING_RELEASE_ONLY" = "true" ]; then args+=(--existing-release-only); fi
+          python tools/cloud_release.py "$PROBE_MODE" \
+            --source-tag "$SOURCE_TAG" --asset "$ASSET" \
+            --destination-tag "$DESTINATION_TAG" \
+            --expected-sha256 "$EXPECTED_SHA256" --out probe-reports "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitee-resource-probe
+          path: probe-reports/*.probe.json
+          if-no-files-found: ignore

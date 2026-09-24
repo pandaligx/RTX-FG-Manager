@@ -1,0 +1,196 @@
+{
+  "purpose": "Cleanup ownership only. Never used to restrict deployable DLLs.",
+  "proxy_sha256": [
+    "03d445237d519ac48cd9226278a0f07aecd7ac597697697eb64404e1d51b3c5a",
+    "0fd91cf32500a640df9eeb7addd6d04a37abce85f368461a8ad8a4d352bb3212",
+    "1004dd4ee0edbe4e1af4c8c7b30d4786bea0f5e7c0412566996b4c2543ae7e36",
+    "110f66869de8ce2be0f666fe6eb2d1588fa1f87bfcf967be2213cb7f68bc9490",
+    "14e10c5d16bf41372985f2e2b30e55b74f9cf8f848dadca26cc25d15eb825f4f",
+    "1619839e4d1b6145ce9a587ba807f42e64f2b0984af9e81700d42ccf46ff7253",
+    "214e4e5c05d0572c76987f2ebdebf58c9e29e1ff8356db8f01f179d682a6aa27",
+    "2a2bf3176c3f7f12c923828bbacb1335dc93d66173c38a7073acdffe89dea229",
+    "34ef84986dce14643557d6f23f1f46e7887ef5bb69c41f4daa1da343b282d5fc",
+    "44f229c99a5d62eb1793559c74c87cd2e5c8e28780dfc1d1ee30f0b6215d33e0",
+    "58d70b74c35d890057fb71cb6d97563e2affdef5cb67afebe41e8fa6eb9ff03c",
+    "6f85b94950e213dcd01efcb44f88ff3e00908a5d6575dc1740baafe0f98d5c3f",
+    "81ba6576aaf164b2f6417071a2f14bcd95ab50633ede4cad1c20aeef51836d04",
+    "86029b27dc2df632c667ba3cf6ad72d27fee1404590f9ec4ac300fd30e1629c4",
+    "8d29eddbd7f1c3e272d07f94ab8812a80ef5b7aeb73923320bf9a432ddcf74c0",
+    "978ab0cef7e72b5f9b780e6843a05120cf4017af1e4878d458b01724deba480f",
+    "9955898bb94db05741704054b0b546eb21d948fc3a766b4273368ba705f656be",
+    "9e106977214046ddbb26885d65de2944b41eae31fb3d12c69a0cd686c402b07d",
+    "b1af3e9a90424c80a297fb168f0d392360c5befd0dbc9edad0032d91e13525f8",
+    "b6c7b1926b95c855b88ddaa3b5a5b90b4de57228909db4943a0340f284ffe1d4",
+    "c844646d835a7b88ed1382eea80403d38b433f8ac09cf92581c73698c44ae7c2",
+    "d4ad9fff5da8d6ce0d1cf356230f2a66691ffe01ebf45c6c679f70ec9d8ef77a",
+    "ef3c3d49c5b5c8a17289c24da9b22885570793d72f3db628fa500f9efdb20489",
+    "f1c9d19873c1fc2a5e46c14df6414a1d7a768cc84a9f7c0e450f6a2f5b7481a8",
+    "fc65e557ae5bdf8d7d9ae61ccaf14dd2b94fe57a09fa7b0f27df9c4f97b752cf"
+  ],
+  "proxy_image_sha256": [
+    "01d50b0e7db2e2e8d076e127ac037c60953e20e85e1394b451f563163298a8c9",
+    "03d445237d519ac48cd9226278a0f07aecd7ac597697697eb64404e1d51b3c5a",
+    "07a3067b975f26b8be0891eee1f2afce9ef4c9ddb6399e4b6ee18722ff510255",
+    "0c091b705e4132effb2364d9f788b36b068fed670cd998cffb4f56d3aa6e594d",
+    "17ee9d00117b4c73bf5e506d07d5f259abd2b3e6e3eb794f0a8ee62d6d51f790",
+    "1cac2a4cd47911004aeb332c42aa1287303c421908cbc72fde996c331c790618",
+    "1f6a386ae98e5bfd9309dc81cbfe7227ee2f90339a0483156a921191bfebf1c5",
+    "2578d8acec8d40cb2b78ae9cc166f4a46714fd23a2618e4ca3eeb2260be2bde4",
+    "278be7d54a0e88b847c47a846e4ce74b8e1e62900b9a62c68db3003100d7d52b",
+    "2ba0a325520d7ccbed9963699969b82e8deab568f89b6eea044acaefb47304a3",
+    "2f1dec4b4337263ba73dd28f5e13320185f15849be0b3b8db37bf853d2d2fe8e",
+    "2f60a5b2c6d6823560360f1ed5a772cc9d3ee6b658b053bccf130ecdd96108b6",
+    "2ff92d156322882e226e5f3aa43d68f9773389f36f32e2dad40aeee5225a4dea",
+    "30d29f915b6cb9b0472778c336e3f1938a5c3ce1ae8f2a924452d6359c98fcad",
+    "36bf1d07f5cc5c306d013cd57facacfd065c7df7b0e223c84b3242fa3706a565",
+    "388d0eea19d4192fd128ab27f2220adf1341e40bf9f9cda48c2cb06a0e91352a",
+    "4cf3b8610ef387d86a58d80309f7d8ef7b576f3cddf7c30c051553c5979c3f84",
+    "4ff0bd14d577e13075cd9e8ebdcf6ae5226cef7df76daf7ee51ac940498fc4b1",
+    "51897e0b45d493fd924bf4900492e3200bc890ca4e79c27f2ad2f714a7452fb2",
+    "528a4a18c40006f966c4bc21d86b99ff05902c7079e629fb6082f59e0efd26d0",
+    "563527e23f40467709441351cee626559885233cbce50b36b4910e040ba9eaf7",
+    "593542b2d2244172d414a10721b770547ab68fde722c6bb434f124a416d9e70b",
+    "59e4a70c3384ed3489f8e261e3051862f56f31332b370dc1f2c4abf38b8f1d13",
+    "623b68e2d8a3d9d993e6fa9b0a0a70a78fbc228b76223b582432cf38eb9f9bc5",
+    "676551a4e721d00e436c8fc0b3d53e10519c455a20d98787814800eee58452b4",
+    "6f73c59019f4857513b0f1b5ff8c04ad9c13c7c681ab1cf73e38ad9cc8736c6d",
+    "7206eb8be24567f1e8cc522a67a40e22e20b6263e4cdfce1ab30bfd5d32d899d",
+    "72a6e2faa7f15f368a59b86ff4cb665b67845cf28f021fcc55b141ee54a706b7",
+    "7489e715b50f0c5586ef1cef962e89e55f5e54e51ea7846cba6b71a4a02b0473",
+    "768003a7dfdbf97174c376e4d59feb9420e8048020f0d5ac79dac8dd6635c246",
+    "79cd5e0018b0d3ff690b14e9a709d68346d84b55fb3774af98ffa4162e242496",
+    "8875fd8b11d0c23f4108eb83e39c7a339ae0bb4a43ebb1efabdbb8279e219dec",
+    "9ce4e9fe06d3b759975086efb76a0cdfb1367ab47abb6df38ffa13b6a5dcd995",
+    "9edfd5d82f77525aa92caa1f6c979c1518e877b96ed166e9465f2822e1a49d93",
+    "a090e93fdd4b7355285549ff2d27c0d10f8927286f203c5f13ec58924a34a9c8",
+    "af79a13f045ef1897c6b44085228a95e06c5dd2fe90ca45042ca602de7c40f44",
+    "b13a762a60469602d3d8038cffa3ea3db2f467dcd841d6efec0fb1048136a811",
+    "b85eecc20438ce86cfa9993449dd98b85a4f5ef4c8ba5482d407a821c28e0172",
+    "b9804e0cb8964d4f712148381ccdad0aafc4931e2ce306e8b66f2f23ea6ffd13",
+    "c0b25751f762737953eb664de03784b39cb3de67ddbf3068147b6b2259d39f43",
+    "c47c01fd18659da28269c29f121b6eb611bf813d90bff3c4478a9739898d6131",
+    "ceda82e1a2ec78427e2525e78e24e329961b983a1ca8f61110e63e77e9f4b474",
+    "d0203be8d2b3df62f8d75d6072ab2ed6bbc98fa13ddc01f8b76d280f9e4f0251",
+    "d050633aef2e1b67f774d0bcc922813ff9268370f2cbe795058a661f3f6d0f67",
+    "d5a5fe67c57d7208ac6dbc9c818e58b216c2277818b6b666ae9e20a496a11350",
+    "e0b43eacb4083e4b7bbdb8f4793fb8ea0f47ac3769d815d54b75d352c038a266",
+    "e88bd6967d32664d5af1e8354571228f64ef9a9307bd3643f334635d5f018932",
+    "f17a345d141c5613741c66ec3a78a6826561826c2f2a7dc8b1190d62fe323f15",
+    "f5715c29aa2738263133cf3a267c3caa8b74d556c19552f83a62d83b23db9cd8",
+    "f8cb720d5096d47cb32c9d8e415ffb33b431486c6e9de536cd68560eaffb6024",
+    "f96275d60e50b96322d32a7bffa65bd044834f061e89e2364784a74bf9398046",
+    "ff5c6d7bee286a03406a1b2c912d063ce546bd6bfe72935688b372b8cfe62726"
+  ],
+  "cache_image_sha256": [
+    "ba4a7df656ab062353003275c99c0fd7e27b00f90a6614da5a3654e3847c56bf",
+    "d7dd5139ab6991b15e2ea6ea28a516bf1d47dcaea44c59b054dee4f2c8a4dd6d",
+    "dfb6d0fdea20159a1f0d9a0cd34f25bd4fe2fbf29ec39dee281e63276632ad89"
+  ],
+  "sources": [
+    {
+      "file": "payloads\\native\\dinput8.dll",
+      "sha256": "978ab0cef7e72b5f9b780e6843a05120cf4017af1e4878d458b01724deba480f",
+      "image_sha256": "f96275d60e50b96322d32a7bffa65bd044834f061e89e2364784a74bf9398046"
+    },
+    {
+      "file": "payloads\\native\\dxgi.dll",
+      "sha256": "b6c7b1926b95c855b88ddaa3b5a5b90b4de57228909db4943a0340f284ffe1d4",
+      "image_sha256": "528a4a18c40006f966c4bc21d86b99ff05902c7079e629fb6082f59e0efd26d0"
+    },
+    {
+      "file": "payloads\\native\\version.dll",
+      "sha256": "34ef84986dce14643557d6f23f1f46e7887ef5bb69c41f4daa1da343b282d5fc",
+      "image_sha256": "2f60a5b2c6d6823560360f1ed5a772cc9d3ee6b658b053bccf130ecdd96108b6"
+    },
+    {
+      "file": "payloads\\native\\winhttp.dll",
+      "sha256": "f1c9d19873c1fc2a5e46c14df6414a1d7a768cc84a9f7c0e450f6a2f5b7481a8",
+      "image_sha256": "0c091b705e4132effb2364d9f788b36b068fed670cd998cffb4f56d3aa6e594d"
+    },
+    {
+      "file": "payloads\\native\\winmm.dll",
+      "sha256": "214e4e5c05d0572c76987f2ebdebf58c9e29e1ff8356db8f01f179d682a6aa27",
+      "image_sha256": "b9804e0cb8964d4f712148381ccdad0aafc4931e2ce306e8b66f2f23ea6ffd13"
+    },
+    {
+      "file": "payloads\\rtx20\\version.dll",
+      "sha256": "9e106977214046ddbb26885d65de2944b41eae31fb3d12c69a0cd686c402b07d",
+      "image_sha256": "e88bd6967d32664d5af1e8354571228f64ef9a9307bd3643f334635d5f018932"
+    },
+    {
+      "file": "payloads\\rtx30\\version.dll",
+      "sha256": "0fd91cf32500a640df9eeb7addd6d04a37abce85f368461a8ad8a4d352bb3212",
+      "image_sha256": "03d445237d519ac48cd9226278a0f07aecd7ac597697697eb64404e1d51b3c5a"
+    },
+    {
+      "file": "development\\backups\\pre-native-0.2.4\\payloads\\native\\dinput8.dll",
+      "sha256": "58d70b74c35d890057fb71cb6d97563e2affdef5cb67afebe41e8fa6eb9ff03c",
+      "image_sha256": "388d0eea19d4192fd128ab27f2220adf1341e40bf9f9cda48c2cb06a0e91352a"
+    },
+    {
+      "file": "development\\backups\\pre-native-0.2.4\\payloads\\native\\dxgi.dll",
+      "sha256": "6f85b94950e213dcd01efcb44f88ff3e00908a5d6575dc1740baafe0f98d5c3f",
+      "image_sha256": "72a6e2faa7f15f368a59b86ff4cb665b67845cf28f021fcc55b141ee54a706b7"
+    },
+    {
+      "file": "development\\backups\\pre-native-0.2.4\\payloads\\native\\version.dll",
+      "sha256": "d4ad9fff5da8d6ce0d1cf356230f2a66691ffe01ebf45c6c679f70ec9d8ef77a",
+      "image_sha256": "f5715c29aa2738263133cf3a267c3caa8b74d556c19552f83a62d83b23db9cd8"
+    },
+    {
+      "file": "development\\backups\\pre-native-0.2.4\\payloads\\native\\winhttp.dll",
+      "sha256": "86029b27dc2df632c667ba3cf6ad72d27fee1404590f9ec4ac300fd30e1629c4",
+      "image_sha256": "79cd5e0018b0d3ff690b14e9a709d68346d84b55fb3774af98ffa4162e242496"
+    },
+    {
+      "file": "development\\backups\\pre-native-0.2.4\\payloads\\native\\winmm.dll",
+      "sha256": "81ba6576aaf164b2f6417071a2f14bcd95ab50633ede4cad1c20aeef51836d04",
+      "image_sha256": "2f1dec4b4337263ba73dd28f5e13320185f15849be0b3b8db37bf853d2d2fe8e"
+    },
+    {
+      "file": "development\\backups\\pre-native-0.2.4\\payloads\\rtx20\\version.dll",
+      "sha256": "9e106977214046ddbb26885d65de2944b41eae31fb3d12c69a0cd686c402b07d",
+      "image_sha256": "e88bd6967d32664d5af1e8354571228f64ef9a9307bd3643f334635d5f018932"
+    },
+    {
+      "file": "development\\backups\\pre-native-0.2.4\\payloads\\rtx30\\version.dll",
+      "sha256": "0fd91cf32500a640df9eeb7addd6d04a37abce85f368461a8ad8a4d352bb3212",
+      "image_sha256": "03d445237d519ac48cd9226278a0f07aecd7ac597697697eb64404e1d51b3c5a"
+    },
+    {
+      "file": "development\\reference\\upstream-version.dll",
+      "sha256": "03d445237d519ac48cd9226278a0f07aecd7ac597697697eb64404e1d51b3c5a",
+      "image_sha256": "03d445237d519ac48cd9226278a0f07aecd7ac597697697eb64404e1d51b3c5a"
+    },
+    {
+      "file": "待签名-Native-0.2.4-Fix1\\version.dll",
+      "sha256": "110f66869de8ce2be0f666fe6eb2d1588fa1f87bfcf967be2213cb7f68bc9490",
+      "image_sha256": "ceda82e1a2ec78427e2525e78e24e329961b983a1ca8f61110e63e77e9f4b474"
+    },
+    {
+      "file": "待签名-Native-0.2.4-Fix1\\winmm.dll",
+      "sha256": "fc65e557ae5bdf8d7d9ae61ccaf14dd2b94fe57a09fa7b0f27df9c4f97b752cf",
+      "image_sha256": "e0b43eacb4083e4b7bbdb8f4793fb8ea0f47ac3769d815d54b75d352c038a266"
+    },
+    {
+      "file": "待签名-Native-0.2.4-Fix1\\dinput8.dll",
+      "sha256": "9955898bb94db05741704054b0b546eb21d948fc3a766b4273368ba705f656be",
+      "image_sha256": "c0b25751f762737953eb664de03784b39cb3de67ddbf3068147b6b2259d39f43"
+    },
+    {
+      "file": "待签名-Native-0.2.4-Fix1\\winhttp.dll",
+      "sha256": "b1af3e9a90424c80a297fb168f0d392360c5befd0dbc9edad0032d91e13525f8",
+      "image_sha256": "30d29f915b6cb9b0472778c336e3f1938a5c3ce1ae8f2a924452d6359c98fcad"
+    },
+    {
+      "file": "待签名-Native-0.2.4-Fix1\\dxgi.dll",
+      "sha256": "44f229c99a5d62eb1793559c74c87cd2e5c8e28780dfc1d1ee30f0b6215d33e0",
+      "image_sha256": "a090e93fdd4b7355285549ff2d27c0d10f8927286f203c5f13ec58924a34a9c8"
+    }
+  ],
+  "vulkan_helper_image_sha256": [
+    "3810a086629bed0a2f30d3d3af3f955ca420774ca0500e3505d2d8654ad9c0c3",
+    "79a85dea63a1b4fea58ab9d5f32f3d7c4f5908e6996a43aa74b129d6e500acc6",
+    "e0845cf672156566a8e77dbdc4bd2b22a0aeb24eced52a7b69c0e990f8eed66b"
+  ]
+}

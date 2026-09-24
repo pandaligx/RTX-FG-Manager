@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "default_scheme": "upstream-0.3.5-310-9",
+  "schemes": [
+    {
+      "id": "upstream-0.3.5-310-9",
+      "name": "0.3.5 · Github-sdli1995",
+      "profile": "upstream035",
+      "version": "0.3.5",
+      "defaults": {
+        "enabled": "1",
+        "optimized": "1",
+        "max_generated_frames": "3",
+        "preset": "Auto",
+        "logging_level": "1"
+      },
+      "archives": [
+        "upstream-0.3.5-310-9-version.zip",
+        "upstream-0.3.5-310-9-d3d12.zip",
+        "upstream-0.3.5-310-9-dbghelp.zip",
+        "upstream-0.3.5-310-9-dinput8.zip",
+        "upstream-0.3.5-310-9-dxgi.zip",
+        "upstream-0.3.5-310-9-winmm.zip"
+      ]
+    },
+    {
+      "id": "pipotoufik-mfg-vulkan-sm86-7",
+      "name": "Dlssg-MFG-Vulkan",
+      "profile": "mfg_vulkan_sm86_7",
+      "version": "1.0.0",
+      "defaults": {},
+      "archives": [
+        {
+          "file": "dlssg-mfg-vulkan-sm86-7-20260922-version.zip",
+          "id": "pipotoufik-mfg-vulkan-sm86-7-version"
+        }
+      ]
+    },
+    {
+      "id": "rtxfg-0.3.5-dx12-vulkan",
+      "name": "0.3.5 · 三角洲专用",
+      "profile": "upstream035",
+      "version": "0.3.5",
+      "names": {
+        "en": "0.3.5 · Delta Force",
+        "ru": "0.3.5 · Delta Force",
+        "ja": "0.3.5 · デルタフォース専用",
+        "ko": "0.3.5 · 델타 포스 전용"
+      },
+      "defaults": {
+        "enabled": "1",
+        "optimized": "1",
+        "max_generated_frames": "3",
+        "preset": "Auto",
+        "logging_level": "1"
+      },
+      "capabilities": [
+        "delta_force_mfg_v1"
+      ],
+      "archives": [
+        "rtxfg-0.3.5-mfg-v421-version.zip",
+        "rtxfg-0.3.5-mfg-v421-winmm.zip",
+        "rtxfg-0.3.5-mfg-v421-dinput8.zip",
+        "rtxfg-0.3.5-mfg-v421-dbghelp.zip",
+        "rtxfg-0.3.5-mfg-v421-dxgi.zip",
+        "rtxfg-0.3.5-mfg-v421-d3d12.zip"
+      ]
+    },
+    {
+      "id": "native-0.2.6-stable",
+      "name": "0.2.6 · DX12/Vulkan",
+      "profile": "native026",
+      "version": "0.2.6",
+      "defaults": {
+        "max_generated_frames": "3",
+        "hardware_bilinear": "0",
+        "logging_level": "1"
+      },
+      "archives": [
+        "native-0.2.6-stable-version.zip",
+        "native-0.2.6-stable-winmm.zip",
+        "native-0.2.6-stable-dinput8.zip",
+        "native-0.2.6-stable-winhttp.zip",
+        "native-0.2.6-stable-dxgi.zip"
+      ]
+    },
+    {
+      "id": "initial",
+      "name": "初始方案 · Github 第一版",
+      "profile": "initial",
+      "version": "0.1.0",
+      "names": {
+        "en": "Initial · GitHub first release",
+        "ru": "Исходный · Первый выпуск GitHub",
+        "ja": "初期版 · GitHub 初回リリース",
+        "ko": "초기 버전 · GitHub 첫 릴리스"
+      },
+      "defaults": {
+        "enabled": "1",
+        "max_generated_frames": "3",
+        "logging_level": "1"
+      },
+      "archives": [
+        {
+          "file": "initial-rtx20-version.zip",
+          "gpu": "rtx20"
+        },
+        {
+          "file": "initial-rtx30-version.zip",
+          "gpu": "rtx30"
+        }
+      ]
+    }
+  ]
+}

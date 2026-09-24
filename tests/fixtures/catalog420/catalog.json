@@ -1,0 +1,83 @@
+{
+  "schema": 2,
+  "revision": "fixture-420",
+  "default_scheme": "upstream-0.3.5-310-9",
+  "sources": {
+    "domestic": {
+      "base_url": "https://panda.ligxng.cn/d/LT/rtxfg/"
+    },
+    "github": {
+      "base_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-20260921-v421/"
+    }
+  },
+  "index": {
+    "url": "https://example.com/index.json",
+    "fallback_url": "https://example.org/index.json",
+    "sha256": "5b22ee675a9254fd780ffe18176a419d25161955e06c6ecc77db955688040652",
+    "bytes": 11378
+  },
+  "schemes": [
+    {
+      "id": "upstream-0.3.5-310-9",
+      "name": "0.3.5 · Github-sdli1995",
+      "names": {},
+      "profile": "upstream035",
+      "defaults": {
+        "enabled": "1",
+        "optimized": "1",
+        "max_generated_frames": "3",
+        "preset": "Auto",
+        "logging_level": "1"
+      },
+      "capabilities": [],
+      "archives": [
+        "upstream-0.3.5-310-9-version.zip",
+        "upstream-0.3.5-310-9-d3d12.zip",
+        "upstream-0.3.5-310-9-dbghelp.zip",
+        "upstream-0.3.5-310-9-dinput8.zip",
+        "upstream-0.3.5-310-9-dxgi.zip",
+        "upstream-0.3.5-310-9-winmm.zip"
+      ]
+    },
+    {
+      "id": "native-0.2.6-stable",
+      "name": "0.2.6 · DX12/Vulkan",
+      "names": {},
+      "profile": "native026",
+      "defaults": {
+        "max_generated_frames": "3",
+        "hardware_bilinear": "0",
+        "logging_level": "1"
+      },
+      "capabilities": [],
+      "archives": [
+        "native-0.2.6-stable-version.zip",
+        "native-0.2.6-stable-winmm.zip",
+        "native-0.2.6-stable-dinput8.zip",
+        "native-0.2.6-stable-winhttp.zip",
+        "native-0.2.6-stable-dxgi.zip"
+      ]
+    },
+    {
+      "id": "initial",
+      "name": "初始方案 · Github 第一版",
+      "names": {
+        "en": "Initial · GitHub first release",
+        "ru": "Исходный · Первый выпуск GitHub",
+        "ja": "初期版 · GitHub 初回リリース",
+        "ko": "초기 버전 · GitHub 첫 릴리스"
+      },
+      "profile": "initial",
+      "defaults": {
+        "enabled": "1",
+        "max_generated_frames": "3",
+        "logging_level": "1"
+      },
+      "capabilities": [],
+      "archives": [
+        "initial-rtx20-version.zip",
+        "initial-rtx30-version.zip"
+      ]
+    }
+  ]
+}

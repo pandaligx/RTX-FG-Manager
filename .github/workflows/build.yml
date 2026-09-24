@@ -1,0 +1,54 @@
+name: Build and test Rust manager
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      binary_regression:
+        description: Run optional pinned signed-binary regressions (large downloads)
+        type: boolean
+        required: false
+        default: false
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        shell: pwsh
+        run: |
+          rustup show active-toolchain
+          rustup component add rustfmt clippy
+      - name: Prepare verified build resource
+        shell: pwsh
+        run: ./tools/prepare-build.ps1
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check
+        run: cargo check --locked
+      - name: Unit and filesystem regression tests
+        run: cargo test --locked
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Build release
+        run: cargo build --locked --release
+      - name: Prepare optional signed-binary fixtures
+        if: github.event_name == 'workflow_dispatch' && inputs.binary_regression
+        shell: pwsh
+        run: ./tools/prepare-fixtures.ps1
+      - name: Optional signed-binary regressions
+        if: github.event_name == 'workflow_dispatch' && inputs.binary_regression
+        run: cargo test --locked --features fixture-tests
+      - name: Optional fixture Clippy
+        if: github.event_name == 'workflow_dispatch' && inputs.binary_regression
+        run: cargo clippy --locked --all-targets --features fixture-tests -- -D warnings
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-RTXManager-windows-x64
+          path: target/x86_64-pc-windows-msvc/release/RTXManager.exe
+          if-no-files-found: error
+          retention-days: 7

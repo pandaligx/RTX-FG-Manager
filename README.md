@@ -30,7 +30,7 @@ A Rust core with a native GPUI interface. One executable for your game library, 
 | Update or remove a patch | Startup update checks, resumable aria2 downloads, speed and compact circular progress; ownership-based cleanup and clear retry notices |
 | Use it every day | Five languages, light/dark themes, DPI-aware layout, background tasks and a visible operation log |
 
-**Portable EXE. No Python, Rust, CUDA Toolkit or separate aria2 installation required.** Manager releases and project-distributed DLLs are digitally signed. This is a **binary distribution repository** containing releases, documentation and update assets; manager source code is not published. Third-party components retain their respective licenses.
+**Portable EXE. No Python, Rust, CUDA Toolkit or separate aria2 installation required.** Manager releases and project-distributed DLLs are digitally signed. The Rust manager source, build instructions and verified cloud maintenance workflow are published here. Third-party components retain their respective licenses.
 
 ## What this project adds to upstream
 
@@ -103,10 +103,10 @@ Both 0.3.5 schemes retain the upstream log directory and empty CacheDirectory (u
 - **Pending cache cleanup:** locked caches keep a retry record and an explicit partial-completion message. Close the relevant processes and retry uninstall or **Clear cache** in Settings.
 - **Preserved data:** original game files, unknown files, the game list and preferences are retained. Old test-3 restoration backups are not removed automatically. Removing a library entry is not uninstalling its patch.
 - **Independent storage:** Delta Force components use `%LOCALAPPDATA%\RTXFG-Delta4X\games\<game-id>\<version>`. Manager data uses `%LOCALAPPDATA%\RTXFGManager`.
-- **Cloud DLLs:** the fixed [catalog.json](https://www.lgxng.cn/1814328088/g/new/catalog.json) selects domestic-first downloads with GitHub fallback. Compatible payload protocols can update independently.
+- **Cloud resources:** mirrored catalogs and DLL packages on Gitee and GitHub. Gitee is the default first source; failures show a reason before trying GitHub. aria2 handles downloads with size, speed and progress. Verified cache entries are reusable.
 - **App updates:** checks run in the background on startup. Downloads are checked for size, SHA-256 and publisher signature, then replace and restart the executable using its new versioned name. The old EXE is removed after successful UI startup; failed startup restores it. Automatic downloading only prefetches a release; applying it still requires confirmation.
 
-Automatic app-update routing uses the Windows region: China prefers Gitee; other regions prefer GitHub. It is configurable and independent of DLL routing. Direct upgrades from 3.7.4 retain game lists, preferences and deployment records.
+Patches, catalogs and app updates share one download preference. New installations default to Gitee first; an explicit GitHub preference is remembered. Existing game libraries, preferences and deployment records remain compatible with upgrades from 3.7.4.
 
 ## Compatibility notes
 
@@ -125,3 +125,11 @@ Thanks to [大大大怪将军阁下 on Bilibili](https://space.bilibili.com/6085
 Not affiliated with NVIDIA, game publishers or the upstream project. The manager's license does not change third-party rights. If this tool helps you, a **Star** is welcome.
 
 Thanks also to [Bilibili · 云外逸声](https://space.bilibili.com/256887068).
+
+## Parameters, source and maintenance
+
+Multiplier controls are visible immediately, while other controls stay under **Advanced parameters**. Changes are marked as pending. **Apply to current game** updates only that game’s INI when the same scheme is installed, without downloading DLLs; **Install and apply** also supports checked batches. Exit the game before applying.
+
+The Rust manager source is published under the repository license. [BUILDING.md](BUILDING.md) documents the pinned toolchain, verified third-party tool and checks for a fresh Windows checkout. Game DLLs retain their respective upstream ownership; private DLL patches and NVIDIA SDK headers are not part of this source release.
+
+Maintain cloud schemes in [cloud/schemes.json](cloud/schemes.json). Add immutable assets to the fixed `payloads` prerelease. The sync verifies packages at both hosts, then publishes the index and finally `cloud/catalog.json`. No private-drive uploads are needed. See [cloud maintenance](docs/cloud-publishing.md). Keep old assets available for older clients.

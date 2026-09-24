@@ -1,0 +1,18 @@
+pub mod assets;
+pub mod cache;
+pub mod cleanup;
+pub mod cloud;
+pub mod core;
+pub mod delta;
+pub mod diagnostics;
+pub mod gpu_alias;
+pub mod hags;
+pub mod i18n;
+pub mod preferences;
+pub mod presets;
+pub mod scanner;
+pub mod selftest;
+pub mod transfer;
+pub mod updater;
+pub mod win;
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
