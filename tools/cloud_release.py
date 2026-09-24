@@ -184,7 +184,7 @@ def official_url(url):
     parsed = urllib.parse.urlsplit(url)
     host = parsed.hostname or ""
     require(parsed.scheme == "https" and not parsed.username and not parsed.password and parsed.port in (None, 443), "Unsafe URL")
-    require(host in {"github.com", "api.github.com", "uploads.github.com", "raw.githubusercontent.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com", "gitee.com", "gitee.cn"} or host.endswith(".gitee.com"), "Unofficial transfer host")
+    require(host in {"github.com", "api.github.com", "uploads.github.com", "raw.githubusercontent.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com", "gitee.com", "gitee.cn", "raw.giteeusercontent.com"} or host.endswith(".gitee.com"), "Unofficial transfer host")
     return url
 
 
@@ -820,6 +820,9 @@ class OfflineTests(unittest.TestCase):
     def test_reject_unsigned_transport_not_package_signature(self):
         for url in ("http://gitee.com/file", "https://github.com@evil.invalid/file", "https://gitee.com.evil.invalid/file"):
             with self.assertRaises(RuntimeError): official_url(url)
+        official_url("https://raw.giteeusercontent.com/pandaligx/RTX-FG-Manager/raw/main/cloud/catalog.json")
+        with self.assertRaises(RuntimeError):
+            official_url("https://raw.giteeusercontent.com.evil.invalid/catalog.json")
 
     def test_invalid_defaults_stop_publication(self):
         spec, archives = self.fixture()
@@ -1043,9 +1046,9 @@ class OfflineTests(unittest.TestCase):
             self.assertEqual(opener.calls, 3)
 
     def test_runtime_error_diagnostic_redacts_tokens_and_queries(self):
-        with patch.dict(os.environ, {"GITEE_TOKEN": "fixture-token-not-real"}):
-            result = safe_exception(RuntimeError("fixture-token-not-real https://gitee.com/path?signature=private"))
-        self.assertNotIn("fixture-token-not-real", result)
+        with patch.dict(os.environ, {"GITEE_TOKEN": "test-token"}):
+            result = safe_exception(RuntimeError("test-token https://gitee.com/path?signature=private"))
+        self.assertNotIn("test-token", result)
         self.assertNotIn("signature=", result)
         self.assertIn("gitee.com/path", result)
 

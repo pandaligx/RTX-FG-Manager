@@ -53,6 +53,7 @@ pub fn validate_url(value: &str, policy: UrlPolicy) -> Result<reqwest::Url> {
                     "gitee.com",
                     "api.gitee.com",
                     "gitee.cn",
+                    "raw.giteeusercontent.com",
                 ]
                 .contains(&host)
                     || host.ends_with(".gitee.com")),

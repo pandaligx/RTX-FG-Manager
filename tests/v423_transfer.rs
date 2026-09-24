@@ -44,6 +44,20 @@ fn transfer_keeps_https_and_official_host_boundaries() {
     assert!(transfer::validate_url(cloud::GITHUB, transfer::UrlPolicy::Official).is_ok());
     assert!(
         transfer::validate_url(
+            "https://raw.giteeusercontent.com/pandaligx/RTX-FG-Manager/raw/main/cloud/catalog.json",
+            transfer::UrlPolicy::Official
+        )
+        .is_ok()
+    );
+    assert!(
+        transfer::validate_url(
+            "https://raw.giteeusercontent.com.evil.invalid/catalog.json",
+            transfer::UrlPolicy::Official
+        )
+        .is_err()
+    );
+    assert!(
+        transfer::validate_url(
             "https://foruda.gitee.com/attach_file/test",
             transfer::UrlPolicy::Official
         )
