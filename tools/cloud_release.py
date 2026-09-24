@@ -165,7 +165,8 @@ def build_documents(spec, archives):
         schemes.append(compact)
     index = canonical({"schema": 1, "packages": packages})
     require(len(index) <= MAX_JSON, "Index too large")
-    revision = "r-" + digest(canonical(spec) + index)[:20]
+    revision = "r-" + digest(canonical({"schemes": spec, "gitee_resources": GITEE_RESOURCE_REPO,
+                                     "github_resources": REPO, "tag": RESOURCE_TAG}) + index)[:20]
     index_path = f"cloud/indexes/payload-index-{revision}.json"
     catalog = {"schema": 2, "revision": revision, "default_scheme": spec["default_scheme"],
                "sources": {"domestic": {"base_url": f"https://gitee.com/{GITEE_RESOURCE_REPO}/releases/download/{RESOURCE_TAG}/"},
@@ -183,6 +184,13 @@ def official_url(url):
     return url
 
 
+def public_location(url):
+    """Never print URL queries, fragments, userinfo or response bodies."""
+    parsed = urllib.parse.urlsplit(url)
+    path = parsed.path[:240]
+    return (parsed.hostname or "unknown") + path
+
+
 class SafeRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         official_url(newurl)
@@ -197,6 +205,7 @@ OPENER = urllib.request.build_opener(SafeRedirect())
 
 def read_url(url, limit=MAX_JSON, headers=None):
     request = urllib.request.Request(official_url(url), headers={"User-Agent": "RTXFG-cloud-publisher", **(headers or {})})
+    print("[read] GET " + public_location(url), flush=True)
     for retry in range(3):
         try:
             with OPENER.open(request, timeout=90) as response:
@@ -221,6 +230,7 @@ class Publisher:
         require(self.github_token and self.gitee_token, "Both repository tokens must be supplied through the environment")
 
     def ensure_gitee_resource_repository(self):
+        print("[stage] Check isolated Gitee resource repository", flush=True)
         try:
             repository = self.api("gitee", GT_RESOURCES)
         except urllib.error.HTTPError as error:
@@ -228,8 +238,10 @@ class Publisher:
                 raise
             repository = None
         if repository is None:
+            print("[stage] Verify Gitee token owner before creating the resource repository", flush=True)
             owner = self.api("gitee", "https://gitee.com/api/v5/user")
             require(isinstance(owner, dict) and owner.get("login", "").lower() == "pandaligx", "Gitee token owner does not match the resource namespace")
+            print("[stage] Create the public resource repository", flush=True)
             repository = self.api("gitee", "https://gitee.com/api/v5/user/repos", {
                 "name": "RTX-FG-Manager-payloads", "path": "RTX-FG-Manager-payloads",
                 "description": "Immutable DLL ZIPs and build tools for RTX-FG-Manager. Manager updates remain in the main repository.",
@@ -248,8 +260,9 @@ class Publisher:
     def api(self, host, path, fields=None, file=None, method=None):
         base = GH if host == "github" else GT
         url = official_url(path if path.startswith("https://") else base + path)
+        print("[api] " + (method or ("POST" if fields is not None or file else "GET")) + " " + public_location(url), flush=True)
         headers = {"User-Agent": "RTXFG-cloud-publisher", "Accept": "application/json"}
-        if host == "gitee" and url == "https://gitee.com/api/v5/user":
+        if host == "gitee" and url.startswith("https://gitee.com/api/v5/"):
             headers["Authorization"] = "Bearer " + self.gitee_token
         data = None
         if host == "github":
@@ -309,11 +322,13 @@ class Publisher:
 
     def ensure_release(self, host, tag=RESOURCE_TAG):
         require(tag in {RESOURCE_TAG, "build-tools"}, "Unexpected resource tag")
+        print(f"[stage] Check {host} manager latest before resource release {tag}", flush=True)
         previous_latest = self.api(host, "/releases/latest")
         require(isinstance(previous_latest, dict) and re.fullmatch(r"v\d{1,4}\.\d{1,4}\.\d{1,4}", previous_latest.get("tag_name", "")), "Legacy latest endpoint is not a manager release; stop migration")
         branch = self.ensure_gitee_resource_repository()["default_branch"] if host == "gitee" else "main"
         current = self.release(host, tag)
         if current is None:
+            print(f"[stage] Create {host} resource release {tag}", flush=True)
             data = {"tag_name": tag, "name": "Resources (not a manager update)",
                     "body": "Immutable, versioned DLL packages. Managed by the cloud publication workflow.",
                     "prerelease": True if host == "github" else "true", "target_commitish": branch}
@@ -332,9 +347,11 @@ class Publisher:
         require(len(actual) == len(data) and digest(actual) == digest(data), "Remote same-name asset differs; refusing overwrite")
 
     def ensure_asset(self, host, release, path):
+        print(f"[stage] Check {host} attachment {path.name}", flush=True)
         current = self.assets(host, release)
         data = path.read_bytes()
         if path.name not in current:
+            print(f"[stage] Upload {host} attachment {path.name}", flush=True)
             if host == "github":
                 url = release["upload_url"].split("{", 1)[0] + "?name=" + urllib.parse.quote(path.name)
                 self.api(host, url, {}, path)
@@ -342,6 +359,7 @@ class Publisher:
                 self.resource_api(host, f'/releases/{release["id"]}/attach_files', {}, path)
             current = self.assets(host, release)
         require(path.name in current, "Uploaded attachment is not visible")
+        print(f"[stage] Anonymous readback {host} attachment {path.name}", flush=True)
         self.verify_asset(current[path.name], data)
         print("Verified " + host + ": " + path.name, flush=True)
 
@@ -379,6 +397,29 @@ def promote_documents(documents, write, promote):
     promote("cloud/catalog.json", catalog)
 
 
+def catalog_promotion_allowed(committed, active_mirror, generated, indexes_ready):
+    # A failed last catalog mirror can be retried only if the committed catalog
+    # is exactly today's verified candidate and both immutable indexes exist.
+    return committed == active_mirror or (committed == generated and indexes_ready())
+
+
+def verify_catalog_gate(root, documents):
+    local = root / "cloud/catalog.json"
+    require(not local.exists() or local.stat().st_size <= MAX_JSON, "Committed catalog too large")
+    committed = local.read_bytes() if local.exists() else None
+    try:
+        active_mirror = read_url(GT_RAW + "cloud/catalog.json", MAX_JSON)
+    except urllib.error.HTTPError as error:
+        if error.code != 404:
+            raise
+        active_mirror = None
+    index_path, index, generated = documents
+    def indexes_ready():
+        return all(read_url(base + index_path, MAX_JSON) == index for base in (GT_RAW, GH_RAW))
+    require(catalog_promotion_allowed(committed, active_mirror, generated, indexes_ready),
+            "Committed catalog differs from the active Gitee mirror; do not hand-edit generated metadata")
+
+
 def git(root, *args, env=None):
     return subprocess.check_output(["git", "-C", str(root), *args], env=env, stderr=subprocess.DEVNULL, text=True).strip()
 
@@ -401,9 +442,10 @@ def publish(args, spec):
     require(origin in {f"https://github.com/{REPO}", f"git@github.com:{REPO}"}, "Unexpected publication repository")
     require(not git(root, "status", "--porcelain"), "Publication checkout must be clean")
     publisher = Publisher()
-    # The candidate schemes commit contains the previous active catalog only.
-    # Mirror it first so the fixed Gitee tag can refer to an existing main.
-    push(root, "gitee", publisher)
+    # Do not mirror main here: a user may have edited generated metadata in the
+    # triggering commit. No Gitee main push is allowed before every ZIP passes
+    # two-site readback. Resource releases live in an independently initialized
+    # Gitee repository and no longer need a preliminary manager-repo push.
     releases = {host: publisher.ensure_release(host) for host in ("github", "gitee")}
     github_assets = publisher.assets("github", releases["github"])
     seed = publisher.release("github", args.seed_release) if args.seed_release else None
@@ -423,6 +465,7 @@ def publish(args, spec):
             path.write_bytes(data)
             for host in ("github", "gitee"):
                 publisher.ensure_asset(host, releases[host], path)
+    verify_catalog_gate(root, documents)
     # Every referenced ZIP now exists and was anonymously read back from both
     # sites. Only at this boundary may active metadata be written and committed.
     index_path, index, catalog = documents
@@ -455,11 +498,13 @@ def probe(args):
     require(re.fullmatch(r"[A-Za-z0-9_.-]{1,150}", args.asset), "Invalid probe asset name")
     require(re.fullmatch(r"[0-9a-f]{64}", args.expected_sha256), "Invalid probe digest")
     publisher = Publisher()
+    print("[stage] Locate the verified GitHub source asset", flush=True)
     source = publisher.release("github", args.source_tag)
     require(source is not None, "Source resource release is absent")
     asset = publisher.assets("github", source).get(args.asset)
     require(asset is not None, "Source asset is absent")
     started = time.monotonic()
+    print("[stage] Download and verify the GitHub source asset", flush=True)
     data = read_url(asset["browser_download_url"], MAX_ZIP)
     require(digest(data) == args.expected_sha256, "Probe source digest mismatch")
     target = publisher.ensure_release("gitee", args.destination_tag)
@@ -585,6 +630,40 @@ class OfflineTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "changed legacy latest"):
             Fake().ensure_release("gitee")
 
+    def test_gitee_resource_repo_is_separate_from_manager_repo(self):
+        spec, archives = self.fixture()
+        catalog = json.loads(build_documents(spec, archives)[2])
+        self.assertIn("/RTX-FG-Manager-payloads/", catalog["sources"]["domestic"]["base_url"])
+        self.assertIn("/RTX-FG-Manager/raw/", catalog["index"]["url"])
+
+    def test_wrong_gitee_owner_does_not_create_repository(self):
+        class Fake(Publisher):
+            def __init__(self): self.calls = []
+            def api(self, host, path, fields=None, file=None):
+                self.calls.append((path, fields))
+                return {"login": "someone-else"} if path.endswith("/user") else None
+        publisher = Fake()
+        with self.assertRaisesRegex(RuntimeError, "owner does not match"):
+            publisher.ensure_gitee_resource_repository()
+        self.assertFalse(any(path.endswith("/user/repos") for path, _ in publisher.calls))
+
+    def test_existing_private_resource_repository_is_never_changed(self):
+        class Fake(Publisher):
+            def __init__(self): self.calls = []
+            def api(self, host, path, fields=None, file=None):
+                self.calls.append((path, fields))
+                return {"full_name": GITEE_RESOURCE_REPO, "owner": {"login": "pandaligx"}, "private": True}
+        publisher = Fake()
+        with self.assertRaisesRegex(RuntimeError, "visibility mismatch"):
+            publisher.ensure_gitee_resource_repository()
+        self.assertEqual(publisher.calls, [(GT_RESOURCES, None)])
+
+    def test_catalog_gate_rejects_hand_edited_metadata_before_any_push(self):
+        self.assertFalse(catalog_promotion_allowed(b"hand-edited", b"old", b"generated", lambda: True))
+        self.assertFalse(catalog_promotion_allowed(b"generated", b"old", b"generated", lambda: False))
+        self.assertTrue(catalog_promotion_allowed(b"generated", b"old", b"generated", lambda: True))
+        self.assertTrue(catalog_promotion_allowed(None, None, b"generated", lambda: False))
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -623,7 +702,7 @@ if __name__ == "__main__":
         main()
     except urllib.error.HTTPError as error:
         # URL/query strings and API response bodies may contain signed links.
-        print(f"Cloud publication stopped: HTTP {error.code}; active metadata was not promoted before asset verification.", file=sys.stderr)
+        print(f"Cloud publication stopped: HTTP {error.code} at {public_location(error.url)}; active metadata was not promoted before asset verification.", file=sys.stderr)
         raise SystemExit(1) from None
     except Exception as error:
         print(f"Cloud publication stopped: {type(error).__name__}: {error}", file=sys.stderr)
