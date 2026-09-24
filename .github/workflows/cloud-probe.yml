@@ -1,0 +1,66 @@
+name: Verify Gitee resource attachments
+
+on:
+  push:
+    branches: [v423-cloud-preflight]
+    paths:
+      - tools/cloud_release.py
+      - .github/workflows/cloud-probe.yml
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: Existing GitHub resource release
+        required: true
+        default: build-tools
+      asset:
+        description: Exact immutable asset filename
+        required: true
+        default: aria2c-1.37.0-35aab6492933.exe
+      destination_tag:
+        description: Fixed Gitee resource prerelease
+        type: choice
+        options: [build-tools, payloads]
+        default: build-tools
+      expected_sha256:
+        description: Verified source SHA-256
+        required: true
+        default: 35aab64929331e10015458a81f5d25d9173df554c48ca43b8f15197d5f1943d8
+
+permissions:
+  contents: read
+concurrency:
+  group: rtxfg-cloud-publish
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate publication code offline
+        run: python tools/cloud_release.py self-test
+      - name: Verify one attachment without changing the catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          SOURCE_TAG: ${{ inputs.source_tag || 'build-tools' }}
+          ASSET: ${{ inputs.asset || 'aria2c-1.37.0-35aab6492933.exe' }}
+          DESTINATION_TAG: ${{ inputs.destination_tag || 'build-tools' }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 || '35aab64929331e10015458a81f5d25d9173df554c48ca43b8f15197d5f1943d8' }}
+        run: >-
+          python tools/cloud_release.py probe
+          --source-tag "$SOURCE_TAG" --asset "$ASSET"
+          --destination-tag "$DESTINATION_TAG"
+          --expected-sha256 "$EXPECTED_SHA256" --out probe-reports
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitee-resource-probe
+          path: probe-reports/*.probe.json
+          if-no-files-found: ignore
