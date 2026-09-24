@@ -28,7 +28,7 @@ $accepted = Join-Path $seed '.workspace/accepted'
 foreach ($relativeFile in @('log/private.json', 'app/main.py', 'rust/native/private.hpp', 'runtime/private.txt', 'AGENTS.md', 'RELEASE_WORKFLOW.md', 'app/tools/aria2c.exe')) {
     if (Test-Path -LiteralPath (Join-Path $accepted $relativeFile)) { throw "Private/binary file was exported: $relativeFile" }
 }
-foreach ($relativeFile in @('Cargo.toml', 'Cargo.lock', 'rust/build.rs', 'rust/assets/help.json', 'rust/assets/cache-hashes.json', 'app/assets/cleanup-catalog.json', 'vendor/gpui_windows/Cargo.toml', 'vendor/sum_tree/Cargo.toml', 'app/tools/aria2.conf', 'tests/test_publication.py', '.github/scripts/mirror_gitee.py')) {
+foreach ($relativeFile in @('Cargo.toml', 'Cargo.lock', '.gitattributes', 'rust/build.rs', 'rust/assets/help.json', 'rust/assets/cache-hashes.json', 'app/assets/cleanup-catalog.json', 'vendor/gpui_windows/Cargo.toml', 'vendor/sum_tree/Cargo.toml', 'app/tools/aria2.conf', 'tests/test_publication.py', '.github/scripts/mirror_gitee.py')) {
     if (-not (Test-Path -LiteralPath (Join-Path $accepted $relativeFile))) { throw "Required source resource is missing: $relativeFile" }
 }
 $nonempty = $false

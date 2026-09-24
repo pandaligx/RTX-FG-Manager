@@ -23,7 +23,7 @@ API='https://gitee.com/api/v5/repos/'+REPO
 # Keep in step with tools/export-source.ps1. This is deliberately not a recursive
 # copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
 ALLOWED = {
-    'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore',
+    'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore', '.gitattributes',
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json',
     'rust/ui-translations.json', 'app/assets/cleanup-catalog.json',

@@ -59,7 +59,7 @@ function Add-Tree([string]$Relative, [string[]]$Extensions) {
 
 # This is a source release allowlist, not a recursive copy of the private workspace.
 foreach ($name in @(
-    'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore',
+    'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore', '.gitattributes',
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json', 'rust/ui-translations.json',
     'app/assets/cleanup-catalog.json', 'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',

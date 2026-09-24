@@ -1,0 +1,5 @@
+# These JSON files are verified as exact bytes, not only as parsed JSON.
+# Preserve their original line endings even with core.autocrlf=true on Windows.
+/tests/fixtures/catalog*/index.json -text
+/cloud/indexes/*.json -text
+/cloud/catalog.json -text

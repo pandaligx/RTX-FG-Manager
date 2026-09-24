@@ -253,17 +253,19 @@ def http_opener():
     return HTTP_STATE.opener
 
 
-def read_url(url, limit=MAX_JSON, headers=None):
+def read_url(url, limit=MAX_JSON, headers=None, attempts=3, timeout=90):
+    require(isinstance(attempts, int) and 1 <= attempts <= 3 and 1 <= timeout <= 90,
+            "Invalid bounded read options")
     request = urllib.request.Request(official_url(url), headers={"User-Agent": "RTXFG-cloud-publisher", **(headers or {})})
     parsed = urllib.parse.urlsplit(url)
     is_zip = parsed.path.lower().endswith(".zip")
     is_json = "/api/" in parsed.path or parsed.path.lower().endswith(".json")
     print("[read] GET " + public_location(url), flush=True)
-    for retry in range(3):
+    for retry in range(attempts):
         delay = 5 + retry * 10
         try:
             with GITEE_READ_SLOTS if (parsed.hostname or "").endswith("gitee.com") else nullcontext():
-                with http_opener().open(request, timeout=90) as response:
+                with http_opener().open(request, timeout=timeout) as response:
                     official_url(response.url)
                     content_type = re.sub(r"[^A-Za-z0-9/;=_. -]", "", response.headers.get("Content-Type", ""))[:80]
                     data = response.read(limit + 1)
@@ -276,17 +278,17 @@ def read_url(url, limit=MAX_JSON, headers=None):
             require(len(data) <= limit, f"Remote file exceeds size limit: limit={limit}, received_at_least={len(data)}")
             return data
         except urllib.error.HTTPError as error:
-            if error.code not in (429, 500, 502, 503, 504) or retry == 2:
+            if error.code not in (429, 500, 502, 503, 504) or retry == attempts - 1:
                 raise
             reason = safe_exception(error)
             retry_after = error.headers.get("Retry-After", "") if error.headers else ""
             if retry_after.isdigit():
                 delay = min(60, max(delay, int(retry_after)))
         except (TimeoutError, urllib.error.URLError, TransientResponse) as error:
-            if retry == 2:
+            if retry == attempts - 1:
                 raise
             reason = safe_exception(error)
-        print(f"[read-retry] {public_location(url)}: {reason}; retry {retry + 2}/3 after {delay}s", flush=True)
+        print(f"[read-retry] {public_location(url)}: {reason}; retry {retry + 2}/{attempts} after {delay}s", flush=True)
         time.sleep(delay)
     raise RuntimeError("Download retry limit reached")
 
@@ -545,6 +547,37 @@ def verify_catalog_gate(root, documents):
             "Committed catalog differs from the active Gitee mirror; do not hand-edit generated metadata")
 
 
+def verify_published_metadata(url, expected):
+    """Only call after a successful push of this exact immutable index/catalog.
+
+    Newly pushed Gitee raw files can briefly retain a negative-cache 404. Wait
+    for visibility within a small fixed budget, never accept different bytes.
+    Existing-catalog admission checks deliberately do not use this helper.
+    """
+    require(url.startswith((GT_RAW + "cloud/", GH_RAW + "cloud/")) and
+            urllib.parse.urlsplit(url).path.endswith(".json"), "Unexpected metadata readback URL")
+    delays = (3, 8, 15, 30)
+    for attempt in range(len(delays) + 1):
+        try:
+            actual = read_url(url, MAX_JSON, attempts=1, timeout=20)
+        except urllib.error.HTTPError as error:
+            if error.code not in (404, 429, 500, 502, 503, 504) or attempt == len(delays):
+                raise
+            reason = safe_exception(error)
+        except (TimeoutError, urllib.error.URLError, TransientResponse) as error:
+            if attempt == len(delays):
+                raise
+            reason = safe_exception(error)
+        else:
+            require(actual == expected, f"Catalog/index mirror readback mismatch: expected_bytes={len(expected)}, "
+                    f"actual_bytes={len(actual)}, expected_sha256={digest(expected)}, actual_sha256={digest(actual)}")
+            print(f"[metadata-verified] {public_location(url)} bytes={len(actual)} sha256={digest(actual)}", flush=True)
+            return
+        print(f"[metadata-wait] {public_location(url)}: {reason}; "
+              f"retry {attempt + 2}/5 after {delays[attempt]}s", flush=True)
+        time.sleep(delays[attempt])
+
+
 def git(root, *args, env=None):
     return subprocess.check_output(["git", "-C", str(root), *args], env=env, stderr=subprocess.DEVNULL, text=True).strip()
 
@@ -667,7 +700,7 @@ def publish_metadata(root, publisher, documents):
         for host in ("github", "gitee"):
             push(root, host, publisher)
             base = GT_RAW if host == "gitee" else GH_RAW
-            require(read_url(base + relative, MAX_JSON) == data, "Catalog/index mirror readback mismatch")
+            verify_published_metadata(base + relative, data)
     promote_documents(documents, write, promote)
     print("Cloud publication completed: " + json.loads(catalog)["revision"], flush=True)
 
@@ -1051,6 +1084,33 @@ class OfflineTests(unittest.TestCase):
         self.assertNotIn("test-token", result)
         self.assertNotIn("signature=", result)
         self.assertIn("gitee.com/path", result)
+
+    def test_published_metadata_waits_for_negative_cache_but_keeps_hash_gate(self):
+        url = GT_RAW + "cloud/catalog.json"
+        missing = urllib.error.HTTPError(url, 404, "not visible yet", {}, None)
+        with patch(__name__ + ".read_url", side_effect=[missing, b"expected"]) as read, \
+                patch(__name__ + ".time.sleep") as sleep:
+            verify_published_metadata(url, b"expected")
+            self.assertEqual(read.call_count, 2)
+            sleep.assert_called_once_with(3)
+            self.assertEqual(read.call_args.kwargs, {"attempts": 1, "timeout": 20})
+        with patch(__name__ + ".read_url", return_value=b"different") as read, \
+                patch(__name__ + ".time.sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "readback mismatch"):
+                verify_published_metadata(url, b"expected")
+            self.assertEqual(read.call_count, 1)
+            sleep.assert_not_called()
+
+    def test_published_metadata_wait_is_bounded_and_never_accepts_auth_failure(self):
+        url = GT_RAW + "cloud/catalog.json"
+        for code, calls in ((404, 5), (403, 1)):
+            error = urllib.error.HTTPError(url, code, "fixture", {}, None)
+            with patch(__name__ + ".read_url", side_effect=error) as read, \
+                    patch(__name__ + ".time.sleep") as sleep:
+                with self.assertRaises(urllib.error.HTTPError):
+                    verify_published_metadata(url, b"expected")
+                self.assertEqual(read.call_count, calls)
+                self.assertEqual(sleep.call_count, calls - 1)
 
 
 def main():
