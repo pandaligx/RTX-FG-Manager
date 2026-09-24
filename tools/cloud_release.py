@@ -561,11 +561,28 @@ def publish(args, spec):
     print("Cloud publication completed: " + json.loads(catalog)["revision"], flush=True)
 
 
+def validate_probe_zip(name, data=None):
+    require(isinstance(name, str) and name.endswith(".zip"), "Actions probes accept DLL ZIPs only; upload EXEs from the publisher machine")
+    filename(name)
+    if data is not None:
+        require(0 < len(data) <= MAX_ZIP, "Invalid probe ZIP size")
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            entries = archive.infolist()
+            names = {entry.filename for entry in entries}
+            require(len(entries) == 2 and len(names) == 2 and "dlssg_sm86.ini" in names and
+                    len(names & PROXIES) == 1, "Probe ZIP must contain only one proxy DLL and its INI")
+            require(all(not entry.is_dir() and not entry.flag_bits & 1 and 0 < entry.file_size <= MAX_ZIP
+                        and (entry.external_attr >> 16) & 0o170000 != 0o120000 for entry in entries),
+                    "Invalid probe ZIP entry")
+
+
 def probe(args):
-    """Explicit remote smoke test: copy one immutable public GitHub asset to
-    Gitee and verify its anonymous download. Never writes an active catalog."""
+    """Copy one immutable DLL ZIP to Gitee and verify its anonymous download.
+    EXEs are uploaded locally, never through this Actions probe. No file is
+    installed or executed and the active catalog remains unchanged."""
     require(args.source_tag and args.asset and args.expected_sha256, "Probe requires source tag, asset and expected SHA-256")
-    require(re.fullmatch(r"[A-Za-z0-9_.-]{1,150}", args.asset), "Invalid probe asset name")
+    validate_probe_zip(args.asset)
+    require(args.destination_tag == RESOURCE_TAG, "DLL ZIP probes must use the payloads resource release")
     require(re.fullmatch(r"[0-9a-f]{64}", args.expected_sha256), "Invalid probe digest")
     publisher = Publisher()
     print("[stage] Locate the verified GitHub source asset", flush=True)
@@ -577,6 +594,7 @@ def probe(args):
     print("[stage] Download and verify the GitHub source asset", flush=True)
     data = read_url(asset["browser_download_url"], MAX_ZIP)
     require(digest(data) == args.expected_sha256, "Probe source digest mismatch")
+    validate_probe_zip(args.asset, data)
     target = publisher.ensure_release("gitee", args.destination_tag, create=not args.existing_release_only)
     with tempfile.TemporaryDirectory(prefix="rtxfg-cloud-probe-") as folder:
         path = Path(folder) / args.asset
@@ -780,6 +798,19 @@ class OfflineTests(unittest.TestCase):
         self.assertNotIn("fake-secret", text)
         self.assertNotIn("?token", text)
         self.assertNotIn("headers", text)
+
+    def test_probe_rejects_exe_and_non_payload_archives(self):
+        with self.assertRaisesRegex(RuntimeError, "DLL ZIPs only"):
+            validate_probe_zip("aria2c-1.37.0-example.exe")
+        _, archives = self.fixture()
+        for name, data in archives.items():
+            validate_probe_zip(name, data)
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, "w") as archive:
+            archive.writestr("tool.exe", b"MZ")
+            archive.writestr("dlssg_sm86.ini", b"[Logging]\nLevel=1\n")
+        with self.assertRaisesRegex(RuntimeError, "only one proxy DLL"):
+            validate_probe_zip("disguised-tool.zip", out.getvalue())
 
 
 def main():
