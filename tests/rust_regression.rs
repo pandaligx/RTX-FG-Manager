@@ -249,9 +249,10 @@ fn scanner_finds_unreal_non_shipping_and_alternate_binary_layouts() -> Result<()
         }
     }
     let r = scanner::scan(&[d.path().into()], &AtomicBool::new(false), |_, _, _| {})?;
-    assert_eq!(r.rows.len(), 4);
+    assert_eq!(r.rows.len(), 1);
     for row in r.rows {
         assert!(row.exe.ends_with("yysls.exe"));
+        assert_eq!(row.targets.len(), 4);
         assert_eq!(core::key(Path::new(&row.root)), core::key(&root));
         assert!(row.reasons.iter().any(|r| r.contains("兼容性待确认")));
         assert!(!row.reasons.iter().any(|r| r.contains("帧生成组件")));
@@ -281,7 +282,7 @@ fn scanner_unity_requires_matching_data_and_player() -> Result<()> {
 #[test]
 fn scanner_sr_evidence_stays_inside_game_and_preserves_architecture_filter() -> Result<()> {
     let d = tempfile::tempdir()?;
-    let good = d.path().join("CustomEngine");
+    let good = d.path().join("Example");
     fs::create_dir_all(good.join("plugins"))?;
     fs::write(good.join("plugins/nvngx_dlss.dll"), b"evidence")?;
     fs::write(good.join("Example.exe"), pe(false))?;
@@ -323,11 +324,11 @@ fn scanner_matches_evidence_and_ignores_launchers() -> Result<()> {
         &AtomicBool::new(false),
         |_, _, _| {},
     )?;
-    assert_eq!(r.rows.len(), 2);
-    assert!(r.rows.iter().any(|row| row.exe.ends_with("Other.exe")));
+    assert_eq!(r.rows.len(), 1);
+    assert_eq!(r.rows[0].targets.len(), 1);
     assert!(r.rows.iter().all(|row| !row.exe.ends_with("Launcher.exe")));
     assert!(r.rows[0].exe.ends_with("Game-Win64-Shipping.exe"));
-    assert_eq!(r.rows[0].rank, 90);
+    assert_eq!(r.rows[0].rank, 105);
     assert_eq!(r.rows[0].root, root.display().to_string());
     let r = scanner::scan(&[d.path().into()], &AtomicBool::new(true), |_, _, _| {})?;
     assert!(r.cancelled);

@@ -63,6 +63,7 @@ foreach ($name in @(
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json', 'rust/ui-translations.json',
     'app/assets/cleanup-catalog.json', 'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',
+    'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/LUCIDE-LICENSE',
     'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json', 'app/tools/aria2.conf',
     'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1',
     'tools/prepare-fixtures.ps1', 'tools/export-source.ps1', 'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', '.github/workflows/build.yml',

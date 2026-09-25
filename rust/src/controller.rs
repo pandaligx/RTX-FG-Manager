@@ -631,12 +631,20 @@ impl Controller {
     }
     pub fn can_apply_parameters(&self) -> bool {
         self.focus.as_ref().is_some_and(|exe| {
+            let Some(game) = self.games.iter().find(|game| &game.exe == exe) else {
+                return false;
+            };
+            let grouped = game.targets.len() > 1 || !game.cleanup_only.is_empty();
+            let expected = format!("已部署 {0}/{0} 个目录", game.targets.len().max(1));
             self.disk_presets
                 .contains_key(&(exe.clone(), self.cloud_scheme()))
-                && self
-                    .statuses
-                    .get(exe)
-                    .is_some_and(|s| s.starts_with("已部署"))
+                && self.statuses.get(exe).is_some_and(|status| {
+                    if grouped {
+                        status == &expected
+                    } else {
+                        status.starts_with("已部署")
+                    }
+                })
         })
     }
     pub fn apply_focused_parameters(&mut self) {
@@ -646,22 +654,77 @@ impl Controller {
         let Some(exe) = self.focus.clone() else {
             return;
         };
-        let context = self.preset_context(&exe);
+        let paths = self
+            .games
+            .iter()
+            .find(|g| g.exe == exe)
+            .map(|g| {
+                if g.targets.is_empty() {
+                    vec![g.exe.clone()]
+                } else {
+                    g.targets.clone()
+                }
+            })
+            .unwrap_or_else(|| vec![exe.clone()]);
+        let scheme = self.cloud_scheme();
+        let policy = self.catalog.scheme_policies[&scheme].clone();
         let values = self.preset_values(&exe);
         self.busy = true;
         self.critical = true;
         self.status_epoch += 1;
         self.progress = "正在应用参数…".into();
         self.channel.operation(move |c| {
-            let path = std::path::Path::new(&exe);
-            match core::apply_parameters(path, &context, &values) {
-                Ok(()) => {
-                    c.send(Event::PresetApplied(exe.clone(), context.scheme, values));
-                    c.send(Event::Log("参数已应用；下次启动游戏生效。".into()));
+            let mut unavailable = Vec::new();
+            for path in &paths {
+                let target = std::path::Path::new(path);
+                let status = core::status(target);
+                if !status.starts_with("已部署") {
+                    unavailable.push(format!("{path}：{status}"));
+                    continue;
                 }
-                Err(e) => c.send(Event::Warning(e.to_string())),
+                match target.parent().map(core::record) {
+                    Some(Ok(Some(record)))
+                        if record.scheme_id.as_deref() == Some(scheme.as_str()) => {}
+                    Some(Ok(_)) => unavailable.push(format!("{path}：已部署方案不同")),
+                    Some(Err(error)) => unavailable.push(format!("{path}：{error}")),
+                    None => unavailable.push(format!("{path}：游戏目录无效")),
+                }
             }
-            c.send(Event::Status(exe.clone(), core::status(path)));
+            if !unavailable.is_empty() {
+                c.send(Event::Warning(format!(
+                    "游戏目录的部署状态或方案不一致，参数未应用：{}",
+                    unavailable.join("；")
+                )));
+                return Ok(());
+            }
+            for path in &paths {
+                if let Err(e) = core::assert_stopped(std::path::Path::new(path)) {
+                    c.send(Event::Warning(e.to_string()));
+                    return Ok(());
+                }
+            }
+            let mut errors = Vec::new();
+            let mut applied = 0;
+            let total = paths.len();
+            for path in paths {
+                let target = std::path::Path::new(&path);
+                let context = rtx_fg_manager::presets::Context::new(&scheme, &policy, target);
+                if let Err(e) = core::apply_parameters(target, &context, &values) {
+                    errors.push(format!("{}：{e}", target.display()));
+                } else {
+                    applied += 1;
+                }
+                c.send(Event::Status(path.clone(), core::status(target)));
+            }
+            if errors.is_empty() {
+                c.send(Event::PresetApplied(exe.clone(), scheme, values));
+                c.send(Event::Log("参数已应用；下次启动游戏生效。".into()));
+            } else {
+                c.send(Event::Warning(format!(
+                    "参数仅应用于 {applied}/{total} 个目录；未完成项：\n{}",
+                    errors.join("\n\n")
+                )));
+            }
             Ok(())
         });
     }
@@ -751,16 +814,58 @@ impl Controller {
             for g in games {
                 let p = std::path::Path::new(&g.exe);
                 let stamp = display_stamp(p).ok();
-                let cached = cache.lock().ok().and_then(|m| {
-                    m.get(&g.exe)
-                        .filter(|(old, at, _)| {
-                            Some(old) == stamp.as_ref() && at.elapsed() < Duration::from_secs(30)
+                let grouped = g.targets.len() > 1 || !g.cleanup_only.is_empty();
+                let cached = (!grouped)
+                    .then(|| {
+                        cache.lock().ok().and_then(|m| {
+                            m.get(&g.exe)
+                                .filter(|(old, at, _)| {
+                                    Some(old) == stamp.as_ref()
+                                        && at.elapsed() < Duration::from_secs(30)
+                                })
+                                .map(|(_, _, s)| s.clone())
                         })
-                        .map(|(_, _, s)| s.clone())
-                });
+                    })
+                    .flatten();
                 let freshly_checked = cached.is_none();
-                let status = cached.unwrap_or_else(|| core::status(p));
+                let status = cached.unwrap_or_else(|| {
+                    if !grouped {
+                        return core::status(p);
+                    }
+                    let targets = if g.targets.is_empty() {
+                        vec![g.exe.clone()]
+                    } else {
+                        g.targets.clone()
+                    };
+                    let statuses = targets
+                        .iter()
+                        .map(|exe| core::status(std::path::Path::new(exe)))
+                        .collect::<Vec<_>>();
+                    let installed = statuses.iter().filter(|s| s.starts_with("已部署")).count();
+                    if installed == targets.len() {
+                        format!("已部署 {installed}/{} 个目录", targets.len())
+                    } else if installed > 0 {
+                        format!(
+                            "已部署 {installed}/{} 个目录，请检查未完成项",
+                            targets.len()
+                        )
+                    } else if g
+                        .cleanup_only
+                        .iter()
+                        .any(|exe| core::status(std::path::Path::new(exe)) != "未部署")
+                    {
+                        "旧路径有补丁，可卸载清理".into()
+                    } else if statuses.iter().all(|s| s == "未部署") {
+                        "未部署".into()
+                    } else {
+                        statuses
+                            .into_iter()
+                            .find(|s| s != "未部署")
+                            .unwrap_or_else(|| "未部署".into())
+                    }
+                });
                 if freshly_checked
+                    && !grouped
                     && let Some(stamp) = stamp
                     && let Ok(mut m) = cache.lock()
                 {
@@ -779,13 +884,204 @@ impl Controller {
             if self.games.len() >= 10000 {
                 break;
             }
-            if !self
+            let path = std::path::Path::new(&g.exe);
+            let same_directory = g.targets.is_empty()
+                && path.is_absolute()
+                && path.parent().is_some_and(|dir| {
+                    let dir = core::key(dir);
+                    self.games.iter().any(|existing| {
+                        existing
+                            .targets
+                            .iter()
+                            .chain(std::iter::once(&existing.exe))
+                            .filter_map(|target| std::path::Path::new(target).parent())
+                            .any(|target_dir| core::key(target_dir) == dir)
+                    })
+                });
+            if self.games.iter().any(|existing| {
+                existing.exe.eq_ignore_ascii_case(&g.exe)
+                    || existing
+                        .targets
+                        .iter()
+                        .any(|target| target.eq_ignore_ascii_case(&g.exe))
+            }) || same_directory
+            {
+                continue;
+            }
+            self.games.push(g);
+        }
+        self.save();
+        self.refresh();
+    }
+    /// Refresh scanned installations without discarding a previously deployed path.
+    pub fn merge_scan(&mut self, rows: Vec<Game>) {
+        // In-flight reads and status checks refer to the old library identities.
+        self.status_epoch += 1;
+        let obsolete = self
+            .games
+            .iter()
+            .filter(|old| {
+                !old.reasons.is_empty()
+                    && scanner::is_steam_client_binary(std::path::Path::new(&old.exe))
+                    && core::status(std::path::Path::new(&old.exe)) == "未部署"
+            })
+            .map(|old| old.exe.clone())
+            .collect::<BTreeSet<_>>();
+        self.games.retain(|old| !obsolete.contains(&old.exe));
+        self.selected.retain(|exe| !obsolete.contains(exe));
+        if self
+            .focus
+            .as_ref()
+            .is_some_and(|exe| obsolete.contains(exe))
+        {
+            self.focus = None;
+        }
+        for exe in &obsolete {
+            self.statuses.remove(exe);
+            self.icons.remove(exe);
+            self.evidence.remove(exe);
+            self.preset_reads.remove(exe);
+            self.running_games.remove(exe);
+            self.disk_presets.retain(|(old, _), _| old != exe);
+        }
+        for mut fresh in rows {
+            let root = core::key(std::path::Path::new(&fresh.root));
+            let matched = self
                 .games
                 .iter()
-                .any(|a| a.exe.eq_ignore_ascii_case(&g.exe))
-            {
-                self.games.push(g);
+                .filter(|old| {
+                    core::key(&scanner::installation_root(std::path::Path::new(&old.exe))) == root
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            if matched.is_empty() && self.games.len() >= 10000 {
+                break;
             }
+            let target_dirs = fresh
+                .targets
+                .iter()
+                .filter_map(|p| std::path::Path::new(p).parent())
+                .map(core::key)
+                .collect::<BTreeSet<_>>();
+            if let Some(chosen) = matched
+                .iter()
+                .find(|old| {
+                    self.focus.as_ref() == Some(&old.exe)
+                        && fresh
+                            .targets
+                            .iter()
+                            .any(|p| p.eq_ignore_ascii_case(&old.exe))
+                })
+                .or_else(|| {
+                    matched.iter().find(|old| {
+                        self.selected.contains(&old.exe)
+                            && fresh
+                                .targets
+                                .iter()
+                                .any(|p| p.eq_ignore_ascii_case(&old.exe))
+                    })
+                })
+            {
+                fresh.exe = chosen.exe.clone();
+            }
+            for old in &matched {
+                for path in old
+                    .cleanup_only
+                    .iter()
+                    .chain(old.targets.iter())
+                    .chain(std::iter::once(&old.exe))
+                {
+                    let p = std::path::Path::new(path);
+                    let Some(dir) = p.parent() else { continue };
+                    // A former card may have covered multiple independent games
+                    // inside one Steam install. Never transfer its other project's
+                    // deployment to this card's uninstall list.
+                    if core::key(&scanner::installation_root(p)) != root {
+                        continue;
+                    }
+                    if target_dirs.contains(&core::key(dir)) {
+                        continue;
+                    }
+                    // An old launcher deployment remains reachable for uninstall, but
+                    // is not silently reinstalled into that unverified location.
+                    if (dir.join(core::OWN).exists() || dir.join(core::INI).exists())
+                        && !fresh
+                            .cleanup_only
+                            .iter()
+                            .any(|old| old.eq_ignore_ascii_case(path))
+                    {
+                        fresh.cleanup_only.push(path.clone());
+                    }
+                }
+            }
+            // Keep the focused game's parameters first, then any settings that
+            // existed only on a second entry in this installation.
+            let mut preference_order = matched.iter().collect::<Vec<_>>();
+            preference_order.sort_by_key(|old| {
+                if self.focus.as_ref() == Some(&old.exe) {
+                    0
+                } else if old.exe.eq_ignore_ascii_case(&fresh.exe) {
+                    1
+                } else if !old.extra.is_empty() {
+                    2
+                } else {
+                    3
+                }
+            });
+            for old in &preference_order {
+                for (key, value) in &old.extra {
+                    if let (Some(Value::Object(existing)), Value::Object(saved)) =
+                        (fresh.extra.get_mut(key), value)
+                    {
+                        for (scheme, options) in saved {
+                            existing
+                                .entry(scheme.clone())
+                                .or_insert_with(|| options.clone());
+                        }
+                    } else {
+                        fresh
+                            .extra
+                            .entry(key.clone())
+                            .or_insert_with(|| value.clone());
+                    }
+                }
+            }
+            for old in &preference_order {
+                let presets = self
+                    .disk_presets
+                    .iter()
+                    .filter(|((exe, _), _)| exe == &old.exe)
+                    .map(|((_, scheme), values)| (scheme.clone(), values.clone()))
+                    .collect::<Vec<_>>();
+                for (scheme, values) in presets {
+                    self.disk_presets
+                        .entry((fresh.exe.clone(), scheme))
+                        .or_insert(values);
+                }
+            }
+            let old_paths = matched
+                .iter()
+                .map(|g| core::key(std::path::Path::new(&g.exe)))
+                .collect::<BTreeSet<_>>();
+            self.games
+                .retain(|g| !old_paths.contains(&core::key(std::path::Path::new(&g.exe))));
+            for old in &matched {
+                if self.focus.as_ref() == Some(&old.exe) {
+                    self.focus = Some(fresh.exe.clone());
+                }
+                if self.selected.remove(&old.exe) {
+                    self.selected.insert(fresh.exe.clone());
+                }
+                self.statuses.remove(&old.exe);
+                self.icons.remove(&old.exe);
+                self.evidence.remove(&old.exe);
+                self.preset_reads.remove(&old.exe);
+                self.running_games.remove(&old.exe);
+                if old.exe != fresh.exe {
+                    self.disk_presets.retain(|(exe, _), _| exe != &old.exe);
+                }
+            }
+            self.games.push(fresh);
         }
         self.save();
         self.refresh();
@@ -857,8 +1153,8 @@ impl Controller {
         if self.closing || self.busy || self.pending_patch.is_some() || (self.read_only && !clean) {
             return;
         }
-        let targets = self.targets();
-        if targets.len() > 1 {
+        let targets = self.patch_targets(clean);
+        if self.target_games().len() > 1 {
             self.pending_patch = Some(PatchRequest { clean, targets });
             self.confirm = Some(if clean { "clean_batch" } else { "deploy_batch" }.into());
         } else {
@@ -918,6 +1214,22 @@ impl Controller {
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
         if !clean {
+            let groups = self
+                .games
+                .iter()
+                .filter_map(|game| {
+                    let entries = if game.targets.is_empty() {
+                        vec![game.exe.clone()]
+                    } else {
+                        game.targets.clone()
+                    };
+                    let entries = entries
+                        .into_iter()
+                        .filter(|p| paths.contains(p))
+                        .collect::<Vec<_>>();
+                    (!entries.is_empty()).then_some((game.title.clone(), entries))
+                })
+                .collect::<Vec<_>>();
             let mut catalog = self.catalog.clone();
             catalog.prefer_github = self.choice("download_source", "domestic") == "github";
             let scheme = self.cloud_scheme();
@@ -927,28 +1239,37 @@ impl Controller {
                 let mut eligible = BTreeSet::new();
                 let mut errors = Vec::new();
                 c.send(Event::Progress("正在检查安装条件…".into()));
-                for exe in paths {
+                for (title, group) in groups {
                     if cancel.load(Ordering::Relaxed) {
                         break;
                     }
-                    match core::preflight_install(std::path::Path::new(&exe), &proxies) {
-                        Ok(()) => {
-                            eligible.insert(exe);
-                        }
-                        Err(e) => {
-                            errors.push(format!(
-                                "{}：{e}",
-                                std::path::Path::new(&exe)
-                                    .file_name()
-                                    .unwrap_or_default()
-                                    .to_string_lossy()
-                            ));
+                    let failed = group.iter().find_map(|exe| {
+                        core::preflight_install(std::path::Path::new(exe), &proxies)
+                            .err()
+                            .map(|e| {
+                                format!(
+                                    "{}：{e}",
+                                    std::path::Path::new(exe)
+                                        .file_name()
+                                        .unwrap_or_default()
+                                        .to_string_lossy()
+                                )
+                            })
+                    });
+                    if let Some(failure) = failed {
+                        errors.push(format!(
+                            "{}：{failure}；此游戏的所有目录均未安装",
+                            if title.is_empty() { "游戏" } else { &title }
+                        ));
+                        for exe in group {
                             c.send(Event::PatchResult(false));
                             c.send(Event::Status(
                                 exe.clone(),
                                 core::status(std::path::Path::new(&exe)),
                             ));
                         }
+                    } else {
+                        eligible.extend(group);
                     }
                 }
                 if !errors.is_empty() {
@@ -978,7 +1299,16 @@ impl Controller {
         let proxies = self.proxies();
         let options = paths
             .iter()
-            .map(|exe| (exe.clone(), self.preset_values(exe)))
+            .map(|exe| {
+                let primary = self
+                    .games
+                    .iter()
+                    .find(|game| {
+                        game.exe == *exe || game.targets.iter().any(|target| target == exe)
+                    })
+                    .map_or(exe.as_str(), |game| game.exe.as_str());
+                (exe.clone(), self.preset_values(primary))
+            })
             .collect::<BTreeMap<_, _>>();
         let cancel = self.cancel.clone();
         self.channel.operation(move |c| {
@@ -1042,8 +1372,7 @@ impl Controller {
             Ok(())
         });
     }
-    /// Checked games are explicit batch targets; otherwise act on the focused row.
-    pub fn targets(&self) -> BTreeSet<String> {
+    fn target_games(&self) -> Vec<&Game> {
         self.games
             .iter()
             .filter(|g| {
@@ -1053,8 +1382,43 @@ impl Controller {
                     self.selected.contains(&g.exe)
                 }
             })
-            .map(|g| g.exe.clone())
             .collect()
+    }
+    /// Installation operates once per verified rendering directory, never on a launcher.
+    pub fn patch_targets(&self, clean: bool) -> BTreeSet<String> {
+        let mut directories = BTreeMap::new();
+        for game in self.target_games() {
+            let targets = if game.targets.is_empty() {
+                std::slice::from_ref(&game.exe)
+            } else {
+                game.targets.as_slice()
+            };
+            for target in targets
+                .iter()
+                .chain(game.cleanup_only.iter().filter(|_| clean))
+            {
+                let path = std::path::Path::new(target);
+                let dir = path.parent().unwrap_or(path);
+                // Persisted game paths are absolute. Keep legacy relative test
+                // entries distinct instead of collapsing every bare name into
+                // the same empty parent directory.
+                let key = if path.is_absolute() {
+                    core::key(dir)
+                } else {
+                    core::key(path)
+                };
+                directories
+                    .entry(key)
+                    .or_insert_with(|| target.as_str().to_owned());
+            }
+        }
+        directories.into_values().collect()
+    }
+    pub fn targets(&self) -> BTreeSet<String> {
+        self.patch_targets(false)
+    }
+    pub fn target_game_count(&self) -> usize {
+        self.target_games().len()
     }
     pub fn can_forget_focused_without_confirmation(&self) -> bool {
         !self.busy
@@ -1312,7 +1676,11 @@ impl Controller {
                         r.seconds,
                         if r.cancelled { " · 已取消" } else { "" }
                     ));
-                    self.merge(r.rows)
+                    if r.cancelled {
+                        self.merge(r.rows)
+                    } else {
+                        self.merge_scan(r.rows)
+                    }
                 }
                 Event::Progress(p) => self.progress = p,
                 Event::PayloadProgress(p) => {
@@ -1819,6 +2187,241 @@ mod tests {
         assert_eq!(c.targets(), BTreeSet::from(["b".into(), "c".into()]));
         c.focus = Some("b".into());
         assert_eq!(c.targets(), BTreeSet::from(["b".into(), "c".into()]));
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn rescan_folds_legacy_entries_and_keeps_parameters_and_old_cleanup_path() {
+        let (dir, mut c) = controller();
+        let root = dir.path().join("steamapps").join("common").join("Signal");
+        let renderer = root
+            .join("SignalGame")
+            .join("Binaries")
+            .join("Win64")
+            .join("Signal-Win64-Shipping.exe");
+        let old_launcher = root.join("Signal.exe");
+        let old_tool = root.join("tools").join("SignalHelper.exe");
+        std::fs::create_dir_all(renderer.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(old_tool.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(root.join(core::OWN)).unwrap();
+        let renderer = renderer.to_string_lossy().into_owned();
+        let old_launcher = old_launcher.to_string_lossy().into_owned();
+        let old_tool = old_tool.to_string_lossy().into_owned();
+        c.games = vec![
+            Game {
+                exe: old_launcher.clone(),
+                root: root.to_string_lossy().into_owned(),
+                extra: [(
+                    "preset_options_v2".into(),
+                    json!({"upstream-0.3.5-310-9":{"logging_level":"3"}}),
+                )]
+                .into_iter()
+                .collect(),
+                ..Default::default()
+            },
+            Game {
+                exe: old_tool.clone(),
+                root: root.to_string_lossy().into_owned(),
+                ..Default::default()
+            },
+        ];
+        c.focus = Some(old_launcher.clone());
+        c.selected.insert(old_launcher.clone());
+        c.disk_presets.insert(
+            (old_launcher.clone(), "upstream-0.3.5-310-9".into()),
+            BTreeMap::from([("logging_level".into(), "3".into())]),
+        );
+        c.merge_scan(vec![Game {
+            exe: renderer.clone(),
+            root: root.to_string_lossy().into_owned(),
+            title: "Signal".into(),
+            targets: vec![renderer.clone()],
+            reasons: vec!["Steam 已安装游戏".into()],
+            ..Default::default()
+        }]);
+        assert_eq!(c.games.len(), 1);
+        assert_eq!(c.focus.as_deref(), Some(renderer.as_str()));
+        assert_eq!(c.selected, BTreeSet::from([renderer.clone()]));
+        assert_eq!(c.target_game_count(), 1);
+        assert_eq!(c.patch_targets(false), BTreeSet::from([renderer.clone()]));
+        assert_eq!(
+            c.patch_targets(true),
+            BTreeSet::from([renderer.clone(), old_launcher.clone()])
+        );
+        assert!(!c.games[0].cleanup_only.contains(&old_tool));
+        assert_eq!(
+            c.games[0].extra["preset_options_v2"]["upstream-0.3.5-310-9"]["logging_level"],
+            "3"
+        );
+        assert!(
+            c.disk_presets
+                .contains_key(&(renderer, "upstream-0.3.5-310-9".into()))
+        );
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn one_game_card_expands_to_verified_rendering_directories() {
+        let (_dir, mut c) = controller();
+        c.games = vec![Game {
+            exe: "C:/Games/Game/Binaries/Win64/Game-Win64-Shipping.exe".into(),
+            targets: vec![
+                "C:/Games/Game/Binaries/Win64/Game-Win64-Shipping.exe".into(),
+                "C:/Games/Game/Binaries/Win64DX12/Game-Win64-Shipping.exe".into(),
+            ],
+            cleanup_only: vec!["C:/Games/Game/OldLauncher.exe".into()],
+            ..Default::default()
+        }];
+        c.focus = Some(c.games[0].exe.clone());
+        assert_eq!(c.target_game_count(), 1);
+        assert_eq!(c.patch_targets(false).len(), 2);
+        assert_eq!(c.patch_targets(true).len(), 3);
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn manual_add_in_an_existing_deployment_directory_does_not_duplicate_the_card() {
+        let (dir, mut c) = controller();
+        let first_dir = dir.path().join("Game/Binaries/Win64");
+        let second_dir = dir.path().join("Game/Binaries/Win64DX12");
+        let first = first_dir
+            .join("Game-Win64-Shipping.exe")
+            .display()
+            .to_string();
+        let alternate = first_dir.join("Game-DX12.exe").display().to_string();
+        let second = second_dir.join("Game-DX12.exe").display().to_string();
+        c.games = vec![Game {
+            exe: first.clone(),
+            targets: vec![first.clone(), second.clone()],
+            ..Default::default()
+        }];
+        c.merge(vec![Game {
+            exe: alternate,
+            ..Default::default()
+        }]);
+        assert_eq!(c.games.len(), 1);
+        c.focus = Some(first);
+        assert_eq!(
+            c.patch_targets(false),
+            BTreeSet::from([c.games[0].exe.clone(), second])
+        );
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn batch_targets_process_a_shared_directory_only_once() {
+        let (dir, mut c) = controller();
+        let common = dir.path().join("Game/Binaries/Win64");
+        let first = common.join("Game.exe").display().to_string();
+        let second = common.join("Game-DX12.exe").display().to_string();
+        c.games = vec![
+            Game {
+                exe: first.clone(),
+                ..Default::default()
+            },
+            Game {
+                exe: second.clone(),
+                ..Default::default()
+            },
+        ];
+        c.selected = BTreeSet::from([first.clone(), second]);
+        assert_eq!(c.patch_targets(false), BTreeSet::from([first.clone()]));
+        assert_eq!(c.patch_targets(true), BTreeSet::from([first]));
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn partial_group_status_cannot_enable_parameter_application() {
+        let (dir, mut c) = controller();
+        let first = dir.path().join("Game/Win64/Game.exe").display().to_string();
+        let second = dir
+            .path()
+            .join("Game/Win64DX12/Game.exe")
+            .display()
+            .to_string();
+        c.games = vec![Game {
+            exe: first.clone(),
+            targets: vec![first.clone(), second],
+            ..Default::default()
+        }];
+        c.focus = Some(first.clone());
+        c.disk_presets.insert(
+            (first.clone(), c.cloud_scheme()),
+            BTreeMap::from([("logging_level".into(), "1".into())]),
+        );
+        c.statuses
+            .insert(first.clone(), "已部署 1/2 个目录，请检查未完成项".into());
+        assert!(!c.can_apply_parameters());
+        c.statuses.insert(first, "已部署 2/2 个目录".into());
+        assert!(c.can_apply_parameters());
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn rescan_does_not_migrate_another_unreal_project_into_cleanup_only() {
+        let (dir, mut c) = controller();
+        let root = dir.path().join("Steam/steamapps/common/Collection");
+        let first = root.join("First/Binaries/Win64/First-Win64-Shipping.exe");
+        let second = root.join("Second/Binaries/Win64/Second-Win64-Shipping.exe");
+        std::fs::create_dir_all(root.join("Engine")).unwrap();
+        std::fs::create_dir_all(first.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(second.parent().unwrap()).unwrap();
+        std::fs::write(second.parent().unwrap().join(core::INI), b"[Runtime]\n").unwrap();
+        assert_ne!(
+            scanner::installation_root(&first),
+            scanner::installation_root(&second)
+        );
+        let first = first.display().to_string();
+        let second = second.display().to_string();
+        c.games = vec![Game {
+            exe: first.clone(),
+            root: root.display().to_string(),
+            targets: vec![first.clone(), second.clone()],
+            ..Default::default()
+        }];
+        c.merge_scan(vec![
+            Game {
+                exe: first.clone(),
+                root: root.join("First").display().to_string(),
+                targets: vec![first.clone()],
+                ..Default::default()
+            },
+            Game {
+                exe: second.clone(),
+                root: root.join("Second").display().to_string(),
+                targets: vec![second],
+                ..Default::default()
+            },
+        ]);
+        assert_eq!(c.games.len(), 2);
+        assert!(c.games[0].cleanup_only.is_empty());
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn rescan_removes_old_steam_client_false_positives_but_keeps_manual_entries() {
+        let (dir, mut c) = controller();
+        let steam = dir.path().join("Steam");
+        std::fs::create_dir_all(steam.join("steamapps")).unwrap();
+        let steam_exe = steam.join("steam.exe").to_string_lossy().into_owned();
+        let manually_added = steam.join("tools.exe").to_string_lossy().into_owned();
+        c.games = vec![
+            Game {
+                exe: steam_exe.clone(),
+                reasons: vec!["旧扫描误报".into()],
+                ..Default::default()
+            },
+            Game {
+                exe: manually_added.clone(),
+                ..Default::default()
+            },
+        ];
+        c.focus = Some(steam_exe.clone());
+        c.selected.insert(steam_exe.clone());
+        c.merge_scan(vec![]);
+        assert_eq!(c.games.len(), 1);
+        assert_eq!(c.games[0].exe, manually_added);
+        assert!(c.focus.is_none() && c.selected.is_empty());
         c.close();
         c.tick_close();
     }

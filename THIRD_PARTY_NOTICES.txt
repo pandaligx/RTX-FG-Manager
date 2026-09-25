@@ -1,6 +1,6 @@
 Helper libraries used by this project
 
-Manager 4.2.3 source and distribution notes (2026-09-25)
+Manager source and distribution notes (2026-09-25)
 The manager is now a Rust native application using GPUI and gpui-component.
 It does not bundle a Python interpreter, Tcl/Tk or a PyInstaller bootloader.
 GPUI: https://github.com/zed-industries/zed (GPUI crate license: Apache-2.0).

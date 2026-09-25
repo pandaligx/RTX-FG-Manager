@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.2.4
+
+- Group verified game executables by installation into one library entry. When
+  a game uses rendering executables in multiple directories, installation and
+  removal process each directory; duplicate EXEs in one directory deploy once.
+- Recognize Steam installations from bounded local manifests, select the
+  rendering EXE, and exclude the Steam client, protected launchers (including
+  Shipping-suffixed anti-cheat launchers), support tools and common game tools
+  from automatic deployment. Separate Unreal projects sharing one Engine are
+  kept apart. Manual EXE addition remains available.
+- Fold older duplicate scan entries into the game card while preserving saved
+  presets, selection and ownership-based uninstall access for old deployments.
+  Parameter application covers all deployed directories in the group, but
+  refuses incomplete or mixed-scheme groups instead of reporting false success.
+- Update the five-language help text. No game DLL or cloud catalog changes.
+
 ## 4.2.3
 
 Compared with 4.2.2, this release improves domestic-first downloads, per-game

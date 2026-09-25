@@ -203,7 +203,11 @@ impl Manager {
             .games
             .iter()
             .enumerate()
-            .filter(|(_, g)| g.exe.to_lowercase().contains(&query))
+            .filter(|(_, g)| {
+                g.exe.to_lowercase().contains(&query)
+                    || g.title.to_lowercase().contains(&query)
+                    || g.root.to_lowercase().contains(&query)
+            })
             .map(|(i, _)| i)
             .collect();
     }
@@ -833,7 +837,11 @@ impl Manager {
         let open_folder = p.parent().unwrap().display().to_string();
         let double_folder = open_folder.clone();
         let open_label = self.t("打开目录");
-        let detail_tip = exe.clone();
+        let detail_tip = if game.targets.len() > 1 {
+            game.targets.join("\n")
+        } else {
+            exe.clone()
+        };
         let view = cx.entity().downgrade();
         let remove_label = self.t("从游戏库移除");
         let menu_disabled = self.c.busy;
@@ -897,12 +905,14 @@ impl Manager {
                                     .text_sm()
                                     .font_weight(FontWeight::MEDIUM)
                                     .truncate()
-                                    .child(
+                                    .child(if game.title.is_empty() {
                                         p.file_name()
                                             .unwrap_or_default()
                                             .to_string_lossy()
-                                            .to_string(),
-                                    ),
+                                            .to_string()
+                                    } else {
+                                        game.title.clone()
+                                    }),
                             )
                             .child(self.deployment_tag(&game.exe)),
                     )
@@ -915,7 +925,7 @@ impl Manager {
                             .text_xs()
                             .text_color(cx.theme().muted_foreground)
                             .truncate()
-                            .child(game.exe.clone()),
+                            .child(game.root.clone()),
                     ),
             )
             .context_menu(move |menu, _, _| {
@@ -1366,7 +1376,7 @@ impl Manager {
         } else {
             self.c.text(&format!(
                 "将处理勾选的 {0} 款游戏。",
-                self.c.targets().len()
+                self.c.target_game_count()
             ))
         };
         if let Some(exe) = &self.c.focus {
@@ -1397,6 +1407,12 @@ impl Manager {
                 .child(Alert::info("game-evidence", self.t(dlss)).small())
                 .child(Alert::new("anti-evidence", self.t(anti)).small());
             if let Some(g) = game {
+                if g.targets.len() > 1 {
+                    panel = panel.child(div().text_xs().child(self.t("将处理以下游戏本体目录：")));
+                    for path in &g.targets {
+                        panel = panel.child(div().text_xs().child(path.clone()));
+                    }
+                }
                 for reason in &g.reasons {
                     panel = panel.child(div().text_xs().child(self.t(reason)));
                 }

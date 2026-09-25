@@ -24,7 +24,7 @@ A Rust core with a native GPUI interface. One executable for your game library, 
 
 | Your task | Built-in support |
 | --- | --- |
-| Find games and deploy patches | Folder, drive and full-drive scans; manual EXE selection; individual or batch deployment with visible scheme and DLL tags |
+| Find games and deploy patches | Folder, drive and full-drive scans grouped by installation; manual EXE selection; individual or batch deployment with visible scheme and DLL tags |
 | Get the right DLL | On-demand cloud downloads, domestic-first routing with GitHub fallback, integrity checks and reusable offline cache |
 | Adjust compatibility and quality | Scheme-specific presets, separate settings for each game and scheme, and contextual **?** help |
 | Update or remove a patch | Startup update checks, resumable aria2 downloads, speed and compact circular progress; ownership-based cleanup and clear retry notices |
@@ -90,6 +90,7 @@ The manager updates the same INI automatically. Follow game and 2X retain the or
 1. Download `RTXManager-v<version>-x64.exe` and run it on Windows 10 / 11 x64. Allow permissions required for the requested operation.
 2. Use the home page's **Graphics settings** button. Under Windows Settings → System → Display → Graphics → Change default graphics settings, enable **Hardware-accelerated GPU scheduling** and restart if requested. Labels vary between Windows versions.
 3. Exit the game, scan or add its actual EXE, select the GPU series, scheme and entry DLL, then install.
+   Verified game executables from one installation appear as one entry. If they occupy separate directories, installation and removal cover every listed directory. Launchers and anti-cheat programs are excluded from automatic deployment; add a missed game EXE manually.
 4. Enable DLSS frame generation in the game. Clicking a row selects the current game; checkboxes select batch targets.
 5. Uninstall the old patch before changing patch version, scheme or entry DLL. Updating the manager does not automatically replace DLLs already installed in games.
 

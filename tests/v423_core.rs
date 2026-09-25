@@ -25,8 +25,6 @@ fn exe(path: &Path) -> Result<()> {
 fn scan_preserves_game_names_containing_tool_words_and_distinct_launch_modes() -> Result<()> {
     let dir = tempfile::tempdir()?;
     for name in [
-        "CrashBandicoot.exe",
-        "InstallerTycoon.exe",
         "Game-DX11.exe",
         "Game-DX12.exe",
         "CrashReportClient.exe",
@@ -39,12 +37,18 @@ fn scan_preserves_game_names_containing_tool_words_and_distinct_launch_modes() -
         exe(&dir.path().join(name))?;
     }
     fs::write(dir.path().join("nvngx_dlssg.dll"), b"component evidence")?;
+    for name in ["CrashBandicoot", "InstallerTycoon"] {
+        let folder = dir.path().join(name);
+        fs::create_dir_all(&folder)?;
+        exe(&folder.join(format!("{name}.exe")))?;
+        fs::write(folder.join("nvngx_dlssg.dll"), b"component evidence")?;
+    }
     let report = scanner::scan(
         &[dir.path().into(), dir.path().into()],
         &AtomicBool::new(false),
         |_, _, _| {},
     )?;
-    let names = report
+    let mut names = report
         .rows
         .iter()
         .map(|g| {
@@ -55,16 +59,173 @@ fn scan_preserves_game_names_containing_tool_words_and_distinct_launch_modes() -
                 .into_owned()
         })
         .collect::<Vec<_>>();
+    names.sort();
     assert_eq!(
         names,
-        [
-            "CrashBandicoot.exe",
-            "Game-DX11.exe",
-            "Game-DX12.exe",
-            "InstallerTycoon.exe"
-        ]
+        ["CrashBandicoot.exe", "Game-DX12.exe", "InstallerTycoon.exe"]
     );
+    assert_eq!(report.candidates, 3);
+    assert_eq!(
+        report
+            .rows
+            .iter()
+            .find(|g| g.exe.ends_with("Game-DX12.exe"))
+            .unwrap()
+            .targets
+            .len(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn steam_scan_uses_install_identity_and_excludes_protected_launchers() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let steam = dir.path().join("Steam");
+    let apps = steam.join("steamapps");
+    let apex = apps.join("common/Apex Legends");
+    let storm = apps.join("common/Stormgate");
+    fs::create_dir_all(&apex)?;
+    fs::create_dir_all(apex.join("Binaries/Win64"))?;
+    fs::create_dir_all(apex.join("Support"))?;
+    fs::create_dir_all(storm.join("Engine"))?;
+    fs::create_dir_all(storm.join("Stormgate/Binaries/Win64"))?;
+    for (id, title, folder) in [
+        ("1172470", "Apex Legends", "Apex Legends"),
+        ("2012510", "Stormgate", "Stormgate"),
+    ] {
+        fs::write(
+            apps.join(format!("appmanifest_{id}.acf")),
+            format!(
+                "\"AppState\"\n{{\n\"appid\" \"{id}\"\n\"name\" \"{title}\"\n\"installdir\" \"{folder}\"\n}}"
+            ),
+        )?;
+    }
+    exe(&apex.join("r5apex_dx12.exe"))?;
+    exe(&apex.join("Binaries/Win64/r5apex_vulkan.exe"))?;
+    exe(&apex.join("start_protected_game.exe"))?;
+    exe(&apex.join("Support/VideoEncoderDX12.exe"))?;
+    exe(&storm.join("Stormgate.exe"))?;
+    exe(&storm.join("start_protected_game.exe"))?;
+    exe(&storm.join("Stormgate/Binaries/Win64/Stormgate-Win64-Shipping.exe"))?;
+    exe(&storm.join("Stormgate/Binaries/Win64/StormgateLauncher-Win64-Shipping.exe"))?;
+    exe(&storm.join("Stormgate/Binaries/Win64/StormgateServer-Win64-Shipping.exe"))?;
+    exe(&storm.join("Stormgate/Binaries/Win64/EasyAntiCheat-Win64-Shipping.exe"))?;
+    exe(&storm.join("Stormgate/Binaries/Win64/StartProtectedGame-Win64-Shipping.exe"))?;
+    exe(&steam.join("steam.exe"))?;
+    fs::create_dir_all(steam.join("bin"))?;
+    exe(&steam.join("bin/steamxboxutil64.exe"))?;
+    fs::write(steam.join("nvngx_dlss.dll"), b"client component")?;
+    let scan = scanner::scan(&[steam], &AtomicBool::new(false), |_, _, _| {})?;
+    assert_eq!(scan.candidates, 2);
+    let mut titles = scan
+        .rows
+        .iter()
+        .map(|g| g.title.as_str())
+        .collect::<Vec<_>>();
+    titles.sort();
+    assert_eq!(titles, ["Apex Legends", "Stormgate"]);
+    let apex_game = scan
+        .rows
+        .iter()
+        .find(|g| g.title == "Apex Legends")
+        .unwrap();
+    assert_eq!(apex_game.targets.len(), 2);
+    assert!(
+        apex_game
+            .targets
+            .iter()
+            .any(|p| p.ends_with("r5apex_dx12.exe"))
+    );
+    assert!(
+        apex_game
+            .targets
+            .iter()
+            .any(|p| p.ends_with("r5apex_vulkan.exe"))
+    );
+    assert_eq!(
+        scan.rows
+            .iter()
+            .find(|g| g.title == "Stormgate")
+            .unwrap()
+            .targets
+            .len(),
+        1
+    );
+    assert_eq!(
+        core::key(Path::new(
+            &scan
+                .rows
+                .iter()
+                .find(|g| g.title == "Stormgate")
+                .unwrap()
+                .root
+        )),
+        core::key(&storm)
+    );
+    assert!(
+        scan.rows
+            .iter()
+            .any(|g| g.exe.ends_with("Stormgate-Win64-Shipping.exe"))
+    );
+    assert!(scan.rows.iter().all(|g| !g.exe.contains("protected_game")));
+    assert!(scan.rows.iter().all(|g| {
+        g.targets.iter().all(|target| {
+            !target.contains("VideoEncoderDX12")
+                && !target.contains("EasyAntiCheat")
+                && !target.contains("StartProtectedGame")
+        })
+    }));
+    Ok(())
+}
+
+#[test]
+fn separate_unreal_projects_do_not_merge_under_shared_engine_or_steam_manifest() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let standalone = dir.path().join("SharedEngine");
+    let steam_apps = dir.path().join("Steam/steamapps");
+    let steam_bundle = steam_apps.join("common/Bundle");
+    fs::create_dir_all(standalone.join("Engine"))?;
+    fs::create_dir_all(steam_bundle.join("Engine"))?;
+    fs::write(
+        steam_apps.join("appmanifest_123.acf"),
+        "\"AppState\"\n{\n\"name\" \"Bundle\"\n\"installdir\" \"Bundle\"\n}",
+    )?;
+    for root in [&standalone, &steam_bundle] {
+        for project in ["Alpha", "Beta"] {
+            let binary = root.join(project).join("Binaries/Win64");
+            fs::create_dir_all(&binary)?;
+            exe(&binary.join(format!("{project}-Win64-Shipping.exe")))?;
+        }
+    }
+    let report = scanner::scan(&[dir.path().into()], &AtomicBool::new(false), |_, _, _| {})?;
     assert_eq!(report.candidates, 4);
+    for root in [&standalone, &steam_bundle] {
+        for project in ["Alpha", "Beta"] {
+            let game = report
+                .rows
+                .iter()
+                .find(|g| core::key(Path::new(&g.root)) == core::key(&root.join(project)))
+                .unwrap();
+            assert_eq!(game.targets.len(), 1);
+            assert!(game.exe.ends_with(&format!("{project}-Win64-Shipping.exe")));
+            if root == &steam_bundle {
+                assert_eq!(game.title, format!("Bundle · {project}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn scanner_does_not_promote_unrelated_software_beside_dlss_files() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let tool = dir.path().join("CaptureTools");
+    fs::create_dir_all(&tool)?;
+    exe(&tool.join("VideoEncoder.exe"))?;
+    fs::write(tool.join("nvngx_dlssg.dll"), b"component evidence")?;
+    let scan = scanner::scan(&[tool], &AtomicBool::new(false), |_, _, _| {})?;
+    assert!(scan.rows.is_empty());
     Ok(())
 }
 
