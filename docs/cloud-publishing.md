@@ -1,19 +1,19 @@
 # DLL 云端维护
 
-日常只维护 GitHub 上的 [`cloud/schemes.json`](../cloud/schemes.json)。GitHub Actions 自动生成摘要索引和 `catalog.json`，将 DLL ZIP 与配置同步到 Gitee。软件默认访问国内 Gitee，失败后切换 GitHub；手动选择 GitHub 优先仍有效。
+日常只维护 GitHub 上的 [`cloud/schemes.json`](../cloud/schemes.json)。发布助手从本机上传两站 DLL ZIP，GitHub Actions 负责双站回下载核验、自动生成摘要索引和 `catalog.json` 并同步配置。软件默认访问国内 Gitee，失败后切换 GitHub；手动选择 GitHub 优先仍有效。
 
 配置和源码在两站的 `pandaligx/RTX-FG-Manager` 主仓库；GitHub DLL 放主仓库的 `payloads` 预发行，Gitee DLL 放独立的 `pandaligx/RTX-FG-Manager-payloads` 资源仓库。这由同一工作流管理，不需要维护第二份配置。实际预检发现 Gitee 的资源预发行仍会抢占同仓库 `/releases/latest`，因此必须隔离资源库，保护旧管理器的软件升级。
 
 此流程管理 DLL 资源，不会自动发布管理器 EXE。EXE 继续先签名，再上传、回下载验证，最后发布 `update.json`。
 
-Actions 的资源探测和自动同步只上传 DLL ZIP。管理器和 aria2 等工具 EXE 均从发布者本机上传 Gitee；不得把 EXE 塞进 ZIP 规避这条发布分工。
+Gitee 的 DLL ZIP、管理器和 aria2 等工具 EXE 均优先由发布助手从本机上传，避免海外运行器向国内上传较慢或超时；用户负责签名，无须例行手动上传。Actions 复用已上传的同名同内容 ZIP，继续执行完整回下载与元数据发布门槛。已有脚本的缺包上传能力保留用于兼容，日常发布应先在本机补齐附件再触发工作流。不得把 EXE 塞进 ZIP 规避发布分工。
 
 ## 更新一次 DLL
 
 1. 对新 DLL 完成游戏测试、签名。每个 ZIP 只放一个代理 DLL 和匹配配置，文件放在 ZIP 根目录。现有方案使用 `dlssg_sm86.ini`；RTX40MFG 使用 `RTXMFG-Universal.json`。不要打包日志、缓存、原游戏 DLL 或子文件夹。
-2. 给 ZIP 新名称，例如 `upstream-0.3.6-version-r1.zip`。上传到 GitHub **`payloads` 固定预发行**。同名不同内容不允许覆盖；修改 INI 或重新签名，也需要新 ZIP 名称。
+2. 给 ZIP 新名称，例如 `upstream-0.3.6-version-r1.zip`。由助手从本机上传到 GitHub 主仓库和 Gitee 资源仓库各自的 **`payloads` 固定预发行**；保留其他附件。同名不同内容不允许覆盖；修改 INI 或重新签名，也需要新 ZIP 名称。
 3. 编辑 `cloud/schemes.json`，修改对应方案的 `version`、`name` 和 `archives`。已有方案的 `id` 保持不变，以保留用户参数记忆。参数协议没有变化时保留 `profile`。
-4. 提交后查看 **Publish verified DLL resources** 工作流。它核验 ZIP 内容，上传到 Gitee，两站匿名回下载核对，再发布索引，最后发布正式 catalog。
+4. 提交后查看 **Publish verified DLL resources** 工作流。它核验 ZIP 内容和两站已有附件，匿名回下载核对，再发布索引，最后发布正式 catalog。若海外传输失败，保留旧清单，从本机补齐缺少的 ZIP 后重跑；不得跳过摘要核验。
 5. 工作流成功后，在管理器中刷新方案并试装。旧 ZIP 先保留；不能仅因新版本发布就删除仍被旧清单或客户端缓存引用的文件。
 
 只调整方案名称、排序或默认参数时，跳过上传 ZIP，直接编辑方案清单。不要手改自动生成的 `cloud/catalog.json` 或 `cloud/indexes/`。
@@ -85,7 +85,7 @@ python tools/cloud_release.py prepare --archives "已签名ZIP目录" --out clou
 
 首次迁移可手动运行资源工作流，在 `seed_release` 填已有 GitHub 资源标签。工具复用经过验证的原 ZIP，不重打包。Gitee 附件能力须先通过 **Verify Gitee resource attachments** 工作流：它只复制一个指定摘要的公开资源并匿名回下载，不触碰生效清单。
 
-如果首次创建 Gitee 独立资源库的 API 返回 403，使用已登录网页创建一次公开的 `pandaligx/RTX-FG-Manager-payloads` 并初始化 README，再重跑工作流。后续无需重复建库或手动上传 Gitee；已有仓库的所有者或公开状态不符时，脚本会停止，不擅自修改权限。
+如果首次创建 Gitee 独立资源库的 API 返回 403，使用已登录网页创建一次公开的 `pandaligx/RTX-FG-Manager-payloads` 并初始化 README，再重跑工作流。后续无需重复建库；Gitee 附件由助手本机上传。已有仓库的所有者或公开状态不符时，脚本会停止，不擅自修改权限。
 
 GitHub 自动令牌来自工作流；Gitee 令牌只放仓库 Secret `GITEE_TOKEN`。不要放入 URL、JSON、日志或源码。日常发布不需要在本机保存令牌。
 
