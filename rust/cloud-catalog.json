@@ -594,9 +594,35 @@
       "scheme_id": "initial",
       "sha256": "97e47cc39176449646ad7de6c1cfd22926d91d48fd2e35d562daa49675fcbdac",
       "version": "0.1.0"
+    },
+    {
+      "id": "rtxmfg-1.3.3-hf2-v425-universal",
+      "scheme_id": "rtx40mfg-1.3.3-hf2",
+      "label": "RTX40 MFG · 1.3.3 Hotfix 2",
+      "labels": {},
+      "version": "1.3.3",
+      "backends": [
+        "rtx40mfg"
+      ],
+      "proxy": "version.dll",
+      "archive": "rtxmfg-1.3.3-hf2-v425-universal.zip",
+      "bytes": 1752761,
+      "sha256": "81cebb00345b9c2b4df125590062a934ea3e3d763631bf163bb6c0deecc092c0",
+      "files": [
+        {
+          "name": "RTXMFG-Universal.json",
+          "bytes": 170,
+          "sha256": "5117658e81f02128cc2578986f12193be0719e8aabaa929521c6c00ff0ddf82a"
+        },
+        {
+          "name": "version.dll",
+          "bytes": 6047760,
+          "sha256": "61bf3f33335efcb40dfef7db9ad4d550049e284b382586acc2a7baccbd3eaa29"
+        }
+      ]
     }
   ],
-  "revision": "r-7bd8be8f09bea1a20bf8",
+  "revision": "candidate-v425-rtxmfg",
   "schema": 2,
   "scheme_policies": {
     "initial": {
@@ -675,6 +701,16 @@
       "ini_policy": "upstream_proxy",
       "max_selected_proxies": 6,
       "parameter_profile": "upstream035"
+    },
+    "rtx40mfg-1.3.3-hf2": {
+      "gpu_paths": [
+        "SM89"
+      ],
+      "max_selected_proxies": 1,
+      "ini_policy": "rtxmfg_json",
+      "parameter_profile": "rtxmfg_universal_133",
+      "defaults": {},
+      "capabilities": []
     }
   },
   "sources": {

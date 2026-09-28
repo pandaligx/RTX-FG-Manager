@@ -17,7 +17,7 @@ use std::{
 };
 pub enum Event {
     Catalog(cloud::Catalog),
-    Payload(Result<cloud::Prepared>, BTreeSet<String>, Arc<AtomicBool>),
+    Deployments(u64, String, rtx_fg_manager::deployment::Snapshot),
     Scan(scanner::Report),
     Progress(String),
     PayloadProgress(cloud::CloudProgress),
@@ -103,7 +103,18 @@ struct PatchSummary {
     succeeded: usize,
     failed: usize,
 }
-type DisplayCache = Arc<Mutex<BTreeMap<String, (Vec<(u64, u64)>, Instant, String)>>>;
+type DisplayCache = Arc<
+    Mutex<
+        BTreeMap<
+            String,
+            (
+                Vec<(u64, u64)>,
+                Instant,
+                rtx_fg_manager::deployment::Snapshot,
+            ),
+        >,
+    >,
+>;
 
 // Display-only metadata cache. All writes and ownership checks use core's full validation.
 fn display_stamp(exe: &std::path::Path) -> Result<Vec<(u64, u64)>> {
@@ -117,6 +128,7 @@ fn display_stamp(exe: &std::path::Path) -> Result<Vec<(u64, u64)>> {
     paths.extend(
         [
             core::INI,
+            rtx_fg_manager::rtxmfg::CONFIG,
             "rtxfg_vk_bridge.dll",
             ".rtx-fg-script.json",
             ".rtx-fg-manager.json",
@@ -150,6 +162,7 @@ pub struct Controller {
     pub selected: BTreeSet<String>,
     pub focus: Option<String>,
     pub statuses: BTreeMap<String, String>,
+    pub deployments: BTreeMap<String, rtx_fg_manager::deployment::Snapshot>,
     pub evidence: BTreeMap<String, Option<scanner::Evidence>>,
     pub disk_presets: BTreeMap<(String, String), rtx_fg_manager::presets::Values>,
     pub running_games: BTreeSet<String>,
@@ -236,6 +249,7 @@ impl Controller {
             selected: BTreeSet::new(),
             focus: None,
             statuses: BTreeMap::new(),
+            deployments: BTreeMap::new(),
             evidence: BTreeMap::new(),
             disk_presets: BTreeMap::new(),
             running_games: BTreeSet::new(),
@@ -374,7 +388,21 @@ impl Controller {
             .unwrap_or_else(|| self.text(&p.label))
     }
     pub fn cloud_scheme(&self) -> String {
-        let requested = self.choice("cloud_scheme", &self.catalog.default_scheme);
+        self.scheme_for(self.focus.as_deref())
+    }
+    pub fn scheme_for(&self, exe: Option<&str>) -> String {
+        let requested = exe
+            .and_then(|exe| self.games.iter().find(|g| g.exe == exe))
+            .and_then(|g| g.extra.get("deployment_choice"))
+            .and_then(|v| v.get("scheme"))
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .or_else(|| {
+                exe.and_then(|e| self.deployments.get(e))
+                    .and_then(|d| d.common.as_ref())
+                    .map(|d| d.0.clone())
+            })
+            .unwrap_or_else(|| self.choice("cloud_scheme", &self.catalog.default_scheme));
         let requested = if requested.starts_with("initial-") {
             "initial".into()
         } else if requested.contains("experimental") {
@@ -385,6 +413,31 @@ impl Controller {
         self.catalog.selected(&requested).scheme_id.clone()
     }
     pub fn cloud_series(&self) -> usize {
+        self.series_for(self.focus.as_deref())
+    }
+    pub fn series_for(&self, exe: Option<&str>) -> usize {
+        if self.catalog.scheme_policies[&self.scheme_for(exe)].parameter_profile
+            == rtx_fg_manager::rtxmfg::PROFILE
+        {
+            return 2;
+        }
+        if let Some(series) = exe
+            .and_then(|e| self.games.iter().find(|g| g.exe == e))
+            .and_then(|g| g.extra.get("deployment_choice"))
+            .and_then(|v| v.get("series"))
+            .and_then(Value::as_u64)
+            .filter(|n| *n <= 1)
+        {
+            return series as usize;
+        }
+        if let Some(series) = exe
+            .and_then(|e| self.deployments.get(e))
+            .and_then(|d| d.common.as_ref())
+            .and_then(|d| d.2)
+            .filter(|n| *n <= 1)
+        {
+            return series;
+        }
         if let Some(series) = self.state["cloud_series"].as_u64()
             && series <= 1
         {
@@ -408,7 +461,7 @@ impl Controller {
             .clone()
     }
     pub fn preset_values(&self, exe: &str) -> rtx_fg_manager::presets::Values {
-        self.preset_values_for(exe, &self.cloud_scheme())
+        self.preset_values_for(exe, &self.scheme_for(Some(exe)))
     }
     fn preset_values_for(&self, exe: &str, scheme: &str) -> rtx_fg_manager::presets::Values {
         let policy = &self.catalog.scheme_policies[scheme];
@@ -448,7 +501,7 @@ impl Controller {
                 ]));
             }
         }
-        if profile == "native026" && self.cloud_series() == 0 {
+        if profile == "native026" && self.series_for(Some(exe)) == 0 {
             values.insert("hardware_bilinear".into(), "0".into());
         }
         let scheme = scheme.to_owned();
@@ -481,7 +534,7 @@ impl Controller {
         }
         rtx_fg_manager::presets::Context::new(&scheme, policy, std::path::Path::new(exe))
             .normalize(&mut values);
-        if profile == "native026" && self.cloud_series() == 0 {
+        if profile == "native026" && self.series_for(Some(exe)) == 0 {
             values.insert("hardware_bilinear".into(), "0".into());
         }
         values
@@ -556,7 +609,7 @@ impl Controller {
         self.save();
     }
     pub fn preset_context(&self, exe: &str) -> rtx_fg_manager::presets::Context {
-        let scheme = self.cloud_scheme();
+        let scheme = self.scheme_for(Some(exe));
         rtx_fg_manager::presets::Context::new(
             &scheme,
             &self.catalog.scheme_policies[&scheme],
@@ -571,13 +624,15 @@ impl Controller {
             self.warning = Some(self.text("请先完全退出游戏再修改参数"));
             return;
         }
-        let profile = self.parameter_profile();
-        let scheme = self.cloud_scheme();
+        let scheme = self.scheme_for(Some(exe));
+        let profile = self.catalog.scheme_policies[&scheme]
+            .parameter_profile
+            .clone();
         let mut values = self.preset_values(exe);
         if key == "reset" {
             values = rtx_fg_manager::presets::defaults(
                 &profile,
-                &self.catalog.scheme_policies[&self.cloud_scheme()].defaults,
+                &self.catalog.scheme_policies[&scheme].defaults,
             );
         } else {
             values.insert(key.into(), value.into());
@@ -625,27 +680,44 @@ impl Controller {
             .iter()
             .find(|g| g.exe == exe)
             .and_then(|g| g.extra.get("preset_dirty"))
-            .and_then(|v| v.get(self.cloud_scheme()))
+            .and_then(|v| v.get(self.scheme_for(Some(exe))))
             .and_then(Value::as_bool)
             .unwrap_or(false)
     }
     pub fn can_apply_parameters(&self) -> bool {
         self.focus.as_ref().is_some_and(|exe| {
-            let Some(game) = self.games.iter().find(|game| &game.exe == exe) else {
-                return false;
-            };
-            let grouped = game.targets.len() > 1 || !game.cleanup_only.is_empty();
-            let expected = format!("已部署 {0}/{0} 个目录", game.targets.len().max(1));
-            self.disk_presets
-                .contains_key(&(exe.clone(), self.cloud_scheme()))
-                && self.statuses.get(exe).is_some_and(|status| {
-                    if grouped {
-                        status == &expected
-                    } else {
-                        status.starts_with("已部署")
-                    }
-                })
+            self.deployments
+                .get(exe)
+                .is_some_and(|d| d.can_apply(&self.cloud_scheme()))
         })
+    }
+    pub fn set_selection(&mut self, scheme: String, series: usize, proxies: Vec<String>) {
+        if self.busy || self.read_only {
+            return;
+        }
+        if let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter_mut().find(|g| &g.exe == e))
+        {
+            let mut choices = game
+                .extra
+                .get("proxy_choices")
+                .filter(|v| v.is_object())
+                .cloned()
+                .unwrap_or(json!({}));
+            choices[&scheme] = json!(proxies);
+            game.extra.insert("proxy_choices".into(), choices);
+            game.extra.insert(
+                "deployment_choice".into(),
+                json!({"scheme":scheme,"series":series}),
+            );
+        } else {
+            self.state["cloud_scheme"] = json!(scheme);
+            self.state["cloud_series"] = json!(series);
+            self.state["proxies"] = json!(proxies);
+        }
+        self.save();
     }
     pub fn apply_focused_parameters(&mut self) {
         if self.busy || self.closing || self.read_only {
@@ -809,71 +881,38 @@ impl Controller {
             });
         }
         let cache = self.display_cache.clone();
+        let catalog = self.catalog.clone();
         self.channel.job(move |c| {
             let _completion = RefreshCompletion(c.clone());
             for g in games {
-                let p = std::path::Path::new(&g.exe);
-                let stamp = display_stamp(p).ok();
-                let grouped = g.targets.len() > 1 || !g.cleanup_only.is_empty();
-                let cached = (!grouped)
-                    .then(|| {
-                        cache.lock().ok().and_then(|m| {
-                            m.get(&g.exe)
-                                .filter(|(old, at, _)| {
-                                    Some(old) == stamp.as_ref()
-                                        && at.elapsed() < Duration::from_secs(30)
-                                })
-                                .map(|(_, _, s)| s.clone())
+                let stamp = std::iter::once(&g.exe)
+                    .chain(g.targets.iter())
+                    .chain(g.cleanup_only.iter())
+                    .map(|e| display_stamp(std::path::Path::new(e)))
+                    .collect::<Result<Vec<_>>>()
+                    .ok()
+                    .map(|v| v.into_iter().flatten().collect::<Vec<_>>());
+                let cached = cache.lock().ok().and_then(|m| {
+                    m.get(&g.exe)
+                        .filter(|(old, at, _)| {
+                            Some(old) == stamp.as_ref() && at.elapsed() < Duration::from_secs(30)
                         })
-                    })
-                    .flatten();
-                let freshly_checked = cached.is_none();
-                let status = cached.unwrap_or_else(|| {
-                    if !grouped {
-                        return core::status(p);
-                    }
-                    let targets = if g.targets.is_empty() {
-                        vec![g.exe.clone()]
-                    } else {
-                        g.targets.clone()
-                    };
-                    let statuses = targets
-                        .iter()
-                        .map(|exe| core::status(std::path::Path::new(exe)))
-                        .collect::<Vec<_>>();
-                    let installed = statuses.iter().filter(|s| s.starts_with("已部署")).count();
-                    if installed == targets.len() {
-                        format!("已部署 {installed}/{} 个目录", targets.len())
-                    } else if installed > 0 {
-                        format!(
-                            "已部署 {installed}/{} 个目录，请检查未完成项",
-                            targets.len()
-                        )
-                    } else if g
-                        .cleanup_only
-                        .iter()
-                        .any(|exe| core::status(std::path::Path::new(exe)) != "未部署")
-                    {
-                        "旧路径有补丁，可卸载清理".into()
-                    } else if statuses.iter().all(|s| s == "未部署") {
-                        "未部署".into()
-                    } else {
-                        statuses
-                            .into_iter()
-                            .find(|s| s != "未部署")
-                            .unwrap_or_else(|| "未部署".into())
-                    }
+                        .map(|(_, _, s)| s.clone())
                 });
-                if freshly_checked
-                    && !grouped
+                let cache_hit = cached.is_some();
+                let snapshot =
+                    cached.unwrap_or_else(|| rtx_fg_manager::deployment::inspect(&g, &catalog));
+                if !cache_hit
                     && let Some(stamp) = stamp
                     && let Ok(mut m) = cache.lock()
                 {
-                    m.insert(g.exe.clone(), (stamp, Instant::now(), status.clone()));
+                    m.insert(g.exe.clone(), (stamp, Instant::now(), snapshot.clone()));
                     if m.len() > 10000 {
                         m.clear();
                     }
                 }
+                let status = snapshot.status.clone();
+                c.send(Event::Deployments(epoch, g.exe.clone(), snapshot));
                 c.send(Event::Statuses(epoch, vec![(g.exe, status)]));
             }
             Ok(())
@@ -1193,13 +1232,35 @@ impl Controller {
             return;
         }
         self.status_epoch += 1;
-        self.critical = clean;
+        self.critical = true;
+        self.busy = true;
         self.patch_summary = Some(PatchSummary {
             total: paths.len(),
             ..Default::default()
         });
-        let proxies = self.proxies();
-        self.busy = true;
+        let mut jobs = Vec::new();
+        for game in &self.games {
+            let targets: Vec<String> = paths
+                .iter()
+                .filter(|p| {
+                    **p == game.exe
+                        || game.targets.contains(p)
+                        || (clean && game.cleanup_only.contains(p))
+                })
+                .cloned()
+                .collect();
+            if !targets.is_empty() {
+                let scheme = self.scheme_for(Some(&game.exe));
+                jobs.push((
+                    game.exe.clone(),
+                    targets,
+                    scheme.clone(),
+                    self.series_for(Some(&game.exe)),
+                    self.proxies_for(Some(&game.exe)),
+                    self.preset_values_for(&game.exe, &scheme),
+                ));
+            }
+        }
         for exe in &paths {
             self.statuses.insert(
                 exe.clone(),
@@ -1213,161 +1274,104 @@ impl Controller {
         }
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
-        if !clean {
-            let groups = self
-                .games
-                .iter()
-                .filter_map(|game| {
-                    let entries = if game.targets.is_empty() {
-                        vec![game.exe.clone()]
-                    } else {
-                        game.targets.clone()
-                    };
-                    let entries = entries
-                        .into_iter()
-                        .filter(|p| paths.contains(p))
-                        .collect::<Vec<_>>();
-                    (!entries.is_empty()).then_some((game.title.clone(), entries))
-                })
-                .collect::<Vec<_>>();
-            let mut catalog = self.catalog.clone();
-            catalog.prefer_github = self.choice("download_source", "domestic") == "github";
-            let scheme = self.cloud_scheme();
-            let series = self.cloud_series();
-            self.progress = self.text("正在下载 DLL…");
-            self.channel.job(move |c| {
-                let mut eligible = BTreeSet::new();
-                let mut errors = Vec::new();
-                c.send(Event::Progress("正在检查安装条件…".into()));
-                for (title, group) in groups {
-                    if cancel.load(Ordering::Relaxed) {
-                        break;
-                    }
-                    let failed = group.iter().find_map(|exe| {
-                        core::preflight_install(std::path::Path::new(exe), &proxies)
-                            .err()
-                            .map(|e| {
-                                format!(
-                                    "{}：{e}",
-                                    std::path::Path::new(exe)
-                                        .file_name()
-                                        .unwrap_or_default()
-                                        .to_string_lossy()
-                                )
-                            })
-                    });
-                    if let Some(failure) = failed {
-                        errors.push(format!(
-                            "{}：{failure}；此游戏的所有目录均未安装",
-                            if title.is_empty() { "游戏" } else { &title }
-                        ));
-                        for exe in group {
+        let mut catalog = self.catalog.clone();
+        catalog.prefer_github = self.choice("download_source", "domestic") == "github";
+        self.channel.operation(move |c| {
+            let mut errors = Vec::new();
+            for (primary, targets, scheme, series, proxies, options) in jobs {
+                if cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+                let prepared = if clean {
+                    Ok(None)
+                } else {
+                    (|| {
+                        for exe in &targets {
+                            core::preflight_install(std::path::Path::new(exe), &proxies)?;
+                        }
+                        cloud::prepare_with_progress(
+                            &catalog,
+                            &scheme,
+                            series,
+                            &proxies,
+                            &cancel,
+                            |p| c.send(Event::PayloadProgress(p)),
+                        )
+                        .map(Some)
+                    })()
+                };
+                let prepared = match prepared {
+                    Ok(p) => p,
+                    Err(e) => {
+                        errors.push(format!("{primary}：{e}"));
+                        for exe in targets {
                             c.send(Event::PatchResult(false));
                             c.send(Event::Status(
                                 exe.clone(),
                                 core::status(std::path::Path::new(&exe)),
                             ));
                         }
-                    } else {
-                        eligible.extend(group);
+                        continue;
                     }
-                }
-                if !errors.is_empty() {
-                    c.send(Event::Warning(errors.join("\n\n")));
-                }
-                if eligible.is_empty() || cancel.load(Ordering::Relaxed) {
-                    c.send(Event::Done);
-                    return Ok(());
-                }
-                let result = cloud::prepare_with_progress(
-                    &catalog,
-                    &scheme,
-                    series,
-                    &proxies,
-                    &cancel,
-                    |p| c.send(Event::PayloadProgress(p)),
-                );
-                c.send(Event::Payload(result, eligible, cancel));
-                Ok(())
-            });
-            return;
-        }
-        self.run_patch(paths, None);
-    }
-    fn run_patch(&mut self, paths: BTreeSet<String>, prepared: Option<cloud::Prepared>) {
-        self.critical = true;
-        let proxies = self.proxies();
-        let options = paths
-            .iter()
-            .map(|exe| {
-                let primary = self
-                    .games
-                    .iter()
-                    .find(|game| {
-                        game.exe == *exe || game.targets.iter().any(|target| target == exe)
-                    })
-                    .map_or(exe.as_str(), |game| game.exe.as_str());
-                (exe.clone(), self.preset_values(primary))
-            })
-            .collect::<BTreeMap<_, _>>();
-        let cancel = self.cancel.clone();
-        self.channel.operation(move |c| {
-            let mut errors = Vec::new();
-            for exe in paths {
-                if cancel.load(Ordering::Relaxed) {
-                    break;
-                }
-                let p = PathBuf::from(&exe);
-                let result = if let Some(ref payload) = prepared {
-                    (|| {
-                        let mut files = payload.files.clone();
-                        let context = rtx_fg_manager::presets::Context::new(
-                            &payload.scheme_id,
-                            &payload.policy,
-                            &p,
-                        );
-                        let configured = context.configure(&files[core::INI], &options[&exe])?;
-                        files.insert(core::INI.into(), configured);
-                        core::deploy_prepared_context(
-                            &p,
-                            &payload.backend,
-                            &proxies,
-                            None,
-                            files,
-                            Some(&payload.version),
-                            Some(&context),
-                        )
-                    })()
-                } else {
-                    cleanup::clean(&p)
                 };
-                let name = p.file_name().unwrap_or_default().to_string_lossy();
-                match result {
-                    Ok(s) => {
-                        c.send(Event::PatchResult(!s.starts_with("补丁已移除，缓存待清理")));
-                        if s.starts_with("补丁已移除，缓存待清理") {
-                            errors.push(format!("{name}：{s}"));
-                        } else {
-                            c.send(Event::Log(format!("{name}：{s}")));
+                let mut all_ok = true;
+                for exe in targets {
+                    if cancel.load(Ordering::Relaxed) {
+                        all_ok = false;
+                        break;
+                    }
+                    let p = PathBuf::from(&exe);
+                    let result = if let Some(ref payload) = prepared {
+                        (|| {
+                            let mut files = payload.files.clone();
+                            let context = rtx_fg_manager::presets::Context::new(
+                                &payload.scheme_id,
+                                &payload.policy,
+                                &p,
+                            );
+                            let name = core::config_name(&payload.backend);
+                            files.insert(name.into(), context.configure(&files[name], &options)?);
+                            core::deploy_prepared_context(
+                                &p,
+                                &payload.backend,
+                                &proxies,
+                                None,
+                                files,
+                                Some(&payload.version),
+                                Some(&context),
+                            )
+                        })()
+                    } else {
+                        cleanup::clean(&p)
+                    };
+                    match result {
+                        Ok(s) => {
+                            let ok = !s.starts_with("补丁已移除，缓存待清理");
+                            all_ok &= ok;
+                            c.send(Event::PatchResult(ok));
+                            if ok {
+                                c.send(Event::Log(format!(
+                                    "{}：{s}",
+                                    p.file_name().unwrap_or_default().to_string_lossy()
+                                )));
+                            } else {
+                                errors.push(format!("{exe}：{s}"));
+                            }
                         }
-                        if let Some(payload) = &prepared {
-                            c.send(Event::PresetApplied(
-                                exe.clone(),
-                                payload.scheme_id.clone(),
-                                options[&exe].clone(),
-                            ));
+                        Err(e) => {
+                            all_ok = false;
+                            c.send(Event::PatchResult(false));
+                            errors.push(format!("{exe}：{e}"));
                         }
                     }
-                    Err(e) => {
-                        c.send(Event::PatchResult(false));
-                        let s = format!("{name}：{e}");
-                        errors.push(s);
-                    }
+                    c.send(Event::Status(exe, core::status(&p)));
                 }
-                c.send(Event::Status(exe, core::status(&p)));
+                if all_ok && !clean {
+                    c.send(Event::PresetApplied(primary, scheme, options));
+                }
             }
             if !errors.is_empty() {
-                c.send(Event::Warning(errors.join("\n\n")))
+                c.send(Event::Warning(errors.join("\n\n")));
             }
             Ok(())
         });
@@ -1437,6 +1441,7 @@ impl Controller {
         self.games.retain(|g| !paths.contains(&g.exe));
         self.selected.retain(|p| !paths.contains(p));
         self.statuses.retain(|p, _| !paths.contains(p));
+        self.deployments.retain(|p, _| !paths.contains(p));
         self.icons.retain(|p, _| !paths.contains(p));
         self.evidence.retain(|p, _| !paths.contains(p));
         if self.focus.as_ref().is_some_and(|p| paths.contains(p)) {
@@ -1483,9 +1488,25 @@ impl Controller {
         });
     }
     pub fn proxies(&self) -> Vec<String> {
-        let allowed = self.catalog.proxies(&self.cloud_scheme());
-        let limit = self.catalog.scheme_policies[&self.cloud_scheme()].max_selected_proxies;
-        let selected: Vec<String> = self.state["proxies"]
+        self.proxies_for(self.focus.as_deref())
+    }
+    pub fn proxies_for(&self, exe: Option<&str>) -> Vec<String> {
+        let scheme = self.scheme_for(exe);
+        let allowed = self.catalog.proxies(&scheme);
+        let limit = self.catalog.scheme_policies[&scheme].max_selected_proxies;
+        let saved = exe
+            .and_then(|e| self.games.iter().find(|g| g.exe == e))
+            .and_then(|g| g.extra.get("proxy_choices"))
+            .and_then(|v| v.get(&scheme))
+            .cloned()
+            .or_else(|| {
+                exe.and_then(|e| self.deployments.get(e))
+                    .and_then(|d| d.common.as_ref())
+                    .filter(|d| d.0 == scheme)
+                    .map(|d| json!(d.1))
+            })
+            .unwrap_or_else(|| self.state["proxies"].clone());
+        let selected: Vec<String> = saved
             .as_array()
             .map(|v| {
                 v.iter()
@@ -1840,22 +1861,9 @@ impl Controller {
                         }
                     }
                 }
-                Event::Payload(result, paths, token) => {
-                    if Arc::ptr_eq(&token, &self.cancel) {
-                        if token.load(Ordering::Relaxed) || self.closing {
-                            self.channel.send(Event::Done);
-                        } else {
-                            match result {
-                                Ok(payload) => self.run_patch(paths, Some(payload)),
-                                Err(e) => {
-                                    if let Some(summary) = &mut self.patch_summary {
-                                        summary.failed += paths.len();
-                                    }
-                                    self.channel.send(Event::Warning(e.to_string()));
-                                    self.channel.send(Event::Done);
-                                }
-                            }
-                        }
+                Event::Deployments(epoch, exe, snapshot) => {
+                    if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
+                        self.deployments.insert(exe, snapshot);
                     }
                 }
                 Event::Done => {
@@ -1997,6 +2005,65 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn game_selection_follows_records_and_explicit_choices_do_not_leak() {
+        let (_dir, mut c) = controller();
+        c.games = vec![
+            Game {
+                exe: "A.exe".into(),
+                ..Default::default()
+            },
+            Game {
+                exe: "B.exe".into(),
+                ..Default::default()
+            },
+        ];
+        for (exe, scheme, proxy) in [
+            ("A.exe", "upstream-0.3.5-310-9", "d3d12.dll"),
+            ("B.exe", "rtxfg-0.3.5-dx12-vulkan", "version.dll"),
+        ] {
+            c.deployments.insert(
+                exe.into(),
+                rtx_fg_manager::deployment::Snapshot {
+                    total: 1,
+                    installed: 1,
+                    common: Some((scheme.into(), vec![proxy.into()], None)),
+                    ..Default::default()
+                },
+            );
+        }
+        c.focus = Some("A.exe".into());
+        assert_eq!(c.cloud_scheme(), "upstream-0.3.5-310-9");
+        assert_eq!(c.proxies(), vec!["d3d12.dll"]);
+        c.set_game_option("A.exe", "logging_level", "3");
+        c.set_selection(c.cloud_scheme(), 0, vec!["winmm.dll".into()]);
+        c.focus = Some("B.exe".into());
+        assert_eq!(c.cloud_scheme(), "rtxfg-0.3.5-dx12-vulkan");
+        assert_eq!(c.proxies(), vec!["version.dll"]);
+        assert_eq!(c.preset_values("B.exe")["logging_level"], "1");
+        c.channel.send(Event::PresetRead(
+            "A.exe".into(),
+            Some((
+                "upstream-0.3.5-310-9".into(),
+                BTreeMap::from([("logging_level".into(), "0".into())]),
+            )),
+            false,
+            c.status_epoch,
+        ));
+        c.events();
+        assert_eq!(c.cloud_scheme(), "rtxfg-0.3.5-dx12-vulkan");
+        c.focus = Some("A.exe".into());
+        assert_eq!(c.proxies(), vec!["winmm.dll"]);
+        assert_eq!(c.cloud_series(), 0);
+        assert_eq!(c.preset_values("A.exe")["logging_level"], "3");
+        assert_eq!(
+            c.games[0].extra["deployment_choice"]["scheme"],
+            "upstream-0.3.5-310-9"
+        );
+        assert_eq!(c.scheme_for(Some("B.exe")), "rtxfg-0.3.5-dx12-vulkan");
+        c.close();
+        c.tick_close();
+    }
     fn controller() -> (tempfile::TempDir, Controller) {
         let dir = tempfile::tempdir().unwrap();
         let c = Controller::new(
@@ -2352,8 +2419,22 @@ mod tests {
         c.statuses
             .insert(first.clone(), "已部署 1/2 个目录，请检查未完成项".into());
         assert!(!c.can_apply_parameters());
-        c.statuses.insert(first, "已部署 2/2 个目录".into());
+        let scheme = c.cloud_scheme();
+        c.deployments.insert(
+            first.clone(),
+            rtx_fg_manager::deployment::Snapshot {
+                total: 2,
+                installed: 1,
+                common: Some((scheme.clone(), vec!["version.dll".into()], None)),
+                ..Default::default()
+            },
+        );
+        assert!(!c.can_apply_parameters());
+        c.statuses.insert(first.clone(), "已部署 2/2 个目录".into());
+        c.deployments.get_mut(&first).unwrap().installed = 2;
         assert!(c.can_apply_parameters());
+        c.deployments.get_mut(&first).unwrap().common = None;
+        assert!(!c.can_apply_parameters());
         c.close();
         c.tick_close();
     }

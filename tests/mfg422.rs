@@ -76,6 +76,7 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
         cloud::bundled()
             .packages
             .iter()
+            .filter(|p| p.scheme_id != "rtx40mfg-1.3.3-hf2")
             .map(|p| (&p.id, &p.sha256))
             .collect::<std::collections::BTreeMap<_, _>>()
     );

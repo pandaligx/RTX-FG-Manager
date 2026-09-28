@@ -108,6 +108,10 @@ pub fn normalize(profile: &str, values: &mut Values) -> bool {
     false
 }
 pub fn parameter_enabled(profile: &str, key: &str, values: &Values) -> bool {
+    if profile == crate::rtxmfg::PROFILE {
+        return key != "rtx_target"
+            || values.get("rtx_mode").map(String::as_str) == Some("dynamic");
+    }
     profile != MFG_VULKAN
         || key != "dynamic_target_fps"
         || values.get("dynamic_mfg").map(String::as_str) == Some("1")
@@ -121,6 +125,9 @@ pub struct Parameter {
     pub choices: Vec<(&'static str, &'static str)>,
 }
 pub fn parameters(profile: &str) -> Vec<Parameter> {
+    if profile == crate::rtxmfg::PROFILE {
+        return crate::rtxmfg::parameters();
+    }
     if profile == MFG_VULKAN {
         return mfg_parameters();
     }
@@ -217,7 +224,12 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
     ensure!(
         matches!(
             profile,
-            "upstream035" | "upstream031" | "native026" | "initial" | MFG_VULKAN
+            "upstream035"
+                | "upstream031"
+                | "native026"
+                | "initial"
+                | MFG_VULKAN
+                | crate::rtxmfg::PROFILE
         ),
         "Unsupported parameter protocol"
     );
@@ -225,7 +237,8 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
     for (key, value) in values {
         ensure!(
             p.iter()
-                .any(|p| p.key == key && p.choices.iter().any(|(v, _)| v == value)),
+                .any(|p| p.key == key && p.choices.iter().any(|(v, _)| v == value))
+                || (profile == crate::rtxmfg::PROFILE && crate::rtxmfg::valid_value(key, value)),
             "Invalid preset parameter: {key}"
         );
     }
@@ -255,7 +268,11 @@ pub fn defaults(profile: &str, overrides: &Values) -> Values {
                 p.key.into(),
                 overrides
                     .get(p.key)
-                    .filter(|v| p.choices.iter().any(|(choice, _)| *choice == v.as_str()))
+                    .filter(|v| {
+                        p.choices.iter().any(|(choice, _)| *choice == v.as_str())
+                            || (profile == crate::rtxmfg::PROFILE
+                                && crate::rtxmfg::valid_value(p.key, v))
+                    })
                     .cloned()
                     .unwrap_or_else(|| p.default.into()),
             )
@@ -265,6 +282,9 @@ pub fn defaults(profile: &str, overrides: &Values) -> Values {
     values
 }
 pub fn configure(bytes: &[u8], profile: &str, values: &Values) -> Result<Vec<u8>> {
+    if profile == crate::rtxmfg::PROFILE {
+        return crate::rtxmfg::configure(bytes, values);
+    }
     let mut values = values.clone();
     normalize(profile, &mut values);
     validate(profile, &values)?;
@@ -324,6 +344,9 @@ pub fn merge_context(
     backend: &str,
     context: Option<&Context>,
 ) -> Result<Vec<u8>> {
+    if backend == crate::rtxmfg::BACKEND {
+        return crate::rtxmfg::configure(current, &crate::rtxmfg::read(desired)?);
+    }
     // A shared proxy backend does not imply a shared INI protocol.
     let mut out = if let Some(context) = context {
         let (text, _) = crate::diagnostics::decode_ini(desired)?;
@@ -441,6 +464,9 @@ fn mfg_parameters() -> Vec<Parameter> {
 }
 
 pub fn read_values(bytes: &[u8], profile: &str) -> Result<Values> {
+    if profile == crate::rtxmfg::PROFILE {
+        return crate::rtxmfg::read(bytes);
+    }
     let (text, _) = crate::diagnostics::decode_ini(bytes)?;
     let mut values = Values::new();
     for p in parameters(profile) {
@@ -488,7 +514,13 @@ pub fn inspect(exe: &Path, catalog: &crate::cloud::Catalog) -> Result<Option<(St
     let Some(policy) = catalog.scheme_policies.get(&scheme) else {
         return Ok(None);
     };
-    let ini = crate::core::no_links(&dir.join(crate::core::INI))?;
+    let ini = crate::core::no_links(&dir.join(
+        if policy.parameter_profile == crate::rtxmfg::PROFILE {
+            crate::rtxmfg::CONFIG
+        } else {
+            crate::core::INI
+        },
+    ))?;
     if !ini.is_file() {
         return Ok(None);
     }

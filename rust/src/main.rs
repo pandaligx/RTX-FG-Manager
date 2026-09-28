@@ -55,6 +55,12 @@ fn run() -> anyhow::Result<()> {
                 let series = if p
                     .backends
                     .iter()
+                    .any(|b| b == rtx_fg_manager::rtxmfg::BACKEND)
+                {
+                    2
+                } else if p
+                    .backends
+                    .iter()
                     .any(|b| b.ends_with("30") || b == "upstream_sm86")
                 {
                     1

@@ -786,7 +786,7 @@
     "GPU 이름 작업 완료를 기다릴 수 없습니다"
   ],
   "已部署": [
-    "Deployed",
+    "Installed",
     "Установлено",
     "導入済み",
     "설치됨"
@@ -2764,5 +2764,119 @@
     "Папка недоступна или является точкой соединения каталогов",
     "フォルダーにアクセスできないか、ディレクトリジャンクションです",
     "폴더에 접근할 수 없거나 디렉터리 연결입니다"
+  ],
+  "此游戏的适配方案": [
+    "Scheme for this game",
+    "Профиль этой игры",
+    "このゲームの方式",
+    "이 게임의 방식"
+  ],
+  "DLL 入口": [
+    "DLL entry",
+    "DLL-вход",
+    "DLL 入口",
+    "DLL 진입점"
+  ],
+  "未知方案": [
+    "Unknown scheme",
+    "Неизвестный профиль",
+    "不明な方式",
+    "알 수 없는 방식"
+  ],
+  "部分部署": [
+    "Partially installed",
+    "Установлено частично",
+    "一部導入済み",
+    "일부 설치됨"
+  ],
+  "动态多帧（仅 DX12）": [
+    "Dynamic MFG (DX12 only)",
+    "Динамический MFG (только DX12)",
+    "動的 MFG（DX12 のみ）",
+    "동적 MFG (DX12 전용)"
+  ],
+  "跟随显示器刷新率": [
+    "Display refresh rate",
+    "Частота обновления экрана",
+    "画面のリフレッシュレート",
+    "디스플레이 주사율"
+  ],
+  "跟随游戏 / 驱动": [
+    "Game / driver controlled",
+    "Управление игрой / драйвером",
+    "ゲーム / ドライバーに従う",
+    "게임 / 드라이버 설정"
+  ],
+  "修改会记住在此游戏；更换方案或入口后，先卸载再安装应用。": [
+    "Changes are saved for this game. Uninstall before applying a different scheme or entry.",
+    "Изменения сохраняются для этой игры. Перед сменой профиля или DLL удалите старый патч.",
+    "変更はこのゲームに保存されます。方式や入口を変更するときは、一度削除して再導入してください。",
+    "변경 사항은 이 게임에 저장됩니다. 방식이나 진입점을 바꾸려면 먼저 제거한 뒤 다시 설치하세요."
+  ],
+  "RTX40 专用 JSON；Backspace 打开游戏内菜单。游戏须已有 DLSS 帧生成；Vulkan 为实验支持且不支持动态倍率，倍率还受驱动与游戏限制。": [
+    "Separate RTX40 JSON settings; Backspace opens the in-game menu. The game must already integrate DLSS FG. Vulkan is experimental without Dynamic mode; available multipliers also depend on the driver and game.",
+    "RTX40 использует отдельный JSON; Backspace открывает меню в игре. Нужна встроенная поддержка DLSS FG. Vulkan экспериментален, без динамического режима; множители зависят от игры и драйвера.",
+    "RTX40 専用 JSON を使用。Backspace でゲーム内メニューを開きます。ゲーム側の DLSS FG 統合が必要です。Vulkan は実験対応で動的倍率は使えず、倍率はゲームとドライバーにも依存します。",
+    "RTX40 전용 JSON을 사용하며 Backspace로 게임 내 메뉴를 엽니다. 게임에 DLSS FG가 통합되어 있어야 합니다. Vulkan은 실험 지원이며 동적 배율을 지원하지 않습니다. 배율은 게임과 드라이버에 따라 달라집니다."
+  ],
+  "RTX40 使用单个通用 DLL，选择入口仅改名，签名不变；不会覆盖游戏或其他 MOD 的同名文件。Bink 入口须自行保留原始 Hooked 文件。": [
+    "RTX40 uses one universal DLL; choosing an entry only renames it and preserves its signature. Existing game/mod files are never overwritten. Bink requires the original Hooked file to be retained separately.",
+    "RTX40 использует одну DLL: меняется лишь имя, подпись сохраняется. Файлы игры и других модов не перезаписываются. Для Bink требуется сохранённый оригинальный файл Hooked.",
+    "RTX40 は単一 DLL の名前だけを変更し、署名を維持します。ゲームや MOD の同名ファイルは上書きしません。Bink には別途保存した元の Hooked ファイルが必要です。",
+    "RTX40은 하나의 DLL 이름만 변경하므로 서명이 유지됩니다. 게임 및 다른 MOD 파일을 덮어쓰지 않습니다. Bink는 원본 Hooked 파일이 별도로 필요합니다."
+  ],
+  "每游戏设置与实际部署": [
+    "Per-game settings and installed files",
+    "Настройки игры и установленные файлы",
+    "ゲーム別設定と導入内容",
+    "게임별 설정 및 설치 내용"
+  ],
+  "选中游戏后，在右侧选择方案与 DLL 加载入口；点击游戏行的“预设参数”按钮打开参数窗口。方案、入口和参数按游戏分别记住；绿色标签显示实际部署内容，悬停查看各目录。批量安装使用各游戏自己的设置。": [
+    "Select a game to choose its scheme and DLL entries in the right sidebar. Click Presets on its row to open the parameter window. Each game remembers its scheme, entries and parameters. The green badge shows installed files; hover for each directory. Batch installation uses each game’s own settings.",
+    "Выберите игру и настройте профиль и DLL на правой панели. Кнопка «Параметры» в строке игры открывает окно настроек. Профиль, DLL и параметры сохраняются отдельно для каждой игры. Зелёная метка показывает установленное; наведите курсор для списка каталогов. Пакетная установка использует настройки каждой игры.",
+    "ゲームを選択し、右側で方式と DLL 入口を設定します。ゲーム行の「プリセット」ボタンでパラメータ画面を開きます。方式・入口・パラメータはゲーム別に記憶されます。緑のラベルは実際の導入内容で、ホバーすると各フォルダーを確認できます。一括導入も各ゲームの設定を使用します。",
+    "게임을 선택한 뒤 오른쪽 패널에서 방식과 DLL 진입점을 설정합니다. 게임 행의 프리셋 버튼으로 매개변수 창을 엽니다. 방식, 진입점, 매개변수는 게임마다 저장됩니다. 녹색 표시는 실제 설치 내용을 뜻하며 마우스를 올리면 폴더별로 확인할 수 있습니다. 일괄 설치도 각 게임의 설정을 사용합니다."
+  ],
+  "RTX40 MFG 方案": [
+    "RTX40 MFG scheme",
+    "Профиль RTX40 MFG",
+    "RTX40 MFG 方式",
+    "RTX40 MFG 방식"
+  ],
+  "RTX40 使用独立 JSON 参数协议": [
+    "RTX40 uses a separate JSON configuration protocol",
+    "RTX40 использует отдельный протокол настроек JSON",
+    "RTX40 は独立した JSON 設定を使用します",
+    "RTX40은 별도의 JSON 설정을 사용합니다"
+  ],
+  "RTX40 方案只允许一个入口": [
+    "The RTX40 profile requires one DLL entry",
+    "Для профиля RTX40 нужен только один DLL",
+    "RTX40 方式では DLL 入口を 1 つ選んでください",
+    "RTX40 방식은 DLL 진입점을 하나만 사용합니다"
+  ],
+  "RTXMFG JSON 必须是对象": [
+    "RTXMFG configuration must be a JSON object",
+    "Настройки RTXMFG должны быть объектом JSON",
+    "RTXMFG 設定は JSON オブジェクトである必要があります",
+    "RTXMFG 설정은 JSON 객체여야 합니다"
+  ],
+  "Bink 入口需要原始 Hooked 文件；请选择其他空闲入口，管理器不会改名或覆盖游戏原文件": [
+    "Bink requires the original Hooked DLL. Choose another unused entry; the manager does not rename or overwrite game files.",
+    "Для Bink нужен исходный DLL с именем Hooked. Выберите другой свободный вход; менеджер не переименовывает и не заменяет файлы игры.",
+    "Bink には元の Hooked DLL が必要です。他の未使用の入口を選んでください。ゲームのファイルは変更しません。",
+    "Bink에는 원본 Hooked DLL이 필요합니다. 사용하지 않는 다른 진입점을 선택하세요. 게임 원본 파일은 변경하지 않습니다."
+  ],
+  "参数仅保存到当前游戏；已有相同方案时可应用参数，保留其他配置。": [
+    "Settings belong to this game. Apply them to an installed matching profile while preserving other configuration.",
+    "Настройки относятся к этой игре. Их можно применить к установленному профилю, сохранив остальные параметры.",
+    "このゲーム専用の設定です。同じ方式が導入済みなら、他の設定を保ったまま適用できます。",
+    "이 게임에만 저장됩니다. 같은 방식이 설치된 경우 다른 설정을 유지하면서 적용할 수 있습니다."
+  ],
+  "倍率选项直接显示，高级参数可以展开。修改后显示“有修改，待应用”；已部署相同方案时，“应用参数到当前游戏”只更新该游戏配置（INI 或 JSON），不下载 DLL。批量安装用底部“安装并应用”，按每款游戏的设置分别处理。请先退出游戏。": [
+    "Multiplier controls are shown directly; expand advanced settings when needed. Changes are marked pending. Apply parameters updates only the matching installed game configuration (INI or JSON), without downloading DLLs. Install and apply handles batch selections using each game’s own settings. Exit the game first.",
+    "Множитель показан сразу, дополнительные параметры можно раскрыть. Изменения отмечаются как ожидающие применения. Применение обновляет только настройки установленного профиля игры (INI или JSON), без загрузки DLL. Пакетная установка использует отдельные настройки каждой игры. Сначала закройте игру.",
+    "倍率は直接表示され、詳細設定は展開できます。変更は未適用として表示されます。同じ方式が導入済みなら、DLL を再取得せず、そのゲームの設定（INI または JSON）だけを適用します。一括導入もゲームごとの設定を使用します。先にゲームを終了してください。",
+    "배율은 바로 표시되며 고급 설정은 펼칠 수 있습니다. 변경 내용은 적용 대기로 표시됩니다. 같은 방식이 설치되어 있으면 DLL을 다시 받지 않고 해당 게임의 INI 또는 JSON 설정만 적용합니다. 일괄 설치도 각 게임의 설정을 사용합니다. 먼저 게임을 종료하세요."
   ]
 }

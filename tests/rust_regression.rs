@@ -427,7 +427,12 @@ fn custom_cleanup_stays_inside_game() -> Result<()> {
 #[test]
 #[cfg(feature = "fixture-tests")]
 fn dll_profiles_and_multiselect_keep_correct_routes() -> Result<()> {
-    for backend in core::BACKENDS.into_iter().filter(|b| *b != "upstream_sm86") {
+    // These are the historical embedded fixtures. Cloud-only profiles are
+    // covered by cloud::tests using their matching ZIP/config protocols.
+    for backend in core::BACKENDS
+        .into_iter()
+        .filter(|b| !["upstream_sm86", rtx_fg_manager::rtxmfg::BACKEND].contains(b))
+    {
         let p = core::package(backend, &["version.dll".into()])?;
         let c = cleanup::parse_ini(std::str::from_utf8(&p[core::INI])?);
         if backend.starts_with("native") {
@@ -993,8 +998,12 @@ fn same_named_process_in_another_directory_does_not_block_game() -> Result<()> {
     };
     let target = tempfile::tempdir()?;
     let elsewhere = tempfile::tempdir()?;
-    let exe = game(target.path());
-    let other = elsewhere.path().join("Game.exe");
+    // Keep this live-process probe separate from other parallel tests' Game.exe
+    // fixtures: a process that exits during a snapshot may lack a readable path.
+    let name = "RTXFG-SameName-Process-Test.exe";
+    let exe = target.path().join(name);
+    fs::write(&exe, pe(false))?;
+    let other = elsewhere.path().join(name);
     fs::copy(
         PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32/PING.EXE"),
         &other,

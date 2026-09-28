@@ -156,6 +156,7 @@ impl CompactCatalog {
             );
             let (ini_policy, max_selected_proxies) = match s.profile.as_str() {
                 "initial" => ("initial", 1),
+                crate::rtxmfg::PROFILE => ("rtxmfg_json", 1),
                 "native026" => ("native", 5),
                 crate::presets::MFG_VULKAN => ("upstream_proxy", 1),
                 _ => ("upstream_proxy", 6),
@@ -176,7 +177,11 @@ impl CompactCatalog {
             policies.insert(
                 s.id,
                 Policy {
-                    gpu_paths: vec!["SM75".into(), "SM86".into()],
+                    gpu_paths: if s.profile == crate::rtxmfg::PROFILE {
+                        vec!["SM89".into()]
+                    } else {
+                        vec!["SM75".into(), "SM86".into()]
+                    },
                     max_selected_proxies,
                     ini_policy: ini_policy.into(),
                     parameter_profile: s.profile,
@@ -270,6 +275,11 @@ impl Catalog {
             ensure!(
                 match policy.parameter_profile.as_str() {
                     "initial" => policy.ini_policy == "initial",
+                    crate::rtxmfg::PROFILE =>
+                        policy.ini_policy == "rtxmfg_json"
+                            && policy.max_selected_proxies == 1
+                            && p.proxy == "version.dll"
+                            && policy.gpu_paths == ["SM89"],
                     "native026" => policy.ini_policy == "native",
                     _ => policy.ini_policy == "upstream_proxy",
                 },
@@ -302,7 +312,14 @@ impl Catalog {
                     .iter()
                     .map(|f| f.name.as_str())
                     .collect::<BTreeSet<_>>()
-                    == BTreeSet::from([p.proxy.as_str(), core::INI]),
+                    == BTreeSet::from([
+                        p.proxy.as_str(),
+                        if policy.parameter_profile == crate::rtxmfg::PROFILE {
+                            crate::rtxmfg::CONFIG
+                        } else {
+                            core::INI
+                        }
+                    ]),
                 "Invalid package entries"
             );
             for f in &p.files {
@@ -316,7 +333,7 @@ impl Catalog {
                     && policy.max_selected_proxies <= 7
                     && matches!(
                         policy.ini_policy.as_str(),
-                        "native" | "initial" | "upstream_proxy"
+                        "native" | "initial" | "upstream_proxy" | "rtxmfg_json"
                     ),
                 "Unsupported deployment protocol"
             );
@@ -331,7 +348,9 @@ impl Catalog {
                     routes.insert((&p.scheme_id, b, &p.proxy)),
                     "Ambiguous package route"
                 );
-                let expected = if b == "upstream_sm86" {
+                let expected = if b == crate::rtxmfg::BACKEND {
+                    "rtxmfg_json"
+                } else if b == "upstream_sm86" {
                     "upstream_proxy"
                 } else if b.starts_with("native") {
                     "native"
@@ -344,7 +363,8 @@ impl Catalog {
                 policy
                     .gpu_paths
                     .iter()
-                    .all(|g| matches!(g.as_str(), "SM75" | "SM86"))
+                    .all(|g| matches!(g.as_str(), "SM75" | "SM86")
+                        || (g == "SM89" && policy.parameter_profile == crate::rtxmfg::PROFILE))
                     && !policy.gpu_paths.is_empty(),
                 "Invalid GPU path"
             );
@@ -380,6 +400,13 @@ impl Catalog {
             })
     }
     pub fn proxies(&self, id: &str) -> Vec<String> {
+        if self
+            .scheme_policies
+            .get(id)
+            .is_some_and(|p| p.parameter_profile == crate::rtxmfg::PROFILE)
+        {
+            return crate::rtxmfg::PROXIES.iter().map(|s| (*s).into()).collect();
+        }
         self.packages
             .iter()
             .filter(|p| p.scheme_id == id)
@@ -674,7 +701,7 @@ pub fn prepare_with_progress(
 ) -> Result<Prepared> {
     c.validate()?;
     let _cache_lock = crate::cache::operation_lock()?;
-    ensure!(series <= 1, "Invalid GPU selection");
+    ensure!(series <= 2, "Invalid GPU selection");
     let policy = c
         .scheme_policies
         .get(scheme)
@@ -683,10 +710,14 @@ pub fn prepare_with_progress(
         policy
             .gpu_paths
             .iter()
-            .any(|g| g == if series == 0 { "SM75" } else { "SM86" }),
+            .any(|g| g == ["SM75", "SM86", "SM89"][series]),
         "This scheme does not support the selected GPU path"
     );
     let selected = core::normalize_proxies(proxies)?;
+    ensure!(
+        selected.iter().all(|name| c.proxies(scheme).contains(name)),
+        "Proxy unavailable in this scheme"
+    );
     ensure!(
         selected.len() <= policy.max_selected_proxies,
         "This scheme requires a single DLL proxy"
@@ -702,9 +733,11 @@ pub fn prepare_with_progress(
             .iter()
             .find(|p| {
                 p.scheme_id == scheme
-                    && p.proxy == proxy
+                    && (p.proxy == proxy || policy.parameter_profile == crate::rtxmfg::PROFILE)
                     && p.backends.iter().any(|b| {
-                        if policy.ini_policy == "upstream_proxy" {
+                        if policy.parameter_profile == crate::rtxmfg::PROFILE {
+                            b == crate::rtxmfg::BACKEND
+                        } else if policy.ini_policy == "upstream_proxy" {
                             b == "upstream_sm86"
                         } else {
                             b.ends_with(if series == 0 { "20" } else { "30" })
@@ -716,7 +749,9 @@ pub fn prepare_with_progress(
             .backends
             .iter()
             .find(|b| {
-                if policy.ini_policy == "upstream_proxy" {
+                if policy.parameter_profile == crate::rtxmfg::PROFILE {
+                    b.as_str() == crate::rtxmfg::BACKEND
+                } else if policy.ini_policy == "upstream_proxy" {
                     b.as_str() == "upstream_sm86"
                 } else {
                     b.ends_with(if series == 0 { "20" } else { "30" })
@@ -739,6 +774,11 @@ pub fn prepare_with_progress(
             })
         };
         for (name, bytes) in archive(c, p, cancel, &mut package_progress)? {
+            let name = if policy.parameter_profile == crate::rtxmfg::PROFILE && name == p.proxy {
+                proxy.clone()
+            } else {
+                name
+            };
             ensure!(
                 out.get(&name).is_none_or(|old| old == &bytes),
                 "Conflicting INI files"
@@ -824,6 +864,14 @@ mod tests {
                 }
                 core::configure_package(backend, &mut files).unwrap();
                 assert_eq!(original, files[&p.proxy]);
+                if backend == crate::rtxmfg::BACKEND {
+                    assert!(!files.contains_key(core::INI));
+                    assert_eq!(
+                        crate::rtxmfg::read(&files[crate::rtxmfg::CONFIG]).unwrap()["rtx_mode"],
+                        "follow"
+                    );
+                    continue;
+                }
                 let ini =
                     crate::cleanup::parse_ini(std::str::from_utf8(&files[core::INI]).unwrap());
                 if backend == "upstream_sm86" {

@@ -34,6 +34,7 @@ enum Command {
     Page(u8),
     Help,
     ConfigHelp,
+    Editor(String),
     ClearCache,
     Scan,
     ScanRoots(Vec<PathBuf>),
@@ -135,6 +136,18 @@ pub struct Manager {
     smoke_step: u8,
     update_ready_sent: bool,
     dialog_active: bool,
+}
+/// Render after Manager::render has released its entity borrow. Building a
+/// live editor inside Root::render_dialog_layer would recursively borrow Manager.
+struct GameEditor {
+    owner: WeakEntity<Manager>,
+}
+impl Render for GameEditor {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.owner
+            .update(cx, |owner, cx| owner.game_editor_body(window, cx))
+            .unwrap_or_else(|_| div().into_any_element())
+    }
 }
 impl Manager {
     fn new(
@@ -243,7 +256,14 @@ impl Manager {
         match command {
             Command::Page(p) => self.c.page = p,
             Command::Help => self.help(window, cx),
-            Command::ConfigHelp => self.config_help(window, cx),
+            Command::ConfigHelp => {
+                if self.dialog_active {
+                    self.c.state["preset_help_open"] =
+                        json!(!self.c.boolean("preset_help_open", false));
+                } else {
+                    self.config_help(window, cx);
+                }
+            }
             Command::ClearCache => self.c.clear_cache(),
             Command::Refresh => {
                 if let Some(exe) = self.c.focus.clone() {
@@ -290,6 +310,13 @@ impl Manager {
                     self.c.set_game_option(&exe, &key, &value);
                 }
             }
+            Command::Editor(exe) => {
+                if !self.c.busy {
+                    self.c.focus = Some(exe.clone());
+                    self.c.inspect(exe);
+                    self.game_editor(window, cx);
+                }
+            }
             Command::Focus(exe) => {
                 self.c.focus = Some(exe.clone());
                 self.c.inspect(exe);
@@ -312,8 +339,8 @@ impl Manager {
                         p.push("version.dll".into())
                     }
                     if let Ok(p) = core::normalize_proxies(&p) {
-                        self.c.state["proxies"] = json!(p);
-                        self.c.save();
+                        self.c
+                            .set_selection(self.c.cloud_scheme(), self.c.cloud_series(), p);
                     }
                 }
             }
@@ -394,34 +421,32 @@ impl Manager {
         let Some(p) = schemes.get(scheme) else {
             return;
         };
-        let policy = &self.c.catalog.scheme_policies[&p.scheme_id];
-        let suffix = if series == 0 { "20" } else { "30" };
-        let backend = self
-            .c
-            .catalog
-            .packages
-            .iter()
-            .filter(|entry| entry.scheme_id == p.scheme_id)
-            .flat_map(|entry| entry.backends.iter())
-            .find(|b| b.ends_with(suffix))
-            .unwrap_or(&p.backends[0])
-            .clone();
         let id = p.scheme_id.clone();
-        let single = policy.max_selected_proxies == 1;
-        self.c.state["cloud_scheme"] = json!(id);
-        self.c.state["backend"] = json!(backend);
-        self.c.state["cloud_series"] = json!(series);
-        self.c.state["backend_schema"] = json!(1);
-        if single
-            || self
-                .c
-                .proxies()
-                .iter()
-                .any(|n| !self.c.catalog.proxies(&id).contains(n))
-        {
-            self.c.state["proxies"] = json!(["version.dll"])
-        }
-        self.c.save();
+        let policy = &self.c.catalog.scheme_policies[&id];
+        let series = if policy.parameter_profile == rtx_fg_manager::rtxmfg::PROFILE {
+            2
+        } else {
+            series.min(1)
+        };
+        let allowed = self.c.catalog.proxies(&id);
+        let proxies = if id == self.c.cloud_scheme() {
+            self.c.proxies()
+        } else {
+            self.c
+                .focus
+                .as_ref()
+                .and_then(|exe| self.c.games.iter().find(|g| &g.exe == exe))
+                .and_then(|g| g.extra.get("proxy_choices"))
+                .and_then(|v| v.get(&id))
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
+                .filter(|p| {
+                    !p.is_empty()
+                        && p.len() <= policy.max_selected_proxies
+                        && p.iter().all(|n| allowed.contains(n))
+                })
+                .unwrap_or_else(|| vec!["version.dll".into()])
+        };
+        self.c.set_selection(id, series, proxies);
     }
     fn commit(&mut self, action: &str) {
         match action {
@@ -471,8 +496,12 @@ impl Manager {
         cx: &Context<Self>,
     ) -> Button {
         Button::new(id)
+            .small()
             .label(self.t(label))
-            .on_click(cx.listener(move |this, _, window, cx| this.act(action.clone(), window, cx)))
+            .on_click(cx.listener(move |this, _, window, cx| {
+                cx.stop_propagation();
+                this.act(action.clone(), window, cx)
+            }))
     }
     fn icon(name: IconName) -> Icon {
         Icon::new(name).size(px(20.))
@@ -608,7 +637,7 @@ impl Manager {
                     )
                     .child(
                         self.button("help", "使用说明", Command::Help, cx)
-                            .icon(Self::icon(IconName::BookOpen)),
+                            .icon(IconName::BookOpen),
                     ),
             )
             .into_any_element()
@@ -618,10 +647,11 @@ impl Manager {
         let folder = self.t("选择目录扫描");
         let all = self.t("全盘扫描");
         DropdownButton::new("scan-split")
+            .small()
             .button(
                 self.button("scan", "扫描", Command::Scan, cx)
-                    .icon(Self::icon(IconName::FolderOpen))
-                    .w(px(102.)),
+                    .icon(IconName::FolderOpen)
+                    .w(px(80.)),
             )
             .disabled(self.c.busy)
             .dropdown_menu(move |mut menu, _, _| {
@@ -693,14 +723,14 @@ impl Manager {
                     .child(self.scan_button(cx))
                     .child(
                         self.button("add", "添加游戏", Command::Pick(false), cx)
-                            .icon(Self::icon(IconName::Plus))
-                            .w(px(124.))
+                            .icon(IconName::Plus)
+                            .w(px(104.))
                             .disabled(self.c.busy),
                     )
                     .child(
                         self.button("refresh", "刷新", Command::Refresh, cx)
-                            .icon(Icon::default().path("app/refresh.svg").size(px(20.)))
-                            .w(px(124.))
+                            .icon(Icon::default().path("app/refresh.svg").size(px(14.)))
+                            .w(px(104.))
                             .disabled(self.c.busy),
                     ),
             )
@@ -792,9 +822,9 @@ impl Manager {
                 uniform_list(
                     "game-list",
                     self.filtered.len(),
-                    cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
+                    cx.processor(|this, range: std::ops::Range<usize>, window, cx| {
                         range
-                            .map(|i| this.game_row(this.filtered[i], cx))
+                            .map(|i| this.game_row(this.filtered[i], window, cx))
                             .collect::<Vec<_>>()
                     }),
                 )
@@ -805,21 +835,64 @@ impl Manager {
         }
         card.into_any_element()
     }
-    fn deployment_tag(&self, exe: &str) -> AnyElement {
+    fn deployment_tag(&self, exe: &str, max_width: Pixels) -> AnyElement {
         let status = self
             .c
             .statuses
             .get(exe)
             .map(String::as_str)
             .unwrap_or("正在检测…");
-        let (label, variant) = deployment_label(status);
+        let (mut label, mut variant) = deployment_label(status);
+        let snapshot = self.c.deployments.get(exe);
+        let tip = snapshot
+            .map(|s| s.details.join("\n\n"))
+            .unwrap_or_else(|| self.t(status).to_string());
+        if !status.starts_with("正在")
+            && let Some(d) = snapshot
+            && d.installed > 0
+        {
+            let names = d
+                .schemes
+                .iter()
+                .map(|id| {
+                    self.c
+                        .catalog
+                        .packages
+                        .iter()
+                        .find(|p| &p.scheme_id == id)
+                        .map(|p| self.c.cloud_label(p))
+                        .unwrap_or_else(|| self.c.text("未知方案"))
+                })
+                .collect::<Vec<_>>();
+            label = format!(
+                "{} · {} · {}",
+                self.c.text(if d.installed == d.total {
+                    "已部署"
+                } else {
+                    "部分部署"
+                }),
+                names.join(" / "),
+                d.proxies.iter().cloned().collect::<Vec<_>>().join(", ")
+            );
+            if d.total > 1 {
+                label.push_str(&format!(" · {}/{}", d.installed, d.total));
+            }
+            variant = if d.installed == d.total && d.common.is_some() {
+                TagVariant::Success
+            } else {
+                TagVariant::Warning
+            };
+        }
         Tag::new()
             .with_variant(variant)
             .outline()
             .small()
-            .max_w(px(245.))
+            .max_w(max_width)
+            .flex_shrink_0()
             .child(
                 div()
+                    .id(SharedString::from(format!("deployment-tip-{exe}")))
+                    .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
                     .min_w_0()
                     .truncate()
                     .line_height(px(20.))
@@ -827,8 +900,17 @@ impl Manager {
             )
             .into_any_element()
     }
-    fn game_row(&self, index: usize, cx: &Context<Self>) -> AnyElement {
+    fn game_row(&self, index: usize, window: &Window, cx: &Context<Self>) -> AnyElement {
         let game = &self.c.games[index];
+        // The status occupies the upper right; the compact action sits directly
+        // below it. Limit long statuses so game names still have room to render.
+        let sidebar_width = if window.viewport_size().width >= px(880.) {
+            px(340.)
+        } else {
+            px(0.)
+        };
+        let badge_width = ((window.viewport_size().width - sidebar_width - px(128.)) * 0.48)
+            .clamp(px(150.), px(360.));
         let exe = game.exe.clone();
         let focus = exe.clone();
         let p = PathBuf::from(&exe);
@@ -914,18 +996,39 @@ impl Manager {
                                         game.title.clone()
                                     }),
                             )
-                            .child(self.deployment_tag(&game.exe)),
+                            .child(self.deployment_tag(&game.exe, badge_width)),
                     )
                     .child(
                         div()
-                            .id(("game-path", index))
-                            .tooltip(move |window, cx| {
-                                Tooltip::new(detail_tip.clone()).build(window, cx)
-                            })
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .truncate()
-                            .child(game.root.clone()),
+                            .h_flex()
+                            .gap_2()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .id(("game-path", index))
+                                    .tooltip(move |window, cx| {
+                                        Tooltip::new(detail_tip.clone()).build(window, cx)
+                                    })
+                                    .flex_1()
+                                    .min_w_0()
+                                    .text_xs()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .truncate()
+                                    .child(game.root.clone()),
+                            )
+                            .child(
+                                self.button(
+                                    ("game-presets", index),
+                                    "预设参数",
+                                    Command::Editor(game.exe.clone()),
+                                    cx,
+                                )
+                                .small()
+                                .compact()
+                                .icon(Icon::new(IconName::Settings2).size(px(14.)))
+                                .flex_shrink_0()
+                                .disabled(self.c.busy),
+                            ),
                     ),
             )
             .context_menu(move |menu, _, _| {
@@ -1029,14 +1132,14 @@ impl Manager {
                     .iter()
                     .find(|(v, _)| *v == value)
                     .map(|(_, l)| *l)
-                    .unwrap_or(param.default);
+                    .unwrap_or(value);
                 let disabled = self.c.busy
                     || !context.parameter_enabled(param.key, &options)
                     || self.c.focus.as_ref().is_some_and(|e| {
                         self.c.running_games.contains(e) || self.c.preset_reads.contains(e)
                     })
                     || (param.key == "hardware_bilinear" && self.c.cloud_series() == 0);
-                let choices = param
+                let mut choices: Vec<_> = param
                     .choices
                     .iter()
                     .filter(|(v, _)| {
@@ -1057,6 +1160,13 @@ impl Manager {
                         )
                     })
                     .collect();
+                if !param.choices.iter().any(|(v, _)| *v == value) {
+                    choices.push((
+                        self.t(value),
+                        Command::GameOption(param.key.into(), value.clone()),
+                        true,
+                    ));
+                }
                 let field = div()
                     .v_flex()
                     .gap_1()
@@ -1064,7 +1174,10 @@ impl Manager {
                     .child(self.menu(param.key, self.t(selected), choices, disabled, window, cx));
                 if matches!(
                     param.key,
-                    "max_generated_frames" | "max_interpolated_frames" | "force_multiplier"
+                    "max_generated_frames"
+                        | "max_interpolated_frames"
+                        | "force_multiplier"
+                        | "rtx_mode"
                 ) {
                     common = common.child(field);
                 } else {
@@ -1116,6 +1229,15 @@ impl Manager {
             .w_full()
             .flex_shrink_0()
             .child(title)
+            .when(self.c.boolean("preset_help_open", false), |d| d.child(Alert::info("preset-inline-help", self.t(if context.profile == rtx_fg_manager::rtxmfg::PROFILE {
+                "RTX40 专用 JSON；Backspace 打开游戏内菜单。游戏须已有 DLSS 帧生成；Vulkan 为实验支持且不支持动态倍率，倍率还受驱动与游戏限制。"
+            } else if context.delta {
+                "三角洲可选跟随游戏、2X、3X、4X，默认4X。4X不是保证四倍FPS，开启后的延迟需实测；旧组件已加载时会保留原运行时。"
+            } else if context.profile == rtx_fg_manager::presets::MFG_VULKAN {
+                "作者默认上限6X，请求倍率跟随游戏。上限与请求是两项独立设置；请求倍率请勿超过上限。支持情况取决于游戏和运行库，不会添加游戏菜单，也不保证成倍FPS。"
+            } else {
+                "仅保存当前游戏、当前方案的参数。完全退出游戏后点击安装补丁以应用；已部署相同 DLL 时只更新这些参数，保留其他 INI 内容。恢复默认只重置这里的选项。"
+            })).small()))
             .when(
                 self.c
                     .focus
@@ -1168,6 +1290,148 @@ impl Manager {
             })
             .into_any_element()
     }
+    fn proxy_panel(&self, cx: &mut Context<Self>) -> AnyElement {
+        let proxies = self.c.proxies();
+        let mut checks = div().h_flex().flex_wrap().gap_x_2().gap_y_2();
+        for n in core::PROXIES {
+            if !self
+                .c
+                .catalog
+                .proxies(&self.c.cloud_scheme())
+                .iter()
+                .any(|p| p == n)
+            {
+                continue;
+            }
+            checks = checks.child(
+                Checkbox::new(n)
+                    // The component's built-in label forces line-height: 1 inside
+                    // an overflow-hidden wrapper, clipping descenders with our font.
+                    // A child keeps the standard checkbox interaction but supplies
+                    // its own full line box, including the bottom of "g".
+                    .child(
+                        div()
+                            .line_height(px(24.))
+                            .min_h(px(24.))
+                            .flex_shrink_0()
+                            .child(n),
+                    )
+                    .tooltip(n)
+                    .checked(proxies.iter().any(|s| s == n))
+                    .disabled(self.c.busy)
+                    .w(px(138.))
+                    .flex_shrink_0()
+                    .items_center()
+                    .min_h(px(24.))
+                    .on_click(cx.listener(move |this, yes, window, cx| {
+                        this.act(Command::Proxy(n.into(), *yes), window, cx)
+                    })),
+            );
+        }
+        let proxy_hint = if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
+            "RTX40 使用单个通用 DLL，选择入口仅改名，签名不变；不会覆盖游戏或其他 MOD 的同名文件。Bink 入口须自行保留原始 Hooked 文件。"
+        } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
+            "此上游版本仅提供version.dll，请勿改名或混装其他方案的DLL。"
+        } else if self.c.cloud_scheme().starts_with("upstream") {
+            "上游支持多选入口；游戏先加载的 DLL 生效，其余仅转发。优先 version/winmm/dinput8/dbghelp；dxgi/d3d12 按需使用。"
+        } else {
+            "优先单选 version.dll；不兼容时卸载后换入口。多选可能冲突。"
+        };
+        div()
+            .v_flex()
+            .w_full()
+            .flex_shrink_0()
+            .gap_3()
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(self.t("DLL 加载入口")),
+            )
+            .child(checks)
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(self.t(proxy_hint)),
+            )
+            .into_any_element()
+    }
+    fn game_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.dialog_active {
+            return;
+        }
+        self.dialog_active = true;
+        self.c.state["preset_help_open"] = json!(false);
+        let owner = cx.entity();
+        let editor = cx.new(|cx| {
+            cx.observe(&owner, |_, _, cx| cx.notify()).detach();
+            GameEditor {
+                owner: owner.downgrade(),
+            }
+        });
+        let view = cx.entity().downgrade();
+        let title = self.t("预设参数");
+        let width = (window.viewport_size().width - px(64.)).min(px(560.));
+        window.open_dialog(cx, move |dialog, _, _| {
+            let close_view = view.clone();
+            dialog
+                .title(title.clone())
+                .width(width)
+                .child(editor.clone())
+                .on_close(move |_, _, cx| {
+                    let _ = close_view.update(cx, |this, cx| {
+                        this.dialog_active = false;
+                        cx.notify();
+                    });
+                })
+        });
+    }
+    fn game_editor_body(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let game = self
+            .c
+            .focus
+            .as_ref()
+            .and_then(|e| self.c.games.iter().find(|g| &g.exe == e));
+        let name = game
+            .map(|g| {
+                if g.title.is_empty() {
+                    PathBuf::from(&g.exe)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string()
+                } else {
+                    g.title.clone()
+                }
+            })
+            .unwrap_or_default();
+        let mut content = div()
+            .v_flex()
+            .gap_3()
+            .child(div().font_weight(FontWeight::SEMIBOLD).child(name))
+            .child(
+                self.c
+                    .cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(self.t("修改会记住在此游戏；更换方案或入口后，先卸载再安装应用。")),
+            );
+        content = content.child(self.preset_panel(window, cx));
+        if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
+            content = content.child(Alert::info("rtxmfg-help", self.t("RTX40 专用 JSON；Backspace 打开游戏内菜单。游戏须已有 DLSS 帧生成；Vulkan 为实验支持且不支持动态倍率，倍率还受驱动与游戏限制。")).small());
+        }
+        div()
+            .id("game-editor-scroll")
+            .v_flex()
+            .max_h((window.viewport_size().height - px(210.)).max(px(180.)))
+            .overflow_y_scroll()
+            .child(content)
+            .into_any_element()
+    }
     fn details(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let (scheme, series) = self.profile();
         let mut panel = div()
@@ -1184,7 +1448,7 @@ impl Manager {
                 div()
                     .v_flex()
                     .gap_2()
-                    .child(div().text_sm().child(self.t("适配方案")))
+                    .child(div().text_sm().child(self.t("此游戏的适配方案")))
                     .child(
                         self.menu(
                             "scheme",
@@ -1231,113 +1495,49 @@ impl Manager {
                                         .contains(&"SM86".into()),
                                 ),
                             )
+                            .child(
+                                Radio::new("rtx40").label("RTX 40").disabled(
+                                    !self.c.catalog.scheme_policies[&self.c.cloud_scheme()]
+                                        .gpu_paths
+                                        .contains(&"SM89".into()),
+                                ),
+                            )
                             .on_click(cx.listener(|this, index, window, cx| {
                                 this.act(Command::Series(*index), window, cx)
                             })),
                     ),
-            );
+            )
+            .child(self.proxy_panel(cx));
         let cloud_source = self.c.choice("download_source", "domestic");
-        panel = panel
-            .child(
-                div()
-                    .v_flex()
-                    .gap_2()
-                    .child(div().text_sm().child(self.t("下载线路")))
-                    .child(self.menu(
-                        "cloud-source",
-                        self.t(if cloud_source == "github" {
-                            "GitHub 优先"
-                        } else {
-                            "国内优先"
-                        }),
-                        vec![
-                            (
-                                self.t("国内优先"),
-                                Command::CloudSource("domestic".into()),
-                                cloud_source != "github",
-                            ),
-                            (
-                                self.t("GitHub 优先"),
-                                Command::CloudSource("github".into()),
-                                cloud_source == "github",
-                            ),
-                        ],
-                        self.c.busy,
-                        window,
-                        cx,
-                    )),
-            )
-            .child(self.preset_panel(window, cx));
-        let proxies = self.c.proxies();
-        let mut checks = div()
-            .v_flex()
-            .gap_3()
-            .child(div().text_sm().child(self.t("DLL 加载入口")));
-        for n in core::PROXIES {
-            if !self
-                .c
-                .catalog
-                .proxies(&self.c.cloud_scheme())
-                .iter()
-                .any(|p| p == n)
-            {
-                continue;
-            }
-            checks = checks.child(
-                Checkbox::new(n)
-                    // The component's built-in label forces line-height: 1 inside
-                    // an overflow-hidden wrapper, clipping descenders with our font.
-                    // A child keeps the standard checkbox interaction but supplies
-                    // its own full line box, including the bottom of "g".
-                    .child(
-                        div()
-                            .line_height(px(24.))
-                            .min_h(px(24.))
-                            .flex_shrink_0()
-                            .child(n),
-                    )
-                    .tooltip(n)
-                    .checked(proxies.iter().any(|s| s == n))
-                    .disabled(self.c.busy)
-                    .items_center()
-                    .min_h(px(24.))
-                    .on_click(cx.listener(move |this, yes, window, cx| {
-                        this.act(Command::Proxy(n.into(), *yes), window, cx)
-                    })),
-            );
-        }
-        let proxy_hint = if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
-            "此上游版本仅提供version.dll，请勿改名或混装其他方案的DLL。"
-        } else if self.c.cloud_scheme().starts_with("upstream") {
-            "上游支持多选入口；游戏先加载的 DLL 生效，其余仅转发。优先 version/winmm/dinput8/dbghelp；dxgi/d3d12 按需使用。"
-        } else {
-            "优先单选 version.dll；不兼容时卸载后换入口。多选可能冲突。"
-        };
-        panel = panel
-            .child(
-                Accordion::new("proxy-accordion")
-                    .small()
-                    .item(|item| {
-                        item.title(format!(
-                            "{} · {}",
-                            self.c.text("DLL 加载入口"),
-                            proxies.join(", ")
-                        ))
-                        .open(self.c.boolean("proxies_expanded", false))
-                        .child(checks)
-                    })
-                    .on_toggle_click(cx.listener(|this, indices: &[usize], _, cx| {
-                        this.c.state["proxies_expanded"] = json!(!indices.is_empty());
-                        this.c.save();
-                        cx.notify();
-                    })),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(self.t(proxy_hint)),
-            );
+        panel = panel.child(
+            div()
+                .v_flex()
+                .gap_2()
+                .child(div().text_sm().child(self.t("下载线路")))
+                .child(self.menu(
+                    "cloud-source",
+                    self.t(if cloud_source == "github" {
+                        "GitHub 优先"
+                    } else {
+                        "国内优先"
+                    }),
+                    vec![
+                        (
+                            self.t("国内优先"),
+                            Command::CloudSource("domestic".into()),
+                            cloud_source != "github",
+                        ),
+                        (
+                            self.t("GitHub 优先"),
+                            Command::CloudSource("github".into()),
+                            cloud_source == "github",
+                        ),
+                    ],
+                    self.c.busy,
+                    window,
+                    cx,
+                )),
+        );
         panel =
             panel.child(
                 div()
@@ -1760,9 +1960,9 @@ impl Manager {
                 div().h_flex().child(
                     self.button(url, label, Command::Open(url.into()), cx)
                         .icon(if url.contains("bilibili.com") || url.contains("b23.tv") {
-                            Icon::default().path("app/bilibili.svg").size(px(20.))
+                            Icon::default().path("app/bilibili.svg").size(px(14.))
                         } else {
-                            Self::icon(icon)
+                            Icon::new(icon).size(px(14.))
                         })
                         .ghost(),
                 ),
@@ -2037,6 +2237,7 @@ impl Manager {
                 .footer(
                     DialogFooter::new().child(
                         Button::new("config-help-ok")
+                            .small()
                             .label(ok.clone())
                             .primary()
                             .on_click(|_, window, cx| {
@@ -2096,9 +2297,13 @@ impl Manager {
                 .button_props(DialogButtonProps::default().ok_text(ok.clone()))
                 .footer(
                     DialogFooter::new().child(
-                        Button::new("help-ok").label(ok.clone()).primary().on_click(
-                            |_, window, cx| window.dispatch_action(Box::new(ConfirmDialog), cx),
-                        ),
+                        Button::new("help-ok")
+                            .small()
+                            .label(ok.clone())
+                            .primary()
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(Box::new(ConfirmDialog), cx)
+                            }),
                     ),
                 )
                 .child(
@@ -2159,13 +2364,17 @@ impl Manager {
                 .margin_top(top)
                 .footer(
                     DialogFooter::new()
-                        .child(Button::new("update-later").label(later.clone()).on_click(
-                            |_, window, cx| {
-                                window.dispatch_action(Box::new(CancelDialog), cx);
-                            },
-                        ))
+                        .child(
+                            Button::new("update-later")
+                                .small()
+                                .label(later.clone())
+                                .on_click(|_, window, cx| {
+                                    window.dispatch_action(Box::new(CancelDialog), cx);
+                                }),
+                        )
                         .child(
                             Button::new("update-accept")
+                                .small()
                                 .label(accept.clone())
                                 .primary()
                                 .on_click(|_, window, cx| {
@@ -2259,15 +2468,18 @@ impl Manager {
         let view = cx.entity().downgrade();
         // The pinned AlertDialog overwrites its base on_close callback during
         // conversion. Release our guard in both standard button handlers instead.
+        let ok_text = self.t(if action.is_some() { "继续" } else { "确定" });
+        let cancel_text = self.t("取消");
+        let ok_variant = if action.as_deref() == Some("clean_batch") {
+            ButtonVariant::Danger
+        } else {
+            ButtonVariant::Primary
+        };
         let props = DialogButtonProps::default()
-            .ok_text(self.t(if action.is_some() { "继续" } else { "确定" }))
-            .cancel_text(self.t("取消"))
+            .ok_text(ok_text.clone())
+            .cancel_text(cancel_text.clone())
             .show_cancel(action.is_some())
-            .ok_variant(if action.as_deref() == Some("clean_batch") {
-                ButtonVariant::Danger
-            } else {
-                ButtonVariant::Primary
-            });
+            .ok_variant(ok_variant);
         let width = (window.viewport_size().width - px(90.)).min(px(600.));
         let height = (window.viewport_size().height - px(240.)).max(px(120.));
         window.open_alert_dialog(cx, move |dialog, _, _| {
@@ -2279,6 +2491,28 @@ impl Manager {
                 .icon(Self::icon(status_icon.clone()).size(px(28.)))
                 .width(width)
                 .button_props(props.clone())
+                .footer(
+                    DialogFooter::new()
+                        .when(action.is_some(), |footer| {
+                            footer.child(
+                                Button::new("message-cancel")
+                                    .small()
+                                    .label(cancel_text.clone())
+                                    .on_click(|_, window, cx| {
+                                        window.dispatch_action(Box::new(CancelDialog), cx);
+                                    }),
+                            )
+                        })
+                        .child(
+                            Button::new("message-ok")
+                                .small()
+                                .label(ok_text.clone())
+                                .with_variant(ok_variant)
+                                .on_click(|_, window, cx| {
+                                    window.dispatch_action(Box::new(ConfirmDialog), cx);
+                                }),
+                        ),
+                )
                 .overlay_closable(false)
                 .child(
                     div()
@@ -2389,7 +2623,13 @@ impl Manager {
             if next > self.smoke_step {
                 self.smoke_step = next;
                 match next {
-                    1 => self.help(window, cx),
+                    1 => {
+                        if self.c.focus.is_some() && self.c.state["smoke_editor"].is_string() {
+                            self.game_editor(window, cx);
+                        } else {
+                            self.help(window, cx);
+                        }
+                    }
                     2 => {
                         window.close_dialog(cx);
                         self.c.page = 1;
@@ -2606,8 +2846,10 @@ fn deployment_label(status: &str) -> (String, TagVariant) {
             format!("{} 5X/6X", saved_version.unwrap_or("0.2.4"))
         } else if profile.starts_with("NATIVE") || profile.starts_with("UPSTREAM") {
             saved_version.unwrap_or("0.2.5").to_string()
-        } else {
+        } else if matches!(profile, "SM75_R2" | "RTX20" | "RTX30") {
             "R2".into()
+        } else {
+            profile.into()
         };
         (
             format!(

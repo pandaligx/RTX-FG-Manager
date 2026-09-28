@@ -10,7 +10,7 @@ Actions 的资源探测和自动同步只上传 DLL ZIP。管理器和 aria2 等
 
 ## 更新一次 DLL
 
-1. 对新 DLL 完成游戏测试、签名。每个 ZIP 只放一个代理 DLL 和匹配的 `dlssg_sm86.ini`，文件放在 ZIP 根目录。不要打包日志、缓存、原游戏 DLL 或子文件夹。
+1. 对新 DLL 完成游戏测试、签名。每个 ZIP 只放一个代理 DLL 和匹配配置，文件放在 ZIP 根目录。现有方案使用 `dlssg_sm86.ini`；RTX40MFG 使用 `RTXMFG-Universal.json`。不要打包日志、缓存、原游戏 DLL 或子文件夹。
 2. 给 ZIP 新名称，例如 `upstream-0.3.6-version-r1.zip`。上传到 GitHub **`payloads` 固定预发行**。同名不同内容不允许覆盖；修改 INI 或重新签名，也需要新 ZIP 名称。
 3. 编辑 `cloud/schemes.json`，修改对应方案的 `version`、`name` 和 `archives`。已有方案的 `id` 保持不变，以保留用户参数记忆。参数协议没有变化时保留 `profile`。
 4. 提交后查看 **Publish verified DLL resources** 工作流。它核验 ZIP 内容，上传到 Gitee，两站匿名回下载核对，再发布索引，最后发布正式 catalog。
@@ -45,13 +45,17 @@ Actions 的资源探测和自动同步只上传 DLL ZIP。管理器和 aria2 等
 | `id` | 稳定身份；改名时不要修改它 |
 | `name` / 可选 `names` | 中文名称 / 按语言代码指定其他语言名称 |
 | `version` | ZIP 内 DLL 方案版本，三段数字 |
-| `profile` | 管理器已支持的 INI 参数协议，不是展示名称 |
+| `profile` | 管理器已支持的参数协议（INI 或 JSON），不是展示名称 |
 | `defaults` | 新配置默认值；留空对象表示使用该协议内置默认值 |
 | `archives` | 固定资源 Release 的 ZIP 文件名，不需要手填 URL 或 SHA-256 |
 | `min_manager_version` | 可选最低管理器版本；较老的新客户端会跳过该方案并提示升级 |
 | `capabilities` | 仅专项构建使用；不要给普通上游 DLL 添加三角洲能力标记 |
 
-当前协议为 `upstream035`、`upstream031`、`native026`、`initial`、`mfg_vulkan_sm86_7`。新 DLL 若改变 INI 字段或功能含义，需要先适配管理器和发布工具，不能只改版本号。
+当前协议为 `upstream035`、`upstream031`、`native026`、`initial`、`mfg_vulkan_sm86_7`、`rtxmfg_universal_133`。新 DLL 若改变参数字段或功能含义，需要先适配管理器和发布工具，不能只改版本号。
+
+RTX40 使用 `rtxmfg_universal_133`，最低管理器版本为 `4.2.5`。只上传一个 ZIP：将已签的通用 DLL 原样命名为 `version.dll`，与 `RTXMFG-Universal.json` 放在根目录。管理器按用户所选入口改名，不修改签名字节。不要按 19 个支持名称复制上传，也不要加入 `dbghelp.dll`。默认参数可留空；可写 `rtx_mode`（`follow`、`1`—`6` 或 `dynamic`）、`rtx_target`（`0`—`1000`，0 跟随刷新率）、`rtx_preset`（`0`、`1`、`2`）。这些键仅用于云端预设，不是 JSON 原始字段名。
+
+包含内嵌后端的方案，先签内部后端，再嵌回外层、更新对应资源摘要，最后签外层 DLL。嵌入操作会使旧外层签名失效。签名有效不等于所有游戏或反作弊允许加载。
 
 `initial` 方案的两条 GPU 路由使用 `{ "file": "文件.zip", "gpu": "rtx20" }` 和 `rtx30`。兼容既有包身份时允许可选 `id`。其他方案通常直接写文件名即可。所有整数和开关默认值使用字符串，例如 `"1"`。
 

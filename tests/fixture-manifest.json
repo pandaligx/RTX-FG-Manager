@@ -492,6 +492,18 @@
           "sha256": "f80ecfbce8a84a5b4c1c59dc5a9f0ee9cf5a989c9fba3a9486ee874f7595a454"
         }
       ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxmfg-1.3.3-hf2-v425-universal.zip",
+      "bytes": 1752761,
+      "sha256": "81cebb00345b9c2b4df125590062a934ea3e3d763631bf163bb6c0deecc092c0",
+      "outputs": [
+        {
+          "path": "packages/rtxmfg-1.3.3-hf2-v425-universal.zip",
+          "bytes": 1752761,
+          "sha256": "81cebb00345b9c2b4df125590062a934ea3e3d763631bf163bb6c0deecc092c0"
+        }
+      ]
     }
   ]
 }

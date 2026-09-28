@@ -11,7 +11,7 @@ use std::{
 pub const OWN: &str = ".rtx-fg-v3";
 pub const MARKER: &str = "install.json";
 pub const INI: &str = "dlssg_sm86.ini";
-pub const PROXIES: [&str; 7] = [
+pub const PROXIES: [&str; 20] = [
     "version.dll",
     "winmm.dll",
     "dinput8.dll",
@@ -19,8 +19,21 @@ pub const PROXIES: [&str; 7] = [
     "dxgi.dll",
     "dbghelp.dll",
     "d3d12.dll",
+    "d3d9.dll",
+    "d3d10.dll",
+    "d3d11.dll",
+    "dsound.dll",
+    "wininet.dll",
+    "binkw64.dll",
+    "bink2w64.dll",
+    "xinput1_1.dll",
+    "xinput1_2.dll",
+    "xinput1_3.dll",
+    "xinput1_4.dll",
+    "xinput9_1_0.dll",
+    "xinputuap.dll",
 ];
-pub const BACKENDS: [&str; 7] = [
+pub const BACKENDS: [&str; 8] = [
     "native20",
     "native30",
     "native_x6_20",
@@ -28,6 +41,7 @@ pub const BACKENDS: [&str; 7] = [
     "rtx20",
     "rtx30",
     "upstream_sm86",
+    crate::rtxmfg::BACKEND,
 ];
 pub const SCHEMES: [&str; 3] = [
     "0.2.6 · DX12/Vulkan（正式）",
@@ -147,7 +161,7 @@ pub fn location(exe: &Path, must_exist: bool) -> Result<PathBuf> {
 }
 pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
     ensure!(
-        !proxies.is_empty() && proxies.len() <= 7,
+        !proxies.is_empty() && proxies.len() <= PROXIES.len(),
         "DLL 入口选择无效"
     );
     ensure!(
@@ -165,6 +179,13 @@ pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
         .map(|s| (*s).into())
         .collect())
 }
+pub fn config_name(backend: &str) -> &'static str {
+    if backend == crate::rtxmfg::BACKEND {
+        crate::rtxmfg::CONFIG
+    } else {
+        INI
+    }
+}
 pub fn folder(backend: &str) -> Result<&str> {
     ensure!(
         BACKENDS.contains(&backend) || backend == "manual",
@@ -181,6 +202,18 @@ pub fn folder(backend: &str) -> Result<&str> {
 pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>> {
     folder(backend)?;
     let mut names = normalize_proxies(proxies)?;
+    if backend == crate::rtxmfg::BACKEND {
+        ensure!(
+            names.len() == 1 && crate::rtxmfg::PROXIES.contains(&names[0].as_str()),
+            "RTX40 方案只允许一个入口"
+        );
+        names.push(crate::rtxmfg::CONFIG.into());
+        return Ok(names);
+    }
+    ensure!(
+        names.iter().all(|n| PROXIES[..7].contains(&n.as_str())),
+        "此方案没有所选 DLL 入口"
+    );
     ensure!(
         !backend.starts_with("native")
             || names
@@ -215,7 +248,7 @@ pub fn package(backend: &str, proxies: &[String]) -> Result<BTreeMap<String, Vec
 pub fn configure_package(backend: &str, out: &mut BTreeMap<String, Vec<u8>>) -> Result<()> {
     // Bundled upstream runtimes default to the user cache. Moving their extracted
     // components next to a game changes DLL loading behavior (reported by ZZZ).
-    if backend == "upstream_sm86" {
+    if backend == "upstream_sm86" || backend == crate::rtxmfg::BACKEND {
         return Ok(());
     }
     let mut bytes = out[INI].clone();
@@ -461,7 +494,7 @@ pub fn apply_parameters(
         status(&exe).starts_with("已部署"),
         "补丁文件已变化，请刷新后检查"
     );
-    let ini = no_links(&dir.join(INI))?;
+    let ini = no_links(&dir.join(config_name(&record.backend)))?;
     ensure!(ini.metadata()?.len() <= 1024 * 1024, "INI 文件过大");
     let before = fs::read(&ini)?;
     let after = context.configure(&before, values)?;
@@ -492,7 +525,7 @@ pub fn status(exe: &Path) -> String {
                     return Ok("未完成 / 可清理恢复".into());
                 }
                 if digest(&q)? != *h {
-                    if n == INI {
+                    if n == config_name(&r.backend) {
                         edited = true
                     } else {
                         return Ok("DLL 已调整 / 卸载会识别本项目文件并保留其他 MOD".into());
@@ -577,6 +610,7 @@ pub fn deploy_prepared_context(
     payload_version: Option<&str>,
     context: Option<&crate::presets::Context>,
 ) -> Result<String> {
+    let config = config_name(backend);
     let expected = deployment_names(backend, proxies)?;
     ensure!(
         data.keys()
@@ -596,8 +630,13 @@ pub fn deploy_prepared_context(
         ensure!(crate::delta::is_game(&p), "三角洲专项目标不匹配");
         let id = crate::delta::cache_id(&p);
         data.insert(
-            INI.into(),
-            crate::diagnostics::edit_ini(&data[INI], "Compatibility", crate::delta::ID_KEY, &id)?,
+            config.into(),
+            crate::diagnostics::edit_ini(
+                &data[config],
+                "Compatibility",
+                crate::delta::ID_KEY,
+                &id,
+            )?,
         );
         crate::delta::register_at(&crate::delta::root()?, &p, &id)?;
         vec![id]
@@ -605,11 +644,30 @@ pub fn deploy_prepared_context(
         Vec::new()
     };
     let selected = normalize_proxies(proxies)?;
+    if backend == crate::rtxmfg::BACKEND {
+        for (proxy, original) in [
+            ("binkw64.dll", "binkw64Hooked.dll"),
+            ("bink2w64.dll", "bink2w64Hooked.dll"),
+        ] {
+            if selected.iter().any(|s| s == proxy) {
+                let original = no_links(&dir.join(original))?;
+                ensure!(
+                    original.is_file(),
+                    "Bink 入口需要原始 Hooked 文件；请选择其他空闲入口，管理器不会改名或覆盖游戏原文件"
+                );
+                pe64(&original, true)?;
+            }
+        }
+    }
     if let Some(level) = level {
+        ensure!(
+            backend != crate::rtxmfg::BACKEND,
+            "RTX40 使用独立 JSON 参数协议"
+        );
         ensure!(level <= 3, "日志级别无效");
         let bytes =
-            crate::diagnostics::edit_ini(&data[INI], "Logging", "Level", &level.to_string())?;
-        data.insert(INI.into(), bytes);
+            crate::diagnostics::edit_ini(&data[config], "Logging", "Level", &level.to_string())?;
+        data.insert(config.into(), bytes);
     }
     let root = no_links(&dir.join(OWN))?;
     let mut existing = record(dir)?;
@@ -617,7 +675,7 @@ pub fn deploy_prepared_context(
     // while allowing an already-tested manual package to retain custom INI text.
     if existing.is_none()
         && context.is_some()
-        && dir.join(INI).is_file()
+        && dir.join(config).is_file()
         && selected.iter().all(|name| {
             let path = dir.join(name);
             crate::cleanup::known_proxy(&path).unwrap_or(false)
@@ -641,10 +699,10 @@ pub fn deploy_prepared_context(
                 "已有其他补丁入口，请先卸载再切换上游方案"
             );
         }
-        let ini = no_links(&dir.join(INI))?;
+        let ini = no_links(&dir.join(config))?;
         ensure!(ini.metadata()?.len() <= 1024 * 1024, "INI 文件过大");
         let mut hashes: BTreeMap<_, _> = data.iter().map(|(n, b)| (n.clone(), hash(b))).collect();
-        hashes.insert(INI.into(), digest(&ini)?);
+        hashes.insert(config.into(), digest(&ini)?);
         let r = Record {
             schema: 3,
             backend: backend.into(),
@@ -666,15 +724,15 @@ pub fn deploy_prepared_context(
         if r.backend == backend && r.selected() == selected && status(&p).starts_with("已部署") {
             ensure!(
                 data.iter()
-                    .filter(|(name, _)| name.as_str() != INI)
+                    .filter(|(name, _)| name.as_str() != config)
                     .all(|(name, bytes)| r.hashes.get(name) == Some(&hash(bytes))),
                 "当前安装与内置文件版本不同，请先卸载补丁，再安装新版；已有文件未覆盖"
             );
             {
-                let ini = no_links(&dir.join(INI))?;
+                let ini = no_links(&dir.join(config))?;
                 let current = fs::read(&ini)?;
                 let updated =
-                    crate::presets::merge_context(&current, &data[INI], backend, context)?;
+                    crate::presets::merge_context(&current, &data[config], backend, context)?;
                 if let Some(context) = context {
                     r.scheme_id = Some(context.scheme.clone());
                     for id in &delta_cache_ids {
@@ -687,7 +745,7 @@ pub fn deploy_prepared_context(
                     atomic_json(&root.join(MARKER), &r)?;
                 }
                 if current != updated {
-                    let stage = no_links(&root.join(format!("{INI}.config-stage")))?;
+                    let stage = no_links(&root.join(format!("{config}.config-stage")))?;
                     ensure!(!stage.exists(), "存在未完成的配置更新，请先卸载补丁");
                     write_new(&stage, &updated)?;
                     if let Err(error) = win::replace_existing(&stage, &ini) {
@@ -701,7 +759,7 @@ pub fn deploy_prepared_context(
         }
         bail!("已有部署或未完成操作，请先清理再重新部署")
     }
-    if backend == "upstream_sm86" {
+    if backend == "upstream_sm86" || backend == crate::rtxmfg::BACKEND {
         for name in PROXIES
             .iter()
             .filter(|n| !selected.iter().any(|s| s == **n))
@@ -713,7 +771,10 @@ pub fn deploy_prepared_context(
             );
         }
     }
-    let conflicts = if backend.starts_with("native") || backend == "upstream_sm86" {
+    let conflicts = if backend.starts_with("native")
+        || backend == "upstream_sm86"
+        || backend == crate::rtxmfg::BACKEND
+    {
         data.keys().cloned().collect::<Vec<_>>()
     } else {
         PROXIES[..5]

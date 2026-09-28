@@ -1,5 +1,35 @@
 # Changelog
 
+## 4.2.5
+
+- Compact the signed-backend resource replacement to reclaim obsolete file space: approximately 28.8 MiB for upstream 0.3.5 and 32.3 MiB for the Delta variant. Preserve the already-signed initial proxies.
+
+- Remember the scheme and DLL entries for each game. Switching games restores
+  that game's selection and presets; mixed batch installs use each game's own settings.
+- Keep DLL entries in the right sidebar, following the selected game. Right-align
+  the deployment badge above a compact, neutral Presets button. Use Small buttons
+  consistently across the toolbar, settings, deployment actions and dialog footers.
+  Separate edits awaiting application from the actual deployment badge; show real scheme names,
+  proxy filenames and directory counts instead of mislabelling grouped installs R2.
+- Add the separate RTX40MFG-Unlock 1.3.3 Hotfix 2 profile, using one renamed,
+  signed universal DLL and its own JSON configuration. Preserve unrelated menu
+  settings; require existing Streamline DLSS FG. Vulkan is experimental; Dynamic
+  mode is DX12 only. Original game and other MOD files remain protected.
+- Repackage both 0.3.5 groups and the two initial backends with code-identical
+  signed internal backends. Update their extraction hashes and cleanup identities;
+  all modified outer proxies are publisher-signed. Each contains one matching
+  backend without duplicate storage. This addresses unsigned embedded backends,
+  not a guarantee of anti-cheat acceptance or game compatibility.
+- Update five-language help, protocol documentation and filesystem regressions.
+  The default remains upstream 0.3.5; 0.2.6 and Dlssg-MFG-Vulkan DLLs are unchanged.
+- Updating the manager preserves the library and preferences and does not replace
+  deployed game DLLs automatically. Exit the game, uninstall its old patch, and
+  reinstall the chosen scheme to obtain the newly signed backend package.
+
+Format, Cargo check/test, strict Clippy and Release build passed, with Windows
+loader and five-language UI checks. No new physical RTX20/30/40 game validation
+is claimed; RTX40 Bink entry loading was skipped without original game components.
+
 ## 4.2.4
 
 - Group verified game executables by installation into one library entry. When

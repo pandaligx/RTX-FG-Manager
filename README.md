@@ -1,6 +1,6 @@
 # RTX Frame Generation Manager · by 小南瓜
 
-**An easier way to install, tune and manage frame-generation patches for RTX 20 / 30 GPUs.**
+**An easier way to install, tune and manage frame-generation patches for RTX 20 / 30 / 40 GPUs.**
 
 A Rust core with a native GPUI interface. One executable for your game library, cloud DLLs, per-game presets and patch removal.
 
@@ -58,6 +58,16 @@ Its separate INI protocol uses `MaxInterpolatedFrames=5` (up to 6X) and `ForceMu
 
 RenderScale, hotkeys and other advanced keys are preserved. Blackwell experimental toggles with upstream GPU-hang reports are not exposed. Managed edits preserve comments and unrelated INI keys; cleanup preserves unknown files. Exit the game and uninstall before switching schemes.
 
+## RTX40 MFG
+
+The upstream 0.3.5, Delta Force and initial RTX20/RTX30 packages also embed their matching signed backends, with one backend copy per proxy. Signing establishes publisher identity and integrity; it does not grant game or anti-cheat approval.
+
+[RTX40MFG-Unlock v1.3.3 Hotfix 2](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.3.3-hotfix.2) is a separate RTX40 profile. It defaults to Follow game and exposes fixed 2X–6X, a Dynamic target and UI preset. The game must already integrate Streamline DLSS FG. Vulkan is experimental and does not support Dynamic mode.
+
+One signed universal DLL is renamed to the chosen entry; existing game/mod files are never overwritten. Settings use `RTXMFG-Universal.json`, separate from RTX20/30 INI protocols. Press **Backspace** in game for the upstream menu. Bink entries require the original Hooked file as described upstream.
+
+Select a game to change its scheme and DLL entries in the right sidebar. The deployment badge appears at the upper right of its row, with a compact **Presets** button below it. Scheme, entry and parameters are remembered per game. Deployment badges show actual installed schemes, DLLs and directory counts, with details on hover. Uninstall before changing scheme or entry; batch installation honors each game's own settings.
+
 ## Choose a scheme
 
 | Scheme | API and purpose | Entry DLLs |
@@ -65,6 +75,7 @@ RenderScale, hotkeys and other advanced keys are preserved. Blackwell experiment
 | **0.3.5 · Github-sdli1995 — default** | Original upstream, D3D12 / SM75 and SM86, 310.9 model | Six |
 | **0.3.5 · Delta Force** | This project's Vulkan and Delta Force extensions | Six |
 | **Dlssg-MFG-Vulkan** | Upstream sm86-7 adds Vulkan; RTX20 unverified | version.dll |
+| **RTX40 MFG · 1.3.3 Hotfix 2** | RTX40 / existing Streamline DLSS FG; separate JSON | One entry, 19 supported filenames |
 | **0.2.6 · DX12/Vulkan** | Retained compatibility option, 310.1 model | Five |
 | **Initial · GitHub first release** | Original capabilities; files selected for RTX20 or RTX30 | version.dll |
 
@@ -79,7 +90,7 @@ Upstream 0.3.5 fixes optimized-kernel selection after feature recreation, which 
 Use **Manager 4.2.1 or later** and exit the game first:
 
 1. Add the actual `DeltaForceClient-Win64-Shipping.exe` inside `Binaries/Win64`.
-2. Select **0.3.5 · Delta Force**, choose the GPU series and expand **Preset parameters**.
+2. Select **0.3.5 · Delta Force**, choose the GPU series and click **Presets** on that game's row.
 3. Set the multiplier to follow game / 2X / 3X / **4X (default)**, then install/apply.
 4. Start the game and enable its frame-generation switch. Exit before applying another multiplier.
 
@@ -129,7 +140,7 @@ Thanks also to [Bilibili · 云外逸声](https://space.bilibili.com/256887068).
 
 ## Parameters, source and maintenance
 
-Multiplier controls are visible immediately, while other controls stay under **Advanced parameters**. Changes are marked as pending. **Apply to current game** updates only that game’s INI when the same scheme is installed, without downloading DLLs; **Install and apply** also supports checked batches. Exit the game before applying.
+Open **Presets** on the game row. Multiplier controls appear first; other controls stay under **Advanced parameters**. Changes are marked as pending. **Apply to current game** updates only that game’s matching INI or JSON when the same scheme is installed, without downloading DLLs; **Install and apply** also supports checked batches using each game's own settings. Exit the game before applying.
 
 The Rust manager source is published under the repository license. [BUILDING.md](BUILDING.md) documents the pinned toolchain, verified third-party tool and checks for a fresh Windows checkout. Game DLLs retain their respective upstream ownership; private DLL patches and NVIDIA SDK headers are not part of this source release.
 

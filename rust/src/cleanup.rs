@@ -263,9 +263,16 @@ fn manual_record(exe: &Path, legacy: Option<String>) -> Result<Option<Record>> {
         );
     }
     let selected = core::normalize_proxies(&hashes.keys().cloned().collect::<Vec<_>>())?;
-    let ini = core::no_links(&dir.join(INI))?;
+    let rtxmfg = hashes.keys().any(|name| {
+        identity(&dir.join(name))
+            .ok()
+            .and_then(|i| i.1)
+            .is_some_and(|h| listed("rtxmfg_images", &h))
+    });
+    let config = if rtxmfg { crate::rtxmfg::CONFIG } else { INI };
+    let ini = core::no_links(&dir.join(config))?;
     hashes.insert(
-        INI.into(),
+        config.into(),
         if ini.is_file() {
             core::digest(&ini)?
         } else {
@@ -274,7 +281,12 @@ fn manual_record(exe: &Path, legacy: Option<String>) -> Result<Option<Record>> {
     );
     Ok(Some(Record {
         schema: 3,
-        backend: "manual".into(),
+        backend: if rtxmfg {
+            crate::rtxmfg::BACKEND
+        } else {
+            "manual"
+        }
+        .into(),
         payload_version: None,
         proxy: selected[0].clone(),
         proxies: selected,
@@ -382,8 +394,13 @@ pub fn clean(exe: &Path) -> Result<String> {
     let mut kept = BTreeSet::new();
     let mut targets = BTreeMap::new();
     let mut dirs = BTreeSet::new();
-    let ini = core::no_links(&dir.join(INI))?;
-    let mut roots = generated_dirs(dir, &ini)?;
+    let config = core::config_name(&record.backend);
+    let ini = core::no_links(&dir.join(config))?;
+    let mut roots = if record.backend == crate::rtxmfg::BACKEND {
+        BTreeMap::new()
+    } else {
+        generated_dirs(dir, &ini)?
+    };
     ensure!(record.cleanup_dirs.len() <= 64, "清理目录记录无效");
     for (name, kind) in &record.cleanup_dirs {
         ensure!(
@@ -415,7 +432,12 @@ pub fn clean(exe: &Path) -> Result<String> {
             kept.insert(helper);
         }
     }
-    for name in VK_LOGS.into_iter().chain([INI]) {
+    let logs: Vec<&str> = if record.backend == crate::rtxmfg::BACKEND {
+        vec!["RTXMFG-Universal.status.json"]
+    } else {
+        VK_LOGS.to_vec()
+    };
+    for name in logs.into_iter().chain([config]) {
         let q = core::no_links(&dir.join(name))?;
         if q.exists() {
             if q.is_file() {
@@ -423,6 +445,12 @@ pub fn clean(exe: &Path) -> Result<String> {
             } else {
                 kept.insert(q);
             }
+        }
+    }
+    if record.backend == crate::rtxmfg::BACKEND {
+        let log = core::no_links(&crate::rtxmfg::log_path(&p))?;
+        if log.is_file() && log.metadata()?.len() <= 128 * 1024 * 1024 {
+            targets.insert(log.clone(), core::digest(&log)?);
         }
     }
     let mut allowed: BTreeSet<String> = [MARKER, "cache", "logs"]
@@ -449,8 +477,8 @@ pub fn clean(exe: &Path) -> Result<String> {
         }
         targets.insert(stage, h);
     }
-    let config_stage = core::no_links(&root.join(format!("{INI}.config-stage")))?;
-    allowed.insert(format!("{INI}.config-stage"));
+    let config_stage = core::no_links(&root.join(format!("{config}.config-stage")))?;
+    allowed.insert(format!("{config}.config-stage"));
     if config_stage.is_file() && config_stage.metadata()?.len() <= 1024 * 1024 {
         // The marker and existing owned INI identify our interrupted config write.
         if ini.is_file() {

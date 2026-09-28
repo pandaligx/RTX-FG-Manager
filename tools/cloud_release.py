@@ -65,7 +65,9 @@ def archive_name(item):
 
 def validate_defaults(profile, defaults):
     boolean = {"0", "1"}
-    if profile == "mfg_vulkan_sm86_7":
+    if profile == "rtxmfg_universal_133":
+        choices = {"rtx_mode": {"follow", "1", "2", "3", "4", "5", "6", "dynamic"}, "rtx_target": {str(n) for n in range(1001)}, "rtx_preset": {"0", "1", "2"}}
+    elif profile == "mfg_vulkan_sm86_7":
         choices = {"max_interpolated_frames": {"1", "2", "3", "4", "5"},
                    "force_multiplier": {"0", "2", "3", "4", "5", "6"},
                    "dynamic_target_fps": {"0", "60", "90", "120", "144", "165", "180", "240", "360"}}
@@ -93,7 +95,7 @@ def validate_spec(spec):
         ids.add(sid)
         require(isinstance(scheme.get("name"), str) and 0 < len(scheme["name"]) <= 200, "Invalid scheme name")
         require(re.fullmatch(r"\d{1,4}\.\d{1,4}\.\d{1,4}", scheme.get("version", "")), "Invalid package version")
-        require(scheme.get("profile") in {"initial", "native026", "upstream031", "upstream035", "mfg_vulkan_sm86_7"}, "New protocols require a manager/tool update")
+        require(scheme.get("profile") in {"initial", "native026", "upstream031", "upstream035", "mfg_vulkan_sm86_7", "rtxmfg_universal_133"}, "New protocols require a manager/tool update")
         require(isinstance(scheme.get("defaults", {}), dict), "Invalid defaults")
         validate_defaults(scheme["profile"], scheme.get("defaults", {}))
         if "min_manager_version" in scheme:
@@ -114,9 +116,10 @@ def package_from_zip(scheme, item, data):
     require(0 < len(data) <= MAX_ZIP, "Invalid ZIP size")
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         entries = archive.infolist()
-        require(len(entries) == 2 and len({e.filename for e in entries}) == 2, "ZIP must contain exactly DLL and INI")
+        require(len(entries) == 2 and len({e.filename for e in entries}) == 2, "ZIP must contain exactly DLL and its configuration")
         dlls = [e.filename for e in entries if e.filename in PROXIES]
-        require(len(dlls) == 1 and {e.filename for e in entries} == {dlls[0], "dlssg_sm86.ini"}, "Unexpected ZIP path")
+        config_name = "RTXMFG-Universal.json" if scheme["profile"] == "rtxmfg_universal_133" else "dlssg_sm86.ini"
+        require(len(dlls) == 1 and {e.filename for e in entries} == {dlls[0], config_name}, "Unexpected ZIP path")
         proxy = dlls[0]
         files = []
         for entry in entries:
@@ -130,13 +133,26 @@ def package_from_zip(scheme, item, data):
                 header = content[offset:offset + 24]
                 require(len(header) == 24 and header[:6] == b"PE\0\0\x64\x86" and int.from_bytes(header[22:24], "little") & 0x2000, "Not an x64 DLL")
             else:
-                content.decode("utf-8-sig")
+                text = content.decode("utf-8-sig")
+                if scheme["profile"] == "rtxmfg_universal_133":
+                    config = json.loads(text)
+                    require(isinstance(config, dict), "RTXMFG config must be a JSON object")
+                    require(type(config.get("multiplier")) is int and 1 <= config["multiplier"] <= 6, "Invalid RTXMFG multiplier")
+                    require(type(config.get("followGame", False)) is bool, "Invalid RTXMFG followGame")
+                    require(config.get("mode", "fixed") in {"fixed", "dynamic", "follow"}, "Invalid RTXMFG mode")
+                    require(config.get("mode") != "follow" or config.get("followGame") is True, "RTXMFG follow mode requires followGame")
+                    for key, maximum in (("dynamicTargetFrameRate", 1000), ("dlssgPreset", 2), ("vsyncMode", 2), ("reflexFrameLimitFps", 1000)):
+                        if key in config:
+                            require(type(config[key]) is int and 0 <= config[key] <= maximum, "Invalid RTXMFG field: " + key)
             files.append({"name": entry.filename, "bytes": len(content), "sha256": digest(content)})
     profile = scheme["profile"]
     if profile == "initial":
         require(isinstance(item, dict) and item.get("gpu") in {"rtx20", "rtx30"}, "Initial archive needs explicit GPU route")
         backends = [item["gpu"]]
         require(proxy == "version.dll", "Initial scheme only supplies version.dll")
+    elif profile == "rtxmfg_universal_133":
+        backends = ["rtx40mfg"]
+        require(proxy == "version.dll", "Universal archive must use canonical version.dll")
     elif profile == "native026":
         backends = ["native20", "native30"]
         require(proxy not in {"d3d12.dll", "dbghelp.dll"}, "Native 0.2.6 proxy mismatch")
@@ -829,6 +845,27 @@ class OfflineTests(unittest.TestCase):
         parsed = json.loads(catalog)
         self.assertEqual(parsed["index"]["sha256"], digest(index))
         self.assertTrue(parsed["index"]["url"].endswith(index_path))
+
+    def test_rtxmfg_requires_separate_json_and_canonical_universal_entry(self):
+        spec, archives = self.fixture()
+        scheme = spec["schemes"][0]
+        scheme.update(profile="rtxmfg_universal_133", min_manager_version="4.2.5", defaults={"rtx_mode":"dynamic", "rtx_target":"200"})
+        dll = zipfile.ZipFile(io.BytesIO(next(iter(archives.values())))).read("version.dll")
+        def pack(config, name="version.dll"):
+            stream = io.BytesIO()
+            with zipfile.ZipFile(stream,"w") as z:
+                z.writestr(name,dll)
+                z.writestr("RTXMFG-Universal.json",json.dumps(config))
+            return stream.getvalue()
+        name = scheme["archives"][0]
+        valid = {"mode":"follow", "followGame":True, "multiplier":2, "dynamicTargetFrameRate":0, "otherMenuSetting":119}
+        p = package_from_zip(scheme,name,pack(valid))
+        self.assertEqual(p["backends"],["rtx40mfg"])
+        self.assertEqual({f["name"] for f in p["files"]},{"version.dll","RTXMFG-Universal.json"})
+        with self.assertRaises(RuntimeError): package_from_zip(scheme,name,next(iter(archives.values())))
+        with self.assertRaises(RuntimeError): package_from_zip(scheme,name,pack(valid,"dxgi.dll"))
+        for invalid in [[], {"multiplier":7}, {"multiplier":2,"followGame":1}, {"multiplier":2,"mode":"follow"}, {"multiplier":2,"dynamicTargetFrameRate":1001}]:
+            with self.assertRaises(RuntimeError): package_from_zip(scheme,name,pack(invalid))
 
     def test_reject_missing_or_ambiguous_archive(self):
         spec, archives = self.fixture()
