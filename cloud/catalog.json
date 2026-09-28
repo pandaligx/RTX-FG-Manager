@@ -1,22 +1,22 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 17476,
-    "fallback_url": "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/indexes/payload-index-r-7bd8be8f09bea1a20bf8.json",
-    "sha256": "3cdb22a829e6408cf998ec4e6dd9e2ebcb3ec657f144239c55acdc07e68a3203",
-    "url": "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/indexes/payload-index-r-7bd8be8f09bea1a20bf8.json"
+    "bytes": 18839,
+    "fallback_url": "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/indexes/payload-index-r-d071063dafc9a31c340f.json",
+    "sha256": "7d1cba1c8cd03ed75ea02b895ff684fb3336fd025a1785d05de15fffadba85cb",
+    "url": "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/indexes/payload-index-r-d071063dafc9a31c340f.json"
   },
-  "revision": "r-7bd8be8f09bea1a20bf8",
+  "revision": "r-d071063dafc9a31c340f",
   "schema": 2,
   "schemes": [
     {
       "archives": [
-        "upstream-0.3.5-310-9-version.zip",
-        "upstream-0.3.5-310-9-d3d12.zip",
-        "upstream-0.3.5-310-9-dbghelp.zip",
-        "upstream-0.3.5-310-9-dinput8.zip",
-        "upstream-0.3.5-310-9-dxgi.zip",
-        "upstream-0.3.5-310-9-winmm.zip"
+        "upstream-0.3.5-310-9-version-signed-backend-v425.zip",
+        "upstream-0.3.5-310-9-d3d12-signed-backend-v425.zip",
+        "upstream-0.3.5-310-9-dbghelp-signed-backend-v425.zip",
+        "upstream-0.3.5-310-9-dinput8-signed-backend-v425.zip",
+        "upstream-0.3.5-310-9-dxgi-signed-backend-v425.zip",
+        "upstream-0.3.5-310-9-winmm-signed-backend-v425.zip"
       ],
       "defaults": {
         "enabled": "1",
@@ -40,12 +40,12 @@
     },
     {
       "archives": [
-        "rtxfg-0.3.5-mfg-v421-version.zip",
-        "rtxfg-0.3.5-mfg-v421-winmm.zip",
-        "rtxfg-0.3.5-mfg-v421-dinput8.zip",
-        "rtxfg-0.3.5-mfg-v421-dbghelp.zip",
-        "rtxfg-0.3.5-mfg-v421-dxgi.zip",
-        "rtxfg-0.3.5-mfg-v421-d3d12.zip"
+        "rtxfg-0.3.5-mfg-v421-version-signed-backend-v425.zip",
+        "rtxfg-0.3.5-mfg-v421-winmm-signed-backend-v425.zip",
+        "rtxfg-0.3.5-mfg-v421-dinput8-signed-backend-v425.zip",
+        "rtxfg-0.3.5-mfg-v421-dbghelp-signed-backend-v425.zip",
+        "rtxfg-0.3.5-mfg-v421-dxgi-signed-backend-v425.zip",
+        "rtxfg-0.3.5-mfg-v421-d3d12-signed-backend-v425.zip"
       ],
       "capabilities": [
         "delta_force_mfg_v1"
@@ -86,8 +86,8 @@
     },
     {
       "archives": [
-        "initial-rtx20-version.zip",
-        "initial-rtx30-version.zip"
+        "initial-rtx20-version-signed-backend-v425.zip",
+        "initial-rtx30-version-signed-backend-v425.zip"
       ],
       "defaults": {
         "enabled": "1",
@@ -103,6 +103,16 @@
         "ru": "Исходный · Первый выпуск GitHub"
       },
       "profile": "initial"
+    },
+    {
+      "archives": [
+        "rtxmfg-1.3.3-hf2-v425-universal.zip"
+      ],
+      "defaults": {},
+      "id": "rtx40mfg-1.3.3-hf2",
+      "min_manager_version": "4.2.5",
+      "name": "RTX40 MFG · 1.3.3 Hotfix 2",
+      "profile": "rtxmfg_universal_133"
     }
   ],
   "sources": {
