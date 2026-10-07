@@ -91,6 +91,16 @@ class SourceAllowlistTests(unittest.TestCase):
 
 
 class PublicationTests(unittest.TestCase):
+    def test_release_inventory_reuses_bounded_publisher_reads_but_never_uploads_exe(self):
+        publisher = Mock()
+        publisher.api.return_value = {'id': 7}
+        with patch('runpy.run_path', return_value={'Publisher': lambda: publisher}):
+            self.assertEqual(mirror['api']('/releases/latest'), {'id': 7})
+            publisher.api.assert_called_once_with('gitee', '/releases/latest')
+            with self.assertRaisesRegex(RuntimeError, 'EXE upload from Actions is prohibited'):
+                mirror['api']('/releases/7/attach_files', {}, Path('signed.exe'))
+            publisher.api.assert_called_once()
+
     def test_static_readback_only_allows_the_exact_github_repository_file(self):
         function = mirror['verify_remote']
         with tempfile.TemporaryDirectory() as folder:

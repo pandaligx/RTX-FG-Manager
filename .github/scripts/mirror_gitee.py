@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import subprocess
 import tempfile
 import time
@@ -211,6 +212,11 @@ def sync_main(root, env, remote_url=None, verified_update=None):
 def api(path, fields=None, file=None):
     if file is not None and file.suffix.lower() == '.exe':
         raise RuntimeError('EXE upload from Actions is prohibited; upload the signed EXE locally')
+    if fields is None and file is None:
+        # The publication runner has repository credentials. Reuse its bounded,
+        # rate-limit-specific authorized GET fallback; clients never receive it.
+        publisher = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'tools/cloud_release.py'))['Publisher']()
+        return publisher.api('gitee', path)
     headers={'User-Agent':'RTXFG-Publication-Mirror'}
     data=None
     if fields is not None:
