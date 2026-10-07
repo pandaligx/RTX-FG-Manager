@@ -13,11 +13,7 @@ pub struct Snapshot {
     pub common: Option<(String, Vec<String>, Option<usize>)>,
 }
 pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
-    let targets = if game.targets.is_empty() {
-        vec![game.exe.clone()]
-    } else {
-        game.targets.clone()
-    };
+    let targets = game.deployment_executables();
     let mut snapshot = Snapshot {
         total: targets.len(),
         ..Default::default()
@@ -26,9 +22,10 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
     let mut statuses = Vec::new();
     for exe in targets {
         let p = Path::new(&exe);
-        let status = core::status(p);
+        let target = game.deployment_target(p);
+        let status = core::status_at(&target);
         statuses.push(status.clone());
-        let record = p.parent().and_then(|dir| core::record(dir).ok().flatten());
+        let record = core::record(&target.directory).ok().flatten();
         if status.starts_with("已部署")
             && let Some(r) = record
         {
@@ -58,7 +55,7 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
             snapshot.proxies.extend(proxies.clone());
             snapshot.details.push(format!(
                 "{}\n{} · {}",
-                p.parent().unwrap().display(),
+                target.directory.display(),
                 label,
                 proxies.join(", ")
             ));
@@ -75,7 +72,7 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
         } else {
             snapshot
                 .details
-                .push(format!("{}\n{}", p.parent().unwrap_or(p).display(), status));
+                .push(format!("{}\n{}", target.directory.display(), status));
         }
     }
     if let Some(first) = selections.first()

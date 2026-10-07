@@ -1,4 +1,5 @@
 {
+  "系统": ["System", "Система", "システム", "시스템"],
   "配置已修改，可正常卸载": [
     "Configuration edited; safe to uninstall",
     "Настройки изменены; удаление доступно",
@@ -16,6 +17,18 @@
     "Тема",
     "テーマ",
     "테마"
+  ],
+  "搜索主题…": [
+    "Search themes…",
+    "Поиск тем…",
+    "テーマを検索…",
+    "테마 검색…"
+  ],
+  "移动预览 · 点击保存 · Esc 取消": [
+    "Hover or use arrows to preview · Click to save · Esc to cancel",
+    "Наведение или стрелки — просмотр · Нажатие — сохранить · Esc — отмена",
+    "マウス移動・矢印キーでプレビュー · クリックで保存 · Esc で取消",
+    "마우스 이동·방향키로 미리 보기 · 클릭하여 저장 · Esc로 취소"
   ],
   "取消": [
     "Cancel",
@@ -294,10 +307,10 @@
     "관리자 프로그램이나 내장 도구를 게임으로 지정할 수 없습니다"
   ],
   "不能部署到 Windows 系统目录": [
-    "Cannot install into Windows system directories",
-    "Нельзя устанавливать в системные папки Windows",
-    "Windows のシステムフォルダーにはインストールできません",
-    "Windows 시스템 폴더에는 설치할 수 없습니다"
+    "Cannot deploy into the Windows system folder",
+    "Установка в системную папку Windows запрещена",
+    "Windowsのシステムフォルダーには配置できません",
+    "Windows 시스템 폴더에는 배포할 수 없습니다"
   ],
   "临时文件不完整且安装源已变化，请恢复原安装源后重试": [
     "Incomplete temporary file and changed source; restore the original installer and retry",
@@ -306,9 +319,9 @@
     "임시 파일이 불완전하고 설치 원본이 변경되었습니다. 원래 설치 프로그램으로 다시 시도하세요"
   ],
   "临时文件不是普通文件": [
-    "Temporary path is not a regular file",
+    "The temporary path is not a regular file",
     "Временный путь не является обычным файлом",
-    "一時パスが通常のファイルではありません",
+    "一時パスは通常のファイルではありません",
     "임시 경로가 일반 파일이 아닙니다"
   ],
   "修改系统显示名称需要管理员权限": [
@@ -2003,11 +2016,11 @@
     "7  互換性",
     "7  호환성"
   ],
-  "安装成功不代表所有游戏兼容，请确认游戏和反作弊规则允许补丁。出现问题可调高当前游戏日志级别，复现后恢复默认；0.2.6 Vulkan 桥接日志不受此开关控制。显卡改名仅改变 Windows 名称，不改变硬件能力。语言和主题可在设置中切换并记忆。": [
-    "Installation does not guarantee game compatibility. Check the game and anti-cheat rules. For troubleshooting raise the log level for the game, then restore defaults; 0.2.6 Vulkan bridge logs are independent. GPU renaming changes Windows labels, not capabilities. Language and theme choices are remembered in Settings.",
-    "Установка не гарантирует совместимость: проверьте правила игры и античита. Для диагностики повысьте уровень журнала, затем верните настройки; журналы Vulkan-моста 0.2.6 независимы. Переименование GPU меняет только имя в Windows. Язык и тема сохраняются в настройках.",
-    "導入成功は全ゲームの互換性を保証しません。ゲームとアンチチートの規則を確認してください。診断時はログレベルを上げ、後で戻します。0.2.6 Vulkan ログは独立です。GPU 改名は Windows 上の名称だけを変え、能力は変えません。言語とテーマは設定で記憶します。",
-    "설치 성공이 모든 게임 호환성을 보장하지는 않습니다. 게임 및 안티치트 규칙을 확인하세요. 진단할 때 로그 수준을 높인 뒤 기본값으로 돌리세요. 0.2.6 Vulkan 브리지 로그는 별개입니다. GPU 이름 변경은 Windows 표시명만 바꿉니다. 언어와 테마는 설정에서 기억됩니다."
+  "安装成功不代表所有游戏兼容，请确认游戏和反作弊规则允许补丁。出现问题可调高当前游戏日志级别，复现后恢复默认；0.2.6 Vulkan 桥接日志不受此开关控制。显卡改名仅改变 Windows 名称，不改变硬件能力。语言在设置中切换，主题从左侧栏打开，选择后会记忆。": [
+    "Installation does not guarantee game compatibility. Check the game and anti-cheat rules. For troubleshooting raise the log level for the game, then restore defaults; 0.2.6 Vulkan bridge logs are independent. GPU renaming changes Windows labels, not capabilities. Change the language in Settings and open themes from the left sidebar; confirmed choices are remembered.",
+    "Установка не гарантирует совместимость: проверьте правила игры и античита. Для диагностики повысьте уровень журнала, затем верните настройки; журналы Vulkan-моста 0.2.6 независимы. Переименование GPU меняет только имя в Windows. Язык выбирается в настройках, темы открываются на левой панели; подтверждённый выбор сохраняется.",
+    "導入成功は全ゲームの互換性を保証しません。ゲームとアンチチートの規則を確認してください。診断時はログレベルを上げ、後で戻します。0.2.6 Vulkan ログは独立です。GPU 改名は Windows 上の名称だけを変え、能力は変えません。言語は設定で変更し、テーマは左サイドバーから開きます。確定した選択は記憶されます。",
+    "설치 성공이 모든 게임 호환성을 보장하지는 않습니다. 게임 및 안티치트 규칙을 확인하세요. 진단할 때 로그 수준을 높인 뒤 기본값으로 돌리세요. 0.2.6 Vulkan 브리지 로그는 별개입니다. GPU 이름 변경은 Windows 표시명만 바꿉니다. 언어는 설정에서 바꾸고 테마는 왼쪽 사이드바에서 여세요. 확정한 선택은 저장됩니다."
   ],
   "下载校验完成后使用新版文件名并自动重启。新版界面启动成功后删除旧程序，失败则还原。": [
     "After verification, restart using the new filename. Delete the old program once the new UI starts; restore it on failure.",
@@ -2878,5 +2891,395 @@
     "Множитель показан сразу, дополнительные параметры можно раскрыть. Изменения отмечаются как ожидающие применения. Применение обновляет только настройки установленного профиля игры (INI или JSON), без загрузки DLL. Пакетная установка использует отдельные настройки каждой игры. Сначала закройте игру.",
     "倍率は直接表示され、詳細設定は展開できます。変更は未適用として表示されます。同じ方式が導入済みなら、DLL を再取得せず、そのゲームの設定（INI または JSON）だけを適用します。一括導入もゲームごとの設定を使用します。先にゲームを終了してください。",
     "배율은 바로 표시되며 고급 설정은 펼칠 수 있습니다. 변경 내용은 적용 대기로 표시됩니다. 같은 방식이 설치되어 있으면 DLL을 다시 받지 않고 해당 게임의 INI 또는 JSON 설정만 적용합니다. 일괄 설치도 각 게임의 설정을 사용합니다. 먼저 게임을 종료하세요."
+  ],
+  "添加文件夹": [
+    "Add folder",
+    "Добавить папку",
+    "フォルダーを追加",
+    "폴더 추가"
+  ],
+  "自定义部署目录": [
+    "Custom deployment folder",
+    "Своя папка установки",
+    "カスタム配置先",
+    "사용자 지정 배포 폴더"
+  ],
+  "选择自定义部署目录（例如 OptiScaler 插件目录）": [
+    "Choose a deployment folder (for example, an OptiScaler plugin folder)",
+    "Выберите папку установки (например, папку плагинов OptiScaler)",
+    "配置先を選択（例：OptiScalerのプラグインフォルダー）",
+    "배포 폴더 선택(예: OptiScaler 플러그인 폴더)"
+  ],
+  "已设置自定义部署目录；请确认加载方式后安装补丁。": [
+    "Custom folder saved. Confirm the loader setup before installing.",
+    "Своя папка сохранена. Проверьте способ загрузки перед установкой.",
+    "配置先を保存しました。読み込み方法を確認してからインストールしてください。",
+    "배포 폴더를 저장했습니다. 로드 방식을 확인한 후 설치하세요."
+  ],
+  "此方案不支持当前显卡系列，请选择兼容方案。": [
+    "This scheme does not support the selected GPU series. Choose a compatible scheme.",
+    "Схема не поддерживает выбранную серию GPU. Выберите совместимую.",
+    "この方式は選択中のGPUシリーズに対応していません。対応方式を選んでください。",
+    "이 방식은 선택한 GPU 시리즈를 지원하지 않습니다. 호환 방식을 선택하세요."
+  ],
+  "已切换到此显卡系列的兼容方案；尚未修改游戏文件。": [
+    "Switched to a scheme compatible with this GPU series. Game files have not been changed.",
+    "Выбрана совместимая схема для этой серии GPU. Файлы игры ещё не изменены.",
+    "GPUシリーズに対応する方式に切り替えました。ゲームファイルはまだ変更していません。",
+    "GPU 시리즈와 호환되는 방식으로 전환했습니다. 게임 파일은 아직 변경하지 않았습니다."
+  ],
+  "更新日志": [
+    "Release notes",
+    "История изменений",
+    "更新履歴",
+    "업데이트 내역"
+  ],
+  "历史版本": [
+    "Previous releases",
+    "Предыдущие версии",
+    "過去のバージョン",
+    "이전 버전"
+  ],
+  "此版本未附更新日志，可在项目发布页查看。": [
+    "No release notes were provided. See the project releases page.",
+    "Описание изменений отсутствует. Откройте страницу выпусков проекта.",
+    "更新履歴が添付されていません。プロジェクトのリリースページで確認できます。",
+    "업데이트 내역이 없습니다. 프로젝트 릴리스 페이지에서 확인하세요."
+  ],
+  "未获得管理员权限，程序未启动": [
+    "Administrator permission was not granted. The app did not start.",
+    "Права администратора не предоставлены. Приложение не запущено.",
+    "管理者権限が許可されなかったため、起動しませんでした。",
+    "관리자 권한이 허용되지 않아 앱을 시작하지 않았습니다."
+  ],
+  "无法确认管理员程序已启动": [
+    "Unable to confirm that the elevated app started",
+    "Не удалось подтвердить запуск с правами администратора",
+    "管理者権限での起動を確認できません",
+    "관리자 권한 앱이 시작되었는지 확인할 수 없습니다"
+  ],
+  "启动参数包含无效字符": [
+    "Startup arguments contain invalid characters",
+    "Аргументы запуска содержат недопустимые символы",
+    "起動引数に無効な文字があります",
+    "시작 인수에 잘못된 문자가 있습니다"
+  ],
+  "启动参数过长": [
+    "Startup arguments are too long",
+    "Слишком длинные аргументы запуска",
+    "起動引数が長すぎます",
+    "시작 인수가 너무 깁니다"
+  ],
+  "请选择已存在的部署文件夹，不能使用磁盘根目录": [
+    "Choose an existing deployment folder, not a drive root",
+    "Выберите существующую папку, а не корень диска",
+    "既存の配置先フォルダーを選んでください。ドライブ直下は使用できません",
+    "기존 배포 폴더를 선택하세요. 드라이브 루트는 사용할 수 없습니다"
+  ],
+  "此部署目录已关联其他游戏，请先从原游戏条目卸载补丁": [
+    "This folder belongs to another game. Uninstall from that game's entry first.",
+    "Папка связана с другой игрой. Сначала удалите патч через её запись.",
+    "この配置先は別のゲームに関連付けられています。元のゲームから先にアンインストールしてください。",
+    "이 폴더는 다른 게임에 연결되어 있습니다. 해당 게임 항목에서 먼저 제거하세요."
+  ],
+  "自定义部署的游戏关联记录无效": [
+    "Invalid game association in the custom deployment record",
+    "Недействительная связь с игрой в записи установки",
+    "カスタム配置のゲーム関連付け記録が無効です",
+    "사용자 지정 배포 기록의 게임 연결이 잘못되었습니다"
+  ],
+  "不能部署到管理器缓存或设置目录": [
+    "Cannot deploy into the manager's cache or settings folder",
+    "Нельзя устанавливать в папки кэша или настроек менеджера",
+    "管理ツールのキャッシュや設定フォルダーには配置できません",
+    "관리자의 캐시 또는 설정 폴더에는 배포할 수 없습니다"
+  ],
+  "不能把补丁内部工作目录作为部署目标": [
+    "The patch working folder cannot be a deployment target",
+    "Рабочая папка патча не может быть папкой установки",
+    "パッチ内部の作業フォルダーは配置先にできません",
+    "패치 내부 작업 폴더를 배포 대상으로 사용할 수 없습니다"
+  ],
+  "DLSSG-Transfusion 只允许一个入口": [
+    "DLSSG-Transfusion requires exactly one entry",
+    "DLSSG-Transfusion требует ровно один DLL-прокси",
+    "DLSSG-Transfusionの読み込みエントリは1つだけ選べます",
+    "DLSSG-Transfusion은 하나의 로드 경로만 허용합니다"
+  ],
+  "动态倍率": [
+    "Dynamic multiplier",
+    "Динамический множитель",
+    "動的倍率",
+    "동적 배율"
+  ],
+  "5X（实验）": [
+    "5X (experimental)",
+    "5X (экспериментально)",
+    "5X（実験的）",
+    "5X(실험적)"
+  ],
+  "6X（实验）": [
+    "6X (experimental)",
+    "6X (экспериментально)",
+    "6X（実験的）",
+    "6X(실험적)"
+  ],
+  "动态允许 5X/6X": [
+    "Allow dynamic 5X/6X",
+    "Разрешить динамические 5X/6X",
+    "動的5X/6Xを許可",
+    "동적 5X/6X 허용"
+  ],
+  "显示帧生成统计": [
+    "Show frame-generation statistics",
+    "Показать статистику генерации кадров",
+    "フレーム生成の統計を表示",
+    "프레임 생성 통계 표시"
+  ],
+  "垂直同步": [
+    "VSync",
+    "Вертикальная синхронизация",
+    "垂直同期",
+    "수직 동기화"
+  ],
+  "固定模式 Reflex 限帧": [
+    "Fixed-mode Reflex FPS limit",
+    "Лимит FPS Reflex в фиксированном режиме",
+    "固定モードのReflex FPS制限",
+    "고정 모드 Reflex FPS 제한"
+  ],
+  "方案来源": [
+    "Project source",
+    "Источник проекта",
+    "プロジェクトの出典",
+    "프로젝트 출처"
+  ],
+  "当前显卡系列不支持": [
+    "Not supported by this GPU series",
+    "Не поддерживается этой серией GPU",
+    "このGPUシリーズは非対応",
+    "이 GPU 시리즈는 지원되지 않음"
+  ],
+  "管理员启动": [
+    "Administrator startup",
+    "Запуск от администратора",
+    "管理者として起動",
+    "관리자 권한 시작"
+  ],
+  "启动时会请求 Windows 管理员权限；请在系统弹窗中选择允许。取消授权时程序不会继续执行部署。管理员权限可解决受保护目录的写入权限问题，但不会解除游戏或反作弊的加载限制。": [
+    "Startup requests Windows administrator permission. Accept the system prompt to continue; cancelling stops startup. Elevation allows writing to protected game folders but does not remove game or anti-cheat loading restrictions.",
+    "При запуске запрашиваются права администратора Windows. Разрешите запуск в системном окне; отмена завершает запуск. Эти права позволяют записывать файлы в защищённые папки, но не снимают ограничения игры или античита.",
+    "起動時にWindowsの管理者権限を要求します。システムの確認画面で許可してください。キャンセルすると起動を中止します。保護されたフォルダーへの書き込みに必要な権限であり、ゲームやアンチチートの制限は解除しません。",
+    "시작 시 Windows 관리자 권한을 요청합니다. 시스템 창에서 허용하세요. 취소하면 시작을 중단합니다. 관리자 권한은 보호된 게임 폴더 쓰기를 허용하지만 게임이나 안티치트의 로드 제한을 해제하지 않습니다."
+  ],
+  "自定义部署文件夹": [
+    "Custom deployment folder",
+    "Своя папка установки",
+    "カスタム配置先フォルダー",
+    "사용자 지정 배포 폴더"
+  ],
+  "先选择游戏，再点击“添加文件夹”，指定该游戏需要的插件目录（例如 OptiScaler 插件目录）。目录无需包含 EXE，但会关联原游戏，用于运行状态检查与卸载。不会凭空安装或配置第三方加载器；请确认该目录确实会被游戏加载。": [
+    "Select a game, then Add folder and choose its required plugin folder, such as an OptiScaler plugin folder. The folder need not contain an EXE; it remains associated with the game for running-process checks and cleanup. This does not install or configure a third-party loader. Confirm that the game loads files from this location.",
+    "Выберите игру, нажмите «Добавить папку» и укажите её папку плагинов, например для OptiScaler. Наличие EXE в ней не требуется: связь с игрой сохраняется для проверки процессов и удаления. Сторонний загрузчик не устанавливается и не настраивается. Убедитесь, что игра загружает файлы из этой папки.",
+    "ゲームを選んで「フォルダーを追加」から必要なプラグインフォルダー（例：OptiScaler）を指定します。EXEは不要ですが、実行中の確認と削除のため元のゲームに関連付けられます。外部ローダーの導入や設定は行いません。ゲームが実際に読み込む場所か確認してください。",
+    "게임을 선택한 다음 ‘폴더 추가’에서 필요한 플러그인 폴더(예: OptiScaler)를 지정하세요. 해당 폴더에 EXE가 없어도 되며 실행 확인과 제거를 위해 원래 게임에 연결됩니다. 타사 로더를 설치하거나 설정하지 않습니다. 게임이 실제로 이 위치의 파일을 로드하는지 확인하세요."
+  ],
+  "显卡系列与方案来源": [
+    "GPU series and project source",
+    "Серия GPU и источник",
+    "GPUシリーズと出典",
+    "GPU 시리즈와 출처"
+  ],
+  "RTX20、RTX30、RTX40仅显示或允许选择相应支持的方案。切换系列或方案只修改待应用选择，不会自动替换已部署文件。点“方案来源”可查看对应项目；下载仍按国内优先或 GitHub 优先的线路设置执行。": [
+    "RTX20, RTX30 and RTX40 choices only allow compatible schemes. Changing series or scheme changes pending settings; it does not replace installed files. Project source opens the relevant upstream page. Downloads still follow your domestic-first or GitHub-first preference.",
+    "Для RTX20, RTX30 и RTX40 доступны только совместимые схемы. Смена серии или схемы меняет настройки к применению, но не установленные файлы. «Источник проекта» открывает страницу соответствующего проекта. Загрузка использует выбранный приоритет зеркала.",
+    "RTX20・RTX30・RTX40には対応する方式だけを選択できます。シリーズや方式の切り替えは適用待ち設定を変更するだけで、配置済みファイルは置き換えません。「プロジェクトの出典」から元のページを開けます。ダウンロードは選択した回線優先設定に従います。",
+    "RTX20, RTX30, RTX40에는 호환되는 방식만 선택할 수 있습니다. 시리즈나 방식 변경은 적용 대기 설정만 바꾸며 설치된 파일을 자동 교체하지 않습니다. ‘프로젝트 출처’에서 해당 페이지를 확인하세요. 다운로드는 국내 또는 GitHub 우선 설정을 따릅니다."
+  ],
+  "DLSSG-Transfusion 方案": [
+    "DLSSG-Transfusion scheme",
+    "Схема DLSSG-Transfusion",
+    "DLSSG-Transfusion方式",
+    "DLSSG-Transfusion 방식"
+  ],
+  "Transfusion 使用独立 JSON，默认跟随游戏。固定支持2X—6X，5X/6X为实验；动态默认最高4X，目标0跟随显示器刷新率。": [
+    "Transfusion uses a separate JSON configuration and follows the game by default. Fixed mode supports 2X–6X; 5X/6X are experimental. Dynamic mode defaults to a 4X ceiling; a target of 0 follows the monitor refresh rate.",
+    "Transfusion использует отдельный JSON и по умолчанию следует игре. Фиксированный режим: 2X–6X; 5X/6X экспериментальные. Динамический режим ограничен 4X по умолчанию; цель 0 означает частоту обновления монитора.",
+    "Transfusionは独立したJSONを使用し、初期設定はゲームに従います。固定倍率は2X〜6Xで、5X/6Xは実験的です。動的倍率は初期設定で最大4X、目標0はモニターのリフレッシュレートに従います。",
+    "Transfusion은 별도 JSON을 사용하며 기본적으로 게임 설정을 따릅니다. 고정 모드는 2X~6X를 지원하며 5X/6X는 실험적입니다. 동적 모드는 기본 최대 4X이며 목표 0은 모니터 주사율을 따릅니다."
+  ],
+  "Transfusion 兼容范围": [
+    "Transfusion compatibility",
+    "Совместимость Transfusion",
+    "Transfusionの対応範囲",
+    "Transfusion 호환 범위"
+  ],
+  "游戏须已有 Streamline DLSS 帧生成；RTX20及RTX20/30 Vulkan仍待实体测试。Smooth Motion不是普通帧生成功能，本版不提供它的开关。": [
+    "The game must already include Streamline DLSS Frame Generation. Physical RTX20 and RTX20/30 Vulkan testing remains pending. Smooth Motion is a separate feature; this manager does not expose its switch.",
+    "Игра должна уже поддерживать Streamline DLSS Frame Generation. Проверка на физических RTX20 и Vulkan на RTX20/30 ещё не выполнена. Smooth Motion — отдельная функция; её переключатель в менеджере не предусмотрен.",
+    "ゲーム側にStreamline DLSSフレーム生成が必要です。実機RTX20とRTX20/30のVulkanは検証待ちです。Smooth Motionは別の機能で、この版では切り替え項目を提供しません。",
+    "게임에 Streamline DLSS 프레임 생성이 있어야 합니다. 실제 RTX20 및 RTX20/30 Vulkan 검증은 아직 필요합니다. Smooth Motion은 별도 기능이며 이 관리자는 해당 스위치를 제공하지 않습니다."
+  ],
+  "Transfusion 倍率与快捷键": [
+    "Transfusion entries and shortcuts",
+    "Прокси и клавиши Transfusion",
+    "Transfusionのエントリとキー操作",
+    "Transfusion 로드 경로와 단축키"
+  ],
+  "仅选 version.dll、dinput8.dll、dxgi.dll、winmm.dll 中一个入口。Ctrl+Alt+2—6切换倍率，Ctrl+Alt+G跟随游戏，Ctrl+Alt+D切换动态，Ctrl+Alt+O显示统计；Vulkan统计需要可选ReShade，本版不捆绑。": [
+    "Choose one entry: version.dll, dinput8.dll, dxgi.dll or winmm.dll. Ctrl+Alt+2–6 selects a multiplier; Ctrl+Alt+G follows the game; Ctrl+Alt+D toggles Dynamic; Ctrl+Alt+O shows statistics. Vulkan statistics require optional ReShade, which is not bundled.",
+    "Выберите один прокси: version.dll, dinput8.dll, dxgi.dll или winmm.dll. Ctrl+Alt+2–6 выбирает множитель; Ctrl+Alt+G — управление игрой; Ctrl+Alt+D — динамический режим; Ctrl+Alt+O — статистика. Для статистики Vulkan нужен необязательный ReShade, не включённый в пакет.",
+    "version.dll・dinput8.dll・dxgi.dll・winmm.dllから1つを選びます。Ctrl+Alt+2〜6で倍率、Ctrl+Alt+Gでゲームに従う、Ctrl+Alt+Dで動的切替、Ctrl+Alt+Oで統計表示。Vulkanの統計にはオプションのReShadeが必要で、同梱していません。",
+    "version.dll, dinput8.dll, dxgi.dll, winmm.dll 중 하나만 선택하세요. Ctrl+Alt+2~6은 배율, Ctrl+Alt+G는 게임 설정 따르기, Ctrl+Alt+D는 동적 전환, Ctrl+Alt+O는 통계입니다. Vulkan 통계에는 선택적 ReShade가 필요하며 포함되어 있지 않습니다."
+  ],
+  "RTX40 MFG 1.4.1 参数": [
+    "RTX40 MFG 1.4.1 settings",
+    "Настройки RTX40 MFG 1.4.1",
+    "RTX40 MFG 1.4.1の設定",
+    "RTX40 MFG 1.4.1 설정"
+  ],
+  "Backspace 菜单仍为上游英文；可在管理器的预设参数中调整倍率、动态目标、UI预设、垂直同步及固定模式Reflex限帧。动态模式使用动态目标，固定限帧值会保留但不启用。": [
+    "The upstream Backspace menu remains in English. Use the manager's Presets to adjust multiplier, Dynamic target, UI preset, VSync and fixed-mode Reflex FPS limit. Dynamic mode uses its target; the fixed FPS limit is retained but inactive.",
+    "Меню по Backspace остаётся на английском. В настройках менеджера можно менять множитель, динамическую цель, пресет UI, VSync и лимит FPS Reflex фиксированного режима. В динамическом режиме действует его цель; фиксированный лимит сохраняется, но не применяется.",
+    "Backspaceメニューは上流版の英語のままです。管理ツールのプリセットから倍率・動的目標・UIプリセット・垂直同期・固定モードのReflex FPS制限を設定できます。動的モードでは動的目標を使い、固定FPS制限は値を保持して無効になります。",
+    "Backspace 메뉴는 원본 영어로 유지됩니다. 관리자 사전 설정에서 배율, 동적 목표, UI 프리셋, 수직 동기화 및 고정 모드 Reflex FPS 제한을 조정하세요. 동적 모드에서는 동적 목표를 사용하며 고정 FPS 제한 값은 저장되지만 적용되지 않습니다."
+  ],
+  "查看更新日志": [
+    "View release notes",
+    "Просмотр изменений",
+    "更新履歴を確認",
+    "업데이트 내역 보기"
+  ],
+  "设置页“更新日志”可查看当前版说明；发现新版本时，更新提示会显示服务端提供的更新内容。旧版清单未包含说明时可打开历史版本页面。更新会保留游戏列表与设置，不会自动替换已部署的游戏补丁。": [
+    "Release notes in Settings shows the current version's changes. When an update is available, its prompt shows notes supplied by the server. If an older manifest has no notes, open Previous releases. Updating preserves your library and preferences and does not automatically replace deployed game patches.",
+    "В настройках «История изменений» показывает текущий выпуск. При доступном обновлении окно показывает описание с сервера. Если старый манифест его не содержит, откройте предыдущие версии. Обновление сохраняет библиотеку и настройки и не заменяет игровые патчи автоматически.",
+    "設定の「更新履歴」で現在の変更点を確認できます。新しい版がある場合、更新画面にサーバーの説明を表示します。古いマニフェストに説明がなければ過去のバージョンを開いてください。更新時もゲーム一覧と設定を保持し、ゲームのパッチは自動交換しません。",
+    "설정의 ‘업데이트 내역’에서 현재 버전 변경 사항을 확인할 수 있습니다. 새 버전이 있으면 서버의 설명을 업데이트 창에 표시합니다. 이전 명세에 설명이 없으면 이전 버전 페이지를 여세요. 업데이트는 게임 목록과 설정을 보존하며 게임 패치를 자동 교체하지 않습니다."
+  ],
+  "选择关联的游戏本体 EXE": [
+    "Choose the associated game executable",
+    "Выберите связанный исполняемый файл игры",
+    "関連付けるゲーム本体のEXEを選択",
+    "연결할 게임 실행 파일 선택"
+  ],
+  "请先卸载原目录补丁，再更改部署目录。": [
+    "Uninstall the patch from the old folder before changing its deployment folder.",
+    "Перед сменой папки удалите патч из прежней папки.",
+    "配置先を変える前に、元のフォルダーのパッチをアンインストールしてください。",
+    "배포 폴더를 변경하기 전에 기존 폴더의 패치를 제거하세요."
+  ],
+  "此目录已关联其他游戏": [
+    "This folder is already associated with another game",
+    "Эта папка уже связана с другой игрой",
+    "このフォルダーは別のゲームに関連付けられています",
+    "이 폴더는 이미 다른 게임에 연결되어 있습니다"
+  ],
+  "不兼容当前显卡系列": [
+    "Incompatible with this GPU series",
+    "Несовместимо с этой серией GPU",
+    "選択中のGPUシリーズとは非互換",
+    "현재 GPU 시리즈와 호환되지 않음"
+  ],
+  "兼容性": [
+    "Compatibility",
+    "Совместимость",
+    "互換性",
+    "호환성"
+  ],
+  "项目与使用说明": [
+    "Project and instructions",
+    "Проект и инструкция",
+    "プロジェクトと使い方",
+    "프로젝트 및 사용 방법"
+  ],
+  "Reflex 帧率限制": [
+    "Reflex FPS limit",
+    "Лимит FPS Reflex",
+    "Reflex FPS制限",
+    "Reflex FPS 제한"
+  ],
+  "Transfusion 每次只安装一个入口；优先 version.dll，冲突时可改选 dinput8、dxgi 或 winmm。保留其他 MOD，配置使用独立 JSON。": [
+    "Install one Transfusion entry at a time. Start with version.dll; select dinput8, dxgi or winmm if it conflicts. Other mods are preserved; settings use a separate JSON.",
+    "Устанавливайте один прокси Transfusion. Начните с version.dll; при конфликте выберите dinput8, dxgi или winmm. Другие моды сохраняются, настройки используют отдельный JSON.",
+    "Transfusionは一度に1つのエントリだけを配置します。まずversion.dllを使い、競合時はdinput8・dxgi・winmmを選んでください。他のMODを保持し、独立したJSONを使います。",
+    "Transfusion은 한 번에 하나의 로드 경로만 설치합니다. version.dll부터 시도하고 충돌하면 dinput8, dxgi 또는 winmm를 선택하세요. 다른 MOD는 보존하며 별도 JSON을 사용합니다."
+  ],
+  "默认跟随游戏；固定倍率可选2X—6X，5X/6X可能增加显存与延迟。Ctrl+Alt+2/3/4切换倍率，Ctrl+Alt+G跟随游戏，Ctrl+Alt+D切换动态。RTX20及旧显卡Vulkan仍需实机验证。": [
+    "Follows the game by default. Fixed mode offers 2X–6X; 5X/6X may increase VRAM use and latency. Ctrl+Alt+2/3/4 selects a multiplier, Ctrl+Alt+G follows the game and Ctrl+Alt+D toggles Dynamic. RTX20 and older-GPU Vulkan need physical testing.",
+    "По умолчанию следует игре. Фиксированный режим: 2X–6X; 5X/6X могут увеличить расход видеопамяти и задержку. Ctrl+Alt+2/3/4 меняет множитель, Ctrl+Alt+G следует игре, Ctrl+Alt+D включает динамический режим. RTX20 и Vulkan на старых GPU требуют проверки на реальном оборудовании.",
+    "初期設定はゲームに従います。固定倍率は2X〜6Xで、5X/6XはVRAM使用量や遅延が増える場合があります。Ctrl+Alt+2/3/4で倍率、Ctrl+Alt+Gでゲームに従う、Ctrl+Alt+Dで動的切替。RTX20と旧世代GPUのVulkanは実機検証が必要です。",
+    "기본적으로 게임 설정을 따릅니다. 고정 모드는 2X~6X이며 5X/6X는 VRAM 사용량과 지연이 증가할 수 있습니다. Ctrl+Alt+2/3/4는 배율, Ctrl+Alt+G는 게임 따르기, Ctrl+Alt+D는 동적 전환입니다. RTX20 및 이전 GPU의 Vulkan은 실제 검증이 필요합니다."
+  ],
+  "补丁已移除，临时文件待核验；恢复记录已保留，请核对后重试卸载：{0}": [
+    "Patch removed; temporary files still need verification. The recovery record was retained. Review the files and retry uninstall: {0}",
+    "Патч удалён; временные файлы требуют проверки. Запись восстановления сохранена. Проверьте файлы и повторите удаление: {0}",
+    "パッチを削除しました。一時ファイルの確認が必要です。復旧記録を保持しました。ファイルを確認してから削除を再試行してください：{0}",
+    "패치를 제거했지만 임시 파일 확인이 필요합니다. 복구 기록을 보존했습니다. 파일을 확인한 후 제거를 다시 시도하세요: {0}"
+  ],
+  "无法核验临时文件 {0}：{1}": [
+    "Cannot verify temporary file {0}: {1}",
+    "Не удалось проверить временный файл {0}: {1}",
+    "一時ファイル {0} を検証できません：{1}",
+    "임시 파일 {0}을(를) 확인할 수 없습니다: {1}"
+  ],
+  "缺少匹配的临时文件安装源": [
+    "The matching source for this temporary file is unavailable",
+    "Отсутствует исходный файл для проверки временного файла",
+    "一時ファイルに対応する元のファイルがありません",
+    "임시 파일에 맞는 원본 파일이 없습니다"
+  ],
+  "在线发布页": [
+    "Online releases",
+    "Релизы в интернете",
+    "オンラインのリリースページ",
+    "온라인 릴리스 페이지"
+  ],
+  "显示模式": [
+    "Display mode",
+    "Режим отображения",
+    "表示モード",
+    "표시 모드"
+  ],
+  "浅色配色": [
+    "Light color scheme",
+    "Светлая цветовая схема",
+    "ライトモードの配色",
+    "라이트 모드 색상"
+  ],
+  "深色配色": [
+    "Dark color scheme",
+    "Тёмная цветовая схема",
+    "ダークモードの配色",
+    "다크 모드 색상"
+  ],
+  "内置 GPUI Kit 主题；浅色与深色配色分别记忆，跟随系统时自动切换。": [
+    "Built-in GPUI Kit themes; light and dark color schemes are remembered separately and switch automatically in System mode.",
+    "Встроенные темы GPUI Kit; светлая и тёмная цветовые схемы сохраняются отдельно и автоматически переключаются в системном режиме.",
+    "GPUI Kit テーマを内蔵。ライトとダークの配色を個別に記憶し、システムに従うモードでは自動で切り替えます。",
+    "GPUI Kit 테마가 내장되어 있습니다. 라이트와 다크 모드 색상을 각각 저장하고 시스템 설정에 따라 자동 전환합니다."
+  ],
+  "主题与配色": [
+    "Themes and colors",
+    "Темы и цвета",
+    "テーマと配色",
+    "테마 및 색상"
+  ],
+  "点击左侧栏的调色板图标打开主题窗口。38 个浅色与深色配色在同一个可搜索、可滚动的列表中显示，并标明明暗类型。悬停或用上下方向键可预览整个界面，点击或按 Enter 保存；按 Esc（即使已输入搜索内容）或点击列表外部会取消并恢复原主题，不保存预览。列表顶部的“跟随系统”会保留分别记忆的浅色、深色配色，并按系统自动切换。内置 21 套 GPUI Kit 主题，36 个变体加两个默认配色，均可离线使用。": [
+    "Click the palette icon in the left sidebar to open themes. All 38 light and dark color schemes appear in one searchable, scrollable list with mode badges. Hover or use the Up/Down keys to preview the whole interface; click or press Enter to save. Press Esc, even with a search query, or click outside to cancel and restore the previous theme without saving the preview. System at the top keeps your separately remembered light and dark choices and switches between them automatically. The 21 built-in GPUI Kit theme sets provide 36 variants plus two defaults, all available offline.",
+    "Нажмите значок палитры на левой панели. Все 38 светлых и тёмных цветовых схем показаны в одном списке с поиском, прокруткой и метками режима. Наведите указатель или используйте стрелки вверх/вниз для предпросмотра всего интерфейса; нажмите на тему или Enter для сохранения. Esc, даже при введённом поисковом запросе, или нажатие вне окна отменяет предпросмотр и возвращает прежнюю тему без сохранения. Пункт «Как в системе» вверху сохраняет отдельный выбор светлой и тёмной схем и автоматически переключает их. Встроена 21 тема GPUI Kit: 36 вариантов и две стандартные схемы, все доступны без сети.",
+    "左サイドバーのパレットアイコンをクリックしてテーマを開きます。ライトとダークの全 38 配色が、モード表示付きの検索・スクロール可能な一つのリストに並びます。マウスを重ねるか上下キーで画面全体をプレビューし、クリックまたは Enter で保存します。検索文字がある場合も Esc、またはウィンドウの外側をクリックすると、保存せず元のテーマに戻ります。先頭の「システムに従う」は、個別に記憶したライトとダークの配色を保ち、システムに合わせて自動で切り替えます。GPUI Kit の 21 テーマセット、36 種類の配色と既定の 2 種類をすべてオフラインで利用できます。",
+    "왼쪽 사이드바의 팔레트 아이콘을 클릭하여 테마를 여세요. 라이트와 다크 색상 38가지가 모드 배지와 함께 검색·스크롤 가능한 하나의 목록에 표시됩니다. 마우스를 올리거나 위/아래 방향키로 전체 화면을 미리 보고, 클릭하거나 Enter를 눌러 저장하세요. 검색어가 있어도 Esc를 누르거나 창 바깥을 클릭하면 저장하지 않고 이전 테마로 돌아갑니다. 맨 위의 시스템 설정 따르기는 라이트와 다크 색상을 각각 기억하고 시스템에 따라 자동 전환합니다. 내장 GPUI Kit 테마 21세트의 36가지 변형과 기본 색상 2가지를 모두 오프라인으로 사용할 수 있습니다."
+  ],
+  "游戏识别与多目录部署": [
+    "Game detection and multiple deployment folders",
+    "Обнаружение игр и установка в несколько папок",
+    "ゲームの検出と複数フォルダーへの配置",
+    "게임 감지 및 여러 폴더 배포"
+  ],
+  "同一安装目录的多个有效游戏本体合并为一项；安装或卸载会处理列出的本体目录。启动器、反作弊程序和 Steam 客户端不会自动部署。若扫描遗漏，可手动添加 EXE；自动识别不等于游戏兼容。": [
+    "Multiple valid game executables in the same installation are grouped into one entry; installation and removal process the listed game folders. Launchers, anti-cheat programs and the Steam client are not automatic deployment targets. If scanning misses a game, add its EXE manually. Automatic detection does not establish game compatibility.",
+    "Несколько подходящих исполняемых файлов одной установки игры объединяются в одну запись; установка и удаление обрабатывают указанные папки игры. Лаунчеры, античиты и клиент Steam не становятся целями автоматической установки. Если сканирование пропустило игру, добавьте её EXE вручную. Автоматическое обнаружение не подтверждает совместимость игры.",
+    "同じインストール先にある複数の有効なゲーム実行ファイルは 1 件にまとめられ、インストールや削除は一覧のゲーム本体フォルダーに対して行われます。ランチャー、アンチチート、Steam クライアントには自動配置しません。スキャンで見つからない場合は EXE を手動で追加できます。自動検出はゲームの互換性を保証するものではありません。",
+    "같은 설치 위치의 유효한 게임 실행 파일 여러 개를 하나로 묶고 설치 및 제거 시 표시된 게임 폴더를 처리합니다. 런처, 안티치트 프로그램, Steam 클라이언트에는 자동으로 배포하지 않습니다. 검색에서 누락된 게임은 EXE를 수동으로 추가할 수 있습니다. 자동 감지가 게임 호환성을 보장하지는 않습니다."
   ]
 }

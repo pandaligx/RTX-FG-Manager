@@ -63,20 +63,22 @@ foreach ($name in @(
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json', 'rust/ui-translations.json',
     'app/assets/cleanup-catalog.json', 'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',
-    'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/LUCIDE-LICENSE',
+    'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/GPUI-FAST-LICENSE', 'rust/assets/licenses/LUCIDE-LICENSE',
     'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json', 'app/tools/aria2.conf',
     'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1',
     'tools/prepare-fixtures.ps1', 'tools/export-source.ps1', 'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', '.github/workflows/build.yml',
-    'vendor/gpui_windows/Cargo.toml', 'vendor/gpui_windows/build.rs', 'vendor/gpui_windows/LICENSE-APACHE',
-    'vendor/sum_tree/Cargo.toml', 'vendor/sum_tree/LICENSE-APACHE', 'vendor/sum_tree/LOCAL_CHANGES.md'
+    'vendor/gpui_fast_windows/Cargo.toml', 'vendor/gpui_fast_windows/Cargo.toml.orig',
+    'vendor/gpui_fast_windows/build.rs', 'vendor/gpui_fast_windows/LICENSE',
+    'vendor/gpui_fast_windows/README.md', 'vendor/gpui_fast_windows/LOCAL_CHANGES.md',
+    'rust/assets/themes/LICENSE-APACHE'
 )) { Add-File $name }
 foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md')) { Add-File $name $false }
 Add-Tree 'rust/src' @('.rs')
 Add-Tree 'rust/assets' @('.json', '.svg', '.png', '.ico', '.txt', '.md')
-Add-Tree 'vendor/gpui_windows/src' @('.rs', '.hlsl')
-Add-Tree 'vendor/sum_tree/src' @('.rs')
+Add-Tree 'vendor/gpui_fast_windows/src' @('.rs', '.hlsl')
+Add-Tree 'vendor/gpui_fast_windows/resources' @('.rc', '.xml', '.manifest', '.ico')
 foreach ($item in Get-ChildItem -LiteralPath (Join-Path $root 'tests') -File -Filter '*.rs') { Add-File "tests/$($item.Name)" }
-foreach ($version in @('420', '421', '422')) { Add-Tree "tests/fixtures/catalog$version" @('.json') }
+foreach ($version in @('420', '421', '422', '425')) { Add-Tree "tests/fixtures/catalog$version" @('.json') }
 # Public cloud metadata and publish automation are separately reviewed source inputs.
 foreach ($name in @('cloud/schemes.json', 'tools/cloud_release.py', 'docs/cloud-publishing.md', '.github/scripts/mirror_gitee.py')) { Add-File $name $false }
 if (-not $ExcludeCloudMetadata) {

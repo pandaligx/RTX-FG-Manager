@@ -85,7 +85,9 @@ fn main() {
         println!("cargo:rerun-if-changed=rust/assets/manager.ico");
         println!("cargo:rustc-link-arg-bin=RTXManager=/NOIMPLIB");
         println!("cargo:rustc-link-arg-bin=RTXManager=/NOEXP");
-        // GPUI supplies the asInvoker / PerMonitorV2 manifest; do not embed a duplicate.
+        // Retain GPUI's single asInvoker / PerMonitorV2 manifest. The GUI and
+        // update installer request UAC in elevation::ensure_admin; a manifest
+        // requiring admin would break CreateProcess in pre-4.2.6 updaters.
         let mut resource = winres::WindowsResource::new();
         resource
             .set_icon("rust/assets/manager.ico")

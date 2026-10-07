@@ -33,7 +33,7 @@ pub const PROXIES: [&str; 20] = [
     "xinput9_1_0.dll",
     "xinputuap.dll",
 ];
-pub const BACKENDS: [&str; 8] = [
+pub const BACKENDS: [&str; 9] = [
     "native20",
     "native30",
     "native_x6_20",
@@ -42,6 +42,7 @@ pub const BACKENDS: [&str; 8] = [
     "rtx30",
     "upstream_sm86",
     crate::rtxmfg::BACKEND,
+    crate::transfusion::BACKEND,
 ];
 pub const SCHEMES: [&str; 3] = [
     "0.2.6 · DX12/Vulkan（正式）",
@@ -137,6 +138,9 @@ pub fn library_location(exe: &Path) -> Result<PathBuf> {
     Ok(p)
 }
 pub fn location(exe: &Path, must_exist: bool) -> Result<PathBuf> {
+    location_checked(exe, must_exist, true)
+}
+fn location_checked(exe: &Path, must_exist: bool, require_parent: bool) -> Result<PathBuf> {
     let p = no_links(exe)?;
     let s = p.to_string_lossy();
     ensure!(
@@ -153,11 +157,111 @@ pub fn location(exe: &Path, must_exist: bool) -> Result<PathBuf> {
         key(&p) != key(&std::env::current_exe()?) && !within(&p, &assets::cache_root()?),
         "不能把管理器或随包运行环境当作游戏部署"
     );
-    ensure!(p.parent().is_some_and(Path::is_dir), "游戏目录不存在");
+    ensure!(
+        p.parent()
+            .is_some_and(|parent| !require_parent || parent.is_dir()),
+        "游戏目录不存在"
+    );
     if must_exist {
         pe64(&p, false)?;
     }
     Ok(p)
+}
+/// Keep the executable used for compatibility/process checks separate from the
+/// directory selected for an OptiScaler plugin or another explicit deployment.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeploymentTarget {
+    pub game_exe: PathBuf,
+    pub directory: PathBuf,
+}
+impl DeploymentTarget {
+    pub fn for_game(exe: &Path) -> Self {
+        Self {
+            game_exe: exe.into(),
+            directory: exe.parent().unwrap_or(exe).into(),
+        }
+    }
+    pub fn custom(exe: &Path, directory: &Path) -> Self {
+        Self {
+            game_exe: exe.into(),
+            directory: directory.into(),
+        }
+    }
+    pub fn validate(&self, must_exist: bool) -> Result<Self> {
+        // An external plugin folder may remain after uninstalling its game.
+        // Only inspection/cleanup may use the recorded missing EXE; deployment
+        // and parameter writes still require the actual x64 game executable.
+        let game_exe =
+            location_checked(&self.game_exe, must_exist, must_exist || !self.is_custom())?;
+        let directory = deployment_directory(&self.directory)?;
+        Ok(Self {
+            game_exe,
+            directory,
+        })
+    }
+    pub fn is_custom(&self) -> bool {
+        self.game_exe
+            .parent()
+            .is_none_or(|p| key(p) != key(&self.directory))
+    }
+    pub fn record_exe(&self) -> Option<String> {
+        self.is_custom()
+            .then(|| self.game_exe.to_string_lossy().into_owned())
+    }
+    pub fn validate_record(&self, record: &Record) -> Result<()> {
+        ensure!(
+            record
+                .game_exe
+                .as_ref()
+                .is_none_or(|exe| key(Path::new(exe)) == key(&self.game_exe)),
+            "此部署目录已关联其他游戏，请先从原游戏条目卸载补丁"
+        );
+        Ok(())
+    }
+}
+pub fn deployment_directory(directory: &Path) -> Result<PathBuf> {
+    let p = no_links(directory)?;
+    let s = p.to_string_lossy();
+    ensure!(
+        !s.starts_with("\\\\") && !s.get(2..).unwrap_or_default().contains(':'),
+        "不支持网络路径或备用数据流"
+    );
+    ensure!(
+        p.is_dir() && p.parent().is_some(),
+        "请选择已存在的部署文件夹，不能使用磁盘根目录"
+    );
+    let windows = PathBuf::from(std::env::var_os("WINDIR").unwrap_or_else(|| "C:\\Windows".into()));
+    ensure!(!within(&p, &windows), "不能部署到 Windows 系统目录");
+    ensure!(
+        !within(&p, &assets::cache_root()?) && !within(&p, &crate::preferences::directory()),
+        "不能部署到管理器缓存或设置目录"
+    );
+    ensure!(
+        !p.components()
+            .any(|c| c.as_os_str().eq_ignore_ascii_case(OWN)),
+        "不能把补丁内部工作目录作为部署目标"
+    );
+    Ok(p)
+}
+pub fn assert_target_stopped(target: &DeploymentTarget) -> Result<()> {
+    if target.is_custom() {
+        let game_dir = target.game_exe.parent().context("无效游戏路径")?;
+        let names = win::running_in_directory_or_missing(game_dir, &target.game_exe)?;
+        ensure!(
+            names.is_empty(),
+            "请先完全退出游戏及同目录程序：{}",
+            names.join(", ")
+        );
+        let names = win::running_in_directory(&target.directory)?;
+        ensure!(
+            names.is_empty(),
+            "请先完全退出游戏及同目录程序：{}",
+            names.join(", ")
+        );
+    } else {
+        assert_stopped(&target.game_exe)?;
+    }
+    Ok(())
 }
 pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
     ensure!(
@@ -182,6 +286,8 @@ pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
 pub fn config_name(backend: &str) -> &'static str {
     if backend == crate::rtxmfg::BACKEND {
         crate::rtxmfg::CONFIG
+    } else if backend == crate::transfusion::BACKEND {
+        crate::transfusion::CONFIG
     } else {
         INI
     }
@@ -202,6 +308,14 @@ pub fn folder(backend: &str) -> Result<&str> {
 pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>> {
     folder(backend)?;
     let mut names = normalize_proxies(proxies)?;
+    if backend == crate::transfusion::BACKEND {
+        ensure!(
+            names.len() == 1 && crate::transfusion::PROXIES.contains(&names[0].as_str()),
+            "DLSSG-Transfusion 只允许一个入口"
+        );
+        names.push(crate::transfusion::CONFIG.into());
+        return Ok(names);
+    }
     if backend == crate::rtxmfg::BACKEND {
         ensure!(
             names.len() == 1 && crate::rtxmfg::PROXIES.contains(&names[0].as_str()),
@@ -248,7 +362,10 @@ pub fn package(backend: &str, proxies: &[String]) -> Result<BTreeMap<String, Vec
 pub fn configure_package(backend: &str, out: &mut BTreeMap<String, Vec<u8>>) -> Result<()> {
     // Bundled upstream runtimes default to the user cache. Moving their extracted
     // components next to a game changes DLL loading behavior (reported by ZZZ).
-    if backend == "upstream_sm86" || backend == crate::rtxmfg::BACKEND {
+    if backend == "upstream_sm86"
+        || backend == crate::rtxmfg::BACKEND
+        || backend == crate::transfusion::BACKEND
+    {
         return Ok(());
     }
     let mut bytes = out[INI].clone();
@@ -334,6 +451,9 @@ pub fn configure_upstream_ini(bytes: &[u8], options: &UpstreamOptions) -> Result
 pub struct Record {
     pub schema: u32,
     pub backend: String,
+    /// Present only for an explicitly selected deployment directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game_exe: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payload_version: Option<String>,
     #[serde(default = "default_proxy")]
@@ -365,6 +485,16 @@ impl Record {
     }
     pub fn validate(&self) -> Result<()> {
         ensure!(self.schema == 3, "部署记录无效");
+        ensure!(
+            self.game_exe.as_ref().is_none_or(|exe| {
+                exe.len() <= 32768
+                    && Path::new(exe).is_absolute()
+                    && Path::new(exe)
+                        .extension()
+                        .is_some_and(|x| x.eq_ignore_ascii_case("exe"))
+            }),
+            "自定义部署的游戏关联记录无效"
+        );
         ensure!(
             self.delta_cache_ids.len() <= 8
                 && self
@@ -455,10 +585,16 @@ pub fn assert_stopped(exe: &Path) -> Result<()> {
 }
 /// Read-only early checks. Deployment must repeat them after acquiring its lock.
 pub fn preflight_install(exe: &Path, proxies: &[String]) -> Result<()> {
-    let exe = location(exe, true)?;
-    assert_stopped(&exe)?;
-    let dir = exe.parent().unwrap();
+    preflight_install_at(&DeploymentTarget::for_game(exe), proxies)
+}
+pub fn preflight_install_at(target: &DeploymentTarget, proxies: &[String]) -> Result<()> {
+    let target = target.validate(true)?;
+    assert_target_stopped(&target)?;
+    let dir = &target.directory;
     let previous = record(dir)?;
+    if let Some(record) = &previous {
+        target.validate_record(record)?;
+    }
     for name in normalize_proxies(proxies)? {
         let path = no_links(&dir.join(&name))?;
         if path.exists() {
@@ -481,17 +617,25 @@ pub fn apply_parameters(
     context: &crate::presets::Context,
     values: &crate::presets::Values,
 ) -> Result<()> {
-    let exe = location(exe, true)?;
-    let dir = exe.parent().unwrap();
+    apply_parameters_at(&DeploymentTarget::for_game(exe), context, values)
+}
+pub fn apply_parameters_at(
+    target: &DeploymentTarget,
+    context: &crate::presets::Context,
+    values: &crate::presets::Values,
+) -> Result<()> {
+    let target = target.validate(true)?;
+    let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
-    assert_stopped(&exe)?;
+    assert_target_stopped(&target)?;
     let record = record(dir)?.context("请先安装当前方案再应用参数")?;
+    target.validate_record(&record)?;
     ensure!(
         record.scheme_id.as_deref() == Some(context.scheme.as_str()),
         "已部署方案不同，请先安装当前方案"
     );
     ensure!(
-        status(&exe).starts_with("已部署"),
+        status_at(&target).starts_with("已部署"),
         "补丁文件已变化，请刷新后检查"
     );
     let ini = no_links(&dir.join(config_name(&record.backend)))?;
@@ -506,15 +650,19 @@ pub fn apply_parameters(
     temp.as_file().sync_all()?;
     no_links(&ini)?;
     ensure!(fs::read(&ini)? == before, "INI 已变化，请刷新后重试");
-    assert_stopped(&exe)?;
+    assert_target_stopped(&target)?;
     temp.persist(&ini)?;
     Ok(())
 }
 pub fn status(exe: &Path) -> String {
-    fn inner(exe: &Path) -> Result<String> {
-        let p = location(exe, false)?;
-        let dir = p.parent().unwrap();
+    status_at(&DeploymentTarget::for_game(exe))
+}
+pub fn status_at(target: &DeploymentTarget) -> String {
+    fn inner(target: &DeploymentTarget) -> Result<String> {
+        let target = target.validate(false)?;
+        let dir = &target.directory;
         if let Some(r) = record(dir)? {
+            target.validate_record(&r)?;
             if r.cache_pending {
                 return Ok("补丁已移除，缓存待清理".into());
             }
@@ -570,7 +718,7 @@ pub fn status(exe: &Path) -> String {
         }
         Ok("未部署".into())
     }
-    inner(exe).unwrap_or_else(|e| format!("需检查：{e}"))
+    inner(target).unwrap_or_else(|e| format!("需检查：{e}"))
 }
 pub fn deploy(exe: &Path, backend: &str, proxies: &[String]) -> Result<String> {
     deploy_with_level(exe, backend, proxies, None)
@@ -606,6 +754,25 @@ pub fn deploy_prepared_context(
     backend: &str,
     proxies: &[String],
     level: Option<u8>,
+    data: BTreeMap<String, Vec<u8>>,
+    payload_version: Option<&str>,
+    context: Option<&crate::presets::Context>,
+) -> Result<String> {
+    deploy_prepared_context_at(
+        &DeploymentTarget::for_game(exe),
+        backend,
+        proxies,
+        level,
+        data,
+        payload_version,
+        context,
+    )
+}
+pub fn deploy_prepared_context_at(
+    target: &DeploymentTarget,
+    backend: &str,
+    proxies: &[String],
+    level: Option<u8>,
     mut data: BTreeMap<String, Vec<u8>>,
     payload_version: Option<&str>,
     context: Option<&crate::presets::Context>,
@@ -622,13 +789,18 @@ pub fn deploy_prepared_context(
     if let Some(v) = payload_version {
         crate::updater::version(v)?;
     }
-    let p = location(exe, true)?;
-    let dir = p.parent().unwrap();
+    let target = target.validate(true)?;
+    let p = &target.game_exe;
+    let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
-    assert_stopped(&p)?;
+    assert_target_stopped(&target)?;
+    let mut existing = record(dir)?;
+    if let Some(record) = &existing {
+        target.validate_record(record)?;
+    }
     let delta_cache_ids = if context.is_some_and(|c| c.delta) {
-        ensure!(crate::delta::is_game(&p), "三角洲专项目标不匹配");
-        let id = crate::delta::cache_id(&p);
+        ensure!(crate::delta::is_game(p), "三角洲专项目标不匹配");
+        let id = crate::delta::cache_id(p);
         data.insert(
             config.into(),
             crate::diagnostics::edit_ini(
@@ -638,7 +810,7 @@ pub fn deploy_prepared_context(
                 &id,
             )?,
         );
-        crate::delta::register_at(&crate::delta::root()?, &p, &id)?;
+        crate::delta::register_at(&crate::delta::root()?, p, &id)?;
         vec![id]
     } else {
         Vec::new()
@@ -661,8 +833,8 @@ pub fn deploy_prepared_context(
     }
     if let Some(level) = level {
         ensure!(
-            backend != crate::rtxmfg::BACKEND,
-            "RTX40 使用独立 JSON 参数协议"
+            backend != crate::rtxmfg::BACKEND && backend != crate::transfusion::BACKEND,
+            "此方案使用独立 JSON 参数协议"
         );
         ensure!(level <= 3, "日志级别无效");
         let bytes =
@@ -670,7 +842,6 @@ pub fn deploy_prepared_context(
         data.insert(config.into(), bytes);
     }
     let root = no_links(&dir.join(OWN))?;
-    let mut existing = record(dir)?;
     // Adopt only identical, recognized proxies. This changes no game binary,
     // while allowing an already-tested manual package to retain custom INI text.
     if existing.is_none()
@@ -706,6 +877,7 @@ pub fn deploy_prepared_context(
         let r = Record {
             schema: 3,
             backend: backend.into(),
+            game_exe: target.record_exe(),
             payload_version: payload_version.map(str::to_owned),
             proxy: selected[0].clone(),
             proxies: selected.clone(),
@@ -721,7 +893,10 @@ pub fn deploy_prepared_context(
         existing = Some(r);
     }
     if let Some(mut r) = existing {
-        if r.backend == backend && r.selected() == selected && status(&p).starts_with("已部署") {
+        if r.backend == backend
+            && r.selected() == selected
+            && status_at(&target).starts_with("已部署")
+        {
             ensure!(
                 data.iter()
                     .filter(|(name, _)| name.as_str() != config)
@@ -735,6 +910,9 @@ pub fn deploy_prepared_context(
                     crate::presets::merge_context(&current, &data[config], backend, context)?;
                 if let Some(context) = context {
                     r.scheme_id = Some(context.scheme.clone());
+                    if target.is_custom() {
+                        r.game_exe = target.record_exe();
+                    }
                     for id in &delta_cache_ids {
                         if !r.delta_cache_ids.contains(id) {
                             r.delta_cache_ids.push(id.clone());
@@ -759,7 +937,10 @@ pub fn deploy_prepared_context(
         }
         bail!("已有部署或未完成操作，请先清理再重新部署")
     }
-    if backend == "upstream_sm86" || backend == crate::rtxmfg::BACKEND {
+    if backend == "upstream_sm86"
+        || backend == crate::rtxmfg::BACKEND
+        || backend == crate::transfusion::BACKEND
+    {
         for name in PROXIES
             .iter()
             .filter(|n| !selected.iter().any(|s| s == **n))
@@ -774,6 +955,7 @@ pub fn deploy_prepared_context(
     let conflicts = if backend.starts_with("native")
         || backend == "upstream_sm86"
         || backend == crate::rtxmfg::BACKEND
+        || backend == crate::transfusion::BACKEND
     {
         data.keys().cloned().collect::<Vec<_>>()
     } else {
@@ -812,6 +994,7 @@ pub fn deploy_prepared_context(
     let r = Record {
         schema: 3,
         backend: backend.into(),
+        game_exe: target.record_exe(),
         payload_version: payload_version.map(str::to_owned),
         proxy: selected[0].clone(),
         proxies: selected,

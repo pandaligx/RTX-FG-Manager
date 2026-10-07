@@ -1,4 +1,5 @@
-//! RTXMFG Universal v1.3.3 HF2 has its own JSON protocol, not dlssg_sm86.ini.
+//! RTXMFG Universal v1.3.3 HF2 / v1.4.1 HF1 use their own JSON protocol,
+//! not dlssg_sm86.ini. Keep the profile ID stable for existing game settings.
 use crate::presets::{Parameter, Values};
 use anyhow::{Result, ensure};
 use serde_json::{Value, json};
@@ -6,6 +7,12 @@ use serde_json::{Value, json};
 pub const PROFILE: &str = "rtxmfg_universal_133";
 pub const BACKEND: &str = "rtx40mfg";
 pub const CONFIG: &str = "RTXMFG-Universal.json";
+/// Fixed upstream sidecars only; never derive deletion targets from JSON values.
+pub const SIDECARS: [&str; 3] = [
+    "RTXMFG-Universal.status.json",
+    "RTX40MFG-UI.ini",
+    "RTX40MFG-UI-layout.ini",
+];
 pub const PROXIES: [&str; 19] = [
     "version.dll",
     "dinput8.dll",
@@ -72,6 +79,32 @@ pub fn parameters() -> Vec<Parameter> {
             default: "0",
             choices: vec![("0", "跟随游戏 / 驱动"), ("1", "A"), ("2", "B")],
         },
+        Parameter {
+            key: "rtx_vsync",
+            section: "",
+            ini_key: "vsyncMode",
+            label: "垂直同步",
+            default: "0",
+            choices: vec![("0", "跟随游戏"), ("1", "关闭")],
+        },
+        Parameter {
+            key: "rtx_reflex_limit",
+            section: "",
+            ini_key: "reflexFrameLimitFps",
+            label: "Reflex 帧率限制",
+            default: "0",
+            choices: vec![
+                ("0", "关闭"),
+                ("60", "60 FPS"),
+                ("90", "90 FPS"),
+                ("120", "120 FPS"),
+                ("144", "144 FPS"),
+                ("165", "165 FPS"),
+                ("180", "180 FPS"),
+                ("240", "240 FPS"),
+                ("360", "360 FPS"),
+            ],
+        },
     ]
 }
 pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
@@ -122,7 +155,7 @@ pub fn read(bytes: &[u8]) -> Result<Values> {
 }
 
 pub fn valid_value(key: &str, value: &str) -> bool {
-    (key == "rtx_target"
+    (matches!(key, "rtx_target" | "rtx_reflex_limit")
         && !value.is_empty()
         && value.bytes().all(|b| b.is_ascii_digit())
         && value.parse::<u32>().is_ok_and(|n| n <= 1000))
@@ -161,4 +194,53 @@ pub fn log_path(exe: &std::path::Path) -> std::path::PathBuf {
         })
         .collect::<String>();
     std::env::temp_dir().join(format!("RTXMFG-{stem}-{hash:016X}.log"))
+}
+
+/// Per-installation runtime artifacts use the exact upstream path hash. No
+/// wildcard TEMP scanning or game-controlled paths are involved.
+pub fn log_paths(exe: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let current = log_path(exe);
+    let previous = current.with_extension("previous.log");
+    let mut interval = current.file_stem().unwrap_or_default().to_os_string();
+    interval.push("-intervals.csv");
+    let interval = current.with_file_name(interval);
+    vec![current, previous, interval]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn presentation_fields_preserve_other_settings_and_custom_frame_limit() -> Result<()> {
+        let before = br#"{"followGame":false,"mode":"dynamic","multiplier":3,"dlssgPreset":1,"reflexFrameLimitFps":200,"custom":{"keep":true}}"#;
+        let mut settings = read(before)?;
+        assert_eq!(settings["rtx_reflex_limit"], "200");
+        settings.insert("rtx_vsync".into(), "1".into());
+        let after: Value = serde_json::from_slice(&configure(before, &settings)?)?;
+        assert_eq!(after["mode"], "dynamic");
+        assert_eq!(after["vsyncMode"], 1);
+        assert_eq!(after["reflexFrameLimitFps"], 200);
+        assert_eq!(after["dlssgPreset"], 1);
+        assert_eq!(after["custom"]["keep"], true);
+        assert!(!valid_value("rtx_vsync", "99"));
+        assert!(!valid_value("rtx_reflex_limit", "1001"));
+        assert!(!valid_value("rtx_reflex_limit", "../60"));
+        Ok(())
+    }
+
+    #[test]
+    fn diagnostic_paths_are_scoped_to_the_full_executable_path() {
+        let a = log_paths(std::path::Path::new("D:/游戏 A/Game.exe"));
+        let a_case = log_paths(std::path::Path::new("d:/游戏 a/game.EXE"));
+        let b = log_paths(std::path::Path::new("D:/游戏 B/Game.exe"));
+        assert_eq!(a, a_case);
+        assert_ne!(a, b);
+        assert!(
+            a.iter()
+                .all(|p| p.parent() == Some(std::env::temp_dir().as_path()))
+        );
+        assert!(a[1].to_string_lossy().ends_with(".previous.log"));
+        assert!(a[2].to_string_lossy().ends_with("-intervals.csv"));
+    }
 }

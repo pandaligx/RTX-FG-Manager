@@ -23,6 +23,7 @@ pub enum Event {
     PayloadProgress(cloud::CloudProgress),
     PatchResult(bool),
     Games(Vec<Game>),
+    CustomFolder(String, String),
     Statuses(u64, Vec<(String, String)>),
     RefreshDone,
     Status(String, String),
@@ -116,19 +117,33 @@ type DisplayCache = Arc<
     >,
 >;
 
+// The active data directory can differ from LOCALAPPDATA after --data-dir or
+// UAC elevation. Write guards must protect the actual controller directory.
+fn ensure_directory_outside_data(
+    directory: &std::path::Path,
+    data: &std::path::Path,
+) -> Result<()> {
+    let directory = core::no_links(directory)?;
+    let data = core::no_links(data)?;
+    anyhow::ensure!(
+        !core::within(&directory, &data),
+        "不能部署到管理器缓存或设置目录"
+    );
+    Ok(())
+}
+
 // Display-only metadata cache. All writes and ownership checks use core's full validation.
-fn display_stamp(exe: &std::path::Path) -> Result<Vec<(u64, u64)>> {
+fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
     use std::os::windows::fs::MetadataExt;
-    let exe = core::no_links(exe)?;
-    let dir = exe
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("无效游戏路径"))?;
+    let exe = core::no_links(&target.game_exe)?;
+    let dir = &target.directory;
     let mut paths = vec![exe.clone(), dir.join(core::OWN).join(core::MARKER)];
     paths.extend(core::PROXIES.iter().map(|n| dir.join(n)));
     paths.extend(
         [
             core::INI,
             rtx_fg_manager::rtxmfg::CONFIG,
+            rtx_fg_manager::transfusion::CONFIG,
             "rtxfg_vk_bridge.dll",
             ".rtx-fg-script.json",
             ".rtx-fg-manager.json",
@@ -410,23 +425,24 @@ impl Controller {
         } else {
             requested
         };
-        self.catalog.selected(&requested).scheme_id.clone()
+        let id = self.catalog.selected(&requested).scheme_id.clone();
+        let series = self.series_for(exe);
+        if self.catalog.supports_series(&id, series) {
+            id
+        } else {
+            self.compatible_scheme(exe, series)
+        }
     }
     pub fn cloud_series(&self) -> usize {
         self.series_for(self.focus.as_deref())
     }
     pub fn series_for(&self, exe: Option<&str>) -> usize {
-        if self.catalog.scheme_policies[&self.scheme_for(exe)].parameter_profile
-            == rtx_fg_manager::rtxmfg::PROFILE
-        {
-            return 2;
-        }
         if let Some(series) = exe
             .and_then(|e| self.games.iter().find(|g| g.exe == e))
             .and_then(|g| g.extra.get("deployment_choice"))
             .and_then(|v| v.get("series"))
             .and_then(Value::as_u64)
-            .filter(|n| *n <= 1)
+            .filter(|n| *n <= 2)
         {
             return series as usize;
         }
@@ -434,12 +450,12 @@ impl Controller {
             .and_then(|e| self.deployments.get(e))
             .and_then(|d| d.common.as_ref())
             .and_then(|d| d.2)
-            .filter(|n| *n <= 1)
+            .filter(|n| *n <= 2)
         {
             return series;
         }
         if let Some(series) = self.state["cloud_series"].as_u64()
-            && series <= 1
+            && series <= 2
         {
             return series as usize;
         }
@@ -447,6 +463,56 @@ impl Controller {
             0
         } else {
             1
+        }
+    }
+    fn compatible_scheme(&self, exe: Option<&str>, series: usize) -> String {
+        let remembered = exe
+            .and_then(|e| self.games.iter().find(|g| g.exe == e))
+            .and_then(|g| g.extra.get("series_schemes"))
+            .or_else(|| self.state.get("series_schemes"))
+            .and_then(|v| v.get(series.to_string()))
+            .and_then(Value::as_str);
+        remembered
+            .filter(|id| self.catalog.supports_series(id, series))
+            .map(str::to_owned)
+            .or_else(|| {
+                self.catalog
+                    .supports_series(&self.catalog.default_scheme, series)
+                    .then(|| self.catalog.default_scheme.clone())
+            })
+            .or_else(|| {
+                self.catalog
+                    .schemes()
+                    .iter()
+                    .find(|s| self.catalog.supports_series(&s.scheme_id, series))
+                    .map(|p| p.scheme_id.clone())
+            })
+            .unwrap_or_else(|| self.catalog.default_scheme.clone())
+    }
+    pub fn select_series(&mut self, series: usize) {
+        if self.busy || series > 2 {
+            return;
+        }
+        let old = self.cloud_scheme();
+        let scheme = if self.catalog.supports_series(&old, series) {
+            old.clone()
+        } else {
+            self.compatible_scheme(self.focus.as_deref(), series)
+        };
+        let proxies = self.catalog.proxies(&scheme);
+        let first = if proxies.iter().any(|p| p == "version.dll") {
+            "version.dll".into()
+        } else {
+            proxies.first().cloned().unwrap_or_default()
+        };
+        let selected = if scheme == old {
+            self.proxies()
+        } else {
+            vec![first]
+        };
+        self.set_selection(scheme.clone(), series, selected);
+        if old != scheme {
+            self.log("已切换到此显卡系列的兼容方案；尚未修改游戏文件。");
         }
     }
     pub fn choice(&self, key: &str, default: &str) -> String {
@@ -695,6 +761,9 @@ impl Controller {
         if self.busy || self.read_only {
             return;
         }
+        if !self.catalog.supports_series(&scheme, series) {
+            return;
+        }
         if let Some(game) = self
             .focus
             .as_ref()
@@ -708,11 +777,23 @@ impl Controller {
                 .unwrap_or(json!({}));
             choices[&scheme] = json!(proxies);
             game.extra.insert("proxy_choices".into(), choices);
+            let history = game
+                .extra
+                .entry("series_schemes")
+                .or_insert_with(|| json!({}));
+            if !history.is_object() {
+                *history = json!({});
+            }
+            history[series.to_string()] = json!(scheme);
             game.extra.insert(
                 "deployment_choice".into(),
                 json!({"scheme":scheme,"series":series}),
             );
         } else {
+            if !self.state["series_schemes"].is_object() {
+                self.state["series_schemes"] = json!({});
+            }
+            self.state["series_schemes"][series.to_string()] = json!(scheme);
             self.state["cloud_scheme"] = json!(scheme);
             self.state["cloud_series"] = json!(series);
             self.state["proxies"] = json!(proxies);
@@ -726,21 +807,14 @@ impl Controller {
         let Some(exe) = self.focus.clone() else {
             return;
         };
-        let paths = self
-            .games
-            .iter()
-            .find(|g| g.exe == exe)
-            .map(|g| {
-                if g.targets.is_empty() {
-                    vec![g.exe.clone()]
-                } else {
-                    g.targets.clone()
-                }
-            })
-            .unwrap_or_else(|| vec![exe.clone()]);
+        let Some(game) = self.games.iter().find(|g| g.exe == exe).cloned() else {
+            return;
+        };
+        let paths = game.deployment_executables();
         let scheme = self.cloud_scheme();
         let policy = self.catalog.scheme_policies[&scheme].clone();
         let values = self.preset_values(&exe);
+        let data = self.data.clone();
         self.busy = true;
         self.critical = true;
         self.status_epoch += 1;
@@ -749,12 +823,17 @@ impl Controller {
             let mut unavailable = Vec::new();
             for path in &paths {
                 let target = std::path::Path::new(path);
-                let status = core::status(target);
+                let location = game.deployment_target(target);
+                if let Err(error) = ensure_directory_outside_data(&location.directory, &data) {
+                    unavailable.push(format!("{path}：{error}"));
+                    continue;
+                }
+                let status = core::status_at(&location);
                 if !status.starts_with("已部署") {
                     unavailable.push(format!("{path}：{status}"));
                     continue;
                 }
-                match target.parent().map(core::record) {
+                match Some(core::record(&location.directory)) {
                     Some(Ok(Some(record)))
                         if record.scheme_id.as_deref() == Some(scheme.as_str()) => {}
                     Some(Ok(_)) => unavailable.push(format!("{path}：已部署方案不同")),
@@ -770,7 +849,9 @@ impl Controller {
                 return Ok(());
             }
             for path in &paths {
-                if let Err(e) = core::assert_stopped(std::path::Path::new(path)) {
+                if let Err(e) =
+                    core::assert_target_stopped(&game.deployment_target(std::path::Path::new(path)))
+                {
                     c.send(Event::Warning(e.to_string()));
                     return Ok(());
                 }
@@ -781,12 +862,18 @@ impl Controller {
             for path in paths {
                 let target = std::path::Path::new(&path);
                 let context = rtx_fg_manager::presets::Context::new(&scheme, &policy, target);
-                if let Err(e) = core::apply_parameters(target, &context, &values) {
+                let location = game.deployment_target(target);
+                let result = ensure_directory_outside_data(&location.directory, &data)
+                    .and_then(|()| core::apply_parameters_at(&location, &context, &values));
+                if let Err(e) = result {
                     errors.push(format!("{}：{e}", target.display()));
                 } else {
                     applied += 1;
                 }
-                c.send(Event::Status(path.clone(), core::status(target)));
+                c.send(Event::Status(
+                    path.clone(),
+                    core::status_at(&game.deployment_target(target)),
+                ));
             }
             if errors.is_empty() {
                 c.send(Event::PresetApplied(exe.clone(), scheme, values));
@@ -888,7 +975,7 @@ impl Controller {
                 let stamp = std::iter::once(&g.exe)
                     .chain(g.targets.iter())
                     .chain(g.cleanup_only.iter())
-                    .map(|e| display_stamp(std::path::Path::new(e)))
+                    .map(|e| display_stamp(&g.deployment_target(std::path::Path::new(e))))
                     .collect::<Result<Vec<_>>>()
                     .ok()
                     .map(|v| v.into_iter().flatten().collect::<Vec<_>>());
@@ -961,8 +1048,10 @@ impl Controller {
             .iter()
             .filter(|old| {
                 !old.reasons.is_empty()
-                    && scanner::is_steam_client_binary(std::path::Path::new(&old.exe))
-                    && core::status(std::path::Path::new(&old.exe)) == "未部署"
+                    && (scanner::is_steam_client_binary(std::path::Path::new(&old.exe))
+                        || scanner::is_gpu_diagnostic_tool(std::path::Path::new(&old.exe)))
+                    && core::status_at(&old.deployment_target(std::path::Path::new(&old.exe)))
+                        == "未部署"
             })
             .map(|old| old.exe.clone())
             .collect::<BTreeSet<_>>();
@@ -984,6 +1073,15 @@ impl Controller {
             self.disk_presets.retain(|(old, _), _| old != exe);
         }
         for mut fresh in rows {
+            if self.games.iter().any(|g| {
+                !g.deployment_dir.is_empty()
+                    && core::key(&scanner::installation_root(std::path::Path::new(&g.exe)))
+                        == core::key(&scanner::installation_root(std::path::Path::new(
+                            &fresh.exe,
+                        )))
+            }) {
+                continue;
+            }
             let root = core::key(std::path::Path::new(&fresh.root));
             let matched = self
                 .games
@@ -1188,6 +1286,99 @@ impl Controller {
             })()
         });
     }
+    pub fn pick_custom_folder(&mut self) {
+        if self.busy || self.read_only {
+            return;
+        }
+        let existing = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned();
+        let games = self.games.clone();
+        let data = self.data.clone();
+        let mut title = self.text("选择自定义部署目录（例如 OptiScaler 插件目录）");
+        if let Some(game) = &existing {
+            title.push_str(&format!(
+                " · {}",
+                std::path::Path::new(&game.exe)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+            ));
+        }
+        let exe_title = self.text("选择关联的游戏本体 EXE");
+        self.busy = true;
+        self.channel.operation(move |c| {
+            let Some(folder) = rfd::FileDialog::new().set_title(title).pick_folder() else {
+                return Ok(());
+            };
+            ensure_directory_outside_data(&folder, &data)?;
+            let game = if let Some(g) = existing {
+                g
+            } else {
+                let Some(exe) = rfd::FileDialog::new()
+                    .set_title(exe_title)
+                    .add_filter("Windows EXE", &["exe"])
+                    .pick_file()
+                else {
+                    return Ok(());
+                };
+                let exe = core::library_location(&exe)?;
+                games
+                    .iter()
+                    .find(|g| core::key(std::path::Path::new(&g.exe)) == core::key(&exe))
+                    .cloned()
+                    .unwrap_or_else(|| Game {
+                        exe: exe.display().to_string(),
+                        root: scanner::game_root(&exe).display().to_string(),
+                        ..Default::default()
+                    })
+            };
+            let target = core::DeploymentTarget::custom(std::path::Path::new(&game.exe), &folder)
+                .validate(false)?;
+            core::assert_target_stopped(&target)?;
+            if let Some(record) = core::record(&target.directory)? {
+                target.validate_record(&record)?;
+            }
+            anyhow::ensure!(
+                !games.iter().any(|g| g.exe != game.exe
+                    && g.deployment_executables()
+                        .iter()
+                        .chain(g.cleanup_only.iter())
+                        .any(|e| core::key(
+                            &g.deployment_target(std::path::Path::new(e)).directory
+                        ) == core::key(&target.directory))),
+                "此目录已关联其他游戏"
+            );
+            if core::key(&game.deployment_directory()) == core::key(&target.directory)
+                && games.iter().any(|g| g.exe == game.exe)
+            {
+                return Ok(());
+            } else {
+                for e in game
+                    .deployment_executables()
+                    .iter()
+                    .chain(game.cleanup_only.iter())
+                {
+                    anyhow::ensure!(
+                        core::status_at(&game.deployment_target(std::path::Path::new(e)))
+                            == "未部署",
+                        "请先卸载原目录补丁，再更改部署目录。"
+                    );
+                }
+            }
+            c.send(Event::CustomFolder(
+                game.exe,
+                if target.is_custom() {
+                    target.directory.display().to_string()
+                } else {
+                    String::new()
+                },
+            ));
+            Ok(())
+        });
+    }
     pub fn request_patch(&mut self, clean: bool) {
         if self.closing || self.busy || self.pending_patch.is_some() || (self.read_only && !clean) {
             return;
@@ -1254,6 +1445,7 @@ impl Controller {
                 jobs.push((
                     game.exe.clone(),
                     targets,
+                    game.clone(),
                     scheme.clone(),
                     self.series_for(Some(&game.exe)),
                     self.proxies_for(Some(&game.exe)),
@@ -1275,10 +1467,11 @@ impl Controller {
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
         let mut catalog = self.catalog.clone();
+        let data = self.data.clone();
         catalog.prefer_github = self.choice("download_source", "domestic") == "github";
         self.channel.operation(move |c| {
             let mut errors = Vec::new();
-            for (primary, targets, scheme, series, proxies, options) in jobs {
+            for (primary, targets, game, scheme, series, proxies, options) in jobs {
                 if cancel.load(Ordering::Relaxed) {
                     break;
                 }
@@ -1287,7 +1480,14 @@ impl Controller {
                 } else {
                     (|| {
                         for exe in &targets {
-                            core::preflight_install(std::path::Path::new(exe), &proxies)?;
+                            ensure_directory_outside_data(
+                                &game.deployment_target(std::path::Path::new(exe)).directory,
+                                &data,
+                            )?;
+                            core::preflight_install_at(
+                                &game.deployment_target(std::path::Path::new(exe)),
+                                &proxies,
+                            )?;
                         }
                         cloud::prepare_with_progress(
                             &catalog,
@@ -1308,7 +1508,9 @@ impl Controller {
                             c.send(Event::PatchResult(false));
                             c.send(Event::Status(
                                 exe.clone(),
-                                core::status(std::path::Path::new(&exe)),
+                                core::status_at(
+                                    &game.deployment_target(std::path::Path::new(&exe)),
+                                ),
                             ));
                         }
                         continue;
@@ -1323,6 +1525,10 @@ impl Controller {
                     let p = PathBuf::from(&exe);
                     let result = if let Some(ref payload) = prepared {
                         (|| {
+                            ensure_directory_outside_data(
+                                &game.deployment_target(&p).directory,
+                                &data,
+                            )?;
                             let mut files = payload.files.clone();
                             let context = rtx_fg_manager::presets::Context::new(
                                 &payload.scheme_id,
@@ -1331,8 +1537,8 @@ impl Controller {
                             );
                             let name = core::config_name(&payload.backend);
                             files.insert(name.into(), context.configure(&files[name], &options)?);
-                            core::deploy_prepared_context(
-                                &p,
+                            core::deploy_prepared_context_at(
+                                &game.deployment_target(&p),
                                 &payload.backend,
                                 &proxies,
                                 None,
@@ -1342,7 +1548,7 @@ impl Controller {
                             )
                         })()
                     } else {
-                        cleanup::clean(&p)
+                        cleanup::clean_at(&game.deployment_target(&p))
                     };
                     match result {
                         Ok(s) => {
@@ -1364,7 +1570,10 @@ impl Controller {
                             errors.push(format!("{exe}：{e}"));
                         }
                     }
-                    c.send(Event::Status(exe, core::status(&p)));
+                    c.send(Event::Status(
+                        exe,
+                        core::status_at(&game.deployment_target(&p)),
+                    ));
                 }
                 if all_ok && !clean {
                     c.send(Event::PresetApplied(primary, scheme, options));
@@ -1392,17 +1601,14 @@ impl Controller {
     pub fn patch_targets(&self, clean: bool) -> BTreeSet<String> {
         let mut directories = BTreeMap::new();
         for game in self.target_games() {
-            let targets = if game.targets.is_empty() {
-                std::slice::from_ref(&game.exe)
-            } else {
-                game.targets.as_slice()
-            };
+            let targets = game.deployment_executables();
             for target in targets
                 .iter()
                 .chain(game.cleanup_only.iter().filter(|_| clean))
             {
                 let path = std::path::Path::new(target);
-                let dir = path.parent().unwrap_or(path);
+                let custom_target = game.deployment_target(path);
+                let dir = &custom_target.directory;
                 // Persisted game paths are absolute. Keep legacy relative test
                 // entries distinct instead of collapsing every bare name into
                 // the same empty parent directory.
@@ -1456,15 +1662,17 @@ impl Controller {
         // Done refreshes the focused game after all writes have completed.
         if !self.closing && !self.busy && self.preset_reads.insert(exe.clone()) {
             let target = exe.clone();
+            let location = self
+                .games
+                .iter()
+                .find(|g| g.exe == exe)
+                .map(|g| g.deployment_target(std::path::Path::new(&exe)))
+                .unwrap_or_else(|| core::DeploymentTarget::for_game(std::path::Path::new(&exe)));
             let catalog = self.catalog.clone();
             let epoch = self.status_epoch;
             self.channel.job(move |c| {
-                let p = std::path::Path::new(&target);
-                let running = p
-                    .parent()
-                    .filter(|p| p.is_dir())
-                    .is_some_and(|p| win::running_in_directory(p).map_or(true, |v| !v.is_empty()));
-                let values = rtx_fg_manager::presets::inspect(p, &catalog);
+                let running = core::assert_target_stopped(&location).is_err();
+                let values = rtx_fg_manager::presets::inspect_at(&location, &catalog);
                 if let Err(e) = &values {
                     c.send(Event::Log(e.to_string()));
                 }
@@ -1724,6 +1932,35 @@ impl Controller {
                         }
                     }
                 }
+                Event::CustomFolder(exe, folder) => {
+                    if let Some(game) = self
+                        .games
+                        .iter_mut()
+                        .find(|g| g.exe.eq_ignore_ascii_case(&exe))
+                    {
+                        game.deployment_dir = folder;
+                    } else {
+                        self.games.push(Game {
+                            exe: exe.clone(),
+                            deployment_dir: folder,
+                            root: scanner::game_root(std::path::Path::new(&exe))
+                                .display()
+                                .to_string(),
+                            ..Default::default()
+                        });
+                    }
+                    self.status_epoch += 1;
+                    self.focus = Some(exe.clone());
+                    self.deployments.remove(&exe);
+                    self.preset_reads.remove(&exe);
+                    self.disk_presets.retain(|(e, _), _| e != &exe);
+                    if let Ok(mut cache) = self.display_cache.lock() {
+                        cache.remove(&exe);
+                    }
+                    self.save();
+                    self.log("已设置自定义部署目录；请确认加载方式后安装补丁。");
+                    self.refresh();
+                }
                 Event::Games(g) => self.merge(g),
                 Event::Statuses(epoch, s) => {
                     if epoch == self.status_epoch {
@@ -1833,6 +2070,15 @@ impl Controller {
                         self.state["backend"] =
                             json!(if *sm == 75 { "native20" } else { "native30" });
                         self.state["backend_schema"] = json!(1);
+                        if self.state.get("cloud_series").is_none() {
+                            self.state["cloud_series"] = json!(if *sm == 75 {
+                                0
+                            } else if *sm == 89 {
+                                2
+                            } else {
+                                1
+                            });
+                        }
                         self.save();
                     }
                 }
@@ -2006,6 +2252,135 @@ impl Controller {
 mod tests {
     use super::*;
     #[test]
+    fn active_data_directory_guard_normalizes_paths_without_blocking_siblings() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path().join("自选管理器数据");
+        std::fs::create_dir_all(data.join("child")).unwrap();
+        assert!(ensure_directory_outside_data(&data, &data).is_err());
+        assert!(ensure_directory_outside_data(&data.join("child"), &data).is_err());
+        assert!(ensure_directory_outside_data(&data.join("child/.."), &data).is_err());
+        assert!(
+            ensure_directory_outside_data(
+                &PathBuf::from(data.to_string_lossy().to_uppercase()).join("child"),
+                &data,
+            )
+            .is_err()
+        );
+        assert!(
+            ensure_directory_outside_data(&dir.path().join("自选管理器数据-游戏"), &data).is_ok()
+        );
+    }
+    #[test]
+    fn active_data_directory_blocks_install_and_presets_but_allows_cleanup() {
+        let (_dir, mut c) = controller();
+        let game_dir = tempfile::tempdir().unwrap();
+        let exe = game_dir.path().join("RTXFG-ActiveData-Guard.exe");
+        // Never executed. The write guard must reject before PE validation or downloads.
+        std::fs::write(&exe, b"not executable").unwrap();
+        let plugin = c.data.join("plugins");
+        std::fs::create_dir(&plugin).unwrap();
+        std::fs::write(plugin.join("OptiScaler.ini"), b"preserve unrelated config").unwrap();
+        let exe = exe.display().to_string();
+        c.games = vec![Game {
+            exe: exe.clone(),
+            deployment_dir: plugin.display().to_string(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.clone());
+        for operation in [0, 1, 2] {
+            c.busy = false;
+            c.critical = false;
+            if operation == 1 {
+                c.apply_focused_parameters();
+            } else {
+                c.perform(operation == 2, BTreeSet::from([exe.clone()]));
+            }
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let mut blocked = false;
+            let mut cleaned = false;
+            loop {
+                let event =
+                    c.rx.recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                        .expect("operation completed");
+                match event {
+                    Event::Warning(message) => {
+                        blocked |= message.contains("不能部署到管理器缓存或设置目录");
+                    }
+                    Event::Log(message) => cleaned |= message.contains("未发现可确认归属的补丁"),
+                    Event::PayloadProgress(_) => panic!("guard must run before cloud downloads"),
+                    Event::Done => break,
+                    _ => {}
+                }
+            }
+            assert_eq!(blocked, operation != 2);
+            assert_eq!(cleaned, operation == 2);
+            assert_eq!(
+                std::fs::read(plugin.join("OptiScaler.ini")).unwrap(),
+                b"preserve unrelated config"
+            );
+            assert!(!plugin.join("version.dll").exists());
+        }
+        c.busy = false;
+        c.critical = false;
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn series_switch_selects_compatible_scheme_without_affecting_other_games() {
+        let (_dir, mut c) = controller();
+        c.games = vec![
+            Game {
+                exe: "A.exe".into(),
+                ..Default::default()
+            },
+            Game {
+                exe: "B.exe".into(),
+                ..Default::default()
+            },
+        ];
+        c.focus = Some("A.exe".into());
+        c.set_selection("upstream-0.3.5-310-9".into(), 0, vec!["version.dll".into()]);
+        c.select_series(2);
+        assert_eq!(c.cloud_series(), 2);
+        assert!(c.catalog.supports_series(&c.cloud_scheme(), 2));
+        c.set_selection(
+            "dlssg-transfusion-1.4.5.3".into(),
+            2,
+            vec!["dxgi.dll".into()],
+        );
+        c.select_series(0);
+        assert_eq!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
+        assert_eq!(c.proxies(), ["dxgi.dll"]);
+        c.set_selection("rtx40mfg-1.3.3-hf2".into(), 0, vec!["version.dll".into()]);
+        assert_eq!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
+        c.focus = Some("B.exe".into());
+        assert_ne!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
+    }
+    #[test]
+    fn custom_folder_event_keeps_grouped_paths_for_restoration_and_rescan() {
+        let (_dir, mut c) = controller();
+        let paths: Vec<String> = vec![
+            "C:/RTXFG-test/Win64/Game.exe".into(),
+            "C:/RTXFG-test/Win64r/Game.exe".into(),
+        ];
+        c.games = vec![Game {
+            exe: paths[0].clone(),
+            targets: paths.clone(),
+            ..Default::default()
+        }];
+        c.channel.send(Event::CustomFolder(
+            paths[0].clone(),
+            "C:/RTXFG-test/plugins".into(),
+        ));
+        c.events();
+        assert_eq!(c.games[0].targets, paths);
+        assert_eq!(c.games[0].deployment_executables(), [paths[0].clone()]);
+        c.channel
+            .send(Event::CustomFolder(paths[0].clone(), String::new()));
+        c.events();
+        assert_eq!(c.games[0].deployment_executables(), paths);
+    }
+    #[test]
     fn game_selection_follows_records_and_explicit_choices_do_not_leak() {
         let (_dir, mut c) = controller();
         c.games = vec![
@@ -2135,6 +2510,7 @@ mod tests {
             bytes: 2_000_000,
             source: "gitee".into(),
             url: String::new(),
+            notes: Default::default(),
         }
     }
     #[test]

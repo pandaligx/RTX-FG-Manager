@@ -3,6 +3,7 @@ mod controller;
 mod game_icons;
 mod ui;
 mod ui_assets;
+mod ui_themes;
 fn main() {
     if let Err(e) = run() {
         if std::env::args().any(|s| {
@@ -166,7 +167,15 @@ fn run() -> anyhow::Result<()> {
             &PathBuf::from(arg(3)?),
             &win::verify_signature(&PathBuf::from(arg(2)?))?,
         ),
-        Some("--apply-update") => updater::apply(&PathBuf::from(arg(2)?)),
+        Some("--apply-update") => {
+            // Older managers launch this asInvoker helper with CreateProcess.
+            // Elevate before touching the installation; its final GUI child
+            // inherits the token, preserving the existing ready/PID handshake.
+            if !rtx_fg_manager::elevation::ensure_admin(&std::env::args_os().collect::<Vec<_>>())? {
+                return Ok(());
+            }
+            updater::apply(&PathBuf::from(arg(2)?))
+        }
         Some("--payload-report") => {
             let rows=rtx_fg_manager::assets::EMBEDDED.iter().map(|r|{let bytes=rtx_fg_manager::assets::bytes(r.name)?;Ok(serde_json::json!({"name":r.name,"bytes":bytes.len(),"sha256":core::hash(&bytes)}))}).collect::<anyhow::Result<Vec<_>>>()?;
             core::atomic_json(&PathBuf::from(arg(2)?), &rows)
@@ -180,6 +189,17 @@ fn run() -> anyhow::Result<()> {
                     "--ui-smoke" => smoke = Some(PathBuf::from(arg(i + 1)?)),
                     _ => {}
                 }
+            }
+            // A standard user may approve UAC with another administrator's
+            // credentials. Keep that user's library/settings path explicit
+            // instead of silently switching to the administrator's profile.
+            let mut elevated_args = std::env::args_os().collect::<Vec<_>>();
+            if !args.iter().any(|arg| arg == "--data-dir") {
+                elevated_args.push("--data-dir".into());
+                elevated_args.push(data.as_os_str().to_os_string());
+            }
+            if !rtx_fg_manager::elevation::ensure_admin(&elevated_args)? {
+                return Ok(());
             }
             ui::run(data, smoke)
         }

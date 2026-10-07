@@ -57,6 +57,7 @@ impl Game {
         let record = core::Record {
             schema: 3,
             backend: "upstream_sm86".into(),
+            game_exe: None,
             payload_version: Some("0.3.5".into()),
             proxy: "version.dll".into(),
             proxies: vec!["version.dll".into()],

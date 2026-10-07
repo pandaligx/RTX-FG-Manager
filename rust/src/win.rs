@@ -117,15 +117,33 @@ pub fn replace_existing(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 pub fn running_in_directory(dir: &Path) -> Result<Vec<String>> {
-    let names: BTreeSet<_> = std::fs::read_dir(dir)?
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .is_some_and(|x| x.eq_ignore_ascii_case("exe"))
-        })
-        .map(|e| e.file_name().to_string_lossy().to_lowercase())
-        .collect();
+    running_in_directory_impl(dir, None)
+}
+/// Cleanup of a separately selected plugin folder still checks a game's process
+/// after its original installation directory was removed. Access-denied and
+/// other filesystem errors remain errors, never an assumed stopped process.
+pub fn running_in_directory_or_missing(dir: &Path, expected_exe: &Path) -> Result<Vec<String>> {
+    running_in_directory_impl(dir, Some(expected_exe))
+}
+fn running_in_directory_impl(dir: &Path, expected_exe: Option<&Path>) -> Result<Vec<String>> {
+    let mut names: BTreeSet<_> = match std::fs::read_dir(dir) {
+        Ok(entries) => entries
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .is_some_and(|x| x.eq_ignore_ascii_case("exe"))
+            })
+            .map(|e| e.file_name().to_string_lossy().to_lowercase())
+            .collect(),
+        Err(error) if expected_exe.is_some() && error.kind() == std::io::ErrorKind::NotFound => {
+            BTreeSet::new()
+        }
+        Err(error) => return Err(error.into()),
+    };
+    if let Some(name) = expected_exe.and_then(Path::file_name) {
+        names.insert(name.to_string_lossy().to_lowercase());
+    }
     let mut result = BTreeSet::new();
     // SAFETY: All Win32 structures are initialized to their ABI sizes, buffers stay
     // live for each call, and every snapshot/process handle is released by RAII.

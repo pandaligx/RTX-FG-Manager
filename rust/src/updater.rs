@@ -22,6 +22,8 @@ pub struct Manifest {
     pub source: String,
     #[serde(default)]
     pub url: String,
+    #[serde(default)]
+    pub notes: std::collections::BTreeMap<String, String>,
 }
 pub fn version(s: &str) -> Result<[u16; 3]> {
     let s = s.strip_prefix('v').unwrap_or(s);
@@ -52,6 +54,10 @@ impl Manifest {
         ensure!(
             (1024 * 1024..=256 * 1024 * 1024).contains(&self.bytes),
             "更新文件大小无效"
+        );
+        ensure!(
+            self.notes.len() <= 8 && self.notes.values().all(|n| n.len() <= 16384),
+            "更新日志过长"
         );
         Ok(())
     }
@@ -400,11 +406,14 @@ pub fn install(path: &Path, m: &Manifest, data: &Path) -> Result<()> {
             || !destination.exists(),
         "新版文件名已被占用，未替换任何文件"
     );
+    // Display-only notes must not enlarge the small, backward-compatible install ticket.
+    let mut install_manifest = m.clone();
+    install_manifest.notes.clear();
     let ticket = Ticket {
         schema: 1,
         old_sha256: core::digest(&target)?,
         target,
-        manifest: m.clone(),
+        manifest: install_manifest,
         parent: std::process::id(),
         data_dir: core::no_links(data)?,
     };
@@ -632,6 +641,7 @@ mod download_tests {
             url: format!(
                 "https://github.com/{REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
             ),
+            notes: Default::default(),
         }
     }
 

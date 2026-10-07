@@ -1,5 +1,30 @@
 # Changelog
 
+## 4.2.6
+
+Compared with 4.2.5, this release adds live theme previews, custom plugin folders,
+in-app release history and a separate DLSSG-Transfusion integration.
+
+- Upgrade to GPUI Kit 0.7.1 with GPUI Fast 0.1.2. Retain Windows first-frame, DPI and font compatibility adjustments, including operation without an external ICU runtime.
+- Embed 21 GPUI Kit theme sets: 36 variants plus two defaults, for 38 offline color schemes. Open the sidebar palette for one searchable, scrollable list. Hover or use arrow keys to preview, click/Enter to save, or Esc/click outside to restore. System mode remembers light/dark choices separately; the list adapts to shorter windows and outside clicks do not activate controls underneath.
+- Add custom deployment folders associated with the selected game's real EXE, including plugin directories without an EXE. Preserve game-process checks, settings, other MOD files and ownership-based removal.
+- Request Windows administrator permission at startup, while retaining the existing updater entry path and user data location. Cancelling the UAC prompt stops startup.
+- Keep a compatible scheme when switching RTX20/30/40, otherwise choose an available scheme. Disable unsupported choices and add links to the relevant projects.
+- Update RTX40 MFG from 1.3.3 Hotfix 2 to 1.4.1 Hotfix 1, retaining its independent JSON profile and RTX40 restriction. Add VSync and a fixed-mode Reflex FPS limit; Dynamic uses its own target and preserves the inactive fixed limit. **The in-game Backspace menu remains upstream English.**
+- Add DLSSG-Transfusion 1.4.5.3 with separate JSONC v3 settings. Select one matching `version.dll`, `dinput8.dll`, `dxgi.dll` or `winmm.dll` proxy; use Follow game, fixed 2X–6X or Dynamic mode. Preserve comments and unrelated settings. 5X/6X remain experimental; optional ASI/ReShade components and Smooth Motion controls are not bundled.
+- Add current notes and offline history for 4.2.0–4.2.5 to Settings, with a version selector. Update prompts can display localized server notes while retaining support for older manifests without notes. Update five-language help.
+- Exclude NVIDIA Vulkan diagnostic tools from game scanning and strengthen configuration-retention, log-cleanup and uninstall checks.
+
+Updating the manager preserves the game library and preferences; it does not
+automatically replace deployed game DLLs. Exit the game and uninstall its old
+patch before installing a different version, scheme or entry.
+
+Local format, Cargo check/test, strict Clippy and Release checks passed
+(151 tests passed, 3 explicitly ignored), with final-build language/theme startup
+and interactive Windows UI checks. No new physical-GPU, target-game or
+cross-monitor validation is claimed. No CPU or game-performance gain has been
+established; Transfusion RTX20 and older-GPU Vulkan paths still need physical testing.
+
 ## 4.2.5
 
 - Compact the signed-backend resource replacement to reclaim obsolete file space: approximately 28.8 MiB for upstream 0.3.5 and 32.3 MiB for the Delta variant. Preserve the already-signed initial proxies.

@@ -68,18 +68,33 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
         .unwrap()
         .max_selected_proxies = 6;
     assert!(invalid.validate().is_err());
-    assert_eq!(
-        c.packages
-            .iter()
-            .map(|p| (&p.id, &p.sha256))
-            .collect::<std::collections::BTreeMap<_, _>>(),
-        cloud::bundled()
-            .packages
-            .iter()
-            .filter(|p| p.scheme_id != "rtx40mfg-1.3.3-hf2")
-            .map(|p| (&p.id, &p.sha256))
-            .collect::<std::collections::BTreeMap<_, _>>()
-    );
+    let current = cloud::bundled();
+    current.validate()?;
+    assert_eq!(current.default_scheme, c.default_scheme);
+    // 4.2.5 replaced the initial/0.3.5 packages with signed internal backends;
+    // those ZIPs intentionally have new immutable names and identities. Keep
+    // the stable scheme IDs and assert the *unchanged* 4.2.2 resources exactly.
+    for (id, old) in &c.scheme_policies {
+        let new = &current.scheme_policies[id];
+        assert_eq!(new.gpu_paths, old.gpu_paths, "{id}");
+        assert_eq!(new.parameter_profile, old.parameter_profile, "{id}");
+        assert_eq!(new.max_selected_proxies, old.max_selected_proxies, "{id}");
+    }
+    let unchanged = c
+        .packages
+        .iter()
+        .filter(|p| matches!(p.scheme_id.as_str(), "native-0.2.6-stable" | SCHEME))
+        .collect::<Vec<_>>();
+    assert_eq!(unchanged.len(), 6);
+    for old in unchanged {
+        let new = current.packages.iter().find(|p| p.id == old.id).unwrap();
+        let sorted = |p: &cloud::Package| -> Result<serde_json::Value> {
+            let mut p = p.clone();
+            p.files.sort_by(|a, b| a.name.cmp(&b.name));
+            Ok(serde_json::to_value(p)?)
+        };
+        assert_eq!(sorted(new)?, sorted(old)?);
+    }
     Ok(())
 }
 #[test]

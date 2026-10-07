@@ -1,10 +1,94 @@
 """Release mirror rejects incomplete/tampered assets before any upload."""
-import hashlib,json,runpy,tempfile,unittest,io,os,subprocess
+import hashlib,json,runpy,tempfile,unittest,io,os,subprocess,re
 from unittest.mock import patch,Mock
 from urllib.error import HTTPError
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 mirror=runpy.run_path(str(ROOT/'.github/scripts/mirror_gitee.py'))
+
+
+def current_source_export_files():
+    """Read the exporter's explicit inputs without invoking PowerShell or Git.
+
+    Keep this test reader narrow: literal Add-File lists, extension-limited
+    Add-Tree lists, top-level Rust tests, and the named catalog fixtures only.
+    A new exporter construct must be reviewed here instead of allowing an
+    unrestricted recursive scan of the maintainer workspace.
+    """
+    script = (ROOT / 'tools/export-source.ps1').read_text(encoding='utf-8-sig')
+    files = set()
+    lists = re.findall(
+        r'foreach \(\$name in @\((.*?)\)\) \{ Add-File \$name(?: \$false)? \}',
+        script, re.S)
+    if len(lists) != 5:
+        raise AssertionError('Review the source exporter Add-File list structure')
+    for group in lists:
+        files.update(re.findall(r"'([^']+)'", group))
+    files.update(re.findall(r"Add-File '([^']+)'", script))
+    trees = re.findall(r"Add-Tree '([^']+)' @\(([^)]*)\)", script)
+    if len(trees) != 5:
+        raise AssertionError('Review the source exporter Add-Tree structure')
+    for directory, group in trees:
+        extensions = set(re.findall(r"'([^']+)'", group))
+        files.update(p.relative_to(ROOT).as_posix()
+                     for p in (ROOT / directory).rglob('*')
+                     if p.is_file() and p.suffix.lower() in extensions)
+    files.update(p.relative_to(ROOT).as_posix() for p in (ROOT / 'tests').glob('*.rs'))
+    fixture_list = re.search(r'foreach \(\$version in @\(([^)]*)\)\)', script)
+    if not fixture_list:
+        raise AssertionError('Review the source exporter catalog fixture structure')
+    for version in re.findall(r"'([^']+)'", fixture_list.group(1)):
+        files.update(p.relative_to(ROOT).as_posix()
+                     for p in (ROOT / 'tests/fixtures' / ('catalog' + version)).rglob('*.json')
+                     if p.is_file())
+    # The exporter permits optional documentation and cloud inputs to be absent.
+    return sorted(path for path in files if (ROOT / path).is_file())
+
+
+class SourceAllowlistTests(unittest.TestCase):
+    def test_current_reviewed_export_is_accepted_by_the_source_mirror(self):
+        files = current_source_export_files()
+        for required in ('Cargo.toml', 'Cargo.lock', 'rust/src/ui_themes.rs',
+                         'vendor/gpui_fast_windows/Cargo.toml',
+                         'vendor/gpui_fast_windows/Cargo.toml.orig',
+                         'vendor/gpui_fast_windows/LICENSE',
+                         'vendor/gpui_fast_windows/src/fast/layers/composite.rs',
+                         'vendor/gpui_fast_windows/src/shaders.hlsl',
+                         'rust/assets/themes/catppuccin.json',
+                         'rust/assets/themes/LICENSE-APACHE',
+                         'rust/assets/licenses/GPUI-FAST-LICENSE'):
+            self.assertIn(required, files)
+        self.assertEqual(sum(path.startswith('rust/assets/themes/') and path.endswith('.json')
+                             for path in files), 21)
+        for path in files:
+            with self.subTest(path=path):
+                self.assertTrue(mirror['allowed_source'](path), path)
+                mirror['validate_content'](path, (ROOT / path).read_bytes())
+
+    def test_current_vendor_resources_and_catalog_fixtures_are_allowed(self):
+        for path in ('vendor/gpui_fast_windows/resources/app.rc',
+                     'vendor/gpui_fast_windows/resources/app.xml',
+                     'vendor/gpui_fast_windows/resources/app.manifest',
+                     'vendor/gpui_fast_windows/resources/app.ico',
+                     'tests/fixtures/catalog425/catalog.json'):
+            self.assertTrue(mirror['allowed_source'](path), path)
+
+    def test_obsolete_vendor_and_private_inputs_stay_rejected(self):
+        for path in ('vendor/gpui_windows/Cargo.toml',
+                     'vendor/gpui_windows/src/window.rs',
+                     'vendor/sum_tree/Cargo.toml', 'vendor/sum_tree/src/sum_tree.rs',
+                     'vendor/gpui_fast_windows/src/private.exe',
+                     'vendor/gpui_fast_windows/resources/private.dll',
+                     'vendor/gpui_fast_windows/resources/private.pfx',
+                     'rust/assets/themes/.env', 'rust/assets/themes/private.key',
+                     'rust/assets/themes/../../development/private.rs',
+                     'rust/assets/licenses/UNREVIEWED-LICENSE',
+                     'development/gpui-fast-upgrade/license-review.md',
+                     'payloads/version.dll', 'log/game.txt', 'rust/native/probe.cpp',
+                     'AGENTS.md', 'agent.md', 'RELEASE_WORKFLOW.md',
+                     'tests/fixtures/catalog999/private.json'):
+            self.assertFalse(mirror['allowed_source'](path), path)
+
 
 class PublicationTests(unittest.TestCase):
     def test_remote_download_resumes_and_restarts_if_range_is_ignored(self):
@@ -156,6 +240,14 @@ class SourceMirrorTests(unittest.TestCase):
         self.env = dict(os.environ, GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull,
                         GIT_AUTHOR_NAME='Offline test', GIT_AUTHOR_EMAIL='offline@example.invalid',
                         GIT_COMMITTER_NAME='Offline test', GIT_COMMITTER_EMAIL='offline@example.invalid')
+        # Windows may assign the Administrators group as the temporary folder's
+        # owner. Trust only repositories created by this test, in process-local
+        # configuration; never change the user's global safe.directory list.
+        test_repositories = (self.repo, self.remote, self.base / 'empty.git')
+        self.env['GIT_CONFIG_COUNT'] = str(len(test_repositories))
+        for index, repository in enumerate(test_repositories):
+            self.env[f'GIT_CONFIG_KEY_{index}'] = 'safe.directory'
+            self.env[f'GIT_CONFIG_VALUE_{index}'] = str(repository)
         self.git('init', '--initial-branch=main', str(self.repo))
         self.git('init', '--bare', '--initial-branch=main', str(self.remote))
         self.write('README.md', 'Public manager documentation\n')

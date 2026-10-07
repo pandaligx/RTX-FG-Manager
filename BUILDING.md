@@ -53,6 +53,12 @@ cargo build --locked --features native-probes,fixture-tests
 
 ## Source and CI boundaries
 
-Keep `Cargo.lock`, `.cargo/config.toml`, Rust sources/assets, current JSON language resources, `vendor/gpui_windows`, and `vendor/sum_tree` together. The vendored patches preserve Windows compatibility and initial-window behavior. The GitHub Windows workflow builds an **unsigned test artifact**, never signs, publishes, or replaces the release update manifest. Signed EXE and game DLL releases remain separate from source commits.
+Keep `Cargo.lock`, `.cargo/config.toml`, Rust sources/assets, current JSON language resources, and `vendor/gpui_fast_windows` together. GPUI Kit 0.7.1 is pinned to commit `4921e5b69834e45592c9772c57f39a29ada7de2f`; its `gpui-fast` feature selects the Fast backend, resolved to crates.io 0.1.2. Shared GPUI Pre support crates remain pinned to 0.3.8. The Windows vendor patch starts from the published Fast 0.1.2 crate and retains the manager's first-frame, DPI and font compatibility changes. These retained changes do not establish a new Windows 10 or physical multi-monitor test result. The former Zed Windows and sum-tree patches are no longer build inputs or part of this source export.
+
+The GPUI Pre 0.3.8 sum-tree, ztracing, ztracing-macro and zlog packages are Apache-2.0, including their recorded Zed source revision. The former GPL-only tracing-chain workaround is therefore unnecessary. Preserve the actual upstream license files and local change notes.
+
+The 21 offline theme sets in `rust/assets/themes` are copied from the same pinned Kit commit. Their 36 variants plus Kit's two defaults provide 38 color variants. The sidebar uses Kit's `Command` component for one searchable list and ephemeral hover/keyboard previews. Only confirmation persists the selected name and mode; cancellation restores saved preferences, and a generation token rejects stale deferred callbacks. Suspend system-theme polling during previews. Keep independent light/dark selections through `Theme::update`; unavailable selections fall back to the matching mode's default. Preserve theme source attribution, license and embedded JSON files with the Rust source.
+
+The GitHub Windows workflow builds an **unsigned test artifact**, never signs, publishes, or replaces the release update manifest. Signed EXE and game DLL releases remain separate from source commits.
 
 Secrets, certificates/private keys, local logs, game binaries, historical development outputs and runtime caches must not be committed. The published source export uses an explicit file allowlist in addition to `.gitignore`. DLL ownership records used for safe cleanup are required application data and are not disposable build caches.

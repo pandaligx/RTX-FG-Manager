@@ -4,7 +4,31 @@
 
 开源 Rust 核心 + GPUI 原生界面。一个 EXE，集中管理游戏、云端 DLL、预设参数与卸载恢复。
 
-[English](README.md) · **简体中文** · [国内下载 · Gitee](https://gitee.com/pandaligx/RTX-FG-Manager/releases) · [GitHub 下载](https://github.com/pandaligx/RTX-FG-Manager/releases/latest)
+[English](README.md) · **简体中文** · [4.2.6 国内下载 · Gitee](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6) · [GitHub 下载](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6)
+
+> **4.2.6 更新**：左侧栏一键预览 38 个离线配色，支持自定义插件目录，并可在软件内查看历史更新。界面升级至 GPUI Kit 0.7.1 / Fast 0.1.2，新增管理员权限启动与按显卡系列选择兼容方案；更新 RTX40 MFG 1.4.1 Hotfix 1，加入独立 DLSSG-Transfusion 1.4.5.3。[完整更新日志](CHANGELOG.zh-CN.md)
+
+### 4.2.6 新功能怎么使用
+
+- **主题配色**：点击左侧栏的调色板图标，全部 38 个浅色、深色配色在同一个可搜索、可滚动的列表中显示，并带明暗标记。悬停或用上下方向键预览整个界面，点击或按 Enter 保存；按 Esc（搜索框非空也可）或点击列表外部取消并恢复原主题。顶部“跟随系统”保留分别记忆的浅色、深色配色，按系统自动切换。离线内置 21 套 GPUI Kit 主题，共 36 个变体，加默认浅色和默认深色。
+- **原生界面框架**：采用 GPUI Kit 0.7.1 与 GPUI Fast 0.1.2，保留 Windows 首帧、DPI 与字体兼容调整。本次升级尚未证实 CPU 或游戏性能收益。
+- **自定义文件夹**：先选中游戏，再点“添加游戏”右侧的“添加文件夹”，指定游戏需要的插件目录，例如 OptiScaler 插件目录。文件夹可没有 EXE，但仍关联原游戏进行运行检查、配置与卸载；这不会替你安装或配置第三方加载器。
+- **管理员权限**：启动时请求 Windows UAC 授权，取消则停止启动。它解决受保护目录的写入权限问题，不绕过游戏的加载规则。
+- **按系列选方案**：切换 RTX20 / RTX30 / RTX40 时保留兼容方案，或自动选择可用方案，不支持的方案会禁用；“方案来源”可打开对应项目。改选择不等于已安装，仍需应用。
+- **更新日志**：设置页内置 4.2.6 及 4.2.0–4.2.5 历史说明，可在软件内按版本切换，离线也能查看；新版更新弹窗还可显示云端提供的变更内容。没有说明的旧清单仍可更新。
+- **扫描与清理**：排除被误识别为游戏的 NVIDIA Vulkan 诊断工具，完善配置保留、日志清理和按游戏归属卸载的检查。
+
+#### RTX40 MFG · 1.4.1 Hotfix 1
+
+采用已签名的[上游发行](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.1-hotfix.1)，继续使用独立 `RTXMFG-Universal.json`，在管理器中仅面向 RTX40。预设增加垂直同步与固定模式 Reflex 限帧；动态模式使用动态目标，并保留未启用的固定限帧值。**Backspace 游戏内菜单仍为上游英文**，管理器内的参数说明支持五语言。
+
+#### DLSSG-Transfusion · 1.4.5.3
+
+独立接入 [SilyNoMeta/DLSSG-Transfusion](https://github.com/SilyNoMeta/DLSSG-Transfusion/releases/tag/v1.4.5.3-rtx20-30-40)，不混用 RTX40 MFG JSON 或原有 INI。默认跟随游戏，可选固定2X—6X或动态倍率；5X/6X为实验选项，动态默认最高4X，目标0跟随显示器刷新率。配置编辑保留注释及其他设置。
+
+只选 `version.dll`、`dinput8.dll`、`dxgi.dll`、`winmm.dll` 中**一个**入口；管理器使用各自匹配的精确导出构建，不将它们互相改名。游戏必须已有 Streamline DLSS 帧生成。RTX20仍只有上游模拟验证，RTX20/30 Vulkan尚待实体测试，不能据此保证所有游戏可用。
+
+游戏内 `Ctrl+Alt+2…6` 改倍率，`Ctrl+Alt+G` 跟随游戏，`Ctrl+Alt+D` 切换动态，`Ctrl+Alt+O` 显示统计。可选 ReShade 面板与 ASI 本轮不捆绑；Vulkan统计需要额外的兼容ReShade组件。Smooth Motion是另一个受驱动限制的实验功能，本版不开放开关。切换方案前退出游戏并卸载旧补丁，不叠加多个帧生成补丁。
 
 <p align="center">
   <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="版本" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
@@ -18,17 +42,17 @@
   <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png" alt="RTX 帧生成管理器：左侧浅色、右侧深色主题对照" width="980" />
 </p>
 
-<p align="center">浅色 / 深色主题合成示意，基于实际界面与演示游戏列表。支持跟随系统主题。</p>
+<p align="center">较早版本的实际界面示意，使用演示游戏列表。4.2.6 新增的左侧主题选择器见上方说明。</p>
 
 ## 为什么使用管理器
 
 | 你要做的事 | 管理器帮你完成 |
 | --- | --- |
-| 找到游戏并安装补丁 | 目录、磁盘、全盘扫描，按安装目录合并同一游戏；手动添加 EXE，单个或批量安装，直观看到已部署方案与入口 |
+| 找到游戏并安装补丁 | 扫描后按安装目录合并同一游戏；手动添加 EXE 与自定义插件目录，单个或批量安装，直观看到已部署方案与入口 |
 | 获取合适的 DLL | 云端按需下载，国内优先、GitHub 备用；校验后缓存，已有缓存可离线复用 |
 | 调整效果与兼容性 | 按方案显示预设，游戏与方案分别记忆，点 **?** 查看说明，无需逐项手填 INI |
 | 更新与还原 | 启动检查更新，aria2 断点下载、速度与圆环进度；补丁按归属卸载，占用时明确提示重试 |
-| 日常使用 | 五语言、明暗主题、高 DPI 布局、后台任务、主页操作日志，关闭管理器后补丁仍生效 |
+| 日常使用 | 五语言、离线明暗配色与独立记忆、跟随系统主题、高 DPI 布局、后台任务、主页操作日志，关闭管理器后补丁仍生效 |
 
 **单文件运行，无需安装 Python、Rust、CUDA Toolkit 或独立 aria2。** 软件与本项目发布的 DLL 均提供数字签名。本仓库公开 Rust 管理器源码、构建说明与云端维护流程；第三方组件保留各自许可。
 
@@ -62,9 +86,9 @@
 
 ## RTX40 MFG
 
-独立接入 [dashdogy/RTX40MFG-Unlock v1.3.3 Hotfix 2](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.3.3-hotfix.2)。选择此方案后使用 RTX40 路径，默认跟随游戏；可设置 2X—6X、动态目标和 UI 预设。**游戏须原生集成 Streamline DLSS 帧生成**；Vulkan 为实验支持，不能使用动态倍率。
+独立接入 [dashdogy/RTX40MFG-Unlock v1.4.1 Hotfix 1](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.1-hotfix.1)。选择此方案后使用 RTX40 路径，默认跟随游戏；可设置 2X—6X、动态目标、UI 预设、垂直同步与固定模式 Reflex 限帧。**游戏须原生集成 Streamline DLSS 帧生成**；Vulkan 为实验支持，不能使用动态倍率。
 
-单个通用 DLL 按所选入口改名，保持原签名；不与 RTX20/30 的 INI 混用。`RTXMFG-Universal.json` 独立保存参数，游戏内按 **Backspace** 调出作者菜单。遇到同名游戏或 MOD 文件时拒绝覆盖；Bink 入口需要按上游说明保留原始 Hooked 文件。
+单个通用 DLL 按所选入口改名，保持原签名；不与 RTX20/30 的 INI 混用。`RTXMFG-Universal.json` 独立保存参数，游戏内按 **Backspace** 调出作者的英文菜单。遇到同名游戏或 MOD 文件时拒绝覆盖；Bink 入口需要按上游说明保留原始 Hooked 文件。
 
 选中游戏后，在右侧选择方案与 DLL 加载入口。游戏行右上方显示部署信息，下方为紧凑的 **预设参数** 按钮，点击即可打开参数窗口。每款游戏分别记忆方案、入口和参数；部署标签显示实际方案、DLL 与多目录数量，悬停可查看明细。切换方案或入口前先卸载，勾选批量处理时使用各游戏自己的设置。
 
@@ -75,7 +99,8 @@
 | **0.3.5 · Github-sdli1995（默认）** | 上游原版，D3D12 / SM75、SM86，310.9 模型 | 六入口 |
 | **0.3.5 · 三角洲专用** | 本项目扩展；Vulkan 或三角洲专项 | 六入口 |
 | **Dlssg-MFG-Vulkan** | 上游 sm86-7，新增 Vulkan；RTX20待实测 | version.dll |
-| **RTX40 MFG · 1.3.3 Hotfix 2** | RTX40 / 原生 Streamline DLSS FG；独立 JSON | 单入口，支持 19 个名称 |
+| **RTX40 MFG · 1.4.1 Hotfix 1** | RTX40 / 原生 Streamline DLSS FG；独立 JSON | 单入口，支持 19 个名称 |
+| **DLSSG-Transfusion · 1.4.5.3** | RTX20/30/40 / 原生 Streamline DLSS FG；独立 JSONC；RTX20 与旧显卡 Vulkan 验证有限 | 四个匹配代理中单选 |
 | **0.2.6 · DX12/Vulkan** | 保留的兼容方案，310.1 模型 | 五入口 |
 | **初始方案 · Github 第一版** | 原始能力；按 RTX20 / RTX30 选择对应文件 | version.dll |
 
@@ -98,7 +123,7 @@
 
 ## 快速开始
 
-1. 下载 `RTXManager-v<版本>-x64.exe`，在 Windows 10 / 11 x64 上运行，按提示授权所需操作。
+1. 下载 `RTXManager-v4.2.6-x64.exe`，在 Windows 10 / 11 x64 上运行，接受 Windows 管理员权限提示；取消授权会停止启动。
 2. 点击主页 **图形设置**，在 Windows 设置 → 系统 → 屏幕 → 显示卡 → 更改默认图形设置中开启 **硬件加速 GPU 计划**，按系统提示重启。不同系统版本名称可能略有差异。
 3. 退出游戏，扫描或手动添加游戏本体 EXE，选择显卡系列、方案及入口，点击 **安装并应用**。
    同一安装目录的多个有效游戏本体只显示一项；若游戏本体分布在多个目录，安装和卸载会处理该项列出的所有目录。不会自动向启动器或反作弊程序部署。扫描遗漏时可手动添加 EXE。
@@ -124,11 +149,11 @@
 
 帧生成需要游戏、驱动、系统和硬件配合；扫描发现游戏不代表已验证兼容。请遵守游戏规则，尤其确认带反作弊的游戏是否允许第三方补丁。显卡名称修改只改变 Windows 显示名称，不改变真实硬件能力，也不保证游戏采用这个名称。
 
-支持简体中文、英语、俄语、日语、韩语，默认跟随系统并记住手动选择。完整版本变化见 [Release 更新日志](https://github.com/pandaligx/RTX-FG-Manager/releases/latest)。
+支持简体中文、英语、俄语、日语、韩语，默认跟随系统并记住手动选择。完整版本变化见 [4.2.6 Release 更新日志](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6)。
 
 ## 致谢与联系
 
-[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [社区扩展 · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version) · [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component) · [aria2](https://github.com/aria2/aria2)
+[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [社区扩展 · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version) · [GPUI](https://gpui.rs/) · [GPUI Kit](https://github.com/longbridge/gpui-kit) · [GPUI Fast](https://github.com/longbridge/gpui-fast) · [aria2](https://github.com/aria2/aria2)
 
 新增致谢：[哔哩哔哩 · 云外逸声](https://space.bilibili.com/256887068)。
 

@@ -157,6 +157,7 @@ impl CompactCatalog {
             let (ini_policy, max_selected_proxies) = match s.profile.as_str() {
                 "initial" => ("initial", 1),
                 crate::rtxmfg::PROFILE => ("rtxmfg_json", 1),
+                crate::transfusion::PROFILE => ("transfusion_json", 1),
                 "native026" => ("native", 5),
                 crate::presets::MFG_VULKAN => ("upstream_proxy", 1),
                 _ => ("upstream_proxy", 6),
@@ -179,6 +180,8 @@ impl CompactCatalog {
                 Policy {
                     gpu_paths: if s.profile == crate::rtxmfg::PROFILE {
                         vec!["SM89".into()]
+                    } else if s.profile == crate::transfusion::PROFILE {
+                        vec!["SM75".into(), "SM86".into(), "SM89".into()]
                     } else {
                         vec!["SM75".into(), "SM86".into()]
                     },
@@ -275,6 +278,11 @@ impl Catalog {
             ensure!(
                 match policy.parameter_profile.as_str() {
                     "initial" => policy.ini_policy == "initial",
+                    crate::transfusion::PROFILE =>
+                        policy.ini_policy == "transfusion_json"
+                            && policy.max_selected_proxies == 1
+                            && crate::transfusion::PROXIES.contains(&p.proxy.as_str())
+                            && policy.gpu_paths == ["SM75", "SM86", "SM89"],
                     crate::rtxmfg::PROFILE =>
                         policy.ini_policy == "rtxmfg_json"
                             && policy.max_selected_proxies == 1
@@ -316,6 +324,8 @@ impl Catalog {
                         p.proxy.as_str(),
                         if policy.parameter_profile == crate::rtxmfg::PROFILE {
                             crate::rtxmfg::CONFIG
+                        } else if policy.parameter_profile == crate::transfusion::PROFILE {
+                            crate::transfusion::CONFIG
                         } else {
                             core::INI
                         }
@@ -333,7 +343,11 @@ impl Catalog {
                     && policy.max_selected_proxies <= 7
                     && matches!(
                         policy.ini_policy.as_str(),
-                        "native" | "initial" | "upstream_proxy" | "rtxmfg_json"
+                        "native"
+                            | "initial"
+                            | "upstream_proxy"
+                            | "rtxmfg_json"
+                            | "transfusion_json"
                     ),
                 "Unsupported deployment protocol"
             );
@@ -350,6 +364,8 @@ impl Catalog {
                 );
                 let expected = if b == crate::rtxmfg::BACKEND {
                     "rtxmfg_json"
+                } else if b == crate::transfusion::BACKEND {
+                    "transfusion_json"
                 } else if b == "upstream_sm86" {
                     "upstream_proxy"
                 } else if b.starts_with("native") {
@@ -364,7 +380,11 @@ impl Catalog {
                     .gpu_paths
                     .iter()
                     .all(|g| matches!(g.as_str(), "SM75" | "SM86")
-                        || (g == "SM89" && policy.parameter_profile == crate::rtxmfg::PROFILE))
+                        || (g == "SM89"
+                            && matches!(
+                                policy.parameter_profile.as_str(),
+                                crate::rtxmfg::PROFILE | crate::transfusion::PROFILE
+                            )))
                     && !policy.gpu_paths.is_empty(),
                 "Invalid GPU path"
             );
@@ -387,6 +407,29 @@ impl Catalog {
             .iter()
             .filter(|p| seen.insert(&p.scheme_id))
             .collect()
+    }
+    pub fn supports_series(&self, id: &str, series: usize) -> bool {
+        ["SM75", "SM86", "SM89"].get(series).is_some_and(|gpu| {
+            self.scheme_policies
+                .get(id)
+                .is_some_and(|policy| policy.gpu_paths.iter().any(|path| path.as_str() == *gpu))
+        })
+    }
+    pub fn scheme_source_url(&self, id: &str) -> Option<&'static str> {
+        let policy = self.scheme_policies.get(id)?;
+        Some(match policy.parameter_profile.as_str() {
+            crate::transfusion::PROFILE => crate::transfusion::SOURCE,
+            crate::rtxmfg::PROFILE => "https://github.com/dashdogy/RTX40MFG-Unlock",
+            crate::presets::MFG_VULKAN => {
+                "https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version"
+            }
+            _ if policy.capabilities.contains(crate::delta::CAPABILITY)
+                || matches!(policy.parameter_profile.as_str(), "native026" | "initial") =>
+            {
+                "https://github.com/pandaligx/RTX-FG-Manager"
+            }
+            _ => "https://github.com/sdli1995/dlssg_for_sm86",
+        })
     }
     pub fn selected(&self, id: &str) -> &Package {
         self.packages
@@ -737,6 +780,8 @@ pub fn prepare_with_progress(
                     && p.backends.iter().any(|b| {
                         if policy.parameter_profile == crate::rtxmfg::PROFILE {
                             b == crate::rtxmfg::BACKEND
+                        } else if policy.parameter_profile == crate::transfusion::PROFILE {
+                            b == crate::transfusion::BACKEND
                         } else if policy.ini_policy == "upstream_proxy" {
                             b == "upstream_sm86"
                         } else {
@@ -751,6 +796,8 @@ pub fn prepare_with_progress(
             .find(|b| {
                 if policy.parameter_profile == crate::rtxmfg::PROFILE {
                     b.as_str() == crate::rtxmfg::BACKEND
+                } else if policy.parameter_profile == crate::transfusion::PROFILE {
+                    b.as_str() == crate::transfusion::BACKEND
                 } else if policy.ini_policy == "upstream_proxy" {
                     b.as_str() == "upstream_sm86"
                 } else {
@@ -838,6 +885,43 @@ pub fn known_image(image: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn transfusion_routes_are_single_exact_proxy_and_independent_json() {
+        let c = bundled();
+        let id = "dlssg-transfusion-1.4.5.3";
+        assert!((0..=2).all(|series| c.supports_series(id, series)));
+        assert!(!c.supports_series(id, 3));
+        assert!(!c.supports_series("absent", 0));
+        assert_eq!(c.scheme_source_url(id), Some(crate::transfusion::SOURCE));
+        let proxies = c.proxies(id);
+        assert_eq!(proxies.len(), 4);
+        assert!(
+            proxies
+                .iter()
+                .all(|p| crate::transfusion::PROXIES.contains(&p.as_str()))
+        );
+        let mut invalid = c.clone();
+        invalid
+            .scheme_policies
+            .get_mut(id)
+            .unwrap()
+            .max_selected_proxies = 2;
+        assert!(invalid.validate().is_err());
+        let mut invalid = c.clone();
+        invalid
+            .packages
+            .iter_mut()
+            .find(|p| p.scheme_id == id)
+            .unwrap()
+            .files
+            .iter_mut()
+            .find(|f| f.name == crate::transfusion::CONFIG)
+            .unwrap()
+            .name = crate::rtxmfg::CONFIG.into();
+        assert!(invalid.validate().is_err());
+        assert!(!c.supports_series("rtx40mfg-1.3.3-hf2", 0));
+        assert!(c.supports_series("rtx40mfg-1.3.3-hf2", 2));
+    }
+    #[test]
     #[cfg(feature = "fixture-tests")]
     fn all_prepared_packages_match_and_keep_route_configuration() {
         let c = bundled();
@@ -869,6 +953,14 @@ mod tests {
                     assert_eq!(
                         crate::rtxmfg::read(&files[crate::rtxmfg::CONFIG]).unwrap()["rtx_mode"],
                         "follow"
+                    );
+                    continue;
+                }
+                if backend == crate::transfusion::BACKEND {
+                    assert!(!files.contains_key(core::INI));
+                    assert_eq!(
+                        crate::transfusion::read(&files[crate::transfusion::CONFIG]).unwrap()["tf_mode"],
+                        "game"
                     );
                     continue;
                 }

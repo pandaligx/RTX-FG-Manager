@@ -238,8 +238,7 @@ fn legacy_identity(journal: &Path) -> Result<Option<String>> {
     );
     Ok(Some(dll.into()))
 }
-fn manual_record(exe: &Path, legacy: Option<String>) -> Result<Option<Record>> {
-    let dir = exe.parent().context("无效游戏路径")?;
+fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Option<Record>> {
     let mut hashes = BTreeMap::new();
     let mut delta_runtime = false;
     for name in PROXIES {
@@ -269,7 +268,19 @@ fn manual_record(exe: &Path, legacy: Option<String>) -> Result<Option<Record>> {
             .and_then(|i| i.1)
             .is_some_and(|h| listed("rtxmfg_images", &h))
     });
-    let config = if rtxmfg { crate::rtxmfg::CONFIG } else { INI };
+    let transfusion = hashes.keys().any(|name| {
+        identity(&dir.join(name))
+            .ok()
+            .and_then(|i| i.1)
+            .is_some_and(|h| listed("transfusion_images", &h))
+    });
+    let config = if rtxmfg {
+        crate::rtxmfg::CONFIG
+    } else if transfusion {
+        crate::transfusion::CONFIG
+    } else {
+        INI
+    };
     let ini = core::no_links(&dir.join(config))?;
     hashes.insert(
         config.into(),
@@ -283,6 +294,8 @@ fn manual_record(exe: &Path, legacy: Option<String>) -> Result<Option<Record>> {
         schema: 3,
         backend: if rtxmfg {
             crate::rtxmfg::BACKEND
+        } else if transfusion {
+            crate::transfusion::BACKEND
         } else {
             "manual"
         }
@@ -293,6 +306,8 @@ fn manual_record(exe: &Path, legacy: Option<String>) -> Result<Option<Record>> {
         hashes,
         cleanup_dirs: BTreeMap::new(),
         scheme_id: None,
+        game_exe: (exe.parent().is_none_or(|p| core::key(p) != core::key(dir)))
+            .then(|| exe.to_string_lossy().into_owned()),
         delta_cache_ids: if delta_runtime {
             vec![crate::delta::cache_id(exe)]
         } else {
@@ -368,10 +383,14 @@ fn scan_generated(
     Ok(())
 }
 pub fn clean(exe: &Path) -> Result<String> {
-    let p = core::location(exe, false)?;
-    let dir = p.parent().context("无效路径")?;
+    clean_at(&core::DeploymentTarget::for_game(exe))
+}
+pub fn clean_at(target: &core::DeploymentTarget) -> Result<String> {
+    let target = target.validate(false)?;
+    let p = target.game_exe.clone();
+    let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
-    core::assert_stopped(&p)?;
+    core::assert_target_stopped(&target)?;
     let root = core::no_links(&dir.join(OWN))?;
     let journal = core::no_links(&dir.join(".rtx-fg-v3-legacy.json"))?;
     let legacy = legacy_identity(&journal)?;
@@ -382,11 +401,14 @@ pub fn clean(exe: &Path) -> Result<String> {
     };
     ensure!(!root.exists() || root.is_dir(), "部署目录不是普通目录");
     let existing = core::record(dir)?;
+    if let Some(record) = &existing {
+        target.validate_record(record)?;
+    }
     let created = existing.is_none();
     let mut record = match if existing.is_some() {
         existing
     } else {
-        manual_record(&p, legacy)?
+        manual_record(&p, dir, legacy)?
     } {
         Some(r) => r,
         None => return Ok("未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留".into()),
@@ -396,7 +418,9 @@ pub fn clean(exe: &Path) -> Result<String> {
     let mut dirs = BTreeSet::new();
     let config = core::config_name(&record.backend);
     let ini = core::no_links(&dir.join(config))?;
-    let mut roots = if record.backend == crate::rtxmfg::BACKEND {
+    let mut roots = if [crate::rtxmfg::BACKEND, crate::transfusion::BACKEND]
+        .contains(&record.backend.as_str())
+    {
         BTreeMap::new()
     } else {
         generated_dirs(dir, &ini)?
@@ -433,7 +457,9 @@ pub fn clean(exe: &Path) -> Result<String> {
         }
     }
     let logs: Vec<&str> = if record.backend == crate::rtxmfg::BACKEND {
-        vec!["RTXMFG-Universal.status.json"]
+        crate::rtxmfg::SIDECARS.to_vec()
+    } else if record.backend == crate::transfusion::BACKEND {
+        vec!["DLSSG-Transfusion.log", "DLSSG-Transfusion_perf.csv"]
     } else {
         VK_LOGS.to_vec()
     };
@@ -448,34 +474,53 @@ pub fn clean(exe: &Path) -> Result<String> {
         }
     }
     if record.backend == crate::rtxmfg::BACKEND {
-        let log = core::no_links(&crate::rtxmfg::log_path(&p))?;
-        if log.is_file() && log.metadata()?.len() <= 128 * 1024 * 1024 {
-            targets.insert(log.clone(), core::digest(&log)?);
+        for path in crate::rtxmfg::log_paths(&p) {
+            let path = core::no_links(&path)?;
+            if path.is_file() && path.metadata()?.len() <= 128 * 1024 * 1024 {
+                targets.insert(path.clone(), core::digest(&path)?);
+            }
         }
     }
     let mut allowed: BTreeSet<String> = [MARKER, "cache", "logs"]
         .map(str::to_owned)
         .into_iter()
         .collect();
+    let mut stage_pending = Vec::new();
     for name in core::deployment_names(&record.backend, &record.selected())? {
         let n = format!("{name}.stage");
         allowed.insert(n.clone());
-        let stage = core::no_links(&root.join(n))?;
-        if !stage.exists() {
-            continue;
+        let candidate = root.join(&n);
+        let checked = (|| -> Result<Option<(PathBuf, String)>> {
+            let stage = core::no_links(&candidate)?;
+            if !stage.exists() {
+                return Ok(None);
+            }
+            ensure!(stage.is_file(), "临时文件不是普通文件");
+            let h = core::digest(&stage)?;
+            if record.hashes.get(&name) != Some(&h) {
+                // Cloud-only packages have no embedded source. An unverifiable
+                // fragment must not block removal of independently owned DLLs.
+                let package = core::package(&record.backend, &record.selected())?;
+                let bytes = package.get(&name).context("缺少匹配的临时文件安装源")?;
+                ensure!(
+                    record.hashes.get(&name) == Some(&core::hash(bytes))
+                        && stage.metadata()?.len() <= bytes.len() as u64
+                        && bytes.starts_with(&fs::read(&stage)?),
+                    "临时文件不完整且安装源已变化，请恢复原安装源后重试"
+                );
+            }
+            Ok(Some((stage, h)))
+        })();
+        match checked {
+            Ok(Some((stage, hash))) => {
+                targets.insert(stage, hash);
+            }
+            Ok(None) => {}
+            Err(error) => {
+                kept.insert(candidate);
+                stage_pending.push(format!("无法核验临时文件 {n}：{error}"));
+            }
         }
-        ensure!(stage.is_file(), "临时文件不是普通文件");
-        let h = core::digest(&stage)?;
-        if record.hashes.get(&name) != Some(&h) {
-            let package = core::package(&record.backend, &record.selected())?;
-            let bytes = &package[&name];
-            ensure!(
-                record.hashes.get(&name) == Some(&core::hash(bytes))
-                    && bytes.starts_with(&fs::read(&stage)?),
-                "临时文件不完整且安装源已变化，请恢复原安装源后重试"
-            );
-        }
-        targets.insert(stage, h);
     }
     let config_stage = core::no_links(&root.join(format!("{config}.config-stage")))?;
     allowed.insert(format!("{config}.config-stage"));
@@ -576,7 +621,7 @@ pub fn clean(exe: &Path) -> Result<String> {
     dirs.sort_by_key(|p| std::cmp::Reverse(p.components().count()));
     for d in dirs {
         core::no_links(&d)?;
-        if d != dir && d.is_dir() && fs::read_dir(&d)?.next().is_none() {
+        if d != *dir && d.is_dir() && fs::read_dir(&d)?.next().is_none() {
             fs::remove_dir(d)?;
         }
     }
@@ -588,13 +633,21 @@ pub fn clean(exe: &Path) -> Result<String> {
         fs::remove_file(journal)?;
     }
     let cache = crate::delta::clean_game(&p, &record.delta_cache_ids, record.delta_legacy_cache);
-    let pending = match cache {
+    let mut pending = match cache {
         Ok(report) => report.pending,
         Err(e) => vec![e.to_string()],
     };
+    let pending_stage = !stage_pending.is_empty();
+    pending.extend(stage_pending);
     if !pending.is_empty() {
         record.cache_pending = true;
         core::atomic_json(&root.join(MARKER), &record)?;
+        if pending_stage {
+            return Ok(format!(
+                "补丁已移除，临时文件待核验；恢复记录已保留，请核对后重试卸载：{}",
+                pending.join("；")
+            ));
+        }
         return Ok(format!("补丁已移除，缓存待清理：{}", pending.join("；")));
     }
     let marker = core::no_links(&root.join(MARKER))?;

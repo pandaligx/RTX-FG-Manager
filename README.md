@@ -4,7 +4,31 @@
 
 A Rust core with a native GPUI interface. One executable for your game library, cloud DLLs, per-game presets and patch removal.
 
-**English** · [简体中文](README.zh-CN.md) · [Download on GitHub](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) · [Gitee mirror](https://gitee.com/pandaligx/RTX-FG-Manager/releases)
+**English** · [简体中文](README.zh-CN.md) · [Download 4.2.6 on GitHub](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6) · [Gitee mirror](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6)
+
+> **New in 4.2.6:** Preview 38 offline color schemes from the sidebar, manage custom plugin folders and browse release history inside the app. Built on GPUI Kit 0.7.1 / Fast 0.1.2, with administrator startup, GPU-aware scheme selection, RTX40 MFG 1.4.1 Hotfix 1 and the new DLSSG-Transfusion 1.4.5.3 profile. [Full changelog](CHANGELOG.md)
+
+### What's new in 4.2.6
+
+- **Themes:** Click the palette icon in the left sidebar. All 38 light and dark color schemes appear in one searchable, scrollable list with mode badges. Hover or use the arrow keys to preview the whole interface; click or press Enter to save. Esc (even while searching) or a click outside cancels and restores the previous theme. **System** at the top preserves your independently remembered light and dark choices and switches between them automatically. All 21 GPUI Kit theme sets are built in for offline use: 36 variants plus the two defaults.
+- **Native UI framework:** GPUI Kit 0.7.1 with GPUI Fast 0.1.2, retaining Windows first-frame, DPI and font compatibility adjustments. This upgrade does not establish a measured CPU or game-performance improvement.
+- **Custom folders:** select a game, then **Add folder** beside Add game. Choose the required plugin folder, for example an OptiScaler plugin folder. It need not contain an EXE; it stays associated with the game for process checks, settings and removal. This does not install or configure a third-party loader.
+- **Administrator startup:** Windows requests UAC permission; cancelling stops startup. This permits writes to protected game folders without changing game loading policies.
+- **GPU selection:** Switching RTX20 / RTX30 / RTX40 keeps a supported scheme or selects an available one; unsupported schemes are disabled. **Project source** opens the relevant upstream page. Changing a selection does not deploy files until applied.
+- **Release notes:** Settings includes offline notes for 4.2.6 and versions 4.2.0–4.2.5, selected by version inside the app. Update prompts can also display notes supplied by the server. Older manifests without notes remain usable.
+- **Discovery and cleanup:** Exclude NVIDIA Vulkan diagnostic tools from game scanning and improve configuration retention, log cleanup and ownership-based removal checks.
+
+#### RTX40 MFG · 1.4.1 Hotfix 1
+
+The signed [upstream release](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.1-hotfix.1) keeps its separate `RTXMFG-Universal.json`. The manager exposes this profile for RTX40 only. Presets add VSync and a fixed-mode Reflex FPS limit. Dynamic mode uses its own target while preserving the inactive fixed limit. **The in-game Backspace menu remains upstream English**; manager controls and help support five languages.
+
+#### DLSSG-Transfusion · 1.4.5.3
+
+A separate integration of [SilyNoMeta/DLSSG-Transfusion](https://github.com/SilyNoMeta/DLSSG-Transfusion/releases/tag/v1.4.5.3-rtx20-30-40), with its own JSONC settings rather than RTX40 MFG JSON or other schemes' INIs. It follows the game by default, with fixed 2X–6X or Dynamic mode. 5X/6X are experimental; Dynamic defaults to a 4X ceiling and target 0 follows monitor refresh rate. Managed edits retain comments and other settings.
+
+Select **one** of `version.dll`, `dinput8.dll`, `dxgi.dll` or `winmm.dll`. Each route uses its matching exact-export binary; the manager does not rename these alternatives interchangeably. The game must already integrate Streamline DLSS Frame Generation. Upstream RTX20 validation is emulated, and RTX20/30 Vulkan still needs physical testing. This is not universal game compatibility.
+
+Use `Ctrl+Alt+2…6` for the multiplier, `Ctrl+Alt+G` to follow the game, `Ctrl+Alt+D` for Dynamic and `Ctrl+Alt+O` for statistics. Optional ReShade and ASI components are not bundled; Vulkan statistics need the optional compatible ReShade component. Driver-dependent Smooth Motion is a separate experimental feature and is not exposed here. Exit the game and uninstall its previous patch before switching; do not stack frame-generation schemes.
 
 <p align="center">
   <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
@@ -18,17 +42,17 @@ A Rust core with a native GPUI interface. One executable for your game library, 
   <img src="docs/screenshot-home.png" alt="RTX Frame Generation Manager: light theme on the left, dark theme on the right" width="980" />
 </p>
 
-<p align="center">Composite theme preview based on the actual interface with demo game entries. System theme is also supported.</p>
+<p align="center">Interface example from an earlier release, using demo game entries. Version 4.2.6 adds the sidebar theme picker described above.</p>
 
 ## What the manager handles
 
 | Your task | Built-in support |
 | --- | --- |
-| Find games and deploy patches | Folder, drive and full-drive scans grouped by installation; manual EXE selection; individual or batch deployment with visible scheme and DLL tags |
+| Find games and deploy patches | Scans grouped by installation; manual EXE selection and custom plugin folders; individual or batch deployment with visible scheme and DLL tags |
 | Get the right DLL | On-demand cloud downloads, domestic-first routing with GitHub fallback, integrity checks and reusable offline cache |
 | Adjust compatibility and quality | Scheme-specific presets, separate settings for each game and scheme, and contextual **?** help |
 | Update or remove a patch | Startup update checks, resumable aria2 downloads, speed and compact circular progress; ownership-based cleanup and clear retry notices |
-| Use it every day | Five languages, light/dark themes, DPI-aware layout, background tasks and a visible operation log |
+| Use it every day | Five languages, offline light/dark color schemes with independent preferences, System appearance mode, DPI-aware layout, background tasks and a visible operation log |
 
 **Portable EXE. No Python, Rust, CUDA Toolkit or separate aria2 installation required.** Manager releases and project-distributed DLLs are digitally signed. The Rust manager source, build instructions and verified cloud maintenance workflow are published here. Third-party components retain their respective licenses.
 
@@ -62,9 +86,9 @@ RenderScale, hotkeys and other advanced keys are preserved. Blackwell experiment
 
 The upstream 0.3.5, Delta Force and initial RTX20/RTX30 packages also embed their matching signed backends, with one backend copy per proxy. Signing establishes publisher identity and integrity; it does not grant game or anti-cheat approval.
 
-[RTX40MFG-Unlock v1.3.3 Hotfix 2](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.3.3-hotfix.2) is a separate RTX40 profile. It defaults to Follow game and exposes fixed 2X–6X, a Dynamic target and UI preset. The game must already integrate Streamline DLSS FG. Vulkan is experimental and does not support Dynamic mode.
+[RTX40MFG-Unlock v1.4.1 Hotfix 1](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.1-hotfix.1) is a separate RTX40 profile. It defaults to Follow game and exposes fixed 2X–6X, a Dynamic target, UI preset, VSync and a fixed-mode Reflex FPS limit. The game must already integrate Streamline DLSS FG. Vulkan is experimental and does not support Dynamic mode.
 
-One signed universal DLL is renamed to the chosen entry; existing game/mod files are never overwritten. Settings use `RTXMFG-Universal.json`, separate from RTX20/30 INI protocols. Press **Backspace** in game for the upstream menu. Bink entries require the original Hooked file as described upstream.
+One signed universal DLL is renamed to the chosen entry; existing game/mod files are never overwritten. Settings use `RTXMFG-Universal.json`, separate from RTX20/30 INI protocols. Press **Backspace** in game for the upstream English menu. Bink entries require the original Hooked file as described upstream.
 
 Select a game to change its scheme and DLL entries in the right sidebar. The deployment badge appears at the upper right of its row, with a compact **Presets** button below it. Scheme, entry and parameters are remembered per game. Deployment badges show actual installed schemes, DLLs and directory counts, with details on hover. Uninstall before changing scheme or entry; batch installation honors each game's own settings.
 
@@ -75,7 +99,8 @@ Select a game to change its scheme and DLL entries in the right sidebar. The dep
 | **0.3.5 · Github-sdli1995 — default** | Original upstream, D3D12 / SM75 and SM86, 310.9 model | Six |
 | **0.3.5 · Delta Force** | This project's Vulkan and Delta Force extensions | Six |
 | **Dlssg-MFG-Vulkan** | Upstream sm86-7 adds Vulkan; RTX20 unverified | version.dll |
-| **RTX40 MFG · 1.3.3 Hotfix 2** | RTX40 / existing Streamline DLSS FG; separate JSON | One entry, 19 supported filenames |
+| **RTX40 MFG · 1.4.1 Hotfix 1** | RTX40 / existing Streamline DLSS FG; separate JSON | One entry, 19 supported filenames |
+| **DLSSG-Transfusion · 1.4.5.3** | RTX20/30/40 / existing Streamline DLSS FG; separate JSONC; RTX20 and older-GPU Vulkan validation remains limited | One of four matching proxies |
 | **0.2.6 · DX12/Vulkan** | Retained compatibility option, 310.1 model | Five |
 | **Initial · GitHub first release** | Original capabilities; files selected for RTX20 or RTX30 | version.dll |
 
@@ -98,7 +123,7 @@ The manager updates the same INI automatically. Follow game and 2X retain the or
 
 ## Get started
 
-1. Download `RTXManager-v<version>-x64.exe` and run it on Windows 10 / 11 x64. Allow permissions required for the requested operation.
+1. Download `RTXManager-v4.2.6-x64.exe` and run it on Windows 10 / 11 x64. Accept the Windows administrator prompt; cancelling stops startup.
 2. Use the home page's **Graphics settings** button. Under Windows Settings → System → Display → Graphics → Change default graphics settings, enable **Hardware-accelerated GPU scheduling** and restart if requested. Labels vary between Windows versions.
 3. Exit the game, scan or add its actual EXE, select the GPU series, scheme and entry DLL, then install.
    Verified game executables from one installation appear as one entry. If they occupy separate directories, installation and removal cover every listed directory. Launchers and anti-cheat programs are excluded from automatic deployment; add a missed game EXE manually.
@@ -124,11 +149,11 @@ Patches, catalogs and app updates share one download preference. New installatio
 
 Frame generation depends on the game, driver, OS and GPU. Finding a game during scanning is not a compatibility verdict. Follow each game's rules, especially where anti-cheat is involved. GPU renaming changes Windows display-name fields, not hardware capability, and a game may read its device name differently.
 
-Chinese, English, Russian, Japanese and Korean are supported, with system-language detection and remembered manual choices. See [Release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/latest) for version-specific changes.
+Chinese, English, Russian, Japanese and Korean are supported, with system-language detection and remembered manual choices. See [4.2.6 release notes](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6) for version-specific changes.
 
 ## Credits and links
 
-[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [Community extension · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version) · [GPUI](https://gpui.rs/) · [GPUI Component](https://github.com/longbridge/gpui-component) · [aria2](https://github.com/aria2/aria2)
+[Github · sdli1995](https://github.com/sdli1995/dlssg_for_sm86) · [Community extension · pipotoufikxyz-lgtm](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version) · [GPUI](https://gpui.rs/) · [GPUI Kit](https://github.com/longbridge/gpui-kit) · [GPUI Fast](https://github.com/longbridge/gpui-fast) · [aria2](https://github.com/aria2/aria2)
 
 Thanks to [大大大怪将军阁下 on Bilibili](https://space.bilibili.com/608531525) for testing, and to users who provide compatibility feedback.
 

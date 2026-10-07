@@ -108,9 +108,17 @@ pub fn normalize(profile: &str, values: &mut Values) -> bool {
     false
 }
 pub fn parameter_enabled(profile: &str, key: &str, values: &Values) -> bool {
+    if profile == crate::transfusion::PROFILE {
+        return !matches!(key, "tf_target" | "tf_dynamic56")
+            || values.get("tf_mode").map(String::as_str) == Some("dynamic");
+    }
     if profile == crate::rtxmfg::PROFILE {
-        return key != "rtx_target"
-            || values.get("rtx_mode").map(String::as_str) == Some("dynamic");
+        let dynamic = values.get("rtx_mode").map(String::as_str) == Some("dynamic");
+        return match key {
+            "rtx_target" => dynamic,
+            "rtx_reflex_limit" => !dynamic,
+            _ => true,
+        };
     }
     profile != MFG_VULKAN
         || key != "dynamic_target_fps"
@@ -125,6 +133,9 @@ pub struct Parameter {
     pub choices: Vec<(&'static str, &'static str)>,
 }
 pub fn parameters(profile: &str) -> Vec<Parameter> {
+    if profile == crate::transfusion::PROFILE {
+        return crate::transfusion::parameters();
+    }
     if profile == crate::rtxmfg::PROFILE {
         return crate::rtxmfg::parameters();
     }
@@ -230,6 +241,7 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
                 | "initial"
                 | MFG_VULKAN
                 | crate::rtxmfg::PROFILE
+                | crate::transfusion::PROFILE
         ),
         "Unsupported parameter protocol"
     );
@@ -238,7 +250,9 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
         ensure!(
             p.iter()
                 .any(|p| p.key == key && p.choices.iter().any(|(v, _)| v == value))
-                || (profile == crate::rtxmfg::PROFILE && crate::rtxmfg::valid_value(key, value)),
+                || (profile == crate::rtxmfg::PROFILE && crate::rtxmfg::valid_value(key, value))
+                || (profile == crate::transfusion::PROFILE
+                    && crate::transfusion::valid_value(key, value)),
             "Invalid preset parameter: {key}"
         );
     }
@@ -272,6 +286,8 @@ pub fn defaults(profile: &str, overrides: &Values) -> Values {
                         p.choices.iter().any(|(choice, _)| *choice == v.as_str())
                             || (profile == crate::rtxmfg::PROFILE
                                 && crate::rtxmfg::valid_value(p.key, v))
+                            || (profile == crate::transfusion::PROFILE
+                                && crate::transfusion::valid_value(p.key, v))
                     })
                     .cloned()
                     .unwrap_or_else(|| p.default.into()),
@@ -282,6 +298,9 @@ pub fn defaults(profile: &str, overrides: &Values) -> Values {
     values
 }
 pub fn configure(bytes: &[u8], profile: &str, values: &Values) -> Result<Vec<u8>> {
+    if profile == crate::transfusion::PROFILE {
+        return crate::transfusion::configure(bytes, values);
+    }
     if profile == crate::rtxmfg::PROFILE {
         return crate::rtxmfg::configure(bytes, values);
     }
@@ -344,6 +363,9 @@ pub fn merge_context(
     backend: &str,
     context: Option<&Context>,
 ) -> Result<Vec<u8>> {
+    if backend == crate::transfusion::BACKEND {
+        return crate::transfusion::configure(current, &crate::transfusion::read(desired)?);
+    }
     if backend == crate::rtxmfg::BACKEND {
         return crate::rtxmfg::configure(current, &crate::rtxmfg::read(desired)?);
     }
@@ -464,6 +486,9 @@ fn mfg_parameters() -> Vec<Parameter> {
 }
 
 pub fn read_values(bytes: &[u8], profile: &str) -> Result<Values> {
+    if profile == crate::transfusion::PROFILE {
+        return crate::transfusion::read(bytes);
+    }
     if profile == crate::rtxmfg::PROFILE {
         return crate::rtxmfg::read(bytes);
     }
@@ -482,9 +507,19 @@ pub fn read_values(bytes: &[u8], profile: &str) -> Result<Values> {
 
 /// Read only recognized deployment INIs, off the UI thread.
 pub fn inspect(exe: &Path, catalog: &crate::cloud::Catalog) -> Result<Option<(String, Values)>> {
-    let exe = crate::core::location(exe, false)?;
-    let dir = exe.parent().unwrap();
+    inspect_at(&crate::core::DeploymentTarget::for_game(exe), catalog)
+}
+pub fn inspect_at(
+    target: &crate::core::DeploymentTarget,
+    catalog: &crate::cloud::Catalog,
+) -> Result<Option<(String, Values)>> {
+    let target = target.validate(false)?;
+    let exe = &target.game_exe;
+    let dir = &target.directory;
     let record = crate::core::record(dir)?;
+    if let Some(record) = &record {
+        target.validate_record(record)?;
+    }
     let mut scheme = record.as_ref().and_then(|r| r.scheme_id.clone());
     if scheme.is_none() {
         for name in crate::core::PROXIES {
@@ -517,6 +552,8 @@ pub fn inspect(exe: &Path, catalog: &crate::cloud::Catalog) -> Result<Option<(St
     let ini = crate::core::no_links(&dir.join(
         if policy.parameter_profile == crate::rtxmfg::PROFILE {
             crate::rtxmfg::CONFIG
+        } else if policy.parameter_profile == crate::transfusion::PROFILE {
+            crate::transfusion::CONFIG
         } else {
             crate::core::INI
         },
@@ -527,7 +564,7 @@ pub fn inspect(exe: &Path, catalog: &crate::cloud::Catalog) -> Result<Option<(St
     ensure!(ini.metadata()?.len() <= 1024 * 1024, "INI 文件过大");
     let bytes = std::fs::read(ini)?;
     let mut values = read_values(&bytes, &policy.parameter_profile)?;
-    if Context::new(&scheme, policy, &exe).delta {
+    if Context::new(&scheme, policy, exe).delta {
         let (text, _) = crate::diagnostics::decode_ini(&bytes)?;
         if let Some(n) =
             crate::diagnostics::ini_value(&text, "Compatibility", "DeltaForceGeneratedFrames")?

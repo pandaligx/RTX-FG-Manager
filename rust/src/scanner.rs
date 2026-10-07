@@ -44,6 +44,9 @@ const SKIP: &[&str] = &[
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Game {
     pub exe: String,
+    /// Explicit plugin folder; the real EXE still supplies identity and process guards.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub deployment_dir: String,
     #[serde(default)]
     pub title: String,
     #[serde(default)]
@@ -62,6 +65,25 @@ pub struct Game {
     pub anti: bool,
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
+}
+impl Game {
+    pub fn deployment_target(&self, exe: &Path) -> core::DeploymentTarget {
+        if self.deployment_dir.is_empty() {
+            core::DeploymentTarget::for_game(exe)
+        } else {
+            core::DeploymentTarget::custom(exe, Path::new(&self.deployment_dir))
+        }
+    }
+    pub fn deployment_directory(&self) -> PathBuf {
+        self.deployment_target(Path::new(&self.exe)).directory
+    }
+    pub fn deployment_executables(&self) -> Vec<String> {
+        if !self.deployment_dir.is_empty() || self.targets.is_empty() {
+            vec![self.exe.clone()]
+        } else {
+            self.targets.clone()
+        }
+    }
 }
 #[derive(Debug, Serialize, Default)]
 pub struct Report {
@@ -91,7 +113,25 @@ impl Report {
     }
 }
 
+/// Exact utility basenames only: NVIDIA/Vulkan words in a game's title are not evidence.
+pub fn is_gpu_diagnostic_tool(exe: &Path) -> bool {
+    exe.file_name().is_some_and(|name| {
+        matches!(
+            name.to_string_lossy().to_ascii_lowercase().as_str(),
+            "vulkaninfo.exe"
+                | "vulkaninfo32.exe"
+                | "vulkaninfo64.exe"
+                | "vulkaninfo-x86.exe"
+                | "vulkaninfo-x64.exe"
+                | "nvidia-smi.exe"
+                | "nvidia-debugdump.exe"
+        )
+    })
+}
 fn auxiliary_exe(name: &str) -> bool {
+    if is_gpu_diagnostic_tool(Path::new(name)) {
+        return true;
+    }
     let stem = name
         .strip_suffix(".exe")
         .or_else(|| name.strip_suffix(".EXE"))

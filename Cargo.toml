@@ -1,6 +1,6 @@
 [package]
 name = "rtx-fg-manager"
-version = "4.2.5"
+version = "4.2.6"
 edition = "2024"
 publish = false
 build = "rust/build.rs"
@@ -41,10 +41,9 @@ zip = { version = "0.6", default-features = false, features = ["deflate"] }
 quick-xml = "0.37"
 base64 = "0.22"
 chrono = "0.4"
-gpui = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe", features = ["font-kit"] }
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "1505b1487131adbb443f6c69e87847db35bfa2d1" }
-gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "1505b1487131adbb443f6c69e87847db35bfa2d1" }
+# The Kit facade keeps the core, platform, components and assets on one backend.
+# Upgraded from the old Zed/Component snapshots; pin this reviewed source for reproducibility.
+gpui = { package = "gpui-kit", git = "https://github.com/longbridge/gpui-kit", rev = "4921e5b69834e45592c9772c57f39a29ada7de2f", features = ["gpui-fast"] }
 smol = "2"
 flate2 = "1.1"
 image = { version = "0.25", default-features = false, features = ["png", "ico"] }
@@ -74,9 +73,5 @@ strip = "debuginfo"
 [lints.clippy]
 undocumented_unsafe_blocks = "warn"
 
-[patch."https://github.com/zed-industries/zed"]
-gpui_windows = { path = "vendor/gpui_windows" }
-sum_tree = { path = "vendor/sum_tree" }
-
 [patch.crates-io]
-proc-macro-error2 = { git = "https://github.com/GnomedDev/proc-macro-error-2", rev = "53ff94b61c678593158db1a3d50269c6f0de0db7" }
+gpui-fast-windows = { path = "vendor/gpui_fast_windows" }

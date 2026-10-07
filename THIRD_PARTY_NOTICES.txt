@@ -1,11 +1,24 @@
 Helper libraries used by this project
 
-Manager source and distribution notes (2026-09-25)
-The manager is now a Rust native application using GPUI and gpui-component.
+Manager source and distribution notes (2026-10-07; 4.2.6 candidate)
+The manager is a Rust native application using GPUI Kit with the GPUI Fast backend.
 It does not bundle a Python interpreter, Tcl/Tk or a PyInstaller bootloader.
-GPUI: https://github.com/zed-industries/zed (GPUI crate license: Apache-2.0).
-gpui-component and gpui-component-assets: https://github.com/longbridge/gpui-component
-(Apache-2.0). Component icons use the supplied Lucide assets (ISC).
+GPUI Kit 0.7.1, including Base, Component and Kit assets:
+https://github.com/longbridge/gpui-kit
+Pinned source: 4921e5b69834e45592c9772c57f39a29ada7de2f (Apache-2.0).
+GPUI Fast 0.1.2: https://github.com/longbridge/gpui-fast (Apache-2.0).
+Copyright 2022 - 2025 Zed Industries, Inc.; Copyright 2026 Longbridge.
+The exact released Fast license is retained in rust/assets/licenses/GPUI-FAST-LICENSE.
+GPUI Pre support crates 0.3.8: https://github.com/zed-industries/zed
+Recorded Zed source: 279fe070bb389b79652e52065b2f001edcc0b11b (Apache-2.0).
+This includes sum-tree, ztracing, ztracing-macro and zlog; the older snapshot's
+GPL-only tracing-chain workaround is not needed for these Apache-2.0 packages.
+The 21 bundled GPUI Kit theme sets retain their original names, authors and
+source URLs; their upstream Apache-2.0 notice is in rust/assets/themes.
+Component icons use the supplied Lucide assets (ISC), with the accompanying
+Feather-derived icon attribution (MIT). The current combined notice is retained
+in rust/assets/licenses/LUCIDE-LICENSE; Kit's Apache-2.0 notice is retained in
+rust/assets/licenses/GPUI-COMPONENT-LICENSE.
 Service brand artwork identifies the corresponding service; it does not imply endorsement.
 Retained application/brand artwork derived from Font Awesome Free 6.7.2
 remains attributed to Fonticons, Inc. (SVG artwork: CC BY 4.0).
@@ -14,8 +27,10 @@ https://creativecommons.org/licenses/by/4.0/
 The Rust manager's original application code and its public maintenance tools
 are covered by the accompanying MIT LICENSE. Dependencies and their local
 patches retain their own licenses; publishing the manager source does not
-relicense them. vendor/gpui_windows and vendor/sum_tree retain Apache-2.0
-notices and records of local changes. Native payload notices below apply to
+relicense them. vendor/gpui_fast_windows retains the published Apache-2.0
+license and records of local Windows compatibility changes. The former Zed
+Windows and sum-tree patches are not used or included in this source export.
+Native payload notices below apply to
 the separately downloaded game DLLs, not to the Rust manager's source license.
 
 aria2 is a separate command-line downloader, called without an RPC server.
@@ -1208,7 +1223,7 @@ Source: https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version
 Release: https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-7
 Tag commit shown by upstream: c1c165b. Upstream version.dll code and INI are unchanged; user Authenticode signature retained. This is separate from Smooth Motion. NVIDIA components and upstream code remain subject to their respective terms; this manager's license does not relicense them. Vulkan/RTX20 compatibility is not guaranteed by packaging or signing.
 
-RTX40MFG-Unlock v1.3.3-hotfix.2: https://github.com/dashdogy/RTX40MFG-Unlock
+RTX40MFG-Unlock v1.3.3-hotfix.2 (previous) / v1.4.1-hotfix.1 (4.2.6 candidate): https://github.com/dashdogy/RTX40MFG-Unlock
 MIT; copyright holders as in the upstream LICENSE. Universal DLL is redistributed unchanged except its proxy filename and publisher signature. Third-party notices embedded by upstream remain in the DLL.
 MIT License
 
@@ -1231,3 +1246,34 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+---
+
+DLSSG-Transfusion v1.4.5.3-rtx20-30-40 (optional cloud payload; 4.2.6 candidate)
+Source: https://github.com/SilyNoMeta/DLSSG-Transfusion
+Release: https://github.com/SilyNoMeta/DLSSG-Transfusion/releases/tag/v1.4.5.3-rtx20-30-40
+Built on TonyJoaca/DLSSG-Transfusion. The signed release engine and four exact-export alternatives retain upstream code. ASI and optional ReShade add-on are not bundled by this manager. Upstream distributed binaries contain optimization payloads omitted from the public source export; see upstream docs/PUBLIC-SOURCE.md. NVIDIA and other third-party components retain their applicable terms. Upstream MIT notice follows:
+
+MIT License
+
+Copyright (c) 2026 Michael Robles
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+

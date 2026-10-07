@@ -15,10 +15,10 @@ impl AssetSource for Assets {
                 "../assets/bilibili.svg"
             ))));
         }
-        gpui_component_assets::Assets.load(path)
+        gpui::assets::Assets.load(path)
     }
     fn list(&self, path: &str) -> anyhow::Result<Vec<SharedString>> {
-        let mut files = gpui_component_assets::Assets.list(path)?;
+        let mut files = gpui::assets::Assets.list(path)?;
         for name in ["app/manager.png", "app/refresh.svg", "app/bilibili.svg"] {
             if name.starts_with(path) {
                 files.push(name.into());

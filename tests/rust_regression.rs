@@ -503,7 +503,7 @@ fn hags_driver_state_beats_registry_intent() {
     ));
 }
 fn manifest() -> updater::Manifest {
-    updater::Manifest{schema:1,version:"4.0.0".into(),file:"RTXManager-v4.0.0-x64.exe".into(),bytes:1048576,sha256:"a".repeat(64),source:"github".into(),url:"https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.0.0/RTXManager-v4.0.0-x64.exe".into()}
+    updater::Manifest{notes:Default::default(),schema:1,version:"4.0.0".into(),file:"RTXManager-v4.0.0-x64.exe".into(),bytes:1048576,sha256:"a".repeat(64),source:"github".into(),url:"https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.0.0/RTXManager-v4.0.0-x64.exe".into()}
 }
 #[test]
 fn malicious_updates_and_aria_options_rejected() {

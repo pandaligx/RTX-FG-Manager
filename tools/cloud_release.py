@@ -10,6 +10,7 @@ import argparse
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import nullcontext
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -330,7 +331,9 @@ def read_url(url, limit=MAX_JSON, headers=None, attempts=3, timeout=90):
             retry_after = error.headers.get("Retry-After", "") if error.headers else ""
             if retry_after.isdigit():
                 delay = min(60, max(delay, int(retry_after)))
-        except (TimeoutError, urllib.error.URLError, TransientResponse) as error:
+        except (TimeoutError, urllib.error.URLError, TransientResponse,
+                http.client.RemoteDisconnected, http.client.IncompleteRead,
+                ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as error:
             if retry == attempts - 1:
                 raise
             reason = safe_exception(error)
@@ -624,11 +627,79 @@ def verify_published_metadata(url, expected):
         time.sleep(delays[attempt])
 
 
+class GitFailure(RuntimeError):
+    """A fixed diagnostic category, never subprocess output or command arguments."""
+    def __init__(self, reason, transient=False):
+        self.reason, self.transient = reason, transient
+        super().__init__("Git operation failed: " + reason)
+
+
+def git_failure(stderr):
+    """Classify stderr in memory; never expose credentials, URLs or raw text."""
+    text = stderr.lower()
+    permanent = (
+        ("authentication", ("authentication failed", "access denied", "permission denied",
+                            "invalid username or password", "could not read username",
+                            "returned error: 401", "returned error: 403", "http 401", "http 403",
+                            "write access to repository not granted")),
+        ("remote-rejected", ("non-fast-forward", "fetch first", "[rejected]", "[remote rejected]",
+                             "pre-receive hook declined", "protected branch")),
+        ("repository-access", ("repository not found", "does not appear to be a git repository")),
+        ("tls-certificate", ("certificate verify failed", "certificate verification failed",
+                             "ssl certificate problem", "self-signed certificate",
+                             "error in the certificate", "certificate has expired")),
+    )
+    for reason, patterns in permanent:
+        if any(pattern in text for pattern in patterns):
+            return GitFailure(reason)
+    transient = (
+        ("dns", ("could not resolve host", "could not resolve proxy", "name or service not known",
+                 "temporary failure in name resolution")),
+        ("connection-timeout", ("connection timed out", "operation timed out", "connection timeout",
+                                "failed to connect", "couldn't connect to server")),
+        ("connection-reset", ("connection reset", "remote end hung up unexpectedly", "early eof",
+                              "empty reply from server", "broken pipe", "http/2 stream",
+                              "http2 framing layer")),
+        ("tls-transport", ("gnutls_handshake() failed", "gnutls_recv error", "ssl_error_syscall",
+                           "ssl connect error", "tls connection was non-properly terminated")),
+    )
+    for reason, patterns in transient:
+        if any(pattern in text for pattern in patterns):
+            return GitFailure(reason, transient=True)
+    return GitFailure("unknown")
+
+
+def git_result(root, *args, env=None):
+    try:
+        return subprocess.run(["git", "-C", str(root), *args], env=env, capture_output=True,
+                              text=True, errors="replace", timeout=120)
+    except subprocess.TimeoutExpired:
+        raise GitFailure("operation-timeout", transient=True) from None
+    except OSError:
+        raise GitFailure("process-unavailable") from None
+
+
 def git(root, *args, env=None):
-    return subprocess.check_output(["git", "-C", str(root), *args], env=env, stderr=subprocess.DEVNULL, text=True).strip()
+    result = git_result(root, *args, env=env)
+    if result.returncode:
+        raise git_failure(result.stderr) from None
+    return result.stdout.strip()
+
+
+def remote_head(root, url, options, env):
+    refs = git(root, *options, "ls-remote", "--refs", url, "refs/heads/main", env=env)
+    if not refs:
+        return None
+    fields = refs.split()
+    if len(fields) != 2 or fields[1] != "refs/heads/main" or not re.fullmatch(r"[0-9a-f]{40}", fields[0]):
+        raise GitFailure("invalid-remote-ref")
+    return fields[0]
 
 
 def push(root, host, publisher):
+    require(host in ("github", "gitee"), "Unexpected Git publication host")
+    target = git(root, "rev-parse", "HEAD^{commit}")
+    require(re.fullmatch(r"[0-9a-f]{40}", target), "Invalid local publication commit")
     with tempfile.TemporaryDirectory(prefix="rtxfg-git-") as folder:
         helper = Path(folder) / "askpass.py"
         helper.write_text('#!/usr/bin/env python3\nimport os,sys\nprint(os.environ["RTXFG_PUSH_USER"] if "username" in sys.argv[1].lower() else os.environ["RTXFG_PUSH_TOKEN"])\n', encoding="utf-8")
@@ -636,7 +707,52 @@ def push(root, host, publisher):
         env = dict(os.environ, GIT_ASKPASS=str(helper), GIT_TERMINAL_PROMPT="0",
                    RTXFG_PUSH_USER="x-access-token" if host == "github" else REPO.split("/")[0],
                    RTXFG_PUSH_TOKEN=publisher.github_token if host == "github" else publisher.gitee_token)
-        git(root, "-c", "credential.helper=", "push", f"https://{host}.com/{REPO}.git", "HEAD:refs/heads/main", env=env)
+        # HTTP/1.1 avoids an additional HTTP/2 reset path; it is a transport
+        # precaution, not a claim about the cause of any earlier failed push.
+        options = ("-c", "credential.helper=", "-c", "http.version=HTTP/1.1",
+                   "-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=60")
+        url = f"https://{host}.com/{REPO}.git"
+        for attempt in range(3):
+            try:
+                remote = remote_head(root, url, options, env)
+                if remote == target:
+                    print(f"[git-verified] {host} main already matches publication commit", flush=True)
+                    return
+                if remote:
+                    exists = git_result(root, "cat-file", "-e", remote + "^{commit}")
+                    if exists.returncode:
+                        # Read unknown remote history without changing local
+                        # branches. Recheck the fetched tip if it moved meanwhile.
+                        git(root, *options, "fetch", "--no-tags", url, "refs/heads/main", env=env)
+                        remote = git(root, "rev-parse", "FETCH_HEAD^{commit}")
+                    relation = git_result(root, "merge-base", "--is-ancestor", remote, target)
+                    if relation.returncode == 1:
+                        raise GitFailure("non-fast-forward")
+                    if relation.returncode:
+                        raise git_failure(relation.stderr)
+                # Pin the originally reviewed target; normal push still rejects
+                # a concurrent divergent remote advance. Never force or reset.
+                git(root, *options, "push", url, target + ":refs/heads/main", env=env)
+                if remote_head(root, url, options, env) != target:
+                    raise GitFailure("remote-head-changed")
+                print(f"[git-verified] {host} main matches publication commit", flush=True)
+                return
+            except GitFailure as error:
+                print(f"[git-transfer] {host} attempt={attempt + 1}/3 reason={error.reason}", flush=True)
+                if error.transient and attempt == 2:
+                    # The final push may have reached the server before its
+                    # response was lost. One bounded read reconciles that case.
+                    try:
+                        if remote_head(root, url, options, env) == target:
+                            print(f"[git-verified] {host} final uncertain response reconciled", flush=True)
+                            return
+                    except GitFailure:
+                        pass
+                if not error.transient or attempt == 2:
+                    raise error from None
+                delay = (5, 15)[attempt]
+                print(f"[git-retry] {host} retry={attempt + 2}/3 after={delay}s", flush=True)
+                time.sleep(delay)
 
 
 def verify_asset_jobs(paths, verify, after_verified, workers=4):
@@ -1174,6 +1290,111 @@ class OfflineTests(unittest.TestCase):
         self.assertNotIn("test-token", result)
         self.assertNotIn("signature=", result)
         self.assertIn("gitee.com/path", result)
+
+    def test_disconnected_reads_retry_three_times_without_weakening_checks(self):
+        class Response:
+            url = "https://gitee.com/test.zip"
+            headers = {"Content-Type": "application/zip"}
+            def __init__(self, value): self.value = value
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, limit):
+                if isinstance(self.value, Exception): raise self.value
+                return self.value[:limit]
+        for error in (http.client.RemoteDisconnected("private"), http.client.IncompleteRead(b"partial"),
+                      ConnectionResetError("private"), ConnectionAbortedError("private")):
+            with self.subTest(error=type(error).__name__), \
+                    patch(__name__ + ".http_opener") as opener, patch(__name__ + ".time.sleep") as sleep:
+                opener.return_value.open.side_effect = [Response(error), Response(b"data")]
+                self.assertEqual(read_url(Response.url, 4), b"data")
+                sleep.assert_called_once_with(5)
+                opener.return_value.open.side_effect = [Response(error)] * 3
+                with self.assertRaises(type(error)): read_url(Response.url, 4)
+                self.assertEqual(opener.return_value.open.call_count, 5)
+        with patch(__name__ + ".http_opener") as opener, patch(__name__ + ".time.sleep"):
+            opener.return_value.open.side_effect = [Response(http.client.RemoteDisconnected()), Response(b"wrong")]
+            with self.assertRaisesRegex(RuntimeError, "refusing overwrite"):
+                Publisher.verify_asset({"url": Response.url}, b"right")
+            self.assertEqual(opener.return_value.open.call_count, 2)
+            opener.return_value.open.return_value = Response(b"oversized")
+            opener.return_value.open.side_effect = None
+            with self.assertRaisesRegex(RuntimeError, "exceeds size limit"): read_url(Response.url, 4)
+            opener.return_value.open.return_value.url = "http://gitee.com/test.zip"
+            with self.assertRaisesRegex(RuntimeError, "Unsafe URL"): read_url(Response.url, 20)
+
+    def test_git_failure_categories_never_include_raw_stderr(self):
+        for stderr, reason, transient in (
+            ("fatal: Authentication failed secret-token", "authentication", False),
+            ("[rejected] main (non-fast-forward)", "remote-rejected", False),
+            ("SSL certificate problem: secret-token", "tls-certificate", False),
+            ("gnutls_handshake() failed: TLS connection was non-properly terminated", "tls-transport", True),
+            ("Could not resolve host: gitee.com", "dns", True),
+            ("Connection reset by peer secret-token", "connection-reset", True),
+            ("unrecognized https://gitee.com/x?access_token=secret-token", "unknown", False),
+        ):
+            error = git_failure(stderr)
+            self.assertEqual((error.reason, error.transient), (reason, transient))
+            self.assertNotIn("secret-token", str(error))
+            self.assertNotIn("https://", str(error))
+
+    def test_git_process_timeout_and_unknown_error_are_sanitized(self):
+        with patch(__name__ + ".subprocess.run", side_effect=subprocess.TimeoutExpired(["private"], 120)):
+            with self.assertRaisesRegex(GitFailure, "operation-timeout") as caught:
+                git(".", "push", "private")
+            self.assertTrue(caught.exception.transient)
+        result = subprocess.CompletedProcess([], 1, "", "unknown secret-token https://private.invalid")
+        with patch(__name__ + ".subprocess.run", return_value=result) as run:
+            with self.assertRaisesRegex(GitFailure, "unknown") as caught: git(".", "push")
+            self.assertNotIn("secret-token", str(caught.exception))
+            self.assertEqual(run.call_args.kwargs["timeout"], 120)
+
+    def test_git_push_retries_only_transient_failures_and_pins_target(self):
+        class PublisherFixture:
+            github_token = gitee_token = "fixture"
+        target, previous = "a" * 40, "b" * 40
+        for reason, transient, attempts in (("tls-transport", True, 3), ("authentication", False, 1),
+                                            ("remote-rejected", False, 1), ("unknown", False, 1)):
+            calls = []
+            def fake_git(root, *args, **kwargs):
+                if args == ("rev-parse", "HEAD^{commit}"): return target
+                if "push" in args:
+                    calls.append(args)
+                    raise GitFailure(reason, transient)
+                raise AssertionError("Unexpected Git operation")
+            with patch(__name__ + ".git", side_effect=fake_git), \
+                    patch(__name__ + ".remote_head", return_value=previous), \
+                    patch(__name__ + ".git_result", return_value=subprocess.CompletedProcess([], 0, "", "")), \
+                    patch(__name__ + ".time.sleep") as sleep:
+                with self.assertRaisesRegex(GitFailure, reason): push(Path("."), "gitee", PublisherFixture())
+                self.assertEqual(len(calls), attempts)
+                self.assertEqual(sleep.call_count, attempts - 1)
+                self.assertTrue(all(args[-1] == target + ":refs/heads/main" and "--force" not in args for args in calls))
+
+    def test_uncertain_push_success_and_divergence_are_reconciled(self):
+        class PublisherFixture:
+            github_token = gitee_token = "fixture"
+        target, previous = "a" * 40, "b" * 40
+        calls = []
+        def fake_git(root, *args, **kwargs):
+            if args == ("rev-parse", "HEAD^{commit}"): return target
+            calls.append(args)
+            if "push" in args: raise GitFailure("operation-timeout", True)
+            raise AssertionError("Unexpected Git operation")
+        with patch(__name__ + ".git", side_effect=fake_git), \
+                patch(__name__ + ".remote_head", side_effect=[previous, target]), \
+                patch(__name__ + ".git_result", return_value=subprocess.CompletedProcess([], 0, "", "")), \
+                patch(__name__ + ".time.sleep"):
+            push(Path("."), "gitee", PublisherFixture())
+            self.assertEqual(len(calls), 1)
+        calls.clear()
+        with patch(__name__ + ".git", side_effect=fake_git), \
+                patch(__name__ + ".remote_head", return_value=previous), \
+                patch(__name__ + ".git_result", side_effect=[subprocess.CompletedProcess([], 0, "", ""),
+                                                           subprocess.CompletedProcess([], 1, "", "")]), \
+                patch(__name__ + ".time.sleep") as sleep:
+            with self.assertRaisesRegex(GitFailure, "non-fast-forward"): push(Path("."), "gitee", PublisherFixture())
+            self.assertFalse(calls)
+            sleep.assert_not_called()
 
     def test_published_metadata_waits_for_negative_cache_but_keeps_hash_gate(self):
         url = GT_RAW + "cloud/catalog.json"

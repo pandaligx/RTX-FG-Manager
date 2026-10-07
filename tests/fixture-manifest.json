@@ -504,6 +504,66 @@
           "sha256": "81cebb00345b9c2b4df125590062a934ea3e3d763631bf163bb6c0deecc092c0"
         }
       ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-transfusion-1.4.5.3-v426-version.zip",
+      "bytes": 731455,
+      "sha256": "39a9c8d3360ecd3a9764c9ed3f85a0f9bf150ff3df645b2d980d41650121f341",
+      "outputs": [
+        {
+          "path": "packages/dlssg-transfusion-1.4.5.3-v426-version.zip",
+          "bytes": 731455,
+          "sha256": "39a9c8d3360ecd3a9764c9ed3f85a0f9bf150ff3df645b2d980d41650121f341"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-transfusion-1.4.5.3-v426-dinput8.zip",
+      "bytes": 731362,
+      "sha256": "a707dc4868668269efc94755b812c8456d4691993b0b8b2442f1f60635ef340d",
+      "outputs": [
+        {
+          "path": "packages/dlssg-transfusion-1.4.5.3-v426-dinput8.zip",
+          "bytes": 731362,
+          "sha256": "a707dc4868668269efc94755b812c8456d4691993b0b8b2442f1f60635ef340d"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-transfusion-1.4.5.3-v426-dxgi.zip",
+      "bytes": 731601,
+      "sha256": "df4491e601bdb39e31d5ee25e248d423ecbb19382d6f206182972b40c3542619",
+      "outputs": [
+        {
+          "path": "packages/dlssg-transfusion-1.4.5.3-v426-dxgi.zip",
+          "bytes": 731601,
+          "sha256": "df4491e601bdb39e31d5ee25e248d423ecbb19382d6f206182972b40c3542619"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-transfusion-1.4.5.3-v426-winmm.zip",
+      "bytes": 732703,
+      "sha256": "c9d40117e8495f7748896c9dfaffdeae485d9d3e625d659585611f2070ee9bd9",
+      "outputs": [
+        {
+          "path": "packages/dlssg-transfusion-1.4.5.3-v426-winmm.zip",
+          "bytes": 732703,
+          "sha256": "c9d40117e8495f7748896c9dfaffdeae485d9d3e625d659585611f2070ee9bd9"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxmfg-1.4.1-hf1-v426-universal.zip",
+      "bytes": 2005106,
+      "sha256": "6191b93a47c4e537f26a9c45108066983d5adc509a824b8bd3cc254be93ae305",
+      "outputs": [
+        {
+          "path": "packages/rtxmfg-1.4.1-hf1-v426-universal.zip",
+          "bytes": 2005106,
+          "sha256": "6191b93a47c4e537f26a9c45108066983d5adc509a824b8bd3cc254be93ae305"
+        }
+      ]
     }
   ]
 }
