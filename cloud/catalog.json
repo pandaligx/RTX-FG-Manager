@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 18839,
-    "fallback_url": "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/indexes/payload-index-r-d071063dafc9a31c340f.json",
-    "sha256": "7d1cba1c8cd03ed75ea02b895ff684fb3336fd025a1785d05de15fffadba85cb",
-    "url": "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/indexes/payload-index-r-d071063dafc9a31c340f.json"
+    "bytes": 22135,
+    "fallback_url": "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/indexes/payload-index-r-27e17f68f3e68de7a12c.json",
+    "sha256": "3bfb6f649c2f7294706704400f4d97b6558ea040a799d21da5764eaa5a81d989",
+    "url": "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/indexes/payload-index-r-27e17f68f3e68de7a12c.json"
   },
-  "revision": "r-d071063dafc9a31c340f",
+  "revision": "r-27e17f68f3e68de7a12c",
   "schema": 2,
   "schemes": [
     {
@@ -106,13 +106,28 @@
     },
     {
       "archives": [
-        "rtxmfg-1.3.3-hf2-v425-universal.zip"
+        "rtxmfg-1.4.1-hf1-v426-universal.zip"
       ],
       "defaults": {},
       "id": "rtx40mfg-1.3.3-hf2",
-      "min_manager_version": "4.2.5",
-      "name": "RTX40 MFG · 1.3.3 Hotfix 2",
-      "profile": "rtxmfg_universal_133"
+      "min_manager_version": "4.2.6",
+      "name": "RTX40 MFG · 1.4.1 Hotfix 1",
+      "profile": "rtxmfg_universal_133",
+      "source_url": "https://github.com/dashdogy/RTX40MFG-Unlock"
+    },
+    {
+      "archives": [
+        "dlssg-transfusion-1.4.5.3-v426-version.zip",
+        "dlssg-transfusion-1.4.5.3-v426-dinput8.zip",
+        "dlssg-transfusion-1.4.5.3-v426-dxgi.zip",
+        "dlssg-transfusion-1.4.5.3-v426-winmm.zip"
+      ],
+      "defaults": {},
+      "id": "dlssg-transfusion-1.4.5.3",
+      "min_manager_version": "4.2.6",
+      "name": "DLSSG-Transfusion · 1.4.5.3",
+      "profile": "transfusion_json_v3",
+      "source_url": "https://github.com/SilyNoMeta/DLSSG-Transfusion"
     }
   ],
   "sources": {
