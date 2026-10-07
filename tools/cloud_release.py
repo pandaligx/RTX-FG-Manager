@@ -696,14 +696,28 @@ def remote_head(root, url, options, env):
     return fields[0]
 
 
+def make_askpass(folder):
+    helper = Path(folder) / "askpass.py"
+    helper.write_text('#!/usr/bin/env python3\nimport os,sys\nprint(os.environ["RTXFG_PUSH_USER"] if "username" in sys.argv[1].lower() else os.environ["RTXFG_PUSH_TOKEN"])\n', encoding="utf-8")
+    if os.name == "nt":
+        # Git for Windows must use this process's Python, not a python3 app alias.
+        # The files contain only program paths and environment variable names.
+        executable = str(Path(sys.executable).resolve())
+        require(not any(char in executable for char in ('"', '\r', '\n')), "Unsafe Python executable path")
+        wrapper = Path(folder) / "askpass.cmd"
+        wrapper.write_text('@echo off\n"' + executable.replace('%', '%%')
+                           + '" "%~dp0askpass.py" %*\n', encoding="utf-8")
+        return wrapper
+    helper.chmod(0o700)
+    return helper
+
+
 def push(root, host, publisher):
     require(host in ("github", "gitee"), "Unexpected Git publication host")
     target = git(root, "rev-parse", "HEAD^{commit}")
     require(re.fullmatch(r"[0-9a-f]{40}", target), "Invalid local publication commit")
     with tempfile.TemporaryDirectory(prefix="rtxfg-git-") as folder:
-        helper = Path(folder) / "askpass.py"
-        helper.write_text('#!/usr/bin/env python3\nimport os,sys\nprint(os.environ["RTXFG_PUSH_USER"] if "username" in sys.argv[1].lower() else os.environ["RTXFG_PUSH_TOKEN"])\n', encoding="utf-8")
-        helper.chmod(0o700)
+        helper = make_askpass(folder)
         env = dict(os.environ, GIT_ASKPASS=str(helper), GIT_TERMINAL_PROMPT="0",
                    RTXFG_PUSH_USER="x-access-token" if host == "github" else REPO.split("/")[0],
                    RTXFG_PUSH_TOKEN=publisher.github_token if host == "github" else publisher.gitee_token)
@@ -1347,6 +1361,26 @@ class OfflineTests(unittest.TestCase):
             with self.assertRaisesRegex(GitFailure, "unknown") as caught: git(".", "push")
             self.assertNotIn("secret-token", str(caught.exception))
             self.assertEqual(run.call_args.kwargs["timeout"], 120)
+
+    @unittest.skipUnless(os.name == "nt", "Windows Git askpass integration")
+    def test_windows_askpass_uses_current_python_without_storing_credentials(self):
+        with tempfile.TemporaryDirectory(prefix="rtxfg askpass ") as folder:
+            helper = make_askpass(folder)
+            self.assertEqual(helper.suffix, ".cmd")
+            env = dict(os.environ, GIT_ASKPASS=str(helper), GIT_TERMINAL_PROMPT="0",
+                       RTXFG_PUSH_USER="fixture-user", RTXFG_PUSH_TOKEN="fixture-pass")
+            # credential fill only invokes the local helper; it makes no HTTP request.
+            result = subprocess.run(["git", "-c", "credential.helper=", "credential", "fill"],
+                                    input="protocol=https\nhost=example.invalid\n\n", env=env,
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, "Local Windows askpass failed")
+            fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+            self.assertEqual(fields.get("username"), "fixture-user")
+            self.assertEqual(fields.get("password"), "fixture-pass")
+            for path in Path(folder).iterdir():
+                text = path.read_text("utf-8")
+                self.assertNotIn("fixture-user", text)
+                self.assertNotIn("fixture-pass", text)
 
     def test_git_push_retries_only_transient_failures_and_pins_target(self):
         class PublisherFixture:
