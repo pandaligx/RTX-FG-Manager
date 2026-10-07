@@ -82,6 +82,7 @@ foreach ($version in @('420', '421', '422', '425')) { Add-Tree "tests/fixtures/c
 # Public cloud metadata and publish automation are separately reviewed source inputs.
 foreach ($name in @('cloud/schemes.json', 'tools/cloud_release.py', 'docs/cloud-publishing.md', '.github/scripts/mirror_gitee.py')) { Add-File $name $false }
 if (-not $ExcludeCloudMetadata) {
+    Add-File 'update.json' $false
     Add-File 'cloud/catalog.json' $false
     Add-Tree 'cloud/indexes' @('.json')
 }

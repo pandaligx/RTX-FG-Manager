@@ -3,3 +3,4 @@
 /tests/fixtures/catalog*/index.json -text
 /cloud/indexes/*.json -text
 /cloud/catalog.json -text
+/update.json -text

@@ -23,6 +23,7 @@ API='https://gitee.com/api/v5/repos/'+REPO
 # Keep in step with tools/export-source.ps1. This is deliberately not a recursive
 # copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
 ALLOWED = {
+    'update.json',
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore', '.gitattributes',
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json',
@@ -141,7 +142,7 @@ def ancestor(root, older, newer):
     return result.returncode == 0
 
 
-def assert_source_range(root, source, remote=None):
+def assert_source_range(root, source, remote=None, verified_update=None):
     """Gate every newly public commit, including private files later deleted.
 
     Source-only pushes cannot introduce, change, remove or roll back catalog or
@@ -153,6 +154,9 @@ def assert_source_range(root, source, remote=None):
     baseline = protected_metadata(tree_entries(root, remote)) if remote else {}
     if protected_metadata(entries) != baseline:
         raise RuntimeError('Cloud metadata differs from Gitee; run tools/cloud_release.py publish to verify both sites before promotion')
+    previous_update = tree_entries(root, remote).get('update.json') if remote else None
+    if entries.get('update.json') != previous_update:
+        assert_verified_update(root, entries, verified_update)
     revision = remote + '..' + source if remote else source
     for commit in git(root, 'rev-list', '--reverse', revision).splitlines():
         entries = tree_entries(root, commit)
@@ -165,9 +169,17 @@ def assert_source_range(root, source, remote=None):
         # current catalog: a normal feature branch can start before a promotion.
         if any(path == 'cloud/catalog.json' or path.startswith('cloud/indexes/') for path in changed):
             raise RuntimeError('Source history contains cloud metadata changes; resume tools/cloud_release.py publish first')
+        if 'update.json' in changed:
+            assert_verified_update(root, entries, verified_update)
 
 
-def sync_main(root, env, remote_url=None):
+def assert_verified_update(root, entries, verified_update):
+    entry = entries.get('update.json')
+    if verified_update is None or entry is None or git(root, 'cat-file', 'blob', entry[2], binary=True) != verified_update:
+        raise RuntimeError('Static update manifest is unverified; resume stable release publication first')
+
+
+def sync_main(root, env, remote_url=None, verified_update=None):
     """Push the exact reviewed Git history, never rewrite or synthesize commits."""
     remote_url = remote_url or 'https://gitee.com/' + REPO + '.git'
     source = git(root, 'rev-parse', 'refs/heads/main^{commit}')
@@ -186,7 +198,7 @@ def sync_main(root, env, remote_url=None):
             return 'gitee-ahead'
         if not ancestor(root, remote, source):
             raise RuntimeError('GitHub/Gitee main histories diverged; refusing a non-fast-forward mirror')
-    assert_source_range(root, source, remote)
+    assert_source_range(root, source, remote, verified_update)
     git(root, '-c', 'credential.helper=', 'push', remote_url,
         source + ':refs/heads/main', env=env)
     # A normal push also rejects any remote advance after the fetch above.
@@ -254,7 +266,10 @@ def validate_assets(folder,tag):
 
 def verify_remote(url,expected):
     parsed=urllib.parse.urlsplit(url)
-    if parsed.scheme!='https' or parsed.username or parsed.password or parsed.hostname not in ('gitee.com','gitee.cn') and not (parsed.hostname or '').endswith('.gitee.com'):
+    if (parsed.scheme!='https' or parsed.username or parsed.password
+            or (parsed.hostname not in ('gitee.com','gitee.cn')
+                and not (parsed.hostname or '').endswith('.gitee.com')
+                and url != f'https://raw.githubusercontent.com/{REPO}/main/update.json')):
         raise RuntimeError('Unsafe mirror asset URL')
     h=hashlib.sha256();size=0;expected_size=expected.stat().st_size
     for attempt in range(4):
@@ -357,6 +372,75 @@ def mirror_small_assets(existing, files, endpoint, exe):
     return True
 
 
+def static_update_action(previous, current):
+    """Only a verified stable release may advance the public update pointer."""
+    def checked(data):
+        value = json.loads(data)
+        version = value.get('version', '')
+        if (value.get('schema') != 1 or not re.fullmatch(r'\d{1,4}\.\d{1,4}\.\d{1,4}', version)
+                or value.get('file') != f'RTXManager-v{version}-x64.exe'
+                or not re.fullmatch('[0-9a-fA-F]{64}', value.get('sha256', ''))
+                or type(value.get('bytes')) is not int or not 1048576 <= value['bytes'] <= 268435456):
+            raise RuntimeError('Invalid static update manifest')
+        return value, tuple(map(int, version.split('.')))
+    new, new_version = checked(current)
+    if previous is None:
+        return 'advance'
+    old, old_version = checked(previous)
+    if new_version < old_version:
+        return 'older-release'
+    if new_version == old_version:
+        if any(new[key] != old[key] for key in ('file', 'sha256', 'bytes')):
+            raise RuntimeError('Same-version update identity differs; refusing replacement')
+        if new != old:
+            raise RuntimeError('Same-version metadata differs; review before replacement')
+        return 'current'
+    return 'advance'
+
+
+def promote_static_update(root, manifest, env):
+    """Call only after GitHub assets and the local-upload Gitee assets passed.
+
+    Uses the exact verified release JSON, never a candidate compiled version.
+    A failed push is resumed with the same inputs; no force-push or rollback.
+    """
+    if git(root, 'status', '--porcelain') or git(root, 'branch', '--show-current') != 'main':
+        raise RuntimeError('Static update promotion needs a clean reviewed main checkout')
+    data = manifest.read_bytes()
+    path = root / 'update.json'
+    previous = path.read_bytes() if path.exists() else None
+    action = static_update_action(previous, data)
+    if action == 'older-release':
+        print('Newer static update already published; older release cannot roll it back.')
+        return
+    refs = git(root, 'ls-remote', 'origin', 'refs/heads/main', env=env)
+    if not refs or refs.split()[0] != git(root, 'rev-parse', 'HEAD'):
+        raise RuntimeError('GitHub main advanced or a previous push is incomplete; refresh the reviewed checkout before promotion')
+    # Validate the source before introducing the one gated metadata change.
+    validate_tree(root, tree_entries(root, 'HEAD'))
+    if action == 'advance':
+        path.write_bytes(data)
+        git(root, 'add', '--', 'update.json')
+        git(root, '-c', 'user.name=RTXFG Release', '-c',
+            'user.email=156283479+pandaligx@users.noreply.github.com',
+            'commit', '-m', 'release: promote verified static update manifest [skip ci]')
+        git(root, 'push', 'origin', 'HEAD:refs/heads/main', env=env)
+    else:
+        data = previous  # Preserve the actual committed bytes, including newlines.
+    sync_main(root, env, verified_update=data)
+    for url in (f'https://raw.githubusercontent.com/{REPO}/main/update.json',
+                f'https://gitee.com/{REPO}/raw/main/update.json'):
+        for attempt in range(4):
+            try:
+                verify_remote(url, path)
+                break
+            except (RuntimeError, urllib.error.URLError):
+                if attempt == 3:
+                    raise
+                time.sleep(2)  # A just-pushed raw file can briefly serve old bytes.
+    print('Verified static update manifests on GitHub and Gitee; no public release API is needed.')
+
+
 def main():
     if not os.environ.get('GITEE_TOKEN'):
         raise RuntimeError('Configure repository secret GITEE_TOKEN; mirror has NOT completed')
@@ -373,10 +457,17 @@ def main():
     api('')
     with tempfile.TemporaryDirectory(prefix='rtxfg-mirror-') as tmp:
         askpass=Path(tmp)/'askpass.py'
-        askpass.write_text('#!/usr/bin/env python3\nimport os,sys\nprint(os.environ["GITEE_USERNAME"] if "username" in sys.argv[1].lower() else os.environ["GITEE_TOKEN"])\n')
+        askpass.write_text('#!/usr/bin/env python3\nimport os,sys\np=sys.argv[1].lower()\ngh="github.com" in p\nprint(("x-access-token" if gh else os.environ["GITEE_USERNAME"]) if "username" in p else os.environ["GH_TOKEN" if gh else "GITEE_TOKEN"])\n')
         askpass.chmod(0o700)
         env=dict(os.environ,GIT_ASKPASS=str(askpass),GIT_TERMINAL_PROMPT='0')
-        result = sync_main(root, env)
+        # A failed static-manifest mirror is resumed only after the release
+        # downloads are reverified below; source-only jobs cannot promote it.
+        try:
+            result = sync_main(root, env)
+        except RuntimeError as error:
+            if not tag or not str(error).startswith('Static update manifest is unverified'):
+                raise
+            result = 'static-manifest-awaiting-release-verification'
         print('Source/documentation mirror: ' + result)
         if tag:
             remote_refs=read_remote_tag(['git','-c','credential.helper=','ls-remote',
@@ -403,6 +494,7 @@ def main():
         # Large EXEs are uploaded from the publisher machine, never from Actions.
         exe=assets/f'RTXManager-{tag}-x64.exe'
         if not mirror_small_assets(existing, files, endpoint, exe):return
+        promote_static_update(root, assets/'update.json', env)
         print('Release mirror completed; GitHub and Gitee downloads match.')
 
 

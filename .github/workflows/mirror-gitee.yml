@@ -11,7 +11,7 @@ on:
         required: false
         type: string
 permissions:
-  contents: read
+  contents: write # Promote update.json only after both release sites pass verification.
 concurrency:
   group: rtxfg-cloud-publish
   cancel-in-progress: false

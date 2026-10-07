@@ -91,6 +91,38 @@ class SourceAllowlistTests(unittest.TestCase):
 
 
 class PublicationTests(unittest.TestCase):
+    def test_static_readback_only_allows_the_exact_github_repository_file(self):
+        function = mirror['verify_remote']
+        with tempfile.TemporaryDirectory() as folder:
+            expected = Path(folder) / 'update.json'
+            expected.write_bytes(b'{}')
+            for url in ('https://raw.githubusercontent.com/other/repo/main/update.json',
+                        'https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/other.json',
+                        'http://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/update.json'):
+                with self.assertRaisesRegex(RuntimeError, 'Unsafe mirror asset URL'):
+                    function(url, expected)
+            response = io.BytesIO(b'{}')
+            response.url = 'https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/update.json'
+            response.status = 200
+            response.headers = {}
+            with patch('urllib.request.urlopen', return_value=response):
+                function(response.url, expected)
+
+    def test_static_pointer_is_monotonic_and_rejects_same_version_replacement(self):
+        def data(version='4.2.6', digest='a' * 64):
+            return json.dumps(dict(schema=1, version=version, file=f'RTXManager-v{version}-x64.exe',
+                                   bytes=32000000, sha256=digest)).encode()
+        action = mirror['static_update_action']
+        self.assertEqual(action(None, data()), 'advance')
+        self.assertEqual(action(data(), data()), 'current')
+        self.assertEqual(action(data(), data('4.2.7')), 'advance')
+        self.assertEqual(action(data('4.2.7'), data()), 'older-release')
+        with self.assertRaisesRegex(RuntimeError, 'identity differs'):
+            action(data(), data(digest='b' * 64))
+        for invalid in (b'{}', b'{"message":"403"}', data().replace(b'RTXManager-', b'../RTXManager-')):
+            with self.assertRaises(RuntimeError):
+                action(None, invalid)
+
     def test_remote_download_resumes_and_restarts_if_range_is_ignored(self):
         function=mirror['verify_remote']
         class Response(io.BytesIO):
@@ -283,6 +315,20 @@ class SourceMirrorTests(unittest.TestCase):
         self.write('cloud/schemes.json', '{"maintainer":"public presets only"}\n')
         head = self.commit('Reviewed Rust source')
         self.assertEqual(self.sync(), 'fast-forwarded')
+        self.assertEqual(self.remote_head(), head)
+        self.assertEqual(self.sync(), 'already-current')
+
+    def test_static_pointer_requires_exact_release_verified_bytes(self):
+        original = self.remote_head()
+        self.write('update.json', '{"candidate":"not yet signed"}\n')
+        head = self.commit('Unverified update pointer')
+        with self.assertRaisesRegex(RuntimeError, 'Static update manifest is unverified'):
+            self.sync()
+        self.assertEqual(self.remote_head(), original)
+        with self.assertRaisesRegex(RuntimeError, 'Static update manifest is unverified'):
+            mirror['sync_main'](self.repo, self.env, str(self.remote), verified_update=b'wrong bytes')
+        expected = (self.repo / 'update.json').read_bytes()
+        self.assertEqual(mirror['sync_main'](self.repo, self.env, str(self.remote), verified_update=expected), 'fast-forwarded')
         self.assertEqual(self.remote_head(), head)
         self.assertEqual(self.sync(), 'already-current')
 

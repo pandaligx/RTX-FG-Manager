@@ -8,6 +8,16 @@
 
 Gitee 的 DLL ZIP、管理器和 aria2 等工具 EXE 均优先由发布助手从本机上传，避免海外运行器向国内上传较慢或超时；用户负责签名，无须例行手动上传。Actions 复用已上传的同名同内容 ZIP，继续执行完整回下载与元数据发布门槛。已有脚本的缺包上传能力保留用于兼容，日常发布应先在本机补齐附件再触发工作流。不得把 EXE 塞进 ZIP 规避发布分工。
 
+## 管理器更新清单（4.2.7 起）
+
+客户端默认读取 `https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/update.json`，失败后读取 GitHub 对应固定文件，再尝试旧 GitHub Release 清单；不再访问 Gitee Release API。下载正文仍使用内置 aria2，程序文件仍需通过摘要、版本和签名检查。
+
+仓库根目录 `update.json` **不是候选版配置**，只代表已经完成发布核验的正式版。签名前保持它指向上一正式版。不要因为修改 Cargo 版本或更新 README 就手动提升该文件。
+
+发行镜像工作流完成已签名 EXE 与小附件的双站核验后，由 `promote_static_update` 将发行附件的同一份 JSON 提交到 GitHub、快进同步到 Gitee，并核对两站固定 URL。普通源码镜像不能提升、删除或回退该文件；同版本摘要不同会停止。工作流需要本仓库 `contents: write`，Gitee 令牌仍只用于发布端，绝不能内置到客户端。
+
+网络中断时继续相同版本的未完成步骤；如果只是 raw 缓存尚未刷新，只需重新回读固定 URL，不能重建或覆盖已签名 EXE。较老版本的发行任务不能回退较新的固定清单。旧 Release 附件 `update.json` 继续保留，供旧管理器使用。
+
 ## 更新一次 DLL
 
 1. 对新 DLL 完成游戏测试、签名。每个 ZIP 只放一个代理 DLL 和匹配配置，文件放在 ZIP 根目录。现有方案使用 `dlssg_sm86.ini`；RTX40MFG 使用 `RTXMFG-Universal.json`。不要打包日志、缓存、原游戏 DLL 或子文件夹。
