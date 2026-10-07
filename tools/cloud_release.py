@@ -349,7 +349,7 @@ class Publisher:
         require(self.github_token and self.gitee_token, "Both repository tokens must be supplied through the environment")
 
     def public_gitee_resource_repository(self):
-        return json.loads(read_url(GT_RESOURCES))
+        return self.api("gitee", GT_RESOURCES)
 
     def ensure_gitee_resource_repository(self):
         print("[stage] Check isolated Gitee resource repository", flush=True)
@@ -417,7 +417,30 @@ class Publisher:
                 data = urllib.parse.urlencode(fields).encode()
                 headers["Content-Type"] = "application/x-www-form-urlencoded"
         if data is None:
-            return json.loads(read_url(url, headers=headers))
+            try:
+                return json.loads(read_url(url, headers=headers))
+            except urllib.error.HTTPError as error:
+                parsed, failed = urllib.parse.urlsplit(url), urllib.parse.urlsplit(error.url)
+                roots = (urllib.parse.urlsplit(GT).path, urllib.parse.urlsplit(GT_RESOURCES).path)
+                inventory = any(parsed.path in (root, root + "/releases")
+                                or parsed.path.startswith(root + "/releases/")
+                                for root in roots)
+                eligible = (host == "gitee" and method in (None, "GET") and file is None
+                            and "Authorization" not in headers and error.code == 403
+                            and parsed.scheme == failed.scheme == "https"
+                            and parsed.netloc == failed.netloc == "gitee.com"
+                            and failed.path == parsed.path and inventory)
+                if not eligible:
+                    raise
+                # This is a single authorized fallback for a proven anonymous
+                # API quota error, not a general retry or permission workaround.
+                evidence = str(error.reason).encode("utf-8") + error.read(16384)
+                if b"rate limit exceeded" not in evidence.lower():
+                    raise
+                print("[api-auth-fallback] GET " + public_location(url)
+                      + " reason=anonymous-rate-limit", flush=True)
+                return json.loads(read_url(url, headers=dict(headers, Authorization="Bearer " + self.gitee_token),
+                                           attempts=1))
         # Never automatically repeat an uncertain POST. A subsequent invocation
         # re-reads assets/releases and checks immutable contents before resuming.
         try:
@@ -1165,6 +1188,42 @@ class OfflineTests(unittest.TestCase):
         self.assertNotIn("fake-secret", text)
         self.assertNotIn("?token", text)
         self.assertNotIn("headers", text)
+
+    def test_gitee_inventory_rate_limit_has_one_authorized_fallback(self):
+        publisher = Publisher.__new__(Publisher)
+        publisher.github_token = publisher.gitee_token = "fixture"
+        for url in (GT + "/releases/latest", GT_RESOURCES):
+            error = urllib.error.HTTPError(url, 403, "Forbidden", {}, io.BytesIO(b"Forbidden (Rate Limit Exceeded)"))
+            with patch(__name__ + ".read_url", side_effect=[error, b'{"id":1}']) as read:
+                self.assertEqual(publisher.api("gitee", url), {"id": 1})
+                self.assertNotIn("Authorization", read.call_args_list[0].kwargs["headers"])
+                self.assertEqual(read.call_args_list[1].kwargs["headers"]["Authorization"], "Bearer fixture")
+                self.assertEqual(read.call_args_list[1].kwargs["attempts"], 1)
+                self.assertEqual(read.call_count, 2)
+        with patch(__name__ + ".read_url", return_value=b'{"id":1}') as read:
+            self.assertEqual(publisher.public_gitee_resource_repository(), {"id": 1})
+            self.assertEqual(read.call_count, 1)
+            self.assertNotIn("Authorization", read.call_args.kwargs["headers"])
+
+    def test_gitee_fallback_never_expands_to_permissions_other_hosts_or_payloads(self):
+        publisher = Publisher.__new__(Publisher)
+        publisher.github_token = publisher.gitee_token = "fixture"
+        cases = [(GT + "/releases/latest", "Forbidden", b"permission denied"),
+                 (GT_RAW + "cloud/catalog.json", "Rate Limit Exceeded", b""),
+                 (GT + "/../../elsewhere", "Rate Limit Exceeded", b""),
+                 (GH + "/releases/latest", "Rate Limit Exceeded", b"")]
+        for url, reason, body in cases:
+            error = urllib.error.HTTPError(url, 403, reason, {}, io.BytesIO(body))
+            with patch(__name__ + ".read_url", side_effect=error) as read:
+                with self.assertRaises(urllib.error.HTTPError): publisher.api("gitee", url)
+                self.assertEqual(read.call_count, 1)
+                self.assertNotIn("Authorization", read.call_args.kwargs["headers"])
+        url = GT + "/releases/latest"
+        errors = [urllib.error.HTTPError(url, 403, "Rate Limit Exceeded", {}, io.BytesIO()),
+                  urllib.error.HTTPError(url, 403, "Forbidden", {}, io.BytesIO())]
+        with patch(__name__ + ".read_url", side_effect=errors) as read:
+            with self.assertRaises(urllib.error.HTTPError): publisher.api("gitee", url)
+            self.assertEqual(read.call_count, 2)
 
     def test_probe_rejects_exe_and_non_payload_archives(self):
         with self.assertRaisesRegex(RuntimeError, "DLL ZIPs only"):
