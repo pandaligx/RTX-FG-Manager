@@ -6,8 +6,8 @@
 [English](README.md) · **简体中文**
 
 <p align="center">
-  <a href="https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6"><img alt="版本" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
-  <a href="https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6"><img alt="下载量" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
+  <a href="https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7"><img alt="版本" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
+  <a href="https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7"><img alt="下载量" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
   <img alt="Windows x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white">
   <a href="LICENSE"><img alt="管理器许可 MIT" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
 </p>
@@ -19,9 +19,9 @@
 
 ## 下载
 
-**当前版本：4.2.6** · [国内下载 · Gitee](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6) · [GitHub 下载](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6) · [更新日志](CHANGELOG.zh-CN.md)
+**当前版本：4.2.7** · [国内下载 · Gitee](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7) · [GitHub 下载](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7) · [更新日志](CHANGELOG.zh-CN.md)
 
-下载 **`RTXManager-v4.2.6-x64.exe`**，适用于 Windows 10 / 11 x64。发行页提供已签名 EXE 和校验清单；无需另装 Python、Rust、CUDA Toolkit 或 aria2，游戏 DLL 按需从云端获取。
+下载 **`RTXManager-v4.2.7-x64.exe`**，适用于 Windows 10 / 11 x64。发行页提供已签名 EXE 和校验清单；无需另装 Python、Rust、CUDA Toolkit 或 aria2，游戏 DLL 按需从云端获取。
 
 <p align="center">
   <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png" alt="较早版本的管理器界面，使用演示游戏展示浅色与深色主题" width="980">
@@ -63,7 +63,7 @@
 
 **游戏目录。** 选中游戏后，用 **添加文件夹** 指定插件目录，文件夹本身无需包含 EXE；它仍关联真实游戏进行运行检查、参数管理与卸载，第三方加载器需要自行配置。合并后的游戏条目可能列出多个部署目录，安装前请确认显示的路径。管理器数据保存在 `%LOCALAPPDATA%\RTXFGManager`。
 
-**下载与更新。** 默认先用 Gitee，失败时回退 GitHub；手动选择 GitHub 优先后会记住。下载显示速度与进度，已校验的 DLL 缓存可离线复用。软件更新会检查大小、SHA-256 和发布者签名，替换前仍需确认。管理器升级保留游戏库与偏好，但不会自动替换游戏中的 DLL；设置页也能离线阅读当前与历史更新日志。
+**下载与更新。** 检查更新直接读取固定清单，不依赖容易限流的 Gitee Release API。默认先用 Gitee，失败时回退 GitHub；手动选择 GitHub 优先后会记住。下载显示速度与进度，已校验的 DLL 缓存可离线复用。软件更新会检查大小、SHA-256 和发布者签名，替换前仍需确认。管理器升级保留游戏库与偏好，但不会自动替换游戏中的 DLL；设置页也能离线阅读当前与历史更新日志。
 
 **安全卸载。** 退出游戏后点击 **卸载补丁**，仅清理已确认属于该部署的文件，保留原游戏文件、未知文件和其他 MOD。文件被占用时会提示重试，关闭相关程序后再操作。从游戏库移除条目不等于卸载补丁；**清理缓存** 不会删除游戏库与偏好。
 

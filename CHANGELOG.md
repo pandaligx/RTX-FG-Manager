@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.2.7
+
+- Fix update checks failing when the Gitee release API returns HTTP 403 due to rate limits. Domestic-first checks now use the repository's static `update.json`, without credentials or an API call.
+- Fall back to GitHub on failed connections or invalid metadata. Preserve explicit GitHub preference and the legacy GitHub Release manifest endpoint. Failed checks never report that the app is up to date.
+- Promote the static manifest only after release files on both sites are verified. File-size, SHA-256, version and Windows signature checks remain required.
+- Add published 4.2.6 notes to offline history. Game DLLs, presets, deployment and removal behavior are unchanged.
+
+An older client that cannot reach either update source needs one manual EXE download to receive this fix. Version 4.2.5's "manager update required" message for newer schemes protects against unsupported configuration formats.
+
 ## 4.2.6
 
 Compared with 4.2.5, this release adds live theme previews, custom plugin folders,

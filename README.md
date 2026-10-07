@@ -6,8 +6,8 @@ A portable Windows app for RTX 20 / 30 / 40, with a native Rust / GPUI interface
 **English** · [简体中文](README.zh-CN.md)
 
 <p align="center">
-  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6"><img alt="release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
-  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6"><img alt="downloads" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
+  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7"><img alt="release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
+  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7"><img alt="downloads" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
   <img alt="Windows x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white">
   <a href="LICENSE"><img alt="manager license MIT" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
 </p>
@@ -19,9 +19,9 @@ A portable Windows app for RTX 20 / 30 / 40, with a native Rust / GPUI interface
 
 ## Download
 
-**Current version: 4.2.6** · [Gitee download](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6) · [GitHub download](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.6) · [Changelog](CHANGELOG.md)
+**Current version: 4.2.7** · [Gitee download](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7) · [GitHub download](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7) · [Changelog](CHANGELOG.md)
 
-Download **`RTXManager-v4.2.6-x64.exe`** for Windows 10 / 11 x64. The release page includes the signed EXE and checksums. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed; game DLLs are downloaded on demand.
+Download **`RTXManager-v4.2.7-x64.exe`** for Windows 10 / 11 x64. The release page includes the signed EXE and checksums. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed; game DLLs are downloaded on demand.
 
 <p align="center">
   <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home.png" alt="Earlier manager interface showing light and dark themes with demo games" width="980">
@@ -63,7 +63,7 @@ The scheme name indicates its origin, not the download route. **Project source**
 
 **Game folders.** Select a game and use **Add folder** for a plugin destination that need not contain an EXE. It remains associated with the real game for process checks, settings and removal; third-party loaders still need their own setup. Grouped games may list several deployment directories, so review the displayed paths before installing. Manager data lives in `%LOCALAPPDATA%\RTXFGManager`.
 
-**Downloads and updates.** Gitee is the default first route, with GitHub fallback; an explicit GitHub preference is remembered. Downloads show progress and speed, and verified DLL caches can be reused offline. App updates verify size, SHA-256 and publisher signature and require confirmation before replacement. Updating the manager preserves the library and preferences but does not replace game DLLs automatically. Settings also includes current and historical release notes for offline reading.
+**Downloads and updates.** Update checks read a public static manifest without the rate-limited Gitee Release API. Gitee is the default first route, with GitHub fallback; an explicit GitHub preference is remembered. Downloads show progress and speed, and verified DLL caches can be reused offline. App updates verify size, SHA-256 and publisher signature and require confirmation before replacement. Updating the manager preserves the library and preferences but does not replace game DLLs automatically. Settings also includes current and historical release notes for offline reading.
 
 **Safe removal.** Exit the game and use **Uninstall patch**. The manager removes recognized files belonging to that deployment while preserving original game files, unknown files and other mods. Locked files leave a retry notice; close the relevant processes and retry. Removing a game from the library is not uninstalling its patch, and **Clear cache** does not delete the library or preferences.
 

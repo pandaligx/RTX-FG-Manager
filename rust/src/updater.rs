@@ -92,52 +92,44 @@ pub fn release(source: &str) -> Result<Manifest> {
     release_with_cancel(source, &AtomicBool::new(false))
 }
 fn release_with_cancel(source: &str, cancel: &AtomicBool) -> Result<Manifest> {
-    if source == "github" {
-        let mut m: Manifest = serde_json::from_value(get_json_with_cancel(
-            &format!("https://github.com/{REPO}/releases/latest/download/update.json"),
-            cancel,
-        )?)?;
-        m.validate(&m.version)?;
-        m.version = m.version.trim_start_matches('v').into();
-        m.url = format!(
-            "https://github.com/{REPO}/releases/download/v{}/{}",
-            m.version, m.file
-        );
-        m.source = source.into();
-        return Ok(m);
-    }
-    ensure!(source == "gitee", "更新来源无效");
-    let base = format!("https://gitee.com/api/v5/repos/{REPO}");
-    let r = get_json_with_cancel(&format!("{base}/releases/latest"), cancel)?;
-    ensure!(
-        !r["draft"].as_bool().unwrap_or(false) && !r["prerelease"].as_bool().unwrap_or(false),
-        "没有可用的正式版本"
-    );
-    let tag = r["tag_name"].as_str().context("更新版本号无效")?;
-    let id = r["id"]
-        .as_u64()
-        .filter(|v| *v > 0)
-        .context("更新信息无效")?;
-    let a = get_json_with_cancel(
-        &format!("{base}/releases/{id}/attach_files?per_page=100"),
-        cancel,
-    )?;
-    let a = a.as_array().context("更新附件列表无效")?;
-    let asset = |name: &str| -> Result<String> {
-        let found = a.iter().filter(|v| v["name"] == name).collect::<Vec<_>>();
-        ensure!(found.len() == 1, "更新附件尚未同步完成");
-        let s = found[0]["browser_download_url"]
-            .as_str()
-            .context("更新地址无效")?;
-        safe_url(s)?;
-        Ok(s.into())
+    release_with_fetch(source, cancel, &mut get_json_with_cancel)
+}
+fn release_with_fetch(
+    source: &str,
+    cancel: &AtomicBool,
+    fetch: &mut impl FnMut(&str, &AtomicBool) -> Result<serde_json::Value>,
+) -> Result<Manifest> {
+    // Public static files need neither an API quota nor an embedded account token.
+    // Only the release publisher promotes these after verifying both sites.
+    let urls = match source {
+        "gitee" => vec![format!("https://gitee.com/{REPO}/raw/main/update.json")],
+        "github" => vec![
+            format!("https://raw.githubusercontent.com/{REPO}/main/update.json"),
+            format!("https://github.com/{REPO}/releases/latest/download/update.json"),
+        ],
+        _ => bail!("更新来源无效"),
     };
-    let mut m: Manifest =
-        serde_json::from_value(get_json_with_cancel(&asset("update.json")?, cancel)?)?;
-    m.validate(tag)?;
-    m.url = asset(&m.file)?;
-    m.source = source.into();
-    Ok(m)
+    for url in urls {
+        ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
+        let result = (|| -> Result<Manifest> {
+            let mut m: Manifest = serde_json::from_value(fetch(&url, cancel)?)?;
+            m.validate(&m.version)?;
+            m.version = m.version.trim_start_matches('v').into();
+            // Never accept a manifest-supplied EXE URL or source, even if the
+            // JSON came from an official host. Construct the versioned route.
+            m.url = format!(
+                "https://{source}.com/{REPO}/releases/download/v{}/{}",
+                m.version, m.file
+            );
+            m.source = source.into();
+            Ok(m)
+        })();
+        ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
+        if let Ok(m) = result {
+            return Ok(m);
+        }
+    }
+    bail!("更新信息暂时不可用")
 }
 pub fn check(choice: &str) -> Result<Option<Manifest>> {
     check_with_cancel(choice, &AtomicBool::new(false))
@@ -152,10 +144,17 @@ fn source_order(choice: &str) -> [&'static str; 2] {
     }
 }
 pub fn check_with_cancel(choice: &str, cancel: &AtomicBool) -> Result<Option<Manifest>> {
+    check_with_fetch(choice, cancel, &mut get_json_with_cancel)
+}
+fn check_with_fetch(
+    choice: &str,
+    cancel: &AtomicBool,
+    fetch: &mut impl FnMut(&str, &AtomicBool) -> Result<serde_json::Value>,
+) -> Result<Option<Manifest>> {
     let mut errors = Vec::new();
     for source in source_order(choice) {
         ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
-        match release_with_cancel(source, cancel) {
+        match release_with_fetch(source, cancel, fetch) {
             Ok(m) => return Ok((version(&m.version)? > version(crate::VERSION)?).then_some(m)),
             Err(_) => errors.push(format!("{source}: 更新信息暂时不可用")),
         }
@@ -643,6 +642,110 @@ mod download_tests {
             ),
             notes: Default::default(),
         }
+    }
+
+    #[test]
+    fn domestic_check_uses_static_json_without_api_or_github() -> Result<()> {
+        let cancel = AtomicBool::new(false);
+        let mut calls = Vec::new();
+        let mut supplied = checked_github_manifest();
+        supplied.source = "untrusted".into();
+        supplied.url = "https://example.invalid/untrusted.exe".into();
+        let mut fetch = |url: &str, _: &AtomicBool| {
+            calls.push(url.to_owned());
+            Ok(serde_json::to_value(&supplied)?)
+        };
+        let actual = release_with_fetch("gitee", &cancel, &mut fetch)?;
+        assert_eq!(actual.source, "gitee");
+        assert_eq!(
+            actual.url,
+            format!("https://gitee.com/{REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe")
+        );
+        // An older published manifest still counts as a successful check, and
+        // must not fall through to the inaccessible overseas service.
+        assert!(check_with_fetch("auto", &cancel, &mut fetch)?.is_none());
+        assert_eq!(
+            calls,
+            vec![format!("https://gitee.com/{REPO}/raw/main/update.json"); 2]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn failed_or_malformed_domestic_metadata_falls_back_to_github() -> Result<()> {
+        for malformed in [false, true] {
+            let cancel = AtomicBool::new(false);
+            let mut calls = Vec::new();
+            let mut m = checked_github_manifest();
+            m.version = "9999.0.0".into();
+            m.file = "RTXManager-v9999.0.0-x64.exe".into();
+            let mut fetch = |url: &str, _: &AtomicBool| {
+                calls.push(url.to_owned());
+                if url.starts_with("https://gitee.com/") {
+                    if malformed {
+                        return Ok(serde_json::json!({"message": "403 Forbidden"}));
+                    }
+                    bail!("HTTP 403 Forbidden (Rate Limit Exceeded)");
+                }
+                Ok(serde_json::to_value(&m)?)
+            };
+            let result = check_with_fetch("domestic", &cancel, &mut fetch)?.unwrap();
+            assert_eq!(result.source, "github");
+            assert_eq!(calls.len(), 2);
+            assert!(calls[0].contains("gitee.com"));
+            assert!(calls[1].contains("raw.githubusercontent.com"));
+            assert!(!calls.iter().any(|u| u.contains("/api/")));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_github_manifest_remains_a_fallback() -> Result<()> {
+        let mut calls = Vec::new();
+        let mut fetch = |url: &str, _: &AtomicBool| {
+            calls.push(url.to_owned());
+            if url.contains("raw.githubusercontent.com") {
+                bail!("TLS connection failed");
+            }
+            Ok(serde_json::to_value(checked_github_manifest())?)
+        };
+        release_with_fetch("github", &AtomicBool::new(false), &mut fetch)?;
+        assert_eq!(calls.len(), 2);
+        assert!(calls[1].ends_with("/releases/latest/download/update.json"));
+        Ok(())
+    }
+
+    #[test]
+    fn failed_check_never_reports_up_to_date_and_cancellation_stops_fallback() {
+        let cancel = AtomicBool::new(false);
+        let mut calls = 0;
+        let mut failed = |_: &str, _: &AtomicBool| -> Result<serde_json::Value> {
+            calls += 1;
+            bail!("network unavailable");
+        };
+        assert!(check_with_fetch("auto", &cancel, &mut failed).is_err());
+        assert_eq!(calls, 3);
+        let mut calls = 0;
+        let mut cancelled = |_: &str, flag: &AtomicBool| -> Result<serde_json::Value> {
+            calls += 1;
+            flag.store(true, Ordering::Relaxed);
+            bail!("cancelled");
+        };
+        assert!(check_with_fetch("auto", &cancel, &mut cancelled).is_err());
+        assert!(check_with_fetch("auto", &cancel, &mut cancelled).is_err());
+        assert_eq!(calls, 1);
+    }
+
+    #[test]
+    fn unsafe_static_manifest_is_rejected_before_offering_an_update() {
+        let mut m = checked_github_manifest();
+        m.file = "../untrusted.exe".into();
+        let mut fetch = |_: &str, _: &AtomicBool| Ok(serde_json::to_value(&m).unwrap());
+        assert!(check_with_fetch("auto", &AtomicBool::new(false), &mut fetch).is_err());
+        m.file = "RTXManager-v4.2.4-x64.exe".into();
+        m.sha256 = "invalid".into();
+        let mut fetch = |_: &str, _: &AtomicBool| Ok(serde_json::to_value(&m).unwrap());
+        assert!(check_with_fetch("auto", &AtomicBool::new(false), &mut fetch).is_err());
     }
 
     #[test]

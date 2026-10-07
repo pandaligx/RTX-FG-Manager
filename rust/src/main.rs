@@ -17,6 +17,7 @@ fn main() {
                 "--gpu-name-action",
                 "--download-check",
                 "--cloud-check",
+                "--update-check",
             ]
             .contains(&s.as_str())
         }) {
@@ -34,6 +35,11 @@ fn run() -> anyhow::Result<()> {
     let args: Vec<_> = std::env::args().collect();
     let arg = |n: usize| args.get(n).context("缺少命令参数");
     match args.get(1).map(String::as_str) {
+        Some("--update-check") => {
+            // Read-only updater smoke check; never downloads or starts an EXE.
+            let manifest = updater::release(arg(2)?)?;
+            core::atomic_json(&PathBuf::from(arg(3)?), &serde_json::to_value(manifest)?)
+        }
         Some("--cloud-check") => {
             let mode = args.get(3).map(String::as_str).unwrap_or("normal");
             let mut catalog = if mode.starts_with("bundled") {
