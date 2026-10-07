@@ -65,8 +65,10 @@ def archive_name(item):
 
 def validate_defaults(profile, defaults):
     boolean = {"0", "1"}
-    if profile == "rtxmfg_universal_133":
-        choices = {"rtx_mode": {"follow", "1", "2", "3", "4", "5", "6", "dynamic"}, "rtx_target": {str(n) for n in range(1001)}, "rtx_preset": {"0", "1", "2"}}
+    if profile == "transfusion_json_v3":
+        choices = {"tf_mode": {"game", "2", "3", "4", "5", "6", "dynamic"}, "tf_target": {str(n) for n in range(1001)}, "tf_dynamic56": boolean, "tf_overlay": boolean}
+    elif profile == "rtxmfg_universal_133":
+        choices = {"rtx_mode": {"follow", "1", "2", "3", "4", "5", "6", "dynamic"}, "rtx_target": {str(n) for n in range(1001)}, "rtx_preset": {"0", "1", "2"}, "rtx_vsync": {"0", "1"}, "rtx_reflex_limit": {str(n) for n in range(1001)}}
     elif profile == "mfg_vulkan_sm86_7":
         choices = {"max_interpolated_frames": {"1", "2", "3", "4", "5"},
                    "force_multiplier": {"0", "2", "3", "4", "5", "6"},
@@ -95,11 +97,13 @@ def validate_spec(spec):
         ids.add(sid)
         require(isinstance(scheme.get("name"), str) and 0 < len(scheme["name"]) <= 200, "Invalid scheme name")
         require(re.fullmatch(r"\d{1,4}\.\d{1,4}\.\d{1,4}", scheme.get("version", "")), "Invalid package version")
-        require(scheme.get("profile") in {"initial", "native026", "upstream031", "upstream035", "mfg_vulkan_sm86_7", "rtxmfg_universal_133"}, "New protocols require a manager/tool update")
+        require(scheme.get("profile") in {"initial", "native026", "upstream031", "upstream035", "mfg_vulkan_sm86_7", "rtxmfg_universal_133", "transfusion_json_v3"}, "New protocols require a manager/tool update")
         require(isinstance(scheme.get("defaults", {}), dict), "Invalid defaults")
         validate_defaults(scheme["profile"], scheme.get("defaults", {}))
         if "min_manager_version" in scheme:
             require(re.fullmatch(r"\d{1,4}\.\d{1,4}\.\d{1,4}", scheme["min_manager_version"]), "Invalid minimum manager version")
+        if "source_url" in scheme:
+            require(re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", scheme["source_url"]), "Invalid upstream project URL")
         require(isinstance(scheme.get("archives"), list) and scheme["archives"], "Missing archives")
         for item in scheme["archives"]:
             name = archive_name(item)
@@ -111,6 +115,19 @@ def validate_spec(spec):
     require(len(names) <= 256, "Too many active archives")
 
 
+def jsonc_loads(text):
+    # Remove comments only outside strings; URLs and escaped quotes are literal.
+    stripped = re.sub(r'"(?:\\.|[^"\\])*"|//[^\r\n]*|/\*[\s\S]*?\*/',
+                      lambda m: m.group() if m.group().startswith('"') else ' ', text)
+    def no_duplicates(items):
+        result = {}
+        for key, value in items:
+            require(key not in result, "Duplicate JSON configuration key")
+            result[key] = value
+        return result
+    return json.loads(stripped, object_pairs_hook=no_duplicates)
+
+
 def package_from_zip(scheme, item, data):
     name = archive_name(item)
     require(0 < len(data) <= MAX_ZIP, "Invalid ZIP size")
@@ -118,7 +135,7 @@ def package_from_zip(scheme, item, data):
         entries = archive.infolist()
         require(len(entries) == 2 and len({e.filename for e in entries}) == 2, "ZIP must contain exactly DLL and its configuration")
         dlls = [e.filename for e in entries if e.filename in PROXIES]
-        config_name = "RTXMFG-Universal.json" if scheme["profile"] == "rtxmfg_universal_133" else "dlssg_sm86.ini"
+        config_name = {"rtxmfg_universal_133": "RTXMFG-Universal.json", "transfusion_json_v3": "DLSSG-Transfusion.json"}.get(scheme["profile"], "dlssg_sm86.ini")
         require(len(dlls) == 1 and {e.filename for e in entries} == {dlls[0], config_name}, "Unexpected ZIP path")
         proxy = dlls[0]
         files = []
@@ -134,6 +151,16 @@ def package_from_zip(scheme, item, data):
                 require(len(header) == 24 and header[:6] == b"PE\0\0\x64\x86" and int.from_bytes(header[22:24], "little") & 0x2000, "Not an x64 DLL")
             else:
                 text = content.decode("utf-8-sig")
+                if scheme["profile"] == "transfusion_json_v3":
+                    config = jsonc_loads(text)
+                    require(isinstance(config, dict) and config.get("configVersion") == 3, "Transfusion requires JSONC v3")
+                    fg = config.get("frameGeneration", {})
+                    require(isinstance(fg, dict) and fg.get("mode") in {"game", "fixed", "dynamic"}, "Invalid Transfusion mode")
+                    require(type(fg.get("multiplier")) is int and 2 <= fg["multiplier"] <= 6, "Invalid Transfusion multiplier")
+                    require(type(fg.get("dynamicTargetFrameRate")) is int and 0 <= fg["dynamicTargetFrameRate"] <= 1000, "Invalid Transfusion target")
+                    require(type(fg.get("dynamicExperimental56")) is bool, "Invalid Transfusion dynamic56")
+                    require(config.get("general", {}).get("gpuArchitecture") == "auto", "Cloud Transfusion config must auto-detect GPU")
+                    require(config.get("compatibility", {}).get("smoothMotionSm86") is False, "Cloud Transfusion must not enable experimental driver Smooth Motion")
                 if scheme["profile"] == "rtxmfg_universal_133":
                     config = json.loads(text)
                     require(isinstance(config, dict), "RTXMFG config must be a JSON object")
@@ -153,6 +180,9 @@ def package_from_zip(scheme, item, data):
     elif profile == "rtxmfg_universal_133":
         backends = ["rtx40mfg"]
         require(proxy == "version.dll", "Universal archive must use canonical version.dll")
+    elif profile == "transfusion_json_v3":
+        backends = ["transfusion"]
+        require(proxy in {"version.dll", "dinput8.dll", "dxgi.dll", "winmm.dll"}, "Transfusion proxy mismatch")
     elif profile == "native026":
         backends = ["native20", "native30"]
         require(proxy not in {"d3d12.dll", "dbghelp.dll"}, "Native 0.2.6 proxy mismatch")
@@ -170,7 +200,7 @@ def build_documents(spec, archives):
     validate_spec(spec)
     packages, schemes, routes = [], [], set()
     for scheme in spec["schemes"]:
-        compact = {k: scheme[k] for k in ("id", "name", "names", "profile", "defaults", "capabilities", "min_manager_version") if k in scheme}
+        compact = {k: scheme[k] for k in ("id", "name", "names", "profile", "defaults", "capabilities", "min_manager_version", "source_url") if k in scheme}
         compact["archives"] = []
         for item in scheme["archives"]:
             name = archive_name(item)
@@ -872,6 +902,29 @@ class OfflineTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): build_documents(spec, {})
         spec["schemes"][0]["archives"].append("test-r1-version.zip")
         with self.assertRaises(RuntimeError): build_documents(spec, archives)
+
+    def test_transfusion_jsonc_and_exact_proxy_routes(self):
+        spec, archives = self.fixture()
+        scheme = spec["schemes"][0]
+        scheme.update(profile="transfusion_json_v3", version="1.4.5", min_manager_version="4.2.6", defaults={"tf_mode":"game", "tf_target":"237"})
+        dll = zipfile.ZipFile(io.BytesIO(next(iter(archives.values())))).read("version.dll")
+        config = {"configVersion":3,"general":{"gpuArchitecture":"auto"},"frameGeneration":{"mode":"game","multiplier":4,"dynamicTargetFrameRate":0,"dynamicExperimental56":False},"compatibility":{"smoothMotionSm86":False}}
+        def pack(name, data):
+            stream = io.BytesIO()
+            with zipfile.ZipFile(stream, "w") as z:
+                z.writestr(name, dll)
+                z.writestr("DLSSG-Transfusion.json", "// 中文 https://example.test/\n" + json.dumps(data))
+            return stream.getvalue()
+        validate_spec(spec)
+        for proxy in ("version.dll", "dinput8.dll", "dxgi.dll", "winmm.dll"):
+            p = package_from_zip(scheme, scheme["archives"][0], pack(proxy, config))
+            self.assertEqual(p["proxy"], proxy)
+            self.assertEqual(p["backends"], ["transfusion"])
+        with self.assertRaises(RuntimeError): package_from_zip(scheme, scheme["archives"][0], pack("d3d12.dll", config))
+        config["compatibility"]["smoothMotionSm86"] = True
+        with self.assertRaises(RuntimeError): package_from_zip(scheme, scheme["archives"][0], pack("version.dll", config))
+        self.assertEqual(jsonc_loads('{"url":"https://example.test/","quote":"a\\\"//b"}')["url"], "https://example.test/")
+        with self.assertRaises(RuntimeError): jsonc_loads('{"mode":"game","mode":"fixed"}')
 
     def test_no_traversal(self):
         spec, archives = self.fixture()
