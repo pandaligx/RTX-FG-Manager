@@ -141,8 +141,10 @@ fn unverified_cloud_stage_preserves_recovery_but_does_not_block_owned_patch_remo
     std::fs::write(&stage, &dll[..100])?;
     std::fs::write(temp.path().join("other-plugin.dll"), b"unknown mod")?;
     std::fs::write(temp.path().join("DLSSG-Transfusion.log"), b"owned log")?;
-    let result = rtx_fg_manager::cleanup::clean(&exe)?;
-    assert!(result.contains("临时文件待核验"));
+    let result =
+        rtx_fg_manager::cleanup::clean_outcome_at(&core::DeploymentTarget::for_game(&exe))?;
+    assert!(!result.complete);
+    assert!(result.message.contains("临时文件待核验"));
     assert!(!temp.path().join("version.dll").exists());
     assert!(!temp.path().join(transfusion::CONFIG).exists());
     assert!(!temp.path().join("DLSSG-Transfusion.log").exists());
@@ -156,7 +158,10 @@ fn unverified_cloud_stage_preserves_recovery_but_does_not_block_owned_patch_remo
     // A user-confirmed removal of the unknown fragment allows the retained
     // recovery record to be finalized on the next uninstall attempt.
     std::fs::remove_file(stage)?;
-    rtx_fg_manager::cleanup::clean(&exe)?;
+    assert!(
+        rtx_fg_manager::cleanup::clean_outcome_at(&core::DeploymentTarget::for_game(&exe))?
+            .complete
+    );
     assert!(core::record(temp.path())?.is_none());
     assert!(exe.is_file());
     Ok(())
@@ -167,8 +172,10 @@ fn completed_stage_matching_record_is_removed_without_embedded_cloud_source() ->
     let (temp, exe, dll) = interrupted_fixture()?;
     let stage = temp.path().join(core::OWN).join("version.dll.stage");
     std::fs::write(&stage, dll)?;
-    let result = rtx_fg_manager::cleanup::clean(&exe)?;
-    assert!(!result.contains("待核验"));
+    let result =
+        rtx_fg_manager::cleanup::clean_outcome_at(&core::DeploymentTarget::for_game(&exe))?;
+    assert!(result.complete);
+    assert!(!result.message.contains("待核验"));
     assert!(!stage.exists());
     assert!(!temp.path().join("version.dll").exists());
     assert!(!temp.path().join(transfusion::CONFIG).exists());

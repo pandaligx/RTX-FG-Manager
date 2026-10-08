@@ -776,7 +776,8 @@
       },
       "gpu_paths": [
         "SM75",
-        "SM86"
+        "SM86",
+        "SM89"
       ],
       "ini_policy": "upstream_proxy",
       "max_selected_proxies": 6,

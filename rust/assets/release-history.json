@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.2.7",
+    "notes": {
+      "zh-CN": "• 修复部分电脑因 Gitee API 限流（403）而无法检查更新的问题。默认直接读取国内固定更新清单，不再依赖 Release 查询接口。\n• 国内清单连接失败或内容无效时自动尝试 GitHub；保留 GitHub 优先设置与旧版 Release 清单备用入口。\n• 保留更新文件大小、SHA-256、版本及数字签名校验。检查失败不会显示为“已是最新版”。\n• 发布流程在双站发行文件核验后才同步固定更新清单。\n\n本次仅更新管理器，已有游戏 DLL 和预设不变。旧版若无法检查更新，可手动下载新版 EXE。",
+      "en": "• Fixed update checks failing on some PCs when Gitee API requests are rate-limited (403). Domestic-first checks now read a public static manifest without querying the release API.\n• Failed or invalid domestic metadata falls back to GitHub. Explicit GitHub preference and the legacy GitHub release-manifest fallback remain supported.\n• File size, SHA-256, version and digital-signature verification remain required. A failed check is never reported as up to date.\n• Publication promotes static manifests only after release files on both sites are verified.\n\nManager-only update; game DLLs and presets are unchanged. Download the new EXE manually if an older manager cannot check for updates.",
+      "ru": "• Исправлена проверка обновлений при ограничении запросов Gitee API (403). По умолчанию используется статический файл Gitee без API релизов.\n• При ошибке или неверном содержимом выполняется переход на GitHub. Выбор приоритета GitHub и прежний адрес релиза сохранены.\n• Проверки размера, SHA-256, версии и цифровой подписи сохранены. Ошибка сети не означает, что установлена последняя версия.\n• Статический файл обновляется только после проверки файлов релиза на обоих сайтах.\n\nОбновлён только менеджер; DLL игр и настройки не изменены. При сбое проверки в старой версии скачайте новый EXE вручную.",
+      "ja": "• Gitee API の制限（403）により一部の PC で更新を確認できない問題を修正。既定では国内の固定 JSON を直接取得し、リリース API を使用しません。\n• 国内データの取得失敗や内容不正時は GitHub に切り替えます。GitHub 優先設定と従来のリリース URL も維持します。\n• サイズ、SHA-256、バージョン、電子署名の検証を維持。確認失敗を「最新」と表示しません。\n• 両サイトの配布ファイル検証後に固定更新情報を公開します。\n\n管理器のみの更新です。ゲーム DLL とプリセットは変更しません。旧版で更新を確認できない場合は新しい EXE を手動でダウンロードしてください。",
+      "ko": "• Gitee API 요청 제한(403) 때문에 일부 PC에서 업데이트를 확인하지 못하는 문제를 수정했습니다. 기본적으로 국내 고정 JSON을 직접 읽으며 릴리스 API를 사용하지 않습니다.\n• 국내 데이터 연결 실패나 잘못된 내용은 GitHub로 전환합니다. GitHub 우선 설정과 기존 릴리스 주소도 유지합니다.\n• 크기, SHA-256, 버전 및 디지털 서명 검증을 유지합니다. 확인 실패를 최신 버전이라고 표시하지 않습니다.\n• 양쪽 사이트의 릴리스 파일 검증 후 고정 업데이트 정보를 게시합니다.\n\n관리기만 업데이트하며 게임 DLL과 프리셋은 변경되지 않습니다. 이전 버전에서 확인이 실패하면 새 EXE를 직접 다운로드하세요."
+    }
+  },
+  {
     "version": "4.2.6",
     "notes": {
       "zh-CN": "• 界面升级至 GPUI Kit 0.7.1 与 GPUI Fast 0.1.2，保留 Windows 首帧、DPI 和字体兼容调整。\n• 左侧栏新增主题窗口：38 个离线配色在同一列表中搜索、滚动并标明明暗；悬停或方向键预览，点击或 Enter 保存，Esc 或点击外部取消并恢复原主题。跟随系统保留分别记忆的浅色、深色配色。\n• 新增 DLSSG-Transfusion 独立方案，使用专属参数和单入口部署。\n• RTXMFG 更新至 1.4.1 Hotfix 1，补充垂直同步、Reflex 限帧及中文帮助。\n• 支持自定义插件部署目录，关联真实游戏并保护其他 MOD。\n• 切换 RTX20/30/40 时保留兼容方案或自动选择可用方案；菜单可打开对应项目。\n• 启动自动请求管理员权限，保留旧版自动更新兼容。\n• 设置和更新提示新增更新日志；软件内可按版本查看历史，当前与历史说明离线可看。\n• 修正 NVIDIA Vulkan 诊断工具误识别，并补充配置保留、日志清理和卸载检查。\n\n提示：游戏内 Backspace 菜单仍为上游英文。Transfusion 的 RTX20 与旧架构 Vulkan 路径仍需实机验证；功能可用性取决于游戏、驱动和显卡。",

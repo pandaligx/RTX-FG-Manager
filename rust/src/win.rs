@@ -56,6 +56,50 @@ pub fn game_lock(dir: &Path) -> Result<GameLock> {
         crate::core::hash(crate::core::key(dir).as_bytes())
     ))
 }
+/// Queue background cache operations without weakening the fail-fast game lock.
+/// The callback runs once on contention, on the waiting worker thread.
+pub fn cache_lock_wait(
+    dir: &Path,
+    cancel: &std::sync::atomic::AtomicBool,
+    mut waiting: impl FnMut(),
+) -> Result<GameLock> {
+    use std::{
+        sync::atomic::Ordering,
+        time::{Duration, Instant},
+    };
+    let name = wide(format!(
+        "Local\\RTXFG-v3-{}",
+        crate::core::hash(crate::core::key(dir).as_bytes())
+    ));
+    let deadline = Instant::now() + Duration::from_secs(15 * 60);
+    let mut notified = false;
+    // SAFETY: The named mutex handle stays owned on this thread. A successful
+    // wait transfers ownership to GameLock, whose Drop releases the mutex.
+    unsafe {
+        let handle = Handle(CreateMutexW(None, false, PCWSTR(name.as_ptr()))?);
+        loop {
+            ensure!(!cancel.load(Ordering::Relaxed), "操作已取消");
+            match WaitForSingleObject(handle.0, 100) {
+                WAIT_OBJECT_0 | WAIT_ABANDONED => {
+                    let guard = GameLock(handle);
+                    ensure!(!cancel.load(Ordering::Relaxed), "操作已取消");
+                    return Ok(guard);
+                }
+                WAIT_TIMEOUT => {
+                    if !notified {
+                        waiting();
+                        notified = true;
+                    }
+                    ensure!(
+                        Instant::now() < deadline,
+                        "等待其他下载任务超时，请稍后重试"
+                    );
+                }
+                _ => return Err(windows::core::Error::from_thread().into()),
+            }
+        }
+    }
+}
 fn named_lock(name: &str) -> Result<GameLock> {
     named_lock_timeout(name, 0)
 }

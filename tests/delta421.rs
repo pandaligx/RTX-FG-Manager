@@ -63,13 +63,22 @@ fn new_cloud_capability_is_optional_and_generic_packages_stay_off() -> Result<()
 fn new_help_is_translated_in_all_supported_languages() -> Result<()> {
     let help: Vec<[String; 2]> =
         serde_json::from_slice(&fs::read(root().join("rust/assets/help.json"))?)?;
-    for lang in ["en", "ru", "ja", "ko"] {
+    let translations: BTreeMap<String, Vec<String>> =
+        serde_json::from_slice(&fs::read(root().join("rust/ui-translations.json"))?)?;
+    assert!(!help.is_empty());
+    for (index, lang) in ["en", "ru", "ja", "ko"].into_iter().enumerate() {
         let t = rtx_fg_manager::i18n::Translator::new(lang);
         for row in &help {
             for source in row {
-                for line in source.split('\n') {
-                    assert_ne!(t.t(line), line, "{lang}: {line}");
-                }
+                // HelpView translates the complete title/body before rendering
+                // Markdown; its blank lines and list markers are not lookup keys.
+                assert!(!source.trim().is_empty());
+                let entries = translations.get(source).expect("complete help translation");
+                assert_eq!(entries.len(), 4, "{source}");
+                let translated = t.t(source);
+                assert!(!translated.trim().is_empty(), "{lang}: empty translation");
+                assert_ne!(translated, *source, "{lang}: {source}");
+                assert_eq!(translated, entries[index], "{lang}: {source}");
             }
         }
         for source in [

@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.2.8
+
+Compared with 4.2.7, this release fixes six manager issues, adds RTX40 selection to the Delta Force scheme and replaces the help pages with a seven-section Markdown guide.
+
+- Check all associated game processes when a custom plugin folder is used, covering installation, parameter changes and removal.
+- Wait cancellably when DLL preparation and manager downloads share the cache, instead of immediately failing on contention; report a timeout with a retry instruction.
+- Keep the newest successful cloud catalog received during scanning, file selection or deployment, then apply it after the operation. The active operation keeps its original settings.
+- Refresh search indices when rescanning changes game contents or order, even if the number of games stays the same.
+- Report cleanup as incomplete when temporary files await verification or caches still need removal. Show a warning and retain ownership records for retry.
+- Exclude Unreal server builds with suffixes such as `Win64-Shipping` from game detection while retaining legitimate game names.
+- Allow **RTX40 (SM89)** selection only for **0.3.5 · Delta Force**. Reuse the existing signed DLLs without rebuilding them or modifying device IDs. Original Github upstream remains the default, and other schemes retain their GPU ranges.
+- Reorganize offline help into seven sections with Markdown headings, steps and tips, a contents list, scrolling, copy support and a narrow-window layout in all five languages.
+
+Updating the manager preserves the game library and preferences and does not automatically replace game DLLs. Existing signed DLLs and cloud packages are unchanged. Compatibility, image quality, multipliers and performance still depend on the game, driver and GPU; no result is generalized to all hardware. **The reported RTX3060 6GB VRAM issue is not fixed by this release.**
+
 ## 4.2.7
 
 - Fix update checks failing when the Gitee release API returns HTTP 403 due to rate limits. Domestic-first checks now use the repository's static `update.json`, without credentials or an API call.

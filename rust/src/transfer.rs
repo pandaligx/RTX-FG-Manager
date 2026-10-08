@@ -73,6 +73,7 @@ pub struct Source {
 pub enum Phase {
     #[default]
     Connecting,
+    Waiting,
     Downloading,
     Switching,
     Restarting,
@@ -104,6 +105,7 @@ impl Progress {
     }
     pub fn label(&self) -> &'static str {
         match self.phase {
+            Phase::Waiting => "正在等待其他下载任务完成…",
             Phase::Connecting => "正在连接下载服务器…",
             Phase::Downloading => "正在下载更新…",
             Phase::Switching => "正在切换下载线路…",

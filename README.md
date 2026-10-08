@@ -6,8 +6,8 @@ A portable Windows app for RTX 20 / 30 / 40, with a native Rust / GPUI interface
 **English** · [简体中文](README.zh-CN.md)
 
 <p align="center">
-  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7"><img alt="release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
-  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7"><img alt="downloads" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
+  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.8"><img alt="release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
+  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.8"><img alt="downloads" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
   <img alt="Windows x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white">
   <a href="LICENSE"><img alt="manager license MIT" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
 </p>
@@ -19,14 +19,27 @@ A portable Windows app for RTX 20 / 30 / 40, with a native Rust / GPUI interface
 
 ## Download
 
-**Current version: 4.2.7** · [Gitee download](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7) · [GitHub download](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7) · [Changelog](CHANGELOG.md)
+**Current version: 4.2.8** · [Gitee download](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.8) · [GitHub download](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.8) · [Changelog](CHANGELOG.md)
 
-Download **`RTXManager-v4.2.7-x64.exe`** for Windows 10 / 11 x64. The release page includes the signed EXE and checksums. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed; game DLLs are downloaded on demand.
+Download **`RTXManager-v4.2.8-x64.exe`** for Windows 10 / 11 x64. The release page includes the signed EXE and checksums. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed; game DLLs are downloaded on demand.
+
+### What changed in 4.2.8
+
+Compared with **4.2.7**, this release fixes six manager issues:
+
+- Custom plugin folders check every associated game EXE process during installation, parameter changes and removal.
+- DLL preparation and manager downloads wait cancellably for the shared cache; a timeout asks you to retry.
+- New cloud metadata received during scanning, file selection or deployment is retained and applied after the operation without changing settings already in use.
+- Search results refresh when a same-count rescan changes game order or names.
+- Removal with temporary files awaiting verification or pending cache cleanup is reported as incomplete with a warning; recovery records remain for retry.
+- Unreal server builds with suffixes such as `Win64-Shipping` are excluded from game detection.
+
+**RTX40 (SM89)** selection is now available for **0.3.5 · Delta Force** only, reusing existing signed DLLs without rebuilding them or changing device IDs. Original Github upstream remains the default, and other schemes retain their GPU ranges. Five-language offline help is organized into seven Markdown sections with a contents list, steps, tips, copy support and a narrow-window layout.
 
 <p align="center">
-  <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home.png" alt="Earlier manager interface showing light and dark themes with demo games" width="980">
+  <img src="https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/docs/screenshot-home.png" alt="RTX Frame Generation Manager 4.2.8 in the light theme with demo games" width="980">
 </p>
-<p align="center">Interface example from an earlier release. Version 4.2.6 adds the sidebar theme picker described below.</p>
+<p align="center">Actual version 4.2.8 window in the light theme, using a demo game library.</p>
 
 ## Choose a scheme
 
@@ -35,7 +48,7 @@ Download **`RTXManager-v4.2.7-x64.exe`** for Windows 10 / 11 x64. The release pa
 | Scheme | GPU series in the app | Game/API requirements and purpose | DLL entry | Configuration |
 | --- | --- | --- | --- | --- |
 | **0.3.5 · Github-sdli1995 — default** | RTX20 / 30 | Compatible D3D12 DLSS FG game; original upstream 310.9 model | Six choices | INI |
-| **0.3.5 · Delta Force** | RTX20 / 30 | D3D12/Vulkan extension; additional multiplier controls for the identified Delta Force game | Six choices | INI |
+| **0.3.5 · Delta Force** | RTX20 / 30 / 40 | D3D12/Vulkan extension; additional multiplier controls for the identified Delta Force game | Six choices | INI |
 | **Dlssg-MFG-Vulkan** | RTX20 / 30 | Compatible DLSS FG path; upstream DX12/Vulkan MFG. RTX20 remains unverified; Dynamic requires compatible DX12 | `version.dll` | Separate INI protocol |
 | **0.2.6 · DX12/Vulkan** | RTX20 / 30 | Retained compatibility option for supported DLSS FG games, using the 310.1 model | Five choices | INI |
 | **Initial · GitHub first release** | RTX20 / 30 | Earlier basic integration for compatible games; a fallback with fewer controls | `version.dll` | INI |
@@ -70,6 +83,7 @@ The scheme name indicates its origin, not the download route. **Project source**
 ## FAQ and limits
 
 - **A scanned game is not a compatibility verdict.** Results depend on its frame-generation integration, graphics API, driver and GPU. A requested multiplier does not guarantee the same FPS increase or unchanged latency; no performance gain is promised.
+- **The reported RTX3060 6GB VRAM issue is not fixed in 4.2.8.** RTX40 selection does not establish compatibility or performance across all hardware.
 - **RTX40 MFG's Backspace menu remains English.** Use the manager's localized presets for multiplier, Dynamic target, UI preset, VSync and fixed-mode Reflex FPS limit. Bink entries require the original Hooked file described by the upstream project.
 - **Digital signatures do not grant anti-cheat approval.** Follow the game's rules and check whether third-party patches are allowed. Administrator access provides file permissions; it does not change those rules.
 - **Different configuration needs different help.** The **?** beside presets explains the selected scheme. Keep its defaults when unsure, and read [version history](CHANGELOG.md) for release-specific changes.

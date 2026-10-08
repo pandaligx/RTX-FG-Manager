@@ -6,8 +6,8 @@
 [English](README.md) · **简体中文**
 
 <p align="center">
-  <a href="https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7"><img alt="版本" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
-  <a href="https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7"><img alt="下载量" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
+  <a href="https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.8"><img alt="版本" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
+  <a href="https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.8"><img alt="下载量" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
   <img alt="Windows x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white">
   <a href="LICENSE"><img alt="管理器许可 MIT" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
 </p>
@@ -19,14 +19,28 @@
 
 ## 下载
 
-**当前版本：4.2.7** · [国内下载 · Gitee](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7) · [GitHub 下载](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.7) · [更新日志](CHANGELOG.zh-CN.md)
+**当前版本：4.2.8** · [国内下载 · Gitee](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.8) · [GitHub 下载](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.8) · [更新日志](CHANGELOG.zh-CN.md)
 
-下载 **`RTXManager-v4.2.7-x64.exe`**，适用于 Windows 10 / 11 x64。发行页提供已签名 EXE 和校验清单；无需另装 Python、Rust、CUDA Toolkit 或 aria2，游戏 DLL 按需从云端获取。
+下载 **`RTXManager-v4.2.8-x64.exe`**，适用于 Windows 10 / 11 x64。发行页提供已签名 EXE 和校验清单；无需另装 Python、Rust、CUDA Toolkit 或 aria2，游戏 DLL 按需从云端获取。
+
+### 4.2.8 更新内容
+
+相比 **4.2.7**，本版修复六项管理器问题：
+
+- 自定义插件目录检查同一游戏的全部关联 EXE 进程，覆盖安装、参数修改和卸载。
+- DLL 准备与软件更新共享缓存时可等待、取消；等待超时后提示重试。
+- 扫描、文件选择或部署期间保留最新云端目录，操作结束后应用，不改变执行中的配置。
+- 相同数量重扫造成游戏顺序或名称变化时，立即刷新搜索结果。
+- 卸载仍有待核验临时文件或待清理缓存时，报告未完成并显示警告，保留记录供重试。
+- 排除带 `Win64-Shipping` 等构建后缀的 Unreal 服务端，避免误列为游戏。
+
+仅为 **0.3.5 · 三角洲专用** 新增 **RTX40（SM89）** 选择，沿用已有签名 DLL，不重建 DLL、不修改设备 ID。Github 上游原版仍为默认，其他方案的显卡范围不变。五语言离线使用说明整理为七节 Markdown 指南，提供目录、步骤、提示、复制和窄窗口布局。
 
 <p align="center">
-  <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png" alt="较早版本的管理器界面，使用演示游戏展示浅色与深色主题" width="980">
+  <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-zh.png" alt="4.2.8 管理器浅色主题，使用演示游戏库" width="49%">
+  <img src="https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/docs/screenshot-home-themes.png" alt="4.2.8 管理器深色主题，使用演示游戏库" width="49%">
 </p>
-<p align="center">较早版本的界面示意；4.2.6 新增的左侧主题选择器见下方说明。</p>
+<p align="center">4.2.8 实际界面，使用演示游戏库展示浅色与深色主题。</p>
 
 ## 选择方案
 
@@ -35,7 +49,7 @@
 | 方案 | 管理器可选显卡 | 游戏／接口要求与用途 | DLL 入口 | 配置格式 |
 | --- | --- | --- | --- | --- |
 | **0.3.5 · Github-sdli1995（默认）** | RTX20 / 30 | 兼容的 D3D12 DLSS 帧生成游戏；保留上游原版与 310.9 模型 | 六入口 | INI |
-| **0.3.5 · 三角洲专用** | RTX20 / 30 | D3D12/Vulkan 扩展；为识别到的三角洲游戏提供额外倍率控制 | 六入口 | INI |
+| **0.3.5 · 三角洲专用** | RTX20 / 30 / 40 | D3D12/Vulkan 扩展；为识别到的三角洲游戏提供额外倍率控制 | 六入口 | INI |
 | **Dlssg-MFG-Vulkan** | RTX20 / 30 | 兼容的 DLSS 帧生成路径；上游 DX12/Vulkan 多帧方案。RTX20 待实测，动态模式需兼容 DX12 | `version.dll` | 独立 INI 协议 |
 | **0.2.6 · DX12/Vulkan** | RTX20 / 30 | 面向受支持 DLSS 帧生成游戏的保留兼容方案，使用 310.1 模型 | 五入口 | INI |
 | **初始方案 · Github 第一版** | RTX20 / 30 | 用于兼容游戏的早期基础方案，供回退选择，参数较少 | `version.dll` | INI |
@@ -70,6 +84,7 @@
 ## 常见问题与限制
 
 - **扫描到游戏不等于确认兼容。** 可用性取决于游戏的帧生成接入、图形接口、驱动和显卡。请求倍率不代表同等倍数的 FPS 提升，也不保证延迟不变；本项目不承诺性能收益。
+- **RTX3060 6GB 的已反馈显存问题不在 4.2.8 修复范围内。** 新增 RTX40 选择不代表全部硬件已验证兼容或性能。
 - **RTX40 MFG 的 Backspace 游戏内菜单仍为英文。** 可在管理器的中文预设中调整倍率、动态目标、UI 预设、垂直同步与固定模式 Reflex 限帧。Bink 入口需要按上游说明保留原始 Hooked 文件。
 - **数字签名不代表反作弊系统允许加载。** 请遵守游戏规则，并确认是否允许第三方补丁。管理员权限只提供文件操作权限，不改变这些规则。
 - **不同方案有不同参数。** 预设旁的 **?** 提供当前方案说明，不确定时保留默认值；具体版本变化见 [更新日志](CHANGELOG.zh-CN.md)。

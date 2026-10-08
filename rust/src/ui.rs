@@ -13,10 +13,12 @@ use gpui_component::{
     input::{Input, InputEvent, InputState},
     menu::{ContextMenuExt, DropdownMenu, PopupMenuItem},
     radio::{Radio, RadioGroup},
+    scroll::ScrollableElement,
     select::{Select, SelectEvent, SelectItem, SelectState},
     sidebar::{Sidebar, SidebarItem, SidebarMenuItem},
     switch::Switch,
     tag::{Tag, TagVariant},
+    text::{TextView, TextViewState, TextViewStyle},
     theme::ThemeMode,
     tooltip::Tooltip,
     *,
@@ -31,6 +33,233 @@ use std::{
     sync::atomic::Ordering,
     time::{Duration, Instant},
 };
+
+/// A local, selectable Markdown document. Sections stay separate so the native
+/// scroll handle can jump to headings without parsing translated anchor names.
+struct HelpDocumentView {
+    sections: Vec<(SharedString, Entity<TextViewState>)>,
+    scroll: ScrollHandle,
+    outline_scroll: ScrollHandle,
+    contents: SharedString,
+    back_to_top: SharedString,
+}
+impl HelpDocumentView {
+    fn new(
+        sections: Vec<(SharedString, SharedString)>,
+        contents: SharedString,
+        back_to_top: SharedString,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self {
+            sections: sections
+                .into_iter()
+                .map(|(heading, body)| {
+                    let markdown = format!("## {heading}\n\n{body}");
+                    let text = cx.new(|cx| TextViewState::markdown(&markdown, cx));
+                    (heading, text)
+                })
+                .collect(),
+            scroll: ScrollHandle::new(),
+            outline_scroll: ScrollHandle::new(),
+            contents,
+            back_to_top,
+        }
+    }
+}
+impl Render for HelpDocumentView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let wide = window.viewport_size().width >= px(1000.);
+        let height = (window.viewport_size().height - px(250.)).clamp(px(112.), px(680.));
+        let mut table = StyleRefinement::default();
+        table.overflow.x = Some(Overflow::Scroll);
+        let text_style = TextViewStyle::default()
+            .paragraph_gap(rems(0.75))
+            .heading_font_size(|level, base| {
+                base * match level {
+                    1 => 1.6,
+                    2 => 1.35,
+                    3 => 1.15,
+                    _ => 1.,
+                }
+            })
+            .table(table);
+        let headings = self
+            .sections
+            .iter()
+            .map(|(heading, _)| heading.clone())
+            .collect::<Vec<_>>();
+        let menu_scroll = self.scroll.clone();
+        let menu_view = cx.weak_entity();
+        div()
+            .v_flex()
+            .gap_3()
+            .w_full()
+            .min_w_0()
+            .child(
+                div()
+                    .h_flex()
+                    .items_center()
+                    .gap_2()
+                    .child(
+                        div()
+                            .px_2()
+                            .py_1()
+                            .rounded_md()
+                            .bg(cx.theme().secondary)
+                            .text_color(cx.theme().muted_foreground)
+                            .text_xs()
+                            .child(format!("RTX FG Manager · v{VERSION}")),
+                    )
+                    .child(div().flex_1())
+                    .when(!wide, |row| {
+                        row.child(
+                            Button::new("help-contents")
+                                .small()
+                                .label(self.contents.clone())
+                                .icon(IconName::ChevronDown)
+                                .dropdown_menu(move |mut menu, window, _| {
+                                    menu = menu
+                                        .max_h(
+                                            (window.viewport_size().height - px(220.))
+                                                .max(px(120.)),
+                                        )
+                                        .max_w(
+                                            (window.viewport_size().width - px(72.)).min(px(440.)),
+                                        )
+                                        .scrollable(true);
+                                    for (index, heading) in headings.iter().enumerate() {
+                                        let scroll = menu_scroll.clone();
+                                        let view = menu_view.clone();
+                                        menu = menu.item(
+                                            PopupMenuItem::new(heading.clone()).on_click(
+                                                move |_, _, cx| {
+                                                    scroll.scroll_to_top_of_item(index);
+                                                    let _ = view.update(cx, |_, cx| cx.notify());
+                                                },
+                                            ),
+                                        );
+                                    }
+                                    menu
+                                }),
+                        )
+                    })
+                    .child(
+                        Button::new("help-back-to-top")
+                            .small()
+                            .ghost()
+                            .label(self.back_to_top.clone())
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.scroll.scroll_to_top_of_item(0);
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(
+                div()
+                    .h_flex()
+                    .items_start()
+                    .gap_4()
+                    .w_full()
+                    .min_w_0()
+                    .when(wide, |row| {
+                        row.child(
+                            div()
+                                .v_flex()
+                                .gap_2()
+                                .w(px(200.))
+                                .flex_shrink_0()
+                                .child(
+                                    div()
+                                        .px_2()
+                                        .text_xs()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(self.contents.clone()),
+                                )
+                                .child(
+                                    div()
+                                        .relative()
+                                        .h(height - px(24.))
+                                        .child(
+                                            div()
+                                                .id("help-outline-scroll")
+                                                .v_flex()
+                                                .gap_1()
+                                                .size_full()
+                                                .pr_2()
+                                                .overflow_y_scroll()
+                                                .track_scroll(&self.outline_scroll)
+                                                .children(self.sections.iter().enumerate().map(
+                                                    |(index, (heading, _))| {
+                                                        Button::new(("help-outline", index))
+                                                            .small()
+                                                            .ghost()
+                                                            .w_full()
+                                                            .justify_start()
+                                                            .label(heading.clone())
+                                                            .tooltip(heading.clone())
+                                                            .on_click(cx.listener(
+                                                                move |this, _, _, cx| {
+                                                                    this.scroll
+                                                                        .scroll_to_top_of_item(
+                                                                            index,
+                                                                        );
+                                                                    cx.notify();
+                                                                },
+                                                            ))
+                                                    },
+                                                )),
+                                        )
+                                        .vertical_scrollbar(&self.outline_scroll),
+                                ),
+                        )
+                    })
+                    .child(
+                        div()
+                            .relative()
+                            .flex_1()
+                            .min_w_0()
+                            .h(height)
+                            .rounded_lg()
+                            .border_1()
+                            .border_color(cx.theme().border)
+                            .bg(cx.theme().background)
+                            .child(
+                                div()
+                                    .id("help-scroll")
+                                    .v_flex()
+                                    .size_full()
+                                    .min_w_0()
+                                    .overflow_y_scroll()
+                                    .track_scroll(&self.scroll)
+                                    .children(self.sections.iter().enumerate().map(
+                                        |(index, (_, text))| {
+                                            div()
+                                                .id(("help-section", index))
+                                                .w_full()
+                                                .min_w_0()
+                                                .flex_shrink_0()
+                                                .p_4()
+                                                .when(index > 0, |section| {
+                                                    section
+                                                        .border_t_1()
+                                                        .border_color(cx.theme().border)
+                                                })
+                                                .child(
+                                                    TextView::new(text)
+                                                        .selectable(true)
+                                                        .style(text_style.clone())
+                                                        .text_sm()
+                                                        .w_full(),
+                                                )
+                                        },
+                                    )),
+                            )
+                            .vertical_scrollbar(&self.scroll),
+                    ),
+            )
+    }
+}
 
 /// Local modal state: selecting a version does not change game preferences.
 struct ReleaseNotesView {
@@ -175,6 +404,33 @@ impl SidebarItem for NavigationItem {
             .child(self.item.render(id, window, cx))
     }
 }
+#[derive(Default)]
+struct GameFilter {
+    revision: Option<u64>,
+    query: String,
+    indices: Vec<usize>,
+}
+impl GameFilter {
+    fn refresh(&mut self, c: &Controller) {
+        if self.revision == Some(c.library_revision) && self.query == c.search {
+            return;
+        }
+        let query = c.search.to_lowercase();
+        self.indices = c
+            .games
+            .iter()
+            .enumerate()
+            .filter(|(_, g)| {
+                g.exe.to_lowercase().contains(&query)
+                    || g.title.to_lowercase().contains(&query)
+                    || g.root.to_lowercase().contains(&query)
+            })
+            .map(|(i, _)| i)
+            .collect();
+        self.revision = Some(c.library_revision);
+        self.query = c.search.clone();
+    }
+}
 pub struct Manager {
     choices: RefCell<HashMap<&'static str, ChoiceBinding>>,
     c: Controller,
@@ -182,7 +438,7 @@ pub struct Manager {
     _subscription: Subscription,
     scroll: UniformListScrollHandle,
     log_scroll: ScrollHandle,
-    filtered: Vec<usize>,
+    filtered: GameFilter,
     theme_choice: String,
     language: String,
     system_poll: Instant,
@@ -237,7 +493,7 @@ impl Manager {
             _subscription: subscription,
             scroll: UniformListScrollHandle::new(),
             log_scroll: ScrollHandle::new(),
-            filtered: Vec::new(),
+            filtered: GameFilter::default(),
             theme_choice,
             language,
             system_poll: Instant::now(),
@@ -273,19 +529,7 @@ impl Manager {
         self.c.text(s).into()
     }
     fn filter(&mut self) {
-        let query = self.c.search.to_lowercase();
-        self.filtered = self
-            .c
-            .games
-            .iter()
-            .enumerate()
-            .filter(|(_, g)| {
-                g.exe.to_lowercase().contains(&query)
-                    || g.title.to_lowercase().contains(&query)
-                    || g.root.to_lowercase().contains(&query)
-            })
-            .map(|(i, _)| i)
-            .collect();
+        self.filtered.refresh(&self.c);
     }
     fn theme(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         if self.theme_preview.is_some() {
@@ -1065,7 +1309,7 @@ impl Manager {
                     .child(self.button("cancel", "取消", Command::Cancel, cx).small()),
             );
         }
-        if self.filtered.is_empty() {
+        if self.filtered.indices.is_empty() {
             card = card.child(
                 div()
                     .flex_1()
@@ -1081,10 +1325,10 @@ impl Manager {
             card = card.child(
                 uniform_list(
                     "game-list",
-                    self.filtered.len(),
+                    self.filtered.indices.len(),
                     cx.processor(|this, range: std::ops::Range<usize>, window, cx| {
                         range
-                            .map(|i| this.game_row(this.filtered[i], window, cx))
+                            .map(|i| this.game_row(this.filtered.indices[i], window, cx))
                             .collect::<Vec<_>>()
                     }),
                 )
@@ -2589,13 +2833,16 @@ impl Manager {
         let title = self.t("使用说明 · RTX 帧生成管理器");
         let ok = self.t("确定");
         let view = cx.entity().downgrade();
-        let height = (window.viewport_size().height - px(270.)).max(px(160.));
-        let width = (window.viewport_size().width - px(100.)).min(px(760.));
-        window.open_dialog(cx, move |dialog, _, _| {
+        let contents = self.t("目录");
+        let back_to_top = self.t("返回顶部");
+        let document = cx.new(|cx| HelpDocumentView::new(sections, contents, back_to_top, cx));
+        window.open_dialog(cx, move |dialog, window, _| {
             let view = view.clone();
+            let width = (window.viewport_size().width - px(48.)).min(px(920.));
             dialog
                 .title(title.clone())
                 .width(width)
+                .margin_top(px(40.))
                 .button_props(DialogButtonProps::default().ok_text(ok.clone()))
                 .footer(
                     DialogFooter::new().child(
@@ -2608,21 +2855,7 @@ impl Manager {
                             }),
                     ),
                 )
-                .child(
-                    div()
-                        .id("help-scroll")
-                        .v_flex()
-                        .gap_5()
-                        .h(height)
-                        .overflow_y_scroll()
-                        .children(sections.iter().map(|(a, b)| {
-                            div()
-                                .v_flex()
-                                .gap_2()
-                                .child(div().font_weight(FontWeight::SEMIBOLD).child(a.clone()))
-                                .child(b.clone())
-                        })),
-                )
+                .child(document.clone())
                 .on_close(move |_, _, cx| {
                     let _ = view.update(cx, |this, cx| {
                         this.dialog_active = false;
@@ -2914,12 +3147,9 @@ impl Manager {
                 .channel
                 .job(move |_| rtx_fg_manager::updater::signal_ready(&data));
         }
-        let before = self.c.games.len();
         let logs = self.c.logs.len();
         if self.c.events() {
-            if before != self.c.games.len() {
-                self.filter()
-            }
+            self.filter();
             if logs != self.c.logs.len() {
                 self.log_scroll.scroll_to_bottom();
             }
@@ -3241,9 +3471,64 @@ fn fitted_bounds(work: Bounds<Pixels>) -> Bounds<Pixels> {
 
 #[cfg(test)]
 mod layout_tests {
-    use super::{deployment_label, fitted_bounds};
+    use super::{GameFilter, deployment_label, fitted_bounds};
     use gpui::component::tag::TagVariant;
     use gpui::{Bounds, point, px, size};
+    #[test]
+    fn search_rebuilds_after_same_count_rescan_reorders_and_relabels_library() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::controller::Controller::new(
+            dir.path().into(),
+            serde_json::json!({"language":"zh-CN", "games":[], "auto_update":false}),
+            Some("read-only test controller".into()),
+            Some(dir.path().join("smoke.json")),
+        );
+        let rows = ["Alpha", "Beta"].map(|name| {
+            let exe = dir
+                .path()
+                .join(name)
+                .join("Binaries/Win64")
+                .join(format!("{name}-Win64-Shipping.exe"));
+            rtx_fg_manager::scanner::Game {
+                title: name.into(),
+                root: rtx_fg_manager::scanner::installation_root(&exe)
+                    .display()
+                    .to_string(),
+                exe: exe.display().to_string(),
+                ..Default::default()
+            }
+        });
+        c.merge(rows.to_vec());
+        c.search = "alpha".into();
+        let mut filter = GameFilter::default();
+        filter.refresh(&c);
+        assert_eq!(filter.indices, [0]);
+        let revision = c.library_revision;
+        c.merge_scan(vec![rows[0].clone()]);
+        assert_eq!(c.games.len(), 2);
+        assert_eq!(c.games[0].title, "Beta");
+        assert_eq!(c.games[1].title, "Alpha");
+        assert_ne!(c.library_revision, revision);
+        filter.refresh(&c);
+        assert_eq!(filter.indices, [1]);
+        assert_eq!(c.games[filter.indices[0]].title, "Alpha");
+
+        // Query changes and metadata-only replacements invalidate the same cache.
+        c.search = "renamed".into();
+        filter.refresh(&c);
+        assert!(filter.indices.is_empty());
+        let mut renamed = rows[0].clone();
+        renamed.title = "Renamed".into();
+        c.merge_scan(vec![renamed]);
+        filter.refresh(&c);
+        assert_eq!(filter.indices, [1]);
+        let exe = c.games[1].exe.clone();
+        c.forget(&std::collections::BTreeSet::from([exe]));
+        filter.refresh(&c);
+        assert!(filter.indices.is_empty());
+        c.close();
+        c.tick_close();
+    }
     #[test]
     fn launch_fits_and_centers_in_scaled_work_areas() {
         for scale in [1.0, 1.25, 1.5, 2.0, 3.0] {

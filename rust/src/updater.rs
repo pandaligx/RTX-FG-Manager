@@ -284,7 +284,13 @@ pub fn download_with_preference(
 ) -> Result<PathBuf> {
     m.validate(&m.version)?;
     safe_url(&m.url)?;
-    let _cache_lock = crate::cache::operation_lock()?;
+    let _cache_lock = crate::cache::wait_for_operation(cancel, || {
+        progress(DownloadProgress {
+            total: m.bytes,
+            phase: DownloadPhase::Waiting,
+            ..Default::default()
+        });
+    })?;
     ensure!(!cancel.load(Ordering::Relaxed), "更新下载已取消");
     let folder = core::no_links(&data.join("updates").join(&m.sha256[..32]))?;
     fs::create_dir_all(&folder)?;

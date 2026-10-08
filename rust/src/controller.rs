@@ -166,6 +166,7 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
 }
 pub struct Controller {
     pub catalog: cloud::Catalog,
+    pending_catalog: Option<cloud::Catalog>,
     pub data: PathBuf,
     pub state: Value,
     pub store: Option<preferences::Store>,
@@ -174,6 +175,8 @@ pub struct Controller {
     pub channel: Channel,
     pub rx: mpsc::Receiver<Event>,
     pub games: Vec<Game>,
+    /// Changes whenever library contents or ordering can invalidate search indices.
+    pub library_revision: u64,
     pub selected: BTreeSet<String>,
     pub focus: Option<String>,
     pub statuses: BTreeMap<String, String>,
@@ -253,6 +256,7 @@ impl Controller {
         let read_only = error.is_some();
         let mut app = Self {
             catalog: cloud::bundled(),
+            pending_catalog: None,
             data: data.clone(),
             state,
             store: (!read_only).then(|| preferences::Store::new(data)),
@@ -261,6 +265,7 @@ impl Controller {
             channel,
             rx,
             games,
+            library_revision: 0,
             selected: BTreeSet::new(),
             focus: None,
             statuses: BTreeMap::new(),
@@ -1006,6 +1011,7 @@ impl Controller {
         })
     }
     pub fn merge(&mut self, rows: Vec<Game>) {
+        let before = self.games.len();
         for g in rows {
             if self.games.len() >= 10000 {
                 break;
@@ -1036,11 +1042,16 @@ impl Controller {
             }
             self.games.push(g);
         }
+        if self.games.len() != before {
+            self.library_revision += 1;
+        }
         self.save();
         self.refresh();
     }
     /// Refresh scanned installations without discarding a previously deployed path.
     pub fn merge_scan(&mut self, rows: Vec<Game>) {
+        // A same-count rescan can reorder entries and replace their title/root.
+        self.library_revision += 1;
         // In-flight reads and status checks refer to the old library identities.
         self.status_epoch += 1;
         let obsolete = self
@@ -1546,13 +1557,18 @@ impl Controller {
                                 Some(&payload.version),
                                 Some(&context),
                             )
+                            .map(|message| cleanup::CleanOutcome {
+                                message,
+                                complete: true,
+                            })
                         })()
                     } else {
-                        cleanup::clean_at(&game.deployment_target(&p))
+                        cleanup::clean_outcome_at(&game.deployment_target(&p))
                     };
                     match result {
-                        Ok(s) => {
-                            let ok = !s.starts_with("补丁已移除，缓存待清理");
+                        Ok(outcome) => {
+                            let ok = outcome.complete;
+                            let s = outcome.message;
                             all_ok &= ok;
                             c.send(Event::PatchResult(ok));
                             if ok {
@@ -1644,7 +1660,11 @@ impl Controller {
         }
         self.status_epoch += 1;
         // Library metadata only: deployment records remain next to the game.
+        let before = self.games.len();
         self.games.retain(|g| !paths.contains(&g.exe));
+        if self.games.len() != before {
+            self.library_revision += 1;
+        }
         self.selected.retain(|p| !paths.contains(p));
         self.statuses.retain(|p, _| !paths.contains(p));
         self.deployments.retain(|p, _| !paths.contains(p));
@@ -1864,6 +1884,26 @@ impl Controller {
             Ok(())
         });
     }
+    fn apply_pending_catalog(&mut self) {
+        if self.closing {
+            self.pending_catalog = None;
+            return;
+        }
+        if self.busy {
+            return;
+        }
+        if let Some(catalog) = self.pending_catalog.take() {
+            for (scheme, reason) in &catalog.skipped_schemes {
+                self.log(&format!("{scheme}：{reason}"));
+            }
+            self.catalog = catalog;
+            self.migrate_presets();
+            if let Some(exe) = self.focus.clone() {
+                self.inspect(exe);
+            }
+        }
+    }
+
     pub fn events(&mut self) -> bool {
         let mut changed = false;
         while let Some(result) = self.store.as_ref().and_then(preferences::Store::try_result) {
@@ -1949,6 +1989,7 @@ impl Controller {
                             ..Default::default()
                         });
                     }
+                    self.library_revision += 1;
                     self.status_epoch += 1;
                     self.focus = Some(exe.clone());
                     self.deployments.remove(&exe);
@@ -2096,16 +2137,10 @@ impl Controller {
                     self.warning = Some(s)
                 }
                 Event::Catalog(catalog) => {
-                    if !self.busy && !self.closing {
-                        for (scheme, reason) in &catalog.skipped_schemes {
-                            self.log(&format!("{scheme}：{reason}"));
-                        }
-                        self.catalog = catalog;
-                        self.migrate_presets();
-                        if let Some(exe) = self.focus.clone() {
-                            self.inspect(exe);
-                        }
-                    }
+                    // Keep the newest successful refresh while the active operation
+                    // continues with its own catalog/payload snapshot.
+                    self.pending_catalog = Some(catalog);
+                    self.apply_pending_catalog();
                 }
                 Event::Deployments(epoch, exe, snapshot) => {
                     if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
@@ -2125,6 +2160,7 @@ impl Controller {
                             s.total.saturating_sub(s.succeeded + s.failed)
                         ));
                     }
+                    self.apply_pending_catalog();
                     self.refresh()
                 }
                 Event::Checked(result, automatic, token) => {
@@ -2208,6 +2244,7 @@ impl Controller {
                     self.update_busy = false;
                     self.update_installing = false;
                     self.closing = true;
+                    self.pending_catalog = None;
                 }
                 Event::SmokeWritten => self.close(),
                 Event::Saved(result) => match result {
@@ -2230,6 +2267,7 @@ impl Controller {
     }
     pub fn close(&mut self) {
         self.closing = true;
+        self.pending_catalog = None;
         self.install_pending = false;
         self.cancel.store(true, Ordering::Relaxed);
         self.update_cancel.store(true, Ordering::Relaxed);
@@ -2448,6 +2486,141 @@ mod tests {
             Some(dir.path().join("test.json")),
         );
         (dir, c)
+    }
+    #[test]
+    fn busy_catalog_refresh_keeps_latest_success_until_operation_finishes() {
+        for critical in [false, true] {
+            let (_dir, mut c) = controller();
+            c.busy = true;
+            c.critical = critical;
+            let operation_catalog = c.catalog.clone();
+            let mut cached = c.catalog.clone();
+            cached.revision = "cached-refresh".into();
+            let mut latest = cached.clone();
+            latest.revision = "latest-refresh".into();
+            c.channel.send(Event::Catalog(cached));
+            c.channel.send(Event::Catalog(latest));
+            c.channel.send(Event::Log("later refresh failed".into()));
+            c.events();
+            assert_eq!(c.catalog.revision, operation_catalog.revision);
+            assert_eq!(
+                c.pending_catalog.as_ref().unwrap().revision,
+                "latest-refresh"
+            );
+            c.channel.send(Event::Done);
+            c.events();
+            assert_eq!(c.catalog.revision, "latest-refresh");
+            assert_ne!(operation_catalog.revision, c.catalog.revision);
+            assert!(c.pending_catalog.is_none());
+            assert!(!c.busy && !c.critical);
+            c.close();
+            c.tick_close();
+        }
+    }
+    #[test]
+    fn idle_catalog_applies_immediately_but_closing_discards_pending_and_late_refreshes() {
+        let (_dir, mut c) = controller();
+        let mut catalog = c.catalog.clone();
+        catalog.revision = "idle-refresh".into();
+        c.channel.send(Event::Catalog(catalog.clone()));
+        c.events();
+        assert_eq!(c.catalog.revision, "idle-refresh");
+        c.busy = true;
+        catalog.revision = "pending-refresh".into();
+        c.channel.send(Event::Catalog(catalog.clone()));
+        c.events();
+        assert!(c.pending_catalog.is_some());
+        c.close();
+        assert!(c.pending_catalog.is_none());
+        catalog.revision = "late-refresh".into();
+        catalog
+            .skipped_schemes
+            .insert("ignored-on-close".into(), "must not be applied".into());
+        c.channel.send(Event::Catalog(catalog));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.catalog.revision, "idle-refresh");
+        assert!(c.pending_catalog.is_none());
+        assert!(!c.logs.iter().any(|s| s.contains("ignored-on-close")));
+        c.tick_close();
+    }
+    #[test]
+    fn cleanup_with_unverified_stage_is_failed_and_warned_until_recovery_finishes() {
+        let (_data, mut c) = controller();
+        let game = tempfile::tempdir().unwrap();
+        let exe = game.path().join("RTXFG-Controller-Stage-Recovery.exe");
+        let mut pe = vec![0; 512];
+        pe[..2].copy_from_slice(b"MZ");
+        pe[60..64].copy_from_slice(&128u32.to_le_bytes());
+        pe[128..132].copy_from_slice(b"PE\0\0");
+        pe[132..134].copy_from_slice(&0x8664u16.to_le_bytes());
+        pe[148..150].copy_from_slice(&240u16.to_le_bytes());
+        pe[150..152].copy_from_slice(&2u16.to_le_bytes());
+        pe[152..154].copy_from_slice(&0x20bu16.to_le_bytes());
+        std::fs::write(&exe, &pe).unwrap();
+        pe[150..152].copy_from_slice(&0x2000u16.to_le_bytes());
+        core::deploy_prepared(
+            &exe,
+            rtx_fg_manager::transfusion::BACKEND,
+            &["version.dll".into()],
+            None,
+            BTreeMap::from([
+                ("version.dll".into(), pe.clone()),
+                (
+                    rtx_fg_manager::transfusion::CONFIG.into(),
+                    br#"{"configVersion":3,"frameGeneration":{"mode":"game","multiplier":4}}"#
+                        .to_vec(),
+                ),
+            ]),
+            Some("1.4.5"),
+        )
+        .unwrap();
+        let stage = game.path().join(core::OWN).join("version.dll.stage");
+        std::fs::write(&stage, &pe[..100]).unwrap();
+        let unknown = game.path().join("other-plugin.dll");
+        std::fs::write(&unknown, b"preserve unrelated plugin").unwrap();
+        let exe = exe.display().to_string();
+        c.games = vec![Game {
+            exe: exe.clone(),
+            ..Default::default()
+        }];
+        for pending in [true, false] {
+            c.warning = None;
+            c.perform(true, BTreeSet::from([exe.clone()]));
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while c.busy {
+                c.events();
+                assert!(Instant::now() < deadline, "cleanup operation completed");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(!game.path().join("version.dll").exists());
+            assert_eq!(
+                std::fs::read(&unknown).unwrap(),
+                b"preserve unrelated plugin"
+            );
+            if pending {
+                assert!(c.warning.as_deref().unwrap().contains("临时文件待核验"));
+                assert!(
+                    c.logs
+                        .iter()
+                        .any(|s| s.contains("成功 0，失败 1，未处理 0"))
+                );
+                assert_eq!(std::fs::read(&stage).unwrap(), pe[..100]);
+                assert!(core::record(game.path()).unwrap().unwrap().cache_pending);
+                // Only the synthetic test fragment is removed; recovery is retried normally.
+                std::fs::remove_file(&stage).unwrap();
+            } else {
+                assert!(c.warning.is_none());
+                assert!(
+                    c.logs
+                        .iter()
+                        .any(|s| s.contains("成功 1，失败 0，未处理 0"))
+                );
+                assert!(core::record(game.path()).unwrap().is_none());
+            }
+        }
+        c.close();
+        c.tick_close();
     }
     #[test]
     fn close_does_not_wait_for_http_or_scan_but_waits_for_mutation() {

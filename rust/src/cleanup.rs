@@ -386,6 +386,16 @@ pub fn clean(exe: &Path) -> Result<String> {
     clean_at(&core::DeploymentTarget::for_game(exe))
 }
 pub fn clean_at(target: &core::DeploymentTarget) -> Result<String> {
+    Ok(clean_outcome_at(target)?.message)
+}
+/// Pending cleanup is a successful partial mutation, but it is not a completed
+/// uninstall. Callers must retain the warning and recovery entry for a retry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CleanOutcome {
+    pub message: String,
+    pub complete: bool,
+}
+pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome> {
     let target = target.validate(false)?;
     let p = target.game_exe.clone();
     let dir = &target.directory;
@@ -411,7 +421,12 @@ pub fn clean_at(target: &core::DeploymentTarget) -> Result<String> {
         manual_record(&p, dir, legacy)?
     } {
         Some(r) => r,
-        None => return Ok("未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留".into()),
+        None => {
+            return Ok(CleanOutcome {
+                message: "未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留".into(),
+                complete: true,
+            });
+        }
     };
     let mut kept = BTreeSet::new();
     let mut targets = BTreeMap::new();
@@ -642,13 +657,18 @@ pub fn clean_at(target: &core::DeploymentTarget) -> Result<String> {
     if !pending.is_empty() {
         record.cache_pending = true;
         core::atomic_json(&root.join(MARKER), &record)?;
-        if pending_stage {
-            return Ok(format!(
+        let message = if pending_stage {
+            format!(
                 "补丁已移除，临时文件待核验；恢复记录已保留，请核对后重试卸载：{}",
                 pending.join("；")
-            ));
-        }
-        return Ok(format!("补丁已移除，缓存待清理：{}", pending.join("；")));
+            )
+        } else {
+            format!("补丁已移除，缓存待清理：{}", pending.join("；"))
+        };
+        return Ok(CleanOutcome {
+            message,
+            complete: false,
+        });
     }
     let marker = core::no_links(&root.join(MARKER))?;
     let bytes = fs::read(&marker)?;
@@ -660,16 +680,20 @@ pub fn clean_at(target: &core::DeploymentTarget) -> Result<String> {
         bail!(e)
     }
     kept.retain(|q| q.exists());
-    if kept.is_empty() {
-        Ok("已清理新旧版补丁 DLL、INI、专属缓存、日志与部署记录".into())
+    let message = if kept.is_empty() {
+        "已清理新旧版补丁 DLL、INI、专属缓存、日志与部署记录".into()
     } else {
-        Ok(format!(
+        format!(
             "已清理可确认归属的补丁、INI、缓存和日志；保留其他或未知文件：{}",
             kept.iter()
                 .filter_map(|p| p.strip_prefix(dir).ok())
                 .map(|p| p.to_string_lossy())
                 .collect::<Vec<_>>()
                 .join("、")
-        ))
-    }
+        )
+    };
+    Ok(CleanOutcome {
+        message,
+        complete: true,
+    })
 }

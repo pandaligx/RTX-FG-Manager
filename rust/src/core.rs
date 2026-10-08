@@ -173,18 +173,23 @@ fn location_checked(exe: &Path, must_exist: bool, require_parent: bool) -> Resul
 pub struct DeploymentTarget {
     pub game_exe: PathBuf,
     pub directory: PathBuf,
+    /// Other rendering/cleanup EXEs in the same library group. These guard
+    /// mutations only; they never change deployment or cleanup ownership.
+    pub guard_exes: Vec<PathBuf>,
 }
 impl DeploymentTarget {
     pub fn for_game(exe: &Path) -> Self {
         Self {
             game_exe: exe.into(),
             directory: exe.parent().unwrap_or(exe).into(),
+            guard_exes: Vec::new(),
         }
     }
     pub fn custom(exe: &Path, directory: &Path) -> Self {
         Self {
             game_exe: exe.into(),
             directory: directory.into(),
+            guard_exes: Vec::new(),
         }
     }
     pub fn validate(&self, must_exist: bool) -> Result<Self> {
@@ -194,9 +199,19 @@ impl DeploymentTarget {
         let game_exe =
             location_checked(&self.game_exe, must_exist, must_exist || !self.is_custom())?;
         let directory = deployment_directory(&self.directory)?;
+        let mut guards = BTreeMap::new();
+        for exe in &self.guard_exes {
+            // Old grouped binaries may have disappeared after a game update.
+            // Keep their process identity without making them install targets.
+            let exe = location_checked(exe, false, false)?;
+            if key(&exe) != key(&game_exe) {
+                guards.insert(key(&exe), exe);
+            }
+        }
         Ok(Self {
             game_exe,
             directory,
+            guard_exes: guards.into_values().collect(),
         })
     }
     pub fn is_custom(&self) -> bool {
@@ -244,22 +259,28 @@ pub fn deployment_directory(directory: &Path) -> Result<PathBuf> {
     Ok(p)
 }
 pub fn assert_target_stopped(target: &DeploymentTarget) -> Result<()> {
-    if target.is_custom() {
-        let game_dir = target.game_exe.parent().context("无效游戏路径")?;
-        let names = win::running_in_directory_or_missing(game_dir, &target.game_exe)?;
+    // Each group can deploy once to a shared plugin folder while still having
+    // multiple real game processes. Do not derive these guards from destinations.
+    for exe in std::iter::once(&target.game_exe).chain(&target.guard_exes) {
+        let game_dir = exe.parent().context("无效游戏路径")?;
+        let names = if exe == &target.game_exe && !target.is_custom() {
+            win::running_in_directory(game_dir)?
+        } else {
+            win::running_in_directory_or_missing(game_dir, exe)?
+        };
         ensure!(
             names.is_empty(),
             "请先完全退出游戏及同目录程序：{}",
             names.join(", ")
         );
+    }
+    if target.is_custom() {
         let names = win::running_in_directory(&target.directory)?;
         ensure!(
             names.is_empty(),
             "请先完全退出游戏及同目录程序：{}",
             names.join(", ")
         );
-    } else {
-        assert_stopped(&target.game_exe)?;
     }
     Ok(())
 }

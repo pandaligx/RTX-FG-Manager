@@ -99,3 +99,13 @@ pub fn operation_lock() -> Result<win::GameLock> {
     fs::create_dir_all(&root)?;
     win::game_lock(&root.join("cache-operations"))
 }
+
+pub fn wait_for_operation(
+    cancel: &std::sync::atomic::AtomicBool,
+    waiting: impl FnMut(),
+) -> Result<win::GameLock> {
+    let root = assets::cache_root()?;
+    core::no_links(&root)?;
+    fs::create_dir_all(&root)?;
+    win::cache_lock_wait(&root.join("cache-operations"), cancel, waiting)
+}

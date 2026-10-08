@@ -14,6 +14,13 @@ use std::{
 pub const DOMESTIC: &str = "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/catalog.json";
 pub const GITHUB: &str =
     "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/catalog.json";
+pub const DELTA_SCHEME: &str = "rtxfg-0.3.5-dx12-vulkan";
+
+fn delta_sm89(id: &str, policy: &Policy) -> bool {
+    id == DELTA_SCHEME
+        && policy.parameter_profile == "upstream035"
+        && policy.capabilities.contains(crate::delta::CAPABILITY)
+}
 const LIMIT: u64 = 128 * 1024 * 1024;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct File {
@@ -206,7 +213,7 @@ impl CompactCatalog {
             );
             packages[0].scheme_id.clone()
         };
-        let c = Catalog {
+        let mut c = Catalog {
             prefer_github: false,
             schema: 2,
             revision: self.revision,
@@ -216,6 +223,7 @@ impl CompactCatalog {
             scheme_policies: policies,
             skipped_schemes,
         };
+        c.enable_legacy_delta_sm89();
         c.validate()?;
         Ok(c)
     }
@@ -381,10 +389,11 @@ impl Catalog {
                     .iter()
                     .all(|g| matches!(g.as_str(), "SM75" | "SM86")
                         || (g == "SM89"
-                            && matches!(
-                                policy.parameter_profile.as_str(),
-                                crate::rtxmfg::PROFILE | crate::transfusion::PROFILE
-                            )))
+                            && (delta_sm89(&p.scheme_id, policy)
+                                || matches!(
+                                    policy.parameter_profile.as_str(),
+                                    crate::rtxmfg::PROFILE | crate::transfusion::PROFILE
+                                ))))
                     && !policy.gpu_paths.is_empty(),
                 "Invalid GPU path"
             );
@@ -393,7 +402,8 @@ impl Catalog {
                     policy
                         .gpu_paths
                         .iter()
-                        .all(|path| matches!(path.as_str(), "SM75" | "SM86"))
+                        .all(|path| matches!(path.as_str(), "SM75" | "SM86")
+                            || (path == "SM89" && delta_sm89(&p.scheme_id, policy)))
                         && policy.max_selected_proxies <= 6,
                     "Unsupported upstream GPU/multi-proxy policy"
                 );
@@ -414,6 +424,16 @@ impl Catalog {
                 .get(id)
                 .is_some_and(|policy| policy.gpu_paths.iter().any(|path| path.as_str() == *gpu))
         })
+    }
+    /// Older cloud clients derived this legacy pair from `upstream035`.
+    /// Only the identified Delta MFG implementation also has an automatic SM89 path.
+    /// Keep restricted/unknown policies unchanged, and never broaden upstream originals.
+    fn enable_legacy_delta_sm89(&mut self) {
+        for (id, policy) in &mut self.scheme_policies {
+            if delta_sm89(id, policy) && policy.gpu_paths == ["SM75", "SM86"] {
+                policy.gpu_paths.push("SM89".into());
+            }
+        }
     }
     pub fn scheme_source_url(&self, id: &str) -> Option<&'static str> {
         let policy = self.scheme_policies.get(id)?;
@@ -460,8 +480,9 @@ impl Catalog {
     }
 }
 pub fn bundled() -> Catalog {
-    let c: Catalog = serde_json::from_str(include_str!("../cloud-catalog.json"))
+    let mut c: Catalog = serde_json::from_str(include_str!("../cloud-catalog.json"))
         .expect("built-in cloud catalog");
+    c.enable_legacy_delta_sm89();
     c.validate().expect("valid built-in cloud catalog");
     c
 }
@@ -470,6 +491,10 @@ pub fn cached() -> Catalog {
         .ok()
         .and_then(|r| core::read_json(&r.join("cloud-catalog.json"), 1024 * 1024).ok())
         .and_then(|v| serde_json::from_value::<Catalog>(v).ok())
+        .map(|mut c| {
+            c.enable_legacy_delta_sm89();
+            c
+        })
         .filter(|c| c.validate().is_ok())
         .unwrap_or_else(bundled)
 }
@@ -743,7 +768,17 @@ pub fn prepare_with_progress(
     mut report: impl FnMut(CloudProgress),
 ) -> Result<Prepared> {
     c.validate()?;
-    let _cache_lock = crate::cache::operation_lock()?;
+    let _cache_lock = crate::cache::wait_for_operation(cancel, || {
+        report(CloudProgress {
+            transfer: crate::transfer::Progress {
+                phase: crate::transfer::Phase::Waiting,
+                ..Default::default()
+            },
+            proxy: String::new(),
+            package_index: 0,
+            package_count: proxies.len(),
+        });
+    })?;
     ensure!(series <= 2, "Invalid GPU selection");
     let policy = c
         .scheme_policies
@@ -884,6 +919,22 @@ pub fn known_image(image: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn legacy_delta_policy_migration_is_idempotent_and_narrow() {
+        let mut c = bundled();
+        c.scheme_policies.get_mut(DELTA_SCHEME).unwrap().gpu_paths =
+            vec!["SM75".into(), "SM86".into()];
+        c.enable_legacy_delta_sm89();
+        c.enable_legacy_delta_sm89();
+        assert_eq!(
+            c.scheme_policies[DELTA_SCHEME].gpu_paths,
+            ["SM75", "SM86", "SM89"]
+        );
+        assert!(!c.supports_series(&c.default_scheme, 2));
+        c.scheme_policies.get_mut(DELTA_SCHEME).unwrap().gpu_paths = vec!["SM86".into()];
+        c.enable_legacy_delta_sm89();
+        assert!(!c.supports_series(DELTA_SCHEME, 2));
+    }
     #[test]
     fn transfusion_routes_are_single_exact_proxy_and_independent_json() {
         let c = bundled();

@@ -68,11 +68,22 @@ pub struct Game {
 }
 impl Game {
     pub fn deployment_target(&self, exe: &Path) -> core::DeploymentTarget {
-        if self.deployment_dir.is_empty() {
+        let mut target = if self.deployment_dir.is_empty() {
             core::DeploymentTarget::for_game(exe)
         } else {
             core::DeploymentTarget::custom(exe, Path::new(&self.deployment_dir))
+        };
+        let mut guards = BTreeMap::new();
+        for path in std::iter::once(&self.exe)
+            .chain(&self.targets)
+            .chain(&self.cleanup_only)
+        {
+            if core::key(Path::new(path)) != core::key(exe) {
+                guards.insert(core::key(Path::new(path)), PathBuf::from(path));
+            }
         }
+        target.guard_exes = guards.into_values().collect();
+        target
     }
     pub fn deployment_directory(&self) -> PathBuf {
         self.deployment_target(Path::new(&self.exe)).directory
@@ -113,18 +124,58 @@ impl Report {
     }
 }
 
+/// Strip only conventional terminal build/platform suffixes. Keep original case
+/// so role boundaries such as GameServer remain distinct from a title like Observer.
+fn executable_role(name: &str) -> &str {
+    let mut role = name
+        .rsplit_once('.')
+        .filter(|(_, extension)| extension.eq_ignore_ascii_case("exe"))
+        .map_or(name, |(stem, _)| stem);
+    for suffixes in [
+        &["-shipping", "-development", "-debuggame", "-debug", "-test"][..],
+        &["-win64", "-win32", "-x64", "-x86"][..],
+    ] {
+        if let Some(prefix) = suffixes.iter().find_map(|suffix| {
+            role.len()
+                .checked_sub(suffix.len())
+                .and_then(|start| role.get(start..).map(|tail| (start, tail)))
+                .filter(|(_, tail)| tail.eq_ignore_ascii_case(suffix))
+                .and_then(|(start, _)| role.get(..start))
+        }) {
+            role = prefix;
+        }
+    }
+    role
+}
+fn role_suffix(name: &str, suffix: &str) -> bool {
+    let Some(start) = name.len().checked_sub(suffix.len()) else {
+        return false;
+    };
+    let Some(tail) = name.get(start..) else {
+        return false;
+    };
+    if !tail.eq_ignore_ascii_case(suffix) {
+        return false;
+    }
+    start == 0
+        || name[..start]
+            .chars()
+            .next_back()
+            .is_some_and(|c| !c.is_alphanumeric())
+        || (tail.starts_with(|c: char| c.is_ascii_uppercase())
+            && name[..start]
+                .chars()
+                .next_back()
+                .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
+}
 /// Exact utility basenames only: NVIDIA/Vulkan words in a game's title are not evidence.
 pub fn is_gpu_diagnostic_tool(exe: &Path) -> bool {
     exe.file_name().is_some_and(|name| {
         matches!(
-            name.to_string_lossy().to_ascii_lowercase().as_str(),
-            "vulkaninfo.exe"
-                | "vulkaninfo32.exe"
-                | "vulkaninfo64.exe"
-                | "vulkaninfo-x86.exe"
-                | "vulkaninfo-x64.exe"
-                | "nvidia-smi.exe"
-                | "nvidia-debugdump.exe"
+            executable_role(&name.to_string_lossy())
+                .to_ascii_lowercase()
+                .as_str(),
+            "vulkaninfo" | "vulkaninfo32" | "vulkaninfo64" | "nvidia-smi" | "nvidia-debugdump"
         )
     })
 }
@@ -132,20 +183,7 @@ fn auxiliary_exe(name: &str) -> bool {
     if is_gpu_diagnostic_tool(Path::new(name)) {
         return true;
     }
-    let stem = name
-        .strip_suffix(".exe")
-        .or_else(|| name.strip_suffix(".EXE"))
-        .unwrap_or(name)
-        .to_ascii_lowercase();
-    let role = [
-        "-win64-shipping",
-        "-win64-development",
-        "-win32-shipping",
-        "-shipping",
-    ]
-    .iter()
-    .find_map(|suffix| stem.strip_suffix(suffix))
-    .unwrap_or(&stem);
+    let role = executable_role(name);
     if [
         "launcher",
         "bootstrap",
@@ -157,7 +195,7 @@ fn auxiliary_exe(name: &str) -> bool {
         "workshoputility",
     ]
     .iter()
-    .any(|suffix| role.ends_with(suffix))
+    .any(|suffix| role_suffix(role, suffix))
     {
         return true;
     }
@@ -184,6 +222,28 @@ fn auxiliary_exe(name: &str) -> bool {
     // Protected launchers also appear with Unreal's Shipping suffix. Match
     // both their original filename and the normalized role above.
     tool.is_match(name) || tool.is_match(&format!("{role}.exe"))
+}
+
+fn non_rendering_role(exe: &Path) -> bool {
+    let name = exe.file_name().unwrap_or_default().to_string_lossy();
+    let role = executable_role(&name);
+    if ["server", "editor", "diagnostics", "benchmark", "config"]
+        .iter()
+        .any(|suffix| role_suffix(role, suffix))
+    {
+        return true;
+    }
+    // Lowercase/all-caps concatenated server names have no word boundary. Only
+    // exclude them with explicit nearby server-directory evidence.
+    role.to_ascii_lowercase().ends_with("server")
+        && exe.parent().is_some_and(|dir| {
+            dir.ancestors().take(4).any(|p| {
+                is_name(
+                    p,
+                    &["server", "servers", "dedicatedserver", "dedicated_server"],
+                )
+            })
+        })
 }
 
 fn steam_root(path: &Path) -> Option<PathBuf> {
@@ -654,12 +714,7 @@ pub fn scan(
             .unwrap_or_default()
             .to_string_lossy()
             .to_lowercase();
-        if name.ends_with("server")
-            || name.ends_with("editor")
-            || name.ends_with("diagnostics")
-            || name.ends_with("benchmark")
-            || name.ends_with("config")
-        {
+        if non_rendering_role(exe) {
             continue;
         }
         if renderer_name(exe, base) {
