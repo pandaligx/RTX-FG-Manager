@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 22135,
-    "fallback_url": "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/indexes/payload-index-r-27e17f68f3e68de7a12c.json",
-    "sha256": "3bfb6f649c2f7294706704400f4d97b6558ea040a799d21da5764eaa5a81d989",
-    "url": "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/indexes/payload-index-r-27e17f68f3e68de7a12c.json"
+    "bytes": 19872,
+    "fallback_url": "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/indexes/payload-index-r-71bc35dde4e8c9e8fb80.json",
+    "sha256": "288f0ea3a96ce3d49e2fa00090370870869073341cdc58739553467ac80b5e4d",
+    "url": "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/indexes/payload-index-r-71bc35dde4e8c9e8fb80.json"
   },
-  "revision": "r-27e17f68f3e68de7a12c",
+  "revision": "r-71bc35dde4e8c9e8fb80",
   "schema": 2,
   "schemes": [
     {
@@ -106,28 +106,25 @@
     },
     {
       "archives": [
-        "rtxmfg-1.4.1-hf1-v426-universal.zip"
+        "rtxmfg-1.4.2-v429-universal.zip"
       ],
       "defaults": {},
       "id": "rtx40mfg-1.3.3-hf2",
       "min_manager_version": "4.2.6",
-      "name": "RTX40 MFG · 1.4.1 Hotfix 1",
+      "name": "RTX40 MFG · 1.4.2",
       "profile": "rtxmfg_universal_133",
       "source_url": "https://github.com/dashdogy/RTX40MFG-Unlock"
     },
     {
       "archives": [
-        "dlssg-transfusion-1.4.5.3-v426-version.zip",
-        "dlssg-transfusion-1.4.5.3-v426-dinput8.zip",
-        "dlssg-transfusion-1.4.5.3-v426-dxgi.zip",
-        "dlssg-transfusion-1.4.5.3-v426-winmm.zip"
+        "rtx-encore-1.0.0-beta.2-v429-universal.zip"
       ],
       "defaults": {},
       "id": "dlssg-transfusion-1.4.5.3",
-      "min_manager_version": "4.2.6",
-      "name": "DLSSG-Transfusion · 1.4.5.3",
-      "profile": "transfusion_json_v3",
-      "source_url": "https://github.com/SilyNoMeta/DLSSG-Transfusion"
+      "min_manager_version": "4.2.9",
+      "name": "RTX Encore · 1.0.0-beta.2",
+      "profile": "rtx_encore_json_v4",
+      "source_url": "https://github.com/SilyNoMeta/rtx-encore"
     }
   ],
   "sources": {
