@@ -1,0 +1,133 @@
+{
+  "configVersion": 4,                        // Settings apply live unless the comment says to restart the game. Editable in the RTX Encore native menu (Insert).
+  "frameGeneration": {
+    "mode": "game",                          // fixed (the multiplier below), dynamic (DLSS-G picks the multiplier to reach the target FPS) or game (the game or NVIDIA Profile Inspector decides).
+    "multiplier": 4,                         // Fixed mode multiplier: 2 to 6. 5 and 6 are experimental.
+    "dynamicTargetFrameRate": 0,             // Dynamic mode target FPS. 0 follows the refresh rate of the monitor showing the game.
+    "dynamicExperimental56": false           // Let Dynamic mode go up to 5x and 6x (needs plenty of VRAM). Off: Dynamic stays at 4x or less.
+  },
+  "smoothMotion": {
+    "smoothMotionEnabled": false,            // Driver Smooth Motion for RTX 30, with the NVIDIA 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply.
+    "smoothMotionApi": "d3d12"               // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
+  },
+  "dlssSuperResolution": {
+    "dlssRenderScale": "game",               // Force the DLSS render resolution: game, dlaa, quality, balanced, performance, ultra-performance or custom. The game must use DLSS already.
+    "dlssCustomScale": 67                    // Render scale in percent (50 to 100) when dlssRenderScale is custom.
+  },
+  "nativeMenuFeatures": {
+    "reflexFrameLimit": 0,                   // 0 follows the game's Reflex frame limit; 1-1000 requests a render-frame cap. Requires a supported Reflex plugin. Applied at its owning options/sleep boundary.
+    "vsyncOff": false,                       // Request interval zero on the application's own DXGI Present. Driver overrides keep priority; TEST/nested presents are preserved.
+    "hairEnabled": true                      // Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change.
+  },
+  "neuralRendering": {
+    "core": {                                // Activation, engine and NR scaler: the main quality/performance controls.
+      "nrEnabled": false,                    // DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0. The first launch prepares it in the background.
+      "nrEngine": "nvidia",                  // nvidia (default) or opendlss (experimental). Open runs dedicated in a Direct3D game (on its own device beside the game) and in-game in a Vulkan game (on the game's device). Restart to apply; no engine fallback.
+      "nrPasses": 1,                         // Independent temporal NR passes, 1 to 4. Cost and VRAM grow. Only a complete chain is published; unsupported chain routes preserve SR.
+      "nrLaterPassLocalTone": 0,             // Tone applied after pass one, 0 to 2. Default zero avoids repeated tone accumulation.
+      "nrResolution": "render",              // Size NR runs at: render (follows the DLSS render size), output (full size), quality (67 percent of the output), balanced (58), performance (50), ultra-performance (33) or custom. Smaller is faster; DLSS keeps the fine detail.
+      "nrResolutionScale": 67                // Percent of the output size (33 to 100) when nrResolution is custom.
+    },
+    "appearance": {                          // Artistic controls applied live.
+      "nrIntensity": 1,                      // Strength of the effect, 0 to 2.
+      "nrStyle": 0,                          // Image style: 0 default (the runtime decides), 1 natural, 2 cinematic. Independent of the model profile.
+      "nrLocalTone": 1,                      // Local tone strength, 0 to 2.
+      "nrLocalStructure": 1,                 // Local structure strength, 0 to 2.
+      "nrAutoMask": false,                   // Character mask: lets the model treat skin separately (needed for nrSkinStructure).
+      "nrSkinStructure": 1,                  // Skin structure strength, 0 to 2. Only read with nrAutoMask.
+      "nrHdrExposure": 1                     // HDR games: brightness given to the model (scene-linear output only).
+    },
+    "passStyles": {                          // Per-pass artistic styles. inherit follows nrStyle, including after a global edit. Applied live with a punctual history reset when the active chain changes.
+      "nrPass1Style": "inherit",             // inherit (default), default, natural or cinematic. Independent of the NVIDIA model profile. Invalid active styles preserve SR.
+      "nrPass2Style": "inherit",             // Style for pass 2, using the global style when inherit. Stored while inactive. Later-pass tone remains nrLaterPassLocalTone.
+      "nrPass3Style": "inherit",             // Style for pass 3: inherit, default, natural or cinematic. Stored while inactive; does not change active history until used.
+      "nrPass4Style": "inherit"              // Style for pass 4: inherit, default, natural or cinematic. Every pass re-encodes the preceding composed colour; only the complete chain is published.
+    },
+    "optimizations": {                       // NVIDIA engine speed options; restart to apply.
+      "nrPrecision": "exact",                // RTX 20/30: exact (same output as NVIDIA) or fast (quicker, small image differences). Gain and image differences vary by scene. No effect on RTX 40/50. Restart the game to apply.
+      "nrFastProcessing": true               // Faster NR processing with the same output bit for bit. Restart the game to apply.
+    },
+    "experimental": {                        // Optional size and scheduling experiments; disabled by default.
+      "nrPaddingAware": false,               // Optionally reduce NR's requested dimensions by up to 2 percent per axis to avoid model padding. May change the NR image; applied live. Does not change DLSS-SR render size.
+      "nrMaxInFlight": 0                     // Experimental D3D12 NR run-ahead limit: 0 baseline, 1 or 2 outstanding NR evaluations. Waits before Reflex sleep; active FG uses at least 2 to retain producer overlap. Same NR image and model; applied live.
+    },
+    "openExperimental": {                    // Open only: explicit backend, speed options and deterministic noise.
+      "nrOpenBackend": "disabled",           // disabled (choose explicitly), rtx40 (RTX 40/50), rtx30 (RTX 30, experimental) or compat (very slow, for qualification). Independent of NVIDIA precision. Restart to apply.
+      "nrOpenExecution": "dedicated",        // Direct3D games only, where Open runs: dedicated (default; on its own device beside the game), shared (experimental, Direct3D 12 only, one NR pass: on the game's device, on a queue of its own) or in_game (experimental: in the game's own command list). Restart to apply; no fallback between them. A Vulkan game always runs it in-game.
+      "nrOpenVramForSpeed": false,           // Open on RTX 30 only: shorter NR time, same image, for more VRAM: about 160 MB at 1440p DLSS Balanced. Leave off when VRAM is nearly full. Restart to apply.
+      "nrOpenFastProjection": true,          // Open on RTX 30 only: shorter NR time, with a slightly different image. Restart to apply.
+      "nrOpenSharedLoads": true,             // Open on RTX 40/50 only: shorter NR time on large sizes, same output. Restart to apply.
+      "nrOpenFast": false,                   // Open on RTX 30 only: fast precision. Shorter NR time, no extra VRAM, a slightly different image. Restart to apply.
+      "nrOpenUltraFast": false,              // Open, one NR pass: ultra-fast mode. About half the NR time, the same on every frame. The image changes: the NR layer follows the image one frame late and can lag or smear in motion; a surface just uncovered or just come on screen is given what NR had made of look-alike surfaces nearby (the two tolerances below). A few MB of VRAM. Restart to apply.
+      "nrOpenUltraFastGhostTolerance": 0.03, // nrOpenUltraFast only: how far the previous frame may differ, where a pixel was, before what NR had made there is dropped (0 to 0.3 of the code range). Lower: fewer ghosts behind what moves, more surface left to fill. Whatever this value, what moved unlike the pixel there (a character the camera turns round) is dropped. Applied live.
+      "nrOpenUltraFastFillTolerance": 0.03,  // nrOpenUltraFast only: a surface just uncovered or just come on screen takes what NR had made of surfaces of the previous frame that look like it; this is how alike they must be (0 to 0.3). 0: no filling, such a surface shows without NR until the network reaches it. Applied live.
+      "nrOpenSeed": 0                        // Open deterministic noise seed. Applied live with history reset.
+    },
+    "advanced": {                            // Model compatibility.
+      "nrUiCorrection": false,               // Model UI correction.
+      "nrPreset": 0                          // NVIDIA model profile: 0 Automatic (recommended), 1-3 numbered profiles. No documented quality/speed ranking; separate from image style.
+    }
+  },
+  "overlay": {
+    "showOverlay": false,                    // Show the in-game multiplier and FPS overlay.
+    "overlayPosition": "top-left",           // top-left, top-right, bottom-left or bottom-right.
+    "overlayFontSize": 14,                   // Overlay text size in pixels: 10 to 32.
+    "metrics": {
+      "overlayShowNr": false,                // Extra line when DLSS Neural Rendering is on: its state and the size it runs at.
+      "overlayShowFramePacing": false,       // Extra line: displayed frame time (average, 99th percentile, jitter).
+      "overlayShowGpu": false,               // Extra line: GPU load, temperature, power and clocks (NVML).
+      "overlayShowVram": false,              // Extra line: VRAM used / total on the GPU (all processes).
+      "overlayShowVersions": false           // Extra line: DLSS (SR), DLSS-G (FG) and Streamline (SL) versions loaded by the game.
+    },
+    "diagnostics": {
+      "overlayShowUiRecomposition": false,   // Extra line: whether DLSS-G UI recomposition (UIR) is on.
+      "overlayShowHudless": false,           // Extra line: where the HUD-less scene comes from (game, UI assist capture or none).
+      "overlayShowUiAlpha": false,           // Extra line: where the UI alpha comes from (game, UI assist injection or none).
+      "overlayShowDebug": false              // Extra line: mode, generated-frame ceiling, Dynamic pacer, last Streamline result, route.
+    }
+  },
+  "imageQuality": {
+    "highMultiplierQuality": true,           // Keeps generated frames clean from 3x to 6x. Leave on. Restart the game to apply.
+    "frameProtection": true,                 // Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). Restart the game to apply.
+    "fastFrameGeneration": true,             // Lowers the GPU cost of each generated frame, same image. Restart the game to apply.
+    "protectionTuning": "refined"            // Protection tuning: refined (default) or classic. Restart the game to apply.
+  },
+  "hudUi": {
+    "autoUiRecomposition": true,             // Turn UI recomposition on when compatible HUD-less inputs are available without the game asking for it. False follows the game. No Man's Sky: use false to avoid generated-frame duplication. See docs/COMPATIBILITY.md.
+    "uiAssist": true,                        // D3D12: capture the HUD-less scene and build the UI layer when the game does not tag them.
+    "forceUiRecomposition": false            // Ask DLSS-G to recompose the HUD separately even when the game does not request it.
+  },
+  "general": {
+    "gpuSeries": "auto"                      // auto, rtx40, rtx30 or rtx20. Leave on auto unless detection fails. Restart the game to apply.
+  },
+  "compatibility": {
+    "disableMenuDetection": false,           // Keep frame generation running in menus and loading screens. Leave false: idling at 1x there avoids device-hang crashes.
+    "forceOTA": false,                       // Load the Frame Generation models downloaded by the NVIDIA App. Restart the game to apply.
+    "flipMeteringBypass": false,             // OptiScaler flip metering bypass, only for setups that need it. Restart the game to apply.
+    "disableMvDilation": false               // Legacy experiment: declare the motion vectors as already dilated. Leave false.
+  },
+  "diagnostics": {
+    "logPerformance": false,                 // Write FPS and frame times to rtx-encore_perf.csv, in rtx-encore-logs.
+    "logNr": false,                          // DLSS Neural Rendering: log what DLSS gives each frame and what NR does (10 frames after enabling, then every 300). Applied live.
+    "profileNrGpu": false,                   // Record NR GPU timestamps and source-frame waits to rtx-encore_nr.csv (NVIDIA engine), or log a [NR-Open timing] line every five seconds (Open engine on Direct3D 12, with logNr; on the shared and in-game routes, also one row per step in rtx-encore_nr_open_steps.csv). The files are in rtx-encore-logs. Optional diagnostics; applied live.
+    "logHudUi": false,                       // Trace the first three game HUD-less copies and D3D12 barrier steps. Applied live.
+    "logMotionTracing": false,               // Very verbose motion-vector diagnostics, for debugging only.
+    "logFilesKept": 3                        // Session logs kept in rtx-encore-logs, the current one included: 1 to 100. Older ones are deleted when the game starts.
+  },
+  "keyboardShortcuts": {
+    "hotkeyFixed2": "Ctrl+Alt+2, Ctrl+Alt+Num2", // Combinations such as Ctrl+Alt+4 or Ctrl+Shift+F5; several separated by commas; empty disables the action.
+    "hotkeyFixed3": "Ctrl+Alt+3, Ctrl+Alt+Num3",
+    "hotkeyFixed4": "Ctrl+Alt+4, Ctrl+Alt+Num4",
+    "hotkeyFixed5": "Ctrl+Alt+5, Ctrl+Alt+Num5",
+    "hotkeyFixed6": "Ctrl+Alt+6, Ctrl+Alt+Num6",
+    "hotkeyMultiplierUp": "Ctrl+Alt+PageUp",
+    "hotkeyMultiplierDown": "Ctrl+Alt+PageDown",
+    "hotkeyToggleDynamic": "Ctrl+Alt+D",
+    "hotkeyTargetFpsUp": "Ctrl+Alt+Up, Ctrl+Alt+Plus, Ctrl+Alt+NumAdd",
+    "hotkeyTargetFpsDown": "Ctrl+Alt+Down, Ctrl+Alt+Minus, Ctrl+Alt+NumSubtract",
+    "hotkeyGameMode": "Ctrl+Alt+G",
+    "hotkeyOverlay": "Ctrl+Alt+O",
+    "hotkeyOverlayPosition": "Ctrl+Alt+P",
+    "disableKeybinds": false                 // Legacy JSON-only switch: disable all shortcuts. Intentionally not exposed in the menu.
+  }
+}

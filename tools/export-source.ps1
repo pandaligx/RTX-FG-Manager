@@ -66,7 +66,7 @@ foreach ($name in @(
     'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/GPUI-FAST-LICENSE', 'rust/assets/licenses/LUCIDE-LICENSE',
     'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json', 'app/tools/aria2.conf',
     'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1',
-    'tools/prepare-fixtures.ps1', 'tools/export-source.ps1', 'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', '.github/workflows/build.yml',
+    'tools/prepare-fixtures.ps1', 'tools/export-source.ps1', 'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', 'tests/test_encore_cloud.py', '.github/workflows/build.yml',
     'vendor/gpui_fast_windows/Cargo.toml', 'vendor/gpui_fast_windows/Cargo.toml.orig',
     'vendor/gpui_fast_windows/build.rs', 'vendor/gpui_fast_windows/LICENSE',
     'vendor/gpui_fast_windows/README.md', 'vendor/gpui_fast_windows/LOCAL_CHANGES.md',
@@ -74,7 +74,7 @@ foreach ($name in @(
 )) { Add-File $name }
 foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md')) { Add-File $name $false }
 Add-Tree 'rust/src' @('.rs')
-Add-Tree 'rust/assets' @('.json', '.svg', '.png', '.ico', '.txt', '.md')
+Add-Tree 'rust/assets' @('.json', '.jsonc', '.svg', '.png', '.ico', '.txt', '.md')
 Add-Tree 'vendor/gpui_fast_windows/src' @('.rs', '.hlsl')
 Add-Tree 'vendor/gpui_fast_windows/resources' @('.rc', '.xml', '.manifest', '.ico')
 foreach ($item in Get-ChildItem -LiteralPath (Join-Path $root 'tests') -File -Filter '*.rs') { Add-File "tests/$($item.Name)" }

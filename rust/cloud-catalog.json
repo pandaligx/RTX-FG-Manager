@@ -567,11 +567,11 @@
       "version": "0.1.0"
     },
     {
-      "archive": "rtxmfg-1.4.1-hf1-v426-universal.zip",
+      "archive": "rtxmfg-1.4.2-v429-universal.zip",
       "backends": [
         "rtx40mfg"
       ],
-      "bytes": 2005106,
+      "bytes": 1997149,
       "files": [
         {
           "bytes": 161,
@@ -579,125 +579,53 @@
           "sha256": "978882875fe0715e81cec40060de367e25637cb81bff0f25b14d63fc7a6a990d"
         },
         {
-          "bytes": 6528096,
+          "bytes": 6575120,
           "name": "version.dll",
-          "sha256": "28f69bba7d320dbcfae7e15b664d0afcb65292640f46eb0814914d44a0e6524e"
+          "sha256": "7ffba7e7ee2ff917f36d0768cdbea42f5fb74de42fc1ea4bb123a439b1f3ce4f"
         }
       ],
-      "id": "rtxmfg-1.4.1-hf1-v426-universal",
-      "label": "RTX40 MFG · 1.4.1 Hotfix 1",
+      "id": "rtxmfg-1.4.2-v429-universal",
+      "label": "RTX40 MFG · 1.4.2",
       "labels": {},
       "proxy": "version.dll",
       "scheme_id": "rtx40mfg-1.3.3-hf2",
-      "sha256": "6191b93a47c4e537f26a9c45108066983d5adc509a824b8bd3cc254be93ae305",
-      "version": "1.4.1"
+      "sha256": "6c2e9a0e0a5d8e07a6081b09227be62024e171550ec46640d0c6b5caa89d3022",
+      "version": "1.4.2"
     },
     {
-      "archive": "dlssg-transfusion-1.4.5.3-v426-version.zip",
+      "archive": "rtx-encore-1.0.0-beta.2-v429-universal.zip",
       "backends": [
-        "transfusion"
+        "encore"
       ],
-      "bytes": 731455,
+      "bytes": 20568987,
       "files": [
         {
-          "bytes": 5822,
-          "name": "DLSSG-Transfusion.json",
-          "sha256": "8dfdcaa71356a6944daab3c372764707abe548c71eec97360a8a5c2b91608f45"
+          "bytes": 9355,
+          "name": "rtx-encore-THIRD-PARTY-NOTICES.md",
+          "sha256": "9b1d0a846f18f047e748b9d375523ebd73893183b66fcd10ed1e94d7f13175b0"
         },
         {
-          "bytes": 3378048,
+          "bytes": 14534,
+          "name": "rtx-encore.jsonc",
+          "sha256": "2c0b2769d2966d61f0d37d0fc29053825db60dbd52554252223111124731c6d2"
+        },
+        {
+          "bytes": 93881768,
           "name": "version.dll",
-          "sha256": "7b07728f0e297b7172490a47a46aa13ead436120fa58914bd74339bec853a979"
+          "sha256": "a99765b22855cc42d7e0c29d1b7d52f7e7f0bc8e6c8d383b20ac46deae7ce58a"
         }
       ],
-      "id": "dlssg-transfusion-1.4.5.3-v426-version",
-      "label": "DLSSG-Transfusion · 1.4.5.3",
+      "id": "rtx-encore-1.0.0-beta.2-v429-universal",
+      "label": "RTX Encore · 1.0.0-beta.2",
       "labels": {},
       "proxy": "version.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "39a9c8d3360ecd3a9764c9ed3f85a0f9bf150ff3df645b2d980d41650121f341",
-      "version": "1.4.5"
-    },
-    {
-      "archive": "dlssg-transfusion-1.4.5.3-v426-dinput8.zip",
-      "backends": [
-        "transfusion"
-      ],
-      "bytes": 731362,
-      "files": [
-        {
-          "bytes": 5822,
-          "name": "DLSSG-Transfusion.json",
-          "sha256": "8dfdcaa71356a6944daab3c372764707abe548c71eec97360a8a5c2b91608f45"
-        },
-        {
-          "bytes": 3377536,
-          "name": "dinput8.dll",
-          "sha256": "55c7ccbb506b80cdaede9c0722a9c964abc0add06f1eefe06b625d67a99dd9a4"
-        }
-      ],
-      "id": "dlssg-transfusion-1.4.5.3-v426-dinput8",
-      "label": "DLSSG-Transfusion · 1.4.5.3",
-      "labels": {},
-      "proxy": "dinput8.dll",
-      "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "a707dc4868668269efc94755b812c8456d4691993b0b8b2442f1f60635ef340d",
-      "version": "1.4.5"
-    },
-    {
-      "archive": "dlssg-transfusion-1.4.5.3-v426-dxgi.zip",
-      "backends": [
-        "transfusion"
-      ],
-      "bytes": 731601,
-      "files": [
-        {
-          "bytes": 5822,
-          "name": "DLSSG-Transfusion.json",
-          "sha256": "8dfdcaa71356a6944daab3c372764707abe548c71eec97360a8a5c2b91608f45"
-        },
-        {
-          "bytes": 3378048,
-          "name": "dxgi.dll",
-          "sha256": "ffc4dc09a80a94c0ed3e58e0926c1c505086a526db73eb684c389fa6eaecf411"
-        }
-      ],
-      "id": "dlssg-transfusion-1.4.5.3-v426-dxgi",
-      "label": "DLSSG-Transfusion · 1.4.5.3",
-      "labels": {},
-      "proxy": "dxgi.dll",
-      "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "df4491e601bdb39e31d5ee25e248d423ecbb19382d6f206182972b40c3542619",
-      "version": "1.4.5"
-    },
-    {
-      "archive": "dlssg-transfusion-1.4.5.3-v426-winmm.zip",
-      "backends": [
-        "transfusion"
-      ],
-      "bytes": 732703,
-      "files": [
-        {
-          "bytes": 5822,
-          "name": "DLSSG-Transfusion.json",
-          "sha256": "8dfdcaa71356a6944daab3c372764707abe548c71eec97360a8a5c2b91608f45"
-        },
-        {
-          "bytes": 3382176,
-          "name": "winmm.dll",
-          "sha256": "b18165553183f28d69162b65553024b710ad470a358da89c971ef35f05b3b1c3"
-        }
-      ],
-      "id": "dlssg-transfusion-1.4.5.3-v426-winmm",
-      "label": "DLSSG-Transfusion · 1.4.5.3",
-      "labels": {},
-      "proxy": "winmm.dll",
-      "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "c9d40117e8495f7748896c9dfaffdeae485d9d3e625d659585611f2070ee9bd9",
-      "version": "1.4.5"
+      "sha256": "b18d1a842ad85442f416c805000f74f79646c4ed71f8a50c57e36c3fe5bb38c7",
+      "upstream_version": "1.0.0-beta.2",
+      "version": "1.0.0"
     }
   ],
-  "revision": "r-27e17f68f3e68de7a12c",
+  "revision": "r-71bc35dde4e8c9e8fb80",
   "schema": 2,
   "scheme_policies": {
     "dlssg-transfusion-1.4.5.3": {
@@ -708,9 +636,9 @@
         "SM86",
         "SM89"
       ],
-      "ini_policy": "transfusion_json",
+      "ini_policy": "encore_json",
       "max_selected_proxies": 1,
-      "parameter_profile": "transfusion_json_v3"
+      "parameter_profile": "rtx_encore_json_v4"
     },
     "initial": {
       "capabilities": [],

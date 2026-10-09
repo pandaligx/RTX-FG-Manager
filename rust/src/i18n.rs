@@ -33,6 +33,12 @@ impl Translator {
                 serde_json::from_str(include_str!("../ui-translations.json"))
                     .expect("bundled UI translations");
             catalog.extend(extra.into_iter().map(|(k, v)| (k, v[index].clone())));
+            let encore: BTreeMap<String, [String; 4]> =
+                serde_json::from_str(include_str!("../assets/encore-translations.json"))
+                    .expect("bundled Encore translations");
+            for (key, values) in encore {
+                catalog.entry(key).or_insert_with(|| values[index].clone());
+            }
         }
         let mut patterns = Vec::new();
         for (k, v) in &catalog {

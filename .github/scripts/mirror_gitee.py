@@ -35,7 +35,7 @@ ALLOWED = {
     'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json',
     'app/tools/aria2.conf', 'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1',
     'tools/prepare-build.ps1', 'tools/prepare-fixtures.ps1', 'tools/export-source.ps1',
-    'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py',
+    'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', 'tests/test_encore_cloud.py',
     'vendor/gpui_fast_windows/Cargo.toml', 'vendor/gpui_fast_windows/Cargo.toml.orig',
     'vendor/gpui_fast_windows/build.rs', 'vendor/gpui_fast_windows/LICENSE',
     'vendor/gpui_fast_windows/README.md', 'vendor/gpui_fast_windows/LOCAL_CHANGES.md',
@@ -50,7 +50,7 @@ ALLOWED = {
 }
 TREES = (
     (r'rust/src/.+', {'.rs'}),
-    (r'rust/assets/.+', {'.json', '.svg', '.png', '.ico', '.txt', '.md'}),
+    (r'rust/assets/.+', {'.json', '.jsonc', '.svg', '.png', '.ico', '.txt', '.md'}),
     (r'vendor/gpui_fast_windows/src/.+', {'.rs', '.hlsl'}),
     (r'vendor/gpui_fast_windows/resources/.+', {'.rc', '.xml', '.manifest', '.ico'}),
     (r'tests/[^/]+', {'.rs'}),

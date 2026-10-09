@@ -51,14 +51,19 @@ impl Game {
     }
 
     fn installed(&self, ini: &[u8]) -> Result<()> {
+        self.installed_backend("upstream_sm86", "0.3.5", ini)
+    }
+
+    fn installed_backend(&self, backend: &str, version: &str, ini: &[u8]) -> Result<()> {
         let dll = synthetic_pe(true, 2);
         fs::write(self.path("version.dll"), &dll)?;
         fs::write(self.path(core::INI), ini)?;
         let record = core::Record {
             schema: 3,
-            backend: "upstream_sm86".into(),
+            backend: backend.into(),
             game_exe: None,
-            payload_version: Some("0.3.5".into()),
+            payload_version: Some(version.into()),
+            upstream_version: None,
             proxy: "version.dll".into(),
             proxies: vec!["version.dll".into()],
             hashes: BTreeMap::from([
@@ -109,20 +114,26 @@ fn prevent_writes_and_removal(path: &Path) -> Result<File> {
 
 #[test]
 fn apply_parameters_uses_the_selected_protocol_and_only_changes_ini() -> Result<()> {
-    for (profile, key, ini_key, value) in [
+    for (backend, version, profile, key, ini_key, value) in [
         (
+            "upstream_sm86",
+            "0.3.5",
             "upstream035",
             "max_generated_frames",
             "MaxGeneratedFrames",
             "2",
         ),
         (
+            "native30",
+            "0.2.6",
             "native026",
             "max_generated_frames",
             "MaxGeneratedFrames",
             "1",
         ),
         (
+            "upstream_sm86",
+            "0.3.5",
             presets::MFG_VULKAN,
             "max_interpolated_frames",
             "MaxInterpolatedFrames",
@@ -130,7 +141,7 @@ fn apply_parameters_uses_the_selected_protocol_and_only_changes_ini() -> Result<
         ),
     ] {
         let game = Game::new()?;
-        game.installed(ORIGINAL_INI.as_bytes())?;
+        game.installed_backend(backend, version, ORIGINAL_INI.as_bytes())?;
         let before = game.snapshot()?;
         let _dll_guard = prevent_writes_and_removal(&game.path("version.dll"))?;
         let _game_guard = prevent_writes_and_removal(&game.exe)?;
@@ -211,6 +222,27 @@ fn same_protocol_does_not_authorize_editing_another_deployed_scheme() -> Result<
     .unwrap_err();
     assert!(error.to_string().contains("方案不同"));
     assert_eq!(game.snapshot()?, before);
+    Ok(())
+}
+
+#[test]
+fn same_scheme_does_not_authorize_a_different_backend_protocol() -> Result<()> {
+    for (backend, version, wrong_profile) in [
+        ("upstream_sm86", "0.3.5", "native026"),
+        ("native30", "0.2.6", "upstream035"),
+    ] {
+        let game = Game::new()?;
+        game.installed_backend(backend, version, ORIGINAL_INI.as_bytes())?;
+        let before = game.snapshot()?;
+        let error = core::apply_parameters(
+            &game.exe,
+            &context(wrong_profile),
+            &BTreeMap::from([("logging_level".into(), "3".into())]),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("旧参数协议"));
+        assert_eq!(game.snapshot()?, before);
+    }
     Ok(())
 }
 

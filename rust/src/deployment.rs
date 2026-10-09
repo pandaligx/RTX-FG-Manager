@@ -11,6 +11,7 @@ pub struct Snapshot {
     pub proxies: BTreeSet<String>,
     pub details: Vec<String>,
     pub common: Option<(String, Vec<String>, Option<usize>)>,
+    pub incompatible_protocol: bool,
 }
 pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
     let targets = game.deployment_executables();
@@ -38,7 +39,7 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
                     b if b.starts_with("native") => "native-0.2.6-stable".into(),
                     _ => "unknown".into(),
                 });
-            let label = catalog
+            let catalog_label = catalog
                 .packages
                 .iter()
                 .find(|p| p.scheme_id == scheme)
@@ -49,6 +50,31 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
                         r.backend,
                         r.payload_version.as_deref().unwrap_or("")
                     )
+                });
+            let label = if r.backend == crate::transfusion::BACKEND {
+                "DLSSG-Transfusion · 1.4.5.3".to_owned()
+            } else if r.backend == crate::encore::BACKEND {
+                format!(
+                    "RTX Encore · {}",
+                    r.upstream_version
+                        .as_deref()
+                        .or(r.payload_version.as_deref())
+                        .unwrap_or("")
+                )
+            } else if r.backend == crate::rtxmfg::BACKEND {
+                format!(
+                    "RTX40 MFG · {}",
+                    r.upstream_version
+                        .as_deref()
+                        .or(r.payload_version.as_deref())
+                        .unwrap_or("?")
+                )
+            } else {
+                catalog_label
+            };
+            snapshot.incompatible_protocol |=
+                catalog.scheme_policies.get(&scheme).is_none_or(|policy| {
+                    !core::backend_matches_profile(&r.backend, &policy.parameter_profile)
                 });
             snapshot.schemes.insert(scheme.clone());
             let proxies = r.selected();
@@ -108,5 +134,6 @@ impl Snapshot {
         self.total > 0
             && self.total == self.installed
             && self.common.as_ref().is_some_and(|c| c.0 == scheme)
+            && !self.incompatible_protocol
     }
 }

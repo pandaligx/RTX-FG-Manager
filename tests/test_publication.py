@@ -56,7 +56,11 @@ class SourceAllowlistTests(unittest.TestCase):
                          'vendor/gpui_fast_windows/src/shaders.hlsl',
                          'rust/assets/themes/catppuccin.json',
                          'rust/assets/themes/LICENSE-APACHE',
-                         'rust/assets/licenses/GPUI-FAST-LICENSE'):
+                         'rust/assets/licenses/GPUI-FAST-LICENSE',
+                         'rust/assets/encore-defaults.jsonc',
+                         'rust/assets/encore-fields.json',
+                         'tests/test_encore_cloud.py',
+                         'tests/v429_encore_cloud.rs'):
             self.assertIn(required, files)
         self.assertEqual(sum(path.startswith('rust/assets/themes/') and path.endswith('.json')
                              for path in files), 21)
@@ -64,6 +68,12 @@ class SourceAllowlistTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue(mirror['allowed_source'](path), path)
                 mirror['validate_content'](path, (ROOT / path).read_bytes())
+
+    def test_build_runs_exported_offline_cloud_protocol_tests(self):
+        workflow = (ROOT / '.github/workflows/build.yml').read_text(encoding='utf-8-sig')
+        self.assertIn('python -B tools/cloud_release.py self-test', workflow)
+        self.assertIn('python -B -m unittest discover -s tests -p test_encore_cloud.py -v', workflow)
+        self.assertIn('python -B -m unittest discover -s tests -p test_publication.py -v', workflow)
 
     def test_current_vendor_resources_and_catalog_fixtures_are_allowed(self):
         for path in ('vendor/gpui_fast_windows/resources/app.rc',

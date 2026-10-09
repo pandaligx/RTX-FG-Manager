@@ -108,6 +108,9 @@ pub fn normalize(profile: &str, values: &mut Values) -> bool {
     false
 }
 pub fn parameter_enabled(profile: &str, key: &str, values: &Values) -> bool {
+    if profile == crate::encore::PROFILE {
+        return crate::encore::field_enabled(key, values, None);
+    }
     if profile == crate::transfusion::PROFILE {
         return !matches!(key, "tf_target" | "tf_dynamic56")
             || values.get("tf_mode").map(String::as_str) == Some("dynamic");
@@ -133,6 +136,23 @@ pub struct Parameter {
     pub choices: Vec<(&'static str, &'static str)>,
 }
 pub fn parameters(profile: &str) -> Vec<Parameter> {
+    if profile == crate::encore::PROFILE {
+        return crate::encore::fields()
+            .iter()
+            .map(|field| Parameter {
+                key: field.key.as_str(),
+                section: field.path.first().map(String::as_str).unwrap_or(""),
+                ini_key: field.path.last().map(String::as_str).unwrap_or(""),
+                label: field.label.as_str(),
+                default: field.default.as_str(),
+                choices: field
+                    .choices
+                    .iter()
+                    .map(|c| (c.value.as_str(), c.label.as_str()))
+                    .collect(),
+            })
+            .collect();
+    }
     if profile == crate::transfusion::PROFILE {
         return crate::transfusion::parameters();
     }
@@ -232,6 +252,9 @@ pub fn parameters(profile: &str) -> Vec<Parameter> {
     p
 }
 pub fn validate(profile: &str, values: &Values) -> Result<()> {
+    if profile == crate::encore::PROFILE {
+        return crate::encore::validate_values(values);
+    }
     ensure!(
         matches!(
             profile,
@@ -275,6 +298,16 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
     Ok(())
 }
 pub fn defaults(profile: &str, overrides: &Values) -> Values {
+    if profile == crate::encore::PROFILE {
+        let mut values = crate::encore::defaults();
+        for (key, value) in overrides {
+            let item = Values::from([(key.clone(), value.clone())]);
+            if crate::encore::validate_values(&item).is_ok() {
+                values.insert(key.clone(), value.clone());
+            }
+        }
+        return values;
+    }
     let mut values = parameters(profile)
         .iter()
         .map(|p| {
@@ -298,6 +331,9 @@ pub fn defaults(profile: &str, overrides: &Values) -> Values {
     values
 }
 pub fn configure(bytes: &[u8], profile: &str, values: &Values) -> Result<Vec<u8>> {
+    if profile == crate::encore::PROFILE {
+        return crate::encore::configure(bytes, values);
+    }
     if profile == crate::transfusion::PROFILE {
         return crate::transfusion::configure(bytes, values);
     }
@@ -363,6 +399,9 @@ pub fn merge_context(
     backend: &str,
     context: Option<&Context>,
 ) -> Result<Vec<u8>> {
+    if backend == crate::encore::BACKEND {
+        return crate::encore::configure(current, &crate::encore::read(desired)?);
+    }
     if backend == crate::transfusion::BACKEND {
         return crate::transfusion::configure(current, &crate::transfusion::read(desired)?);
     }
@@ -486,6 +525,9 @@ fn mfg_parameters() -> Vec<Parameter> {
 }
 
 pub fn read_values(bytes: &[u8], profile: &str) -> Result<Values> {
+    if profile == crate::encore::PROFILE {
+        return crate::encore::read(bytes);
+    }
     if profile == crate::transfusion::PROFILE {
         return crate::transfusion::read(bytes);
     }
@@ -536,7 +578,17 @@ pub fn inspect_at(
             scheme = catalog
                 .packages
                 .iter()
-                .find(|p| p.files.iter().any(|f| f.name == name && f.sha256 == sha))
+                .find(|p| {
+                    p.files.iter().any(|f| {
+                        f.sha256 == sha
+                            && (f.name == name
+                                || (f.name == p.proxy
+                                    && catalog.scheme_policies.get(&p.scheme_id).is_some_and(
+                                        |s| s.parameter_profile == crate::encore::PROFILE,
+                                    )
+                                    && crate::encore::PROXIES.contains(&name)))
+                    })
+                })
                 .map(|p| p.scheme_id.clone());
             if scheme.is_some() {
                 break;
@@ -549,21 +601,38 @@ pub fn inspect_at(
     let Some(policy) = catalog.scheme_policies.get(&scheme) else {
         return Ok(None);
     };
-    let ini = crate::core::no_links(&dir.join(
-        if policy.parameter_profile == crate::rtxmfg::PROFILE {
-            crate::rtxmfg::CONFIG
-        } else if policy.parameter_profile == crate::transfusion::PROFILE {
-            crate::transfusion::CONFIG
-        } else {
-            crate::core::INI
-        },
-    ))?;
+    let ini = crate::core::no_links(
+        &dir.join(
+            if record
+                .as_ref()
+                .is_some_and(|r| r.backend == crate::transfusion::BACKEND)
+            {
+                crate::transfusion::CONFIG
+            } else if policy.parameter_profile == crate::encore::PROFILE {
+                crate::encore::CONFIG
+            } else if policy.parameter_profile == crate::rtxmfg::PROFILE {
+                crate::rtxmfg::CONFIG
+            } else if policy.parameter_profile == crate::transfusion::PROFILE {
+                crate::transfusion::CONFIG
+            } else {
+                crate::core::INI
+            },
+        ),
+    )?;
     if !ini.is_file() {
         return Ok(None);
     }
     ensure!(ini.metadata()?.len() <= 1024 * 1024, "INI 文件过大");
     let bytes = std::fs::read(ini)?;
-    let mut values = read_values(&bytes, &policy.parameter_profile)?;
+    let mut values = if policy.parameter_profile == crate::encore::PROFILE
+        && record
+            .as_ref()
+            .is_some_and(|r| r.backend == crate::transfusion::BACKEND)
+    {
+        crate::encore::read(&crate::encore::migrate(&bytes, &Values::new())?)?
+    } else {
+        read_values(&bytes, &policy.parameter_profile)?
+    };
     if Context::new(&scheme, policy, exe).delta {
         let (text, _) = crate::diagnostics::decode_ini(&bytes)?;
         if let Some(n) =

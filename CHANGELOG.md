@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.2.9
+
+Adapt [RTX MFG 1.4.2](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.2) and [RTX Encore 1.0.0-beta.2](https://github.com/SilyNoMeta/rtx-encore), which succeeds DLSSG-Transfusion 1.4.5.3. Existing scheme identities and per-game selections are retained.
+
+- **RTX40 MFG · 1.4.2** improves experimental path-traced hair detection in The Witcher 3 after a game update made the option unavailable. Use `winmm.dll` beside `witcher3.exe`. The manager keeps this scheme RTX40-only; Vulkan is experimental and lacks Dynamic MFG.
+- Preserve settings when upgrading RTX MFG to a newer version with a valid manager record and the same scheme and DLL entry. Exit the game, then choose **Install and apply**. Ownership checks protect unknown modifications instead of overwriting them.
+- Encore uses one signed universal DLL with one of 19 loader names selected. Byte-preserving copying and renaming retain its signature; this does not apply to separately compiled alternative-proxies or ASI files. ASI is not deployed. Filenames do not add graphics API support.
+- Bink entries require original game components beside the patch as `binkw64Hooked.dll` / `bink2w64Hooked.dll`. Existing files are protected; the manager does not rename or delete original Bink files.
+- Add separate JSONC v4 and advanced controls for frame generation, Smooth Motion, super resolution, Neural Rendering, menus/shortcuts, statistics and compatibility using the actual configuration fields. Write explicit user edits only, preserving comments, unknown fields, menu state and inactive settings instead of overwriting game-side values with defaults.
+- Upgrade valid manager-owned Transfusion installs in place after the game exits: back up the DLL, JSONC and record before migrating to `rtx-encore.jsonc`. Failures roll back; interrupted transactions recover from the journal. Unknown changes or altered backups are retained and reported. The stable ID neither mislabels old DLLs as upgraded nor permits new parameters to be written into the old protocol.
+- The native menu opens once initially and then toggles with **Insert**, without ReShade. RTX40 MFG's **Backspace** menu remains separate. Shorten five-language help into eight practical sections while retaining contents, scrolling and copy support. Update actual deployment labels and the full `1.0.0-beta.2` version display.
+- Include upstream third-party notices in each Encore ZIP and deployment. Removal handles owned patch files, configuration, matching notices and recognized logs while preserving unknown files, original Bink components, shared components and user-supplied NVIDIA DLLs.
+
+**NR defaults to off** and requires user-supplied NVIDIA `nvngx_dlssnr.dll` **310.8.0** with DLSS SR/DLAA enabled in game; the manager does not distribute that file. RTX20 remains experimental. Open, precision, multiple passes and optimization options require target-game checks for performance and image trade-offs. **Smooth Motion defaults to off**; this unlock route requires RTX30 and exactly **617.42 / 617.14 / 616.92 / 616.64**. Upstream reports actual game validation only for **617.14**. A DX11/DX12/Vulkan menu does not imply every feature works in every game, and renaming adds no API capabilities.
+
+Updating the manager alone never replaces game DLLs. Use Install and apply for the Transfusion migration or an eligible RTX MFG upgrade. Changing schemes or DLL entries still requires removal of the old patch; different DLL versions of an existing Encore install retain their prior removal requirement. This release has no new target-game or GPU validation; manager and offline file checks are not game compatibility or performance results.
+
 ## 4.2.8
 
 Compared with 4.2.7, this release fixes six manager issues, adds RTX40 selection to the Delta Force scheme and replaces the help pages with a seven-section Markdown guide.

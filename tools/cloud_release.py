@@ -13,6 +13,7 @@ import hashlib
 import http.client
 import io
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -35,6 +36,9 @@ RESOURCE_TAG = "payloads"
 MAX_ZIP = 128 * 1024 * 1024
 MAX_JSON = 1024 * 1024
 PROXIES = {"version.dll", "winmm.dll", "dinput8.dll", "dbghelp.dll", "dxgi.dll", "d3d12.dll", "winhttp.dll"}
+ENCORE_PROFILE = "rtx_encore_json_v4"
+ENCORE_CONFIG = "rtx-encore.jsonc"
+ENCORE_NOTICES = "rtx-encore-THIRD-PARTY-NOTICES.md"
 GH = f"https://api.github.com/repos/{REPO}"
 GT = f"https://gitee.com/api/v5/repos/{REPO}"
 GT_RESOURCES = f"https://gitee.com/api/v5/repos/{GITEE_RESOURCE_REPO}"
@@ -66,7 +70,12 @@ def archive_name(item):
 
 def validate_defaults(profile, defaults):
     boolean = {"0", "1"}
-    if profile == "transfusion_json_v3":
+    if profile == ENCORE_PROFILE:
+        fields = {field["key"]: field for field in encore_fields()}
+        require(all(key in fields and encore_value_valid(fields[key], value)
+                    for key, value in defaults.items()), "Unknown or invalid Encore preset default")
+        return
+    elif profile == "transfusion_json_v3":
         choices = {"tf_mode": {"game", "2", "3", "4", "5", "6", "dynamic"}, "tf_target": {str(n) for n in range(1001)}, "tf_dynamic56": boolean, "tf_overlay": boolean}
     elif profile == "rtxmfg_universal_133":
         choices = {"rtx_mode": {"follow", "1", "2", "3", "4", "5", "6", "dynamic"}, "rtx_target": {str(n) for n in range(1001)}, "rtx_preset": {"0", "1", "2"}, "rtx_vsync": {"0", "1"}, "rtx_reflex_limit": {str(n) for n in range(1001)}}
@@ -98,14 +107,24 @@ def validate_spec(spec):
         ids.add(sid)
         require(isinstance(scheme.get("name"), str) and 0 < len(scheme["name"]) <= 200, "Invalid scheme name")
         require(re.fullmatch(r"\d{1,4}\.\d{1,4}\.\d{1,4}", scheme.get("version", "")), "Invalid package version")
-        require(scheme.get("profile") in {"initial", "native026", "upstream031", "upstream035", "mfg_vulkan_sm86_7", "rtxmfg_universal_133", "transfusion_json_v3"}, "New protocols require a manager/tool update")
+        require(scheme.get("profile") in {"initial", "native026", "upstream031", "upstream035", "mfg_vulkan_sm86_7", "rtxmfg_universal_133", "transfusion_json_v3", ENCORE_PROFILE}, "New protocols require a manager/tool update")
+        if "upstream_version" in scheme:
+            upstream = scheme["upstream_version"]
+            require(isinstance(upstream, str) and len(upstream) <= 100 and re.fullmatch(
+                r"\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?(?:\+[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?", upstream)
+                and re.split(r"[-+]", upstream, maxsplit=1)[0] == scheme["version"], "Invalid upstream package version")
         require(isinstance(scheme.get("defaults", {}), dict), "Invalid defaults")
         validate_defaults(scheme["profile"], scheme.get("defaults", {}))
         if "min_manager_version" in scheme:
             require(re.fullmatch(r"\d{1,4}\.\d{1,4}\.\d{1,4}", scheme["min_manager_version"]), "Invalid minimum manager version")
+        if scheme["profile"] == ENCORE_PROFILE:
+            minimum = scheme.get("min_manager_version", "0.0.0")
+            require(tuple(map(int, minimum.split("."))) >= (4, 2, 9), "Encore requires manager 4.2.9 or newer")
         if "source_url" in scheme:
             require(re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", scheme["source_url"]), "Invalid upstream project URL")
         require(isinstance(scheme.get("archives"), list) and scheme["archives"], "Missing archives")
+        if scheme["profile"] == ENCORE_PROFILE:
+            require(len(scheme["archives"]) == 1, "Encore uses one canonical universal archive")
         for item in scheme["archives"]:
             name = archive_name(item)
             require(name not in names, "ZIP used by multiple scheme routes")
@@ -129,15 +148,121 @@ def jsonc_loads(text):
     return json.loads(stripped, object_pairs_hook=no_duplicates)
 
 
+def encore_fields():
+    """Share the reviewed native schema with the manager; never infer paths from prose."""
+    path = Path(__file__).resolve().parents[1] / "rust/assets/encore-fields.json"
+    fields = json.loads(path.read_text(encoding="utf-8-sig"))
+    require(isinstance(fields, list) and fields, "Missing Encore field metadata")
+    return fields
+
+
+def encore_value_valid(field, value):
+    if not isinstance(value, str):
+        return False
+    kind = field["kind"]
+    if kind == "bool":
+        return value in {"0", "1"}
+    if kind == "choice":
+        return value in {choice["value"] for choice in field["choices"]}
+    if kind in {"integer", "decimal"}:
+        try:
+            if kind == "integer" and not re.fullmatch(r"[0-9]+", value):
+                return False
+            if kind == "decimal" and not re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", value):
+                return False
+            number = int(value) if kind == "integer" else float(value)
+            return (math.isfinite(number)
+                    and (kind != "integer" or number <= 18446744073709551615)
+                    and (kind != "decimal" or abs(number) <= 3.4028234663852886e38)
+                    and (field["min"] is None or number >= float(field["min"]))
+                    and (field["max"] is None or number <= float(field["max"])))
+        except (ValueError, OverflowError):
+            return False
+    if kind == "hotkey":
+        return encore_hotkey_valid(value)
+    return False
+
+
+def encore_hotkey_valid(value):
+    if not value:
+        return True
+    if len(value.encode("utf-8")) > 512 or len(value.split(",")) > 16:
+        return False
+    named = {"pageup", "pagedown", "end", "home", "left", "right", "up", "down", "insert", "delete",
+             "space", "tab", "backspace", "enter", "pause", "esc", "escape", "plus", "comma", "minus", "period",
+             "nummultiply", "numadd", "numsubtract", "numdecimal", "numdivide"}
+    for combination in value.split(","):
+        parts = [part.strip().lower() for part in combination.split("+")]
+        if not all(parts):
+            return False
+        modifiers = ["ctrl" if part == "control" else part for part in parts[:-1]]
+        if any(part not in {"ctrl", "alt", "shift", "win"} for part in modifiers) or len(set(modifiers)) != len(modifiers):
+            return False
+        key = parts[-1]
+        function = re.fullmatch(r"f([0-9]+)", key)
+        if not ((len(key) == 1 and key.isascii() and key.isalnum()) or key in named
+                or (function and 1 <= int(function[1]) <= 24) or re.fullmatch(r"num[0-9]", key)):
+            return False
+    return True
+
+
+def validate_encore_config(config):
+    require(isinstance(config, dict) and type(config.get("configVersion")) is int
+            and config["configVersion"] == 4, "Encore requires JSONC v4")
+    for field in encore_fields():
+        value = config
+        missing = False
+        for part in field["path"]:
+            require(isinstance(value, dict), "Invalid Encore section: " + ".".join(field["path"]))
+            if part not in value:
+                require(field.get("optional", False), "Missing Encore field: " + field["key"])
+                missing = True
+                break
+            value = value[part]
+        if missing:
+            continue
+        kind = field["kind"]
+        if field["key"] == "tf_mode":
+            require(isinstance(value, str) and value in {"game", "fixed", "dynamic"}, "Invalid Encore mode")
+            continue
+        if kind == "bool":
+            valid_type = type(value) is bool
+            encoded = "1" if value is True else "0"
+        elif kind == "integer":
+            valid_type = type(value) is int
+            encoded = str(value)
+        elif kind == "decimal":
+            valid_type = type(value) in {int, float}
+            encoded = str(value)
+        elif kind == "choice" and all(re.fullmatch(r"[0-9]+", choice["value"]) for choice in field["choices"]):
+            valid_type = type(value) is int
+            encoded = str(value)
+        else:
+            valid_type = isinstance(value, str)
+            encoded = value
+        require(valid_type and encore_value_valid(field, encoded), "Invalid Encore field: " + field["key"])
+    fg = config["frameGeneration"]
+    require(type(fg.get("multiplier")) is int and 2 <= fg["multiplier"] <= 6, "Invalid Encore multiplier")
+    require(fg["mode"] == "game", "Cloud Encore must follow the game by default")
+    require(config["general"]["gpuSeries"] == "auto", "Cloud Encore must auto-detect GPU")
+    require(config["smoothMotion"]["smoothMotionEnabled"] is False, "Cloud Encore must not enable driver Smooth Motion")
+    require(config["neuralRendering"]["core"]["nrEnabled"] is False, "Cloud Encore must not enable Neural Rendering")
+
+
 def package_from_zip(scheme, item, data):
     name = archive_name(item)
     require(0 < len(data) <= MAX_ZIP, "Invalid ZIP size")
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         entries = archive.infolist()
-        require(len(entries) == 2 and len({e.filename for e in entries}) == 2, "ZIP must contain exactly DLL and its configuration")
+        encore = scheme["profile"] == ENCORE_PROFILE
+        expected_count = 3 if encore else 2
+        require(len(entries) == expected_count and len({e.filename for e in entries}) == expected_count,
+                "Encore ZIP must contain exactly DLL, configuration and notices" if encore else "ZIP must contain exactly DLL and its configuration")
         dlls = [e.filename for e in entries if e.filename in PROXIES]
-        config_name = {"rtxmfg_universal_133": "RTXMFG-Universal.json", "transfusion_json_v3": "DLSSG-Transfusion.json"}.get(scheme["profile"], "dlssg_sm86.ini")
-        require(len(dlls) == 1 and {e.filename for e in entries} == {dlls[0], config_name}, "Unexpected ZIP path")
+        config_name = {"rtxmfg_universal_133": "RTXMFG-Universal.json", "transfusion_json_v3": "DLSSG-Transfusion.json", ENCORE_PROFILE: ENCORE_CONFIG}.get(scheme["profile"], "dlssg_sm86.ini")
+        require(len(dlls) == 1, "ZIP must contain one supported DLL")
+        expected_names = {dlls[0], config_name} | ({ENCORE_NOTICES} if encore else set())
+        require({e.filename for e in entries} == expected_names, "Unexpected ZIP path")
         proxy = dlls[0]
         files = []
         for entry in entries:
@@ -152,7 +277,11 @@ def package_from_zip(scheme, item, data):
                 require(len(header) == 24 and header[:6] == b"PE\0\0\x64\x86" and int.from_bytes(header[22:24], "little") & 0x2000, "Not an x64 DLL")
             else:
                 text = content.decode("utf-8-sig")
-                if scheme["profile"] == "transfusion_json_v3":
+                if entry.filename == ENCORE_NOTICES:
+                    require(text.strip(), "Empty Encore third-party notices")
+                elif encore:
+                    validate_encore_config(jsonc_loads(text))
+                elif scheme["profile"] == "transfusion_json_v3":
                     config = jsonc_loads(text)
                     require(isinstance(config, dict) and config.get("configVersion") == 3, "Transfusion requires JSONC v3")
                     fg = config.get("frameGeneration", {})
@@ -162,7 +291,7 @@ def package_from_zip(scheme, item, data):
                     require(type(fg.get("dynamicExperimental56")) is bool, "Invalid Transfusion dynamic56")
                     require(config.get("general", {}).get("gpuArchitecture") == "auto", "Cloud Transfusion config must auto-detect GPU")
                     require(config.get("compatibility", {}).get("smoothMotionSm86") is False, "Cloud Transfusion must not enable experimental driver Smooth Motion")
-                if scheme["profile"] == "rtxmfg_universal_133":
+                elif scheme["profile"] == "rtxmfg_universal_133":
                     config = json.loads(text)
                     require(isinstance(config, dict), "RTXMFG config must be a JSON object")
                     require(type(config.get("multiplier")) is int and 1 <= config["multiplier"] <= 6, "Invalid RTXMFG multiplier")
@@ -184,6 +313,9 @@ def package_from_zip(scheme, item, data):
     elif profile == "transfusion_json_v3":
         backends = ["transfusion"]
         require(proxy in {"version.dll", "dinput8.dll", "dxgi.dll", "winmm.dll"}, "Transfusion proxy mismatch")
+    elif profile == ENCORE_PROFILE:
+        backends = ["encore"]
+        require(proxy == "version.dll", "Encore archive must use canonical version.dll")
     elif profile == "native026":
         backends = ["native20", "native30"]
         require(proxy not in {"d3d12.dll", "dbghelp.dll"}, "Native 0.2.6 proxy mismatch")
@@ -191,10 +323,13 @@ def package_from_zip(scheme, item, data):
         backends = ["upstream_sm86"]
         require(proxy != "winhttp.dll", "Upstream proxy mismatch")
         require(profile != "mfg_vulkan_sm86_7" or proxy == "version.dll", "MFG protocol only supplies version.dll")
-    return {"id": item.get("id", name[:-4]) if isinstance(item, dict) else name[:-4],
+    package = {"id": item.get("id", name[:-4]) if isinstance(item, dict) else name[:-4],
             "scheme_id": scheme["id"], "label": scheme["name"], "labels": scheme.get("names", {}),
             "version": scheme["version"], "backends": backends, "proxy": proxy, "archive": name,
             "bytes": len(data), "sha256": digest(data), "files": sorted(files, key=lambda f: f["name"])}
+    if "upstream_version" in scheme:
+        package["upstream_version"] = scheme["upstream_version"]
+    return package
 
 
 def build_documents(spec, archives):

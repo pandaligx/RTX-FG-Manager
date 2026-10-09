@@ -26,7 +26,7 @@ fn v426_only_replaces_rtxmfg_and_keeps_previous_resources_immutable() -> Result<
                 .iter()
                 .find(|p| p.scheme_id == old.scheme_id)
                 .unwrap();
-            assert_eq!(updated.version, "1.4.1");
+            assert_eq!(updated.version, "1.4.2");
             assert_ne!(updated.archive, old.archive);
             assert_ne!(updated.sha256, old.sha256);
             assert_eq!(updated.proxy, old.proxy);
@@ -49,7 +49,34 @@ fn v426_only_replaces_rtxmfg_and_keeps_previous_resources_immutable() -> Result<
         preserved += 1;
     }
     assert_eq!(preserved, 20);
-    assert_eq!(current.proxies("dlssg-transfusion-1.4.5.3").len(), 4);
+    // These four exact proxy packages belonged to 4.2.6; a later stable-ID
+    // upgrade must not rewrite that historical download/cleanup evidence.
+    let historical: Value = serde_json::from_str(include_str!(
+        "../cloud/indexes/payload-index-r-27e17f68f3e68de7a12c.json"
+    ))?;
+    let historical_mfg = historical["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["scheme_id"] == "rtx40mfg-1.3.3-hf2")
+        .unwrap();
+    assert_eq!(historical_mfg["version"], "1.4.1");
+    assert_eq!(
+        historical_mfg["archive"],
+        "rtxmfg-1.4.1-hf1-v426-universal.zip"
+    );
+    let legacy: Vec<_> = historical["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|p| p["scheme_id"] == "dlssg-transfusion-1.4.5.3")
+        .collect();
+    assert_eq!(legacy.len(), 4);
+    assert!(
+        legacy
+            .iter()
+            .all(|p| p["backends"] == json!(["transfusion"]))
+    );
     Ok(())
 }
 

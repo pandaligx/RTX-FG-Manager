@@ -1,5 +1,22 @@
 # 更新日志
 
+## 4.2.9
+
+适配 [RTX MFG 1.4.2](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.2) 与 [RTX Encore 1.0.0-beta.2](https://github.com/SilyNoMeta/rtx-encore)，其中 Encore 接替原 DLSSG-Transfusion 1.4.5.3；保留稳定方案标识和每游戏的方案选择。
+
+- **RTX40 MFG · 1.4.2** 改善《巫师 3》实验性路径追踪毛发的兼容检测，解决游戏更新后选项不可用的问题。该游戏使用 `winmm.dll`，放在 `witcher3.exe` 旁。管理器仍限 RTX40；Vulkan 属实验且无动态 MFG。
+- RTX MFG 在有合法管理器记录、同方案、同 DLL 入口且目标版本更新时，可保留设置升级。退出游戏后点 **安装并应用**；归属校验保护未知改动，不直接覆盖。
+- Encore 的一个已签通用 DLL 支持 19 个加载名称单选。原样复制和改名不改变签名；不把签名结论推广到独立编译的 alternative-proxies 或 ASI，本版不部署 ASI。文件名不增加图形 API 支持。
+- Bink 入口检查旁边已有的 `binkw64Hooked.dll` / `bink2w64Hooked.dll` 原游戏组件，拒绝覆盖现有文件，不自动改名或删除原 Bink DLL。
+- 新增独立 JSONC v4 与完整高级参数：帧生成、Smooth Motion、超分辨率、Neural Rendering、菜单/快捷键、统计与兼容选项按真实字段管理。只保存用户明确修改的字段；保留注释、未知项、菜单状态和未启用参数，避免用新默认值覆盖游戏内设置。
+- 有合法管理器记录的旧 Transfusion 可在游戏退出后原位升级：先备份原 DLL、JSONC 与记录，再迁移为 `rtx-encore.jsonc`；失败回滚，断电后按事务记录恢复，未知文件或备份变动时保留材料并提示。稳定方案 ID 不会使旧 DLL 被误标为已升级，也不能直接把 Encore 参数应用到旧协议。
+- 补丁首次启动的内置菜单自动打开一次，之后按 **Insert**；无需 ReShade。RTX40 MFG 的 **Backspace** 菜单保持独立。五语言帮助缩短为八节实用步骤，保留目录、滚动与复制；同步实际部署标签与完整 `1.0.0-beta.2` 版本显示。
+- 每份 Encore ZIP/部署携带上游第三方许可；卸载仅按归属处理补丁、配置、匹配许可和可识别日志，保留未知文件、原 Bink 组件、共享组件及用户自行提供的 NVIDIA DLL。
+
+**NR 默认关闭**，须用户提供 NVIDIA `nvngx_dlssnr.dll` **310.8.0** 并在游戏开启 DLSS SR/DLAA；管理器不分发该文件。RTX20 路径仍为实验，Open、精度、多遍和优化选项的性能与画面取舍须自行在目标游戏确认。**Smooth Motion 默认关闭**，此解锁路径限 RTX30 和驱动 **617.42 / 617.14 / 616.92 / 616.64**，其中上游仅报告 **617.14** 的实际游戏验证。菜单支持 DX11/DX12/Vulkan 不代表每项功能适用于所有游戏；改名也不增加接口能力。
+
+管理器自身更新不自动替换游戏 DLL；对旧 Transfusion 迁移或满足条件的 RTX MFG 升级使用“安装并应用”。更换方案或 DLL 入口仍须先卸载旧补丁；已有 Encore 更换不同 DLL 版本时仍须先处理旧安装。本版没有新增目标游戏或 GPU 验证；管理器和离线文件检查不代表游戏兼容性或性能结果。
+
 ## 4.2.8
 
 相比 4.2.7，本版修复六项管理器问题，为三角洲专用方案增加 RTX40 选择，并将使用说明整理为七节 Markdown 指南。

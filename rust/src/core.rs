@@ -33,7 +33,7 @@ pub const PROXIES: [&str; 20] = [
     "xinput9_1_0.dll",
     "xinputuap.dll",
 ];
-pub const BACKENDS: [&str; 9] = [
+pub const BACKENDS: [&str; 10] = [
     "native20",
     "native30",
     "native_x6_20",
@@ -43,6 +43,7 @@ pub const BACKENDS: [&str; 9] = [
     "upstream_sm86",
     crate::rtxmfg::BACKEND,
     crate::transfusion::BACKEND,
+    crate::encore::BACKEND,
 ];
 pub const SCHEMES: [&str; 3] = [
     "0.2.6 · DX12/Vulkan（正式）",
@@ -305,12 +306,27 @@ pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
         .collect())
 }
 pub fn config_name(backend: &str) -> &'static str {
-    if backend == crate::rtxmfg::BACKEND {
+    if backend == crate::encore::BACKEND {
+        crate::encore::CONFIG
+    } else if backend == crate::rtxmfg::BACKEND {
         crate::rtxmfg::CONFIG
     } else if backend == crate::transfusion::BACKEND {
         crate::transfusion::CONFIG
     } else {
         INI
+    }
+}
+/// A stable scheme ID can acquire a new configuration protocol. Never apply
+/// that protocol to a previously installed backend merely because its ID matches.
+pub fn backend_matches_profile(backend: &str, profile: &str) -> bool {
+    match profile {
+        crate::encore::PROFILE => backend == crate::encore::BACKEND,
+        crate::transfusion::PROFILE => backend == crate::transfusion::BACKEND,
+        crate::rtxmfg::PROFILE => backend == crate::rtxmfg::BACKEND,
+        "upstream035" | "upstream031" | crate::presets::MFG_VULKAN => backend == "upstream_sm86",
+        "native026" => backend.starts_with("native"),
+        "initial" => matches!(backend, "rtx20" | "rtx30"),
+        _ => false,
     }
 }
 pub fn folder(backend: &str) -> Result<&str> {
@@ -329,6 +345,14 @@ pub fn folder(backend: &str) -> Result<&str> {
 pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>> {
     folder(backend)?;
     let mut names = normalize_proxies(proxies)?;
+    if backend == crate::encore::BACKEND {
+        ensure!(
+            names.len() == 1 && crate::encore::PROXIES.contains(&names[0].as_str()),
+            "RTX Encore 只允许一个 DLL 入口"
+        );
+        names.extend([crate::encore::CONFIG.into(), crate::encore::NOTICES.into()]);
+        return Ok(names);
+    }
     if backend == crate::transfusion::BACKEND {
         ensure!(
             names.len() == 1 && crate::transfusion::PROXIES.contains(&names[0].as_str()),
@@ -386,6 +410,7 @@ pub fn configure_package(backend: &str, out: &mut BTreeMap<String, Vec<u8>>) -> 
     if backend == "upstream_sm86"
         || backend == crate::rtxmfg::BACKEND
         || backend == crate::transfusion::BACKEND
+        || backend == crate::encore::BACKEND
     {
         return Ok(());
     }
@@ -468,7 +493,7 @@ pub fn configure_upstream_ini(bytes: &[u8], options: &UpstreamOptions) -> Result
     Ok(output)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Record {
     pub schema: u32,
     pub backend: String,
@@ -477,6 +502,9 @@ pub struct Record {
     pub game_exe: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payload_version: Option<String>,
+    /// Full upstream release identity, including beta labels; never used for paths.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream_version: Option<String>,
     #[serde(default = "default_proxy")]
     pub proxy: String,
     #[serde(default)]
@@ -535,6 +563,15 @@ impl Record {
                 .as_ref()
                 .is_none_or(|v| crate::updater::version(v).is_ok()),
             "部署记录无效"
+        );
+        ensure!(
+            self.upstream_version.as_ref().is_none_or(|v| {
+                !v.is_empty()
+                    && v.len() <= 100
+                    && v.bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b".-+_".contains(&c))
+            }),
+            "上游版本记录无效"
         );
         let p = normalize_proxies(&self.selected())?;
         ensure!(self.proxy == p[0], "部署记录的 DLL 入口不一致");
@@ -612,6 +649,13 @@ pub fn preflight_install_at(target: &DeploymentTarget, proxies: &[String]) -> Re
     let target = target.validate(true)?;
     assert_target_stopped(&target)?;
     let dir = &target.directory;
+    if crate::encore_upgrade::has_pending(dir)? || crate::rtxmfg_upgrade::has_pending(dir)? {
+        // A transaction may already have published the new entry while its
+        // marker still describes the old one. The locked recovery below must
+        // reconcile this state; ordinary collision checks cannot classify it.
+        normalize_proxies(proxies)?;
+        return Ok(());
+    }
     let previous = record(dir)?;
     if let Some(record) = &previous {
         target.validate_record(record)?;
@@ -649,11 +693,17 @@ pub fn apply_parameters_at(
     let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
     assert_target_stopped(&target)?;
+    crate::encore_upgrade::recover_locked(&target)?;
+    crate::rtxmfg_upgrade::recover_locked(&target)?;
     let record = record(dir)?.context("请先安装当前方案再应用参数")?;
     target.validate_record(&record)?;
     ensure!(
         record.scheme_id.as_deref() == Some(context.scheme.as_str()),
         "已部署方案不同，请先安装当前方案"
+    );
+    ensure!(
+        backend_matches_profile(&record.backend, &context.profile),
+        "已部署版本使用旧参数协议，请先升级补丁再应用参数"
     );
     ensure!(
         status_at(&target).starts_with("已部署"),
@@ -682,6 +732,9 @@ pub fn status_at(target: &DeploymentTarget) -> String {
     fn inner(target: &DeploymentTarget) -> Result<String> {
         let target = target.validate(false)?;
         let dir = &target.directory;
+        if crate::encore_upgrade::has_pending(dir)? || crate::rtxmfg_upgrade::has_pending(dir)? {
+            return Ok("升级未完成 / 可恢复原安装".into());
+        }
         if let Some(r) = record(dir)? {
             target.validate_record(&r)?;
             if r.cache_pending {
@@ -704,8 +757,9 @@ pub fn status_at(target: &DeploymentTarget) -> String {
             return Ok(format!(
                 "已部署 {}{} / {}{}",
                 r.backend.to_uppercase(),
-                r.payload_version
+                r.upstream_version
                     .as_ref()
+                    .or(r.payload_version.as_ref())
                     .map(|v| format!(" @{v}"))
                     .unwrap_or_default(),
                 r.selected().join(", "),
@@ -794,9 +848,36 @@ pub fn deploy_prepared_context_at(
     backend: &str,
     proxies: &[String],
     level: Option<u8>,
+    data: BTreeMap<String, Vec<u8>>,
+    payload_version: Option<&str>,
+    context: Option<&crate::presets::Context>,
+) -> Result<String> {
+    deploy_prepared_context_at_with_overrides(
+        target,
+        backend,
+        proxies,
+        level,
+        data,
+        payload_version,
+        context,
+        None,
+        None,
+    )
+}
+
+/// Explicit overrides contain only fields edited by the user, not the expanded
+/// default preset. JSON runtime updates merge them over the latest disk document.
+#[allow(clippy::too_many_arguments)]
+pub fn deploy_prepared_context_at_with_overrides(
+    target: &DeploymentTarget,
+    backend: &str,
+    proxies: &[String],
+    level: Option<u8>,
     mut data: BTreeMap<String, Vec<u8>>,
     payload_version: Option<&str>,
     context: Option<&crate::presets::Context>,
+    explicit_overrides: Option<&crate::presets::Values>,
+    upstream_version: Option<&str>,
 ) -> Result<String> {
     let config = config_name(backend);
     let expected = deployment_names(backend, proxies)?;
@@ -815,6 +896,8 @@ pub fn deploy_prepared_context_at(
     let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
     assert_target_stopped(&target)?;
+    crate::encore_upgrade::recover_locked(&target)?;
+    crate::rtxmfg_upgrade::recover_locked(&target)?;
     let mut existing = record(dir)?;
     if let Some(record) = &existing {
         target.validate_record(record)?;
@@ -837,7 +920,7 @@ pub fn deploy_prepared_context_at(
         Vec::new()
     };
     let selected = normalize_proxies(proxies)?;
-    if backend == crate::rtxmfg::BACKEND {
+    if matches!(backend, crate::rtxmfg::BACKEND | crate::encore::BACKEND) {
         for (proxy, original) in [
             ("binkw64.dll", "binkw64Hooked.dll"),
             ("bink2w64.dll", "bink2w64Hooked.dll"),
@@ -854,7 +937,9 @@ pub fn deploy_prepared_context_at(
     }
     if let Some(level) = level {
         ensure!(
-            backend != crate::rtxmfg::BACKEND && backend != crate::transfusion::BACKEND,
+            backend != crate::rtxmfg::BACKEND
+                && backend != crate::transfusion::BACKEND
+                && backend != crate::encore::BACKEND,
             "此方案使用独立 JSON 参数协议"
         );
         ensure!(level <= 3, "日志级别无效");
@@ -863,9 +948,62 @@ pub fn deploy_prepared_context_at(
         data.insert(config.into(), bytes);
     }
     let root = no_links(&dir.join(OWN))?;
+    if backend == crate::encore::BACKEND
+        && let Some(old) = existing
+            .as_ref()
+            .filter(|r| r.backend == crate::transfusion::BACKEND)
+    {
+        let new = Record {
+            schema: 3,
+            backend: backend.into(),
+            game_exe: target.record_exe(),
+            payload_version: payload_version.map(str::to_owned),
+            upstream_version: upstream_version.map(str::to_owned),
+            proxy: selected[0].clone(),
+            proxies: selected.clone(),
+            hashes: data.iter().map(|(n, b)| (n.clone(), hash(b))).collect(),
+            cleanup_dirs: BTreeMap::new(),
+            scheme_id: context.map(|c| c.scheme.clone()),
+            delta_cache_ids: Vec::new(),
+            delta_legacy_cache: false,
+            cache_pending: false,
+        };
+        return crate::encore_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides);
+    }
+    if backend == crate::rtxmfg::BACKEND
+        && let Some(old) = existing.as_ref().filter(|record| {
+            record.backend == crate::rtxmfg::BACKEND
+                && record.selected() == selected
+                && record.hashes.get(&selected[0]) != Some(&hash(&data[&selected[0]]))
+        })
+    {
+        ensure!(
+            context.is_some_and(|c| c.scheme == crate::rtxmfg_upgrade::SCHEME
+                && c.profile == crate::rtxmfg::PROFILE
+                && !c.delta),
+            "RTX40 MFG 升级方案或参数协议不匹配"
+        );
+        let new = Record {
+            schema: 3,
+            backend: backend.into(),
+            game_exe: target.record_exe(),
+            payload_version: payload_version.map(str::to_owned),
+            upstream_version: upstream_version.map(str::to_owned),
+            proxy: selected[0].clone(),
+            proxies: selected.clone(),
+            hashes: data.iter().map(|(n, b)| (n.clone(), hash(b))).collect(),
+            cleanup_dirs: BTreeMap::new(),
+            scheme_id: context.map(|c| c.scheme.clone()),
+            delta_cache_ids: Vec::new(),
+            delta_legacy_cache: false,
+            cache_pending: false,
+        };
+        return crate::rtxmfg_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides);
+    }
     // Adopt only identical, recognized proxies. This changes no game binary,
     // while allowing an already-tested manual package to retain custom INI text.
     if existing.is_none()
+        && backend != crate::encore::BACKEND
         && context.is_some()
         && dir.join(config).is_file()
         && selected.iter().all(|name| {
@@ -900,6 +1038,7 @@ pub fn deploy_prepared_context_at(
             backend: backend.into(),
             game_exe: target.record_exe(),
             payload_version: payload_version.map(str::to_owned),
+            upstream_version: upstream_version.map(str::to_owned),
             proxy: selected[0].clone(),
             proxies: selected.clone(),
             hashes,
@@ -927,8 +1066,18 @@ pub fn deploy_prepared_context_at(
             {
                 let ini = no_links(&dir.join(config))?;
                 let current = fs::read(&ini)?;
-                let updated =
-                    crate::presets::merge_context(&current, &data[config], backend, context)?;
+                let updated = if backend == crate::encore::BACKEND {
+                    let empty = crate::presets::Values::new();
+                    crate::encore::configure(&current, explicit_overrides.unwrap_or(&empty))?
+                } else if backend == crate::rtxmfg::BACKEND {
+                    if let Some(values) = explicit_overrides.filter(|v| !v.is_empty()) {
+                        crate::rtxmfg::configure(&current, values)?
+                    } else {
+                        current.clone()
+                    }
+                } else {
+                    crate::presets::merge_context(&current, &data[config], backend, context)?
+                };
                 if let Some(context) = context {
                     r.scheme_id = Some(context.scheme.clone());
                     if target.is_custom() {
@@ -947,6 +1096,8 @@ pub fn deploy_prepared_context_at(
                     let stage = no_links(&root.join(format!("{config}.config-stage")))?;
                     ensure!(!stage.exists(), "存在未完成的配置更新，请先卸载补丁");
                     write_new(&stage, &updated)?;
+                    ensure!(fs::read(&ini)? == current, "配置已变化，请刷新后重试");
+                    assert_target_stopped(&target)?;
                     if let Err(error) = win::replace_existing(&stage, &ini) {
                         let _ = fs::remove_file(&stage);
                         return Err(error.context("配置更新失败，原文件未改变"));
@@ -961,6 +1112,7 @@ pub fn deploy_prepared_context_at(
     if backend == "upstream_sm86"
         || backend == crate::rtxmfg::BACKEND
         || backend == crate::transfusion::BACKEND
+        || backend == crate::encore::BACKEND
     {
         for name in PROXIES
             .iter()
@@ -977,6 +1129,7 @@ pub fn deploy_prepared_context_at(
         || backend == "upstream_sm86"
         || backend == crate::rtxmfg::BACKEND
         || backend == crate::transfusion::BACKEND
+        || backend == crate::encore::BACKEND
     {
         data.keys().cloned().collect::<Vec<_>>()
     } else {
@@ -1017,6 +1170,7 @@ pub fn deploy_prepared_context_at(
         backend: backend.into(),
         game_exe: target.record_exe(),
         payload_version: payload_version.map(str::to_owned),
+        upstream_version: upstream_version.map(str::to_owned),
         proxy: selected[0].clone(),
         proxies: selected,
         hashes: data.iter().map(|(n, b)| (n.clone(), hash(b))).collect(),
@@ -1026,6 +1180,7 @@ pub fn deploy_prepared_context_at(
         delta_legacy_cache: false,
         cache_pending: false,
     };
+    r.validate()?;
     write_new(&root.join(MARKER), &serde_json::to_vec(&r)?)?;
     let mut published = Vec::new();
     let outcome = (|| -> Result<()> {

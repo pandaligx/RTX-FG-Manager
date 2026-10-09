@@ -22,6 +22,14 @@ fn delta_sm89(id: &str, policy: &Policy) -> bool {
         && policy.capabilities.contains(crate::delta::CAPABILITY)
 }
 const LIMIT: u64 = 128 * 1024 * 1024;
+fn valid_upstream_version(value: &str, version: &str) -> bool {
+    static FORMAT: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    value.len() <= 100
+        && value.split(['-', '+']).next() == Some(version)
+        && FORMAT
+            .get_or_init(|| regex::Regex::new(r"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?(?:\+[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?$").expect("package version pattern"))
+            .is_match(value)
+}
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct File {
     pub name: String,
@@ -36,6 +44,8 @@ pub struct Package {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub labels: BTreeMap<String, String>,
     pub version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream_version: Option<String>,
     pub backends: Vec<String>,
     pub proxy: String,
     pub archive: String,
@@ -75,6 +85,7 @@ pub struct Catalog {
 pub struct Prepared {
     pub backend: String,
     pub version: String,
+    pub upstream_version: Option<String>,
     pub files: BTreeMap<String, Vec<u8>>,
     pub scheme_id: String,
     pub policy: Policy,
@@ -113,6 +124,11 @@ pub struct CompactScheme {
 }
 impl CompactCatalog {
     pub fn expand(self, index: &[u8]) -> Result<Catalog> {
+        self.expand_for_manager_version(index, crate::VERSION)
+    }
+
+    fn expand_for_manager_version(self, index: &[u8], manager_version: &str) -> Result<Catalog> {
+        let manager_version = crate::updater::version(manager_version)?;
         ensure!(
             self.schema == 2 && !self.schemes.is_empty() && self.schemes.len() <= 32,
             "Invalid compact catalog"
@@ -148,10 +164,7 @@ impl CompactCatalog {
                 .as_deref()
                 .map(crate::updater::version)
                 .transpose()?
-                .is_some_and(|minimum| {
-                    minimum
-                        > crate::updater::version(crate::VERSION).expect("valid manager version")
-                });
+                .is_some_and(|minimum| minimum > manager_version);
             if newer || crate::presets::validate(&s.profile, &BTreeMap::new()).is_err() {
                 skipped_schemes.insert(s.id, "此方案需要更新管理器".into());
                 continue;
@@ -165,6 +178,7 @@ impl CompactCatalog {
                 "initial" => ("initial", 1),
                 crate::rtxmfg::PROFILE => ("rtxmfg_json", 1),
                 crate::transfusion::PROFILE => ("transfusion_json", 1),
+                crate::encore::PROFILE => ("encore_json", 1),
                 "native026" => ("native", 5),
                 crate::presets::MFG_VULKAN => ("upstream_proxy", 1),
                 _ => ("upstream_proxy", 6),
@@ -187,7 +201,10 @@ impl CompactCatalog {
                 Policy {
                     gpu_paths: if s.profile == crate::rtxmfg::PROFILE {
                         vec!["SM89".into()]
-                    } else if s.profile == crate::transfusion::PROFILE {
+                    } else if matches!(
+                        s.profile.as_str(),
+                        crate::transfusion::PROFILE | crate::encore::PROFILE
+                    ) {
                         vec!["SM75".into(), "SM86".into(), "SM89".into()]
                     } else {
                         vec!["SM75".into(), "SM86".into()]
@@ -286,6 +303,12 @@ impl Catalog {
             ensure!(
                 match policy.parameter_profile.as_str() {
                     "initial" => policy.ini_policy == "initial",
+                    crate::encore::PROFILE =>
+                        policy.ini_policy == "encore_json"
+                            && policy.max_selected_proxies == 1
+                            && p.proxy == "version.dll"
+                            && p.backends == [crate::encore::BACKEND]
+                            && policy.gpu_paths == ["SM75", "SM86", "SM89"],
                     crate::transfusion::PROFILE =>
                         policy.ini_policy == "transfusion_json"
                             && policy.max_selected_proxies == 1
@@ -306,8 +329,16 @@ impl Catalog {
                 "Duplicate or invalid cloud package"
             );
             crate::updater::version(&p.version)?;
+            if let Some(upstream) = &p.upstream_version {
+                ensure!(
+                    valid_upstream_version(upstream, &p.version),
+                    "Invalid upstream package version"
+                );
+            }
+            let encore = policy.parameter_profile == crate::encore::PROFILE;
             ensure!(
-                core::PROXIES.contains(&p.proxy.as_str()) && p.files.len() == 2,
+                core::PROXIES.contains(&p.proxy.as_str())
+                    && p.files.len() == if encore { 3 } else { 2 },
                 "Invalid cloud proxy"
             );
             ensure!(
@@ -323,21 +354,27 @@ impl Catalog {
                 p.bytes > 0 && p.bytes <= LIMIT && core::valid_hash(&p.sha256),
                 "Invalid archive digest/size"
             );
+            let mut expected_entries = BTreeSet::from([
+                p.proxy.as_str(),
+                if encore {
+                    crate::encore::CONFIG
+                } else if policy.parameter_profile == crate::rtxmfg::PROFILE {
+                    crate::rtxmfg::CONFIG
+                } else if policy.parameter_profile == crate::transfusion::PROFILE {
+                    crate::transfusion::CONFIG
+                } else {
+                    core::INI
+                },
+            ]);
+            if encore {
+                expected_entries.insert(crate::encore::NOTICES);
+            }
             ensure!(
                 p.files
                     .iter()
                     .map(|f| f.name.as_str())
                     .collect::<BTreeSet<_>>()
-                    == BTreeSet::from([
-                        p.proxy.as_str(),
-                        if policy.parameter_profile == crate::rtxmfg::PROFILE {
-                            crate::rtxmfg::CONFIG
-                        } else if policy.parameter_profile == crate::transfusion::PROFILE {
-                            crate::transfusion::CONFIG
-                        } else {
-                            core::INI
-                        }
-                    ]),
+                    == expected_entries,
                 "Invalid package entries"
             );
             for f in &p.files {
@@ -356,6 +393,7 @@ impl Catalog {
                             | "upstream_proxy"
                             | "rtxmfg_json"
                             | "transfusion_json"
+                            | "encore_json"
                     ),
                 "Unsupported deployment protocol"
             );
@@ -374,6 +412,8 @@ impl Catalog {
                     "rtxmfg_json"
                 } else if b == crate::transfusion::BACKEND {
                     "transfusion_json"
+                } else if b == crate::encore::BACKEND {
+                    "encore_json"
                 } else if b == "upstream_sm86" {
                     "upstream_proxy"
                 } else if b.starts_with("native") {
@@ -392,7 +432,9 @@ impl Catalog {
                             && (delta_sm89(&p.scheme_id, policy)
                                 || matches!(
                                     policy.parameter_profile.as_str(),
-                                    crate::rtxmfg::PROFILE | crate::transfusion::PROFILE
+                                    crate::rtxmfg::PROFILE
+                                        | crate::transfusion::PROFILE
+                                        | crate::encore::PROFILE
                                 ))))
                     && !policy.gpu_paths.is_empty(),
                 "Invalid GPU path"
@@ -438,6 +480,7 @@ impl Catalog {
     pub fn scheme_source_url(&self, id: &str) -> Option<&'static str> {
         let policy = self.scheme_policies.get(id)?;
         Some(match policy.parameter_profile.as_str() {
+            crate::encore::PROFILE => crate::encore::SOURCE,
             crate::transfusion::PROFILE => crate::transfusion::SOURCE,
             crate::rtxmfg::PROFILE => "https://github.com/dashdogy/RTX40MFG-Unlock",
             crate::presets::MFG_VULKAN => {
@@ -463,6 +506,13 @@ impl Catalog {
             })
     }
     pub fn proxies(&self, id: &str) -> Vec<String> {
+        if self
+            .scheme_policies
+            .get(id)
+            .is_some_and(|p| p.parameter_profile == crate::encore::PROFILE)
+        {
+            return crate::encore::PROXIES.iter().map(|s| (*s).into()).collect();
+        }
         if self
             .scheme_policies
             .get(id)
@@ -645,6 +695,15 @@ pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
             );
         } else {
             std::str::from_utf8(&b).context("INI is not UTF-8")?;
+            if f.name == crate::encore::CONFIG {
+                crate::encore::validate_cloud_config(&b)?;
+            }
+            if f.name == crate::encore::NOTICES {
+                ensure!(
+                    !std::str::from_utf8(&b)?.trim().is_empty(),
+                    "Empty Encore third-party notices"
+                );
+            }
         }
         out.insert(f.name.clone(), b);
     }
@@ -803,6 +862,7 @@ pub fn prepare_with_progress(
     let mut out = BTreeMap::new();
     let mut backend = None;
     let mut version = None;
+    let mut upstream_version = None;
     let package_count = selected.len();
     for (index, proxy) in selected.into_iter().enumerate() {
         ensure!(!cancel.load(Ordering::Relaxed), "Cancelled");
@@ -811,12 +871,18 @@ pub fn prepare_with_progress(
             .iter()
             .find(|p| {
                 p.scheme_id == scheme
-                    && (p.proxy == proxy || policy.parameter_profile == crate::rtxmfg::PROFILE)
+                    && (p.proxy == proxy
+                        || matches!(
+                            policy.parameter_profile.as_str(),
+                            crate::rtxmfg::PROFILE | crate::encore::PROFILE
+                        ))
                     && p.backends.iter().any(|b| {
                         if policy.parameter_profile == crate::rtxmfg::PROFILE {
                             b == crate::rtxmfg::BACKEND
                         } else if policy.parameter_profile == crate::transfusion::PROFILE {
                             b == crate::transfusion::BACKEND
+                        } else if policy.parameter_profile == crate::encore::PROFILE {
+                            b == crate::encore::BACKEND
                         } else if policy.ini_policy == "upstream_proxy" {
                             b == "upstream_sm86"
                         } else {
@@ -833,6 +899,8 @@ pub fn prepare_with_progress(
                     b.as_str() == crate::rtxmfg::BACKEND
                 } else if policy.parameter_profile == crate::transfusion::PROFILE {
                     b.as_str() == crate::transfusion::BACKEND
+                } else if policy.parameter_profile == crate::encore::PROFILE {
+                    b.as_str() == crate::encore::BACKEND
                 } else if policy.ini_policy == "upstream_proxy" {
                     b.as_str() == "upstream_sm86"
                 } else {
@@ -842,11 +910,13 @@ pub fn prepare_with_progress(
             .context("Missing GPU package")?;
         ensure!(
             backend.as_ref().is_none_or(|v| v == b)
-                && version.as_ref().is_none_or(|v| v == &p.version),
+                && version.as_ref().is_none_or(|v| v == &p.version)
+                && (backend.is_none() || upstream_version == p.upstream_version),
             "Inconsistent scheme packages"
         );
         backend = Some(b.clone());
         version = Some(p.version.clone());
+        upstream_version = p.upstream_version.clone();
         let mut package_progress = |transfer| {
             report(CloudProgress {
                 transfer,
@@ -856,7 +926,11 @@ pub fn prepare_with_progress(
             })
         };
         for (name, bytes) in archive(c, p, cancel, &mut package_progress)? {
-            let name = if policy.parameter_profile == crate::rtxmfg::PROFILE && name == p.proxy {
+            let name = if matches!(
+                policy.parameter_profile.as_str(),
+                crate::rtxmfg::PROFILE | crate::encore::PROFILE
+            ) && name == p.proxy
+            {
                 proxy.clone()
             } else {
                 name
@@ -876,6 +950,7 @@ pub fn prepare_with_progress(
     Ok(Prepared {
         backend,
         version: version.context("No version")?,
+        upstream_version,
         files: out,
         scheme_id: scheme.into(),
         policy: policy.clone(),
@@ -920,6 +995,56 @@ pub fn known_image(image: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn older_manager_skips_encore_before_resolving_archives_and_falls_back() {
+        let current = bundled();
+        let legacy = current.packages[0].clone();
+        let index = serde_json::to_vec(&serde_json::json!({
+            "schema": 1,
+            "packages": [legacy],
+        }))
+        .unwrap();
+        let compact = serde_json::json!({
+            "schema": 2,
+            "revision": "compat-v429",
+            "default_scheme": crate::encore::SCHEME,
+            "sources": current.sources,
+            "index": {
+                "url": "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/index.json",
+                "fallback_url": "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/index.json",
+                "sha256": core::hash(&index), "bytes": index.len(),
+            },
+            "schemes": [
+                {
+                    "id": legacy.scheme_id, "name": legacy.label,
+                    "profile": current.scheme_policies[&legacy.scheme_id].parameter_profile,
+                    "archives": [legacy.archive],
+                },
+                {
+                    "id": crate::encore::SCHEME, "name": "RTX Encore",
+                    "profile": crate::encore::PROFILE, "min_manager_version": "4.2.9",
+                    // Intentionally absent: a skipped scheme must not make
+                    // older clients reject every usable scheme in the catalog.
+                    "archives": ["new-encore-package.zip"],
+                },
+            ],
+        });
+        let parsed: CompactCatalog = serde_json::from_value(compact.clone()).unwrap();
+        let older = parsed.expand_for_manager_version(&index, "4.2.8").unwrap();
+        assert_eq!(older.packages.len(), 1);
+        assert_eq!(older.default_scheme, legacy.scheme_id);
+        assert!(older.skipped_schemes.contains_key(crate::encore::SCHEME));
+        let mut unknown = compact;
+        unknown["schemes"][1]["profile"] = "future_unrecognized_protocol".into();
+        unknown["schemes"][1]
+            .as_object_mut()
+            .unwrap()
+            .remove("min_manager_version");
+        let parsed: CompactCatalog = serde_json::from_value(unknown).unwrap();
+        let result = parsed.expand(&index).unwrap();
+        assert!(result.skipped_schemes.contains_key(crate::encore::SCHEME));
+    }
+
+    #[test]
     fn legacy_delta_policy_migration_is_idempotent_and_narrow() {
         let mut c = bundled();
         c.scheme_policies.get_mut(DELTA_SCHEME).unwrap().gpu_paths =
@@ -937,8 +1062,35 @@ mod tests {
     }
     #[test]
     fn transfusion_routes_are_single_exact_proxy_and_independent_json() {
-        let c = bundled();
+        // The stable scheme ID now points at Encore in current catalogs. Keep
+        // exercising the immutable legacy protocol with its published index.
+        let mut c = bundled();
         let id = "dlssg-transfusion-1.4.5.3";
+        let historical: serde_json::Value = serde_json::from_str(include_str!(
+            "../../cloud/indexes/payload-index-r-27e17f68f3e68de7a12c.json"
+        ))
+        .unwrap();
+        c.packages.retain(|p| p.scheme_id != id);
+        c.packages.extend(
+            historical["packages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|p| p["scheme_id"] == id)
+                .map(|p| serde_json::from_value::<Package>(p.clone()).unwrap()),
+        );
+        c.scheme_policies.insert(
+            id.into(),
+            Policy {
+                gpu_paths: vec!["SM75".into(), "SM86".into(), "SM89".into()],
+                max_selected_proxies: 1,
+                ini_policy: "transfusion_json".into(),
+                parameter_profile: crate::transfusion::PROFILE.into(),
+                defaults: BTreeMap::new(),
+                capabilities: BTreeSet::new(),
+            },
+        );
+        c.validate().unwrap();
         assert!((0..=2).all(|series| c.supports_series(id, series)));
         assert!(!c.supports_series(id, 3));
         assert!(!c.supports_series("absent", 0));
@@ -1013,6 +1165,12 @@ mod tests {
                         crate::transfusion::read(&files[crate::transfusion::CONFIG]).unwrap()["tf_mode"],
                         "game"
                     );
+                    continue;
+                }
+                if backend == crate::encore::BACKEND {
+                    assert!(!files.contains_key(core::INI));
+                    crate::encore::validate_cloud_config(&files[crate::encore::CONFIG]).unwrap();
+                    assert!(files.contains_key(crate::encore::NOTICES));
                     continue;
                 }
                 let ini =

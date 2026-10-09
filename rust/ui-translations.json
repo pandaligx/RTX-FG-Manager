@@ -1,5 +1,10 @@
 {
-  "系统": ["System", "Система", "システム", "시스템"],
+  "系统": [
+    "System",
+    "Система",
+    "システム",
+    "시스템"
+  ],
   "配置已修改，可正常卸载": [
     "Configuration edited; safe to uninstall",
     "Настройки изменены; удаление доступно",
@@ -3402,23 +3407,11 @@
     "クイックスタート",
     "빠른 시작"
   ],
-  "1. 在 Windows **图形设置**开启硬件加速 GPU 计划，按提示重启。启动管理器时允许管理员权限；取消授权会停止启动。\n2. **完全退出游戏**，扫描或手动添加实际游戏 EXE。\n3. 选择显卡系列、方案和 DLL 入口，在**预设参数**中调整后点**安装并应用**。\n4. 启动游戏并开启游戏内 DLSS 帧生成。安装完成后可关闭管理器。\n\n> 扫描到游戏或安装成功不等于兼容。请确认游戏允许使用第三方补丁。": [
-    "1. Enable hardware-accelerated GPU scheduling in Windows **Graphics settings** and restart if prompted. Allow administrator access when launching the manager; cancelling stops startup.\n2. **Exit the game completely**, then scan or add its actual EXE.\n3. Choose the GPU series, scheme and DLL entry, adjust **Presets**, then select **Install and apply**.\n4. Launch the game and enable its DLSS frame generation. You may close the manager after installation.\n\n> Detection or successful installation does not establish compatibility. Confirm that the game permits third-party patches.",
-    "1. Включите аппаратное планирование GPU в **параметрах графики Windows** и перезагрузитесь по запросу. Разрешите запуск менеджера от администратора; отмена остановит запуск.\n2. **Полностью закройте игру**, затем найдите её сканированием или добавьте настоящий EXE.\n3. Выберите серию GPU, схему и DLL, настройте **пресеты**, затем нажмите **Установить и применить**.\n4. Запустите игру и включите в ней генерацию кадров DLSS. После установки менеджер можно закрыть.\n\n> Обнаружение игры или успешная установка не подтверждают совместимость. Убедитесь, что игра разрешает сторонние патчи.",
-    "1. Windows の**グラフィック設定**でハードウェアアクセラレータによる GPU スケジューリングを有効にし、必要なら再起動します。管理器の起動時は管理者権限を許可してください。取り消すと起動を終了します。\n2. **ゲームを完全に終了**し、スキャンまたは手動で実際のゲーム EXE を追加します。\n3. GPU シリーズ、方式、DLL 入口を選び、**プリセット**を調整して**インストールして適用**します。\n4. ゲームを起動し、ゲーム内の DLSS フレーム生成を有効にします。配置後は管理器を閉じられます。\n\n> 検出やインストール成功は互換性の確認ではありません。ゲームが第三者のパッチを許可しているか確認してください。",
-    "1. Windows **그래픽 설정**에서 하드웨어 가속 GPU 스케줄링을 켜고 안내에 따라 재부팅합니다. 관리기 실행 시 관리자 권한을 허용하세요. 취소하면 실행을 종료합니다.\n2. **게임을 완전히 종료**하고 검색하거나 실제 게임 EXE를 직접 추가합니다.\n3. GPU 시리즈, 방식, DLL 진입점을 선택하고 **프리셋**을 조정한 뒤 **설치 및 적용**을 누릅니다.\n4. 게임을 실행하고 게임 내 DLSS 프레임 생성을 켭니다. 설치 후 관리기는 닫아도 됩니다.\n\n> 게임 검색이나 설치 성공이 호환성을 보장하지 않습니다. 게임이 외부 패치를 허용하는지 확인하세요."
-  ],
   "游戏库与部署目录": [
     "Library and deployment folders",
     "Библиотека и папки установки",
     "ライブラリと配置先",
     "라이브러리와 설치 폴더"
-  ],
-  "- 单击游戏行选择当前游戏，复选框用于批量操作；双击或右键可打开目录。方案、入口和参数按游戏记忆，批量安装使用各游戏自己的设置。\n- 同一安装的多个游戏本体合并为一项，安装与卸载处理列出的目录。启动器、反作弊程序、Steam 客户端及服务端构建不自动部署；遗漏时可手动添加 EXE。重扫后搜索随内容和顺序刷新。\n- **添加文件夹**可关联独立插件目录，无需在其中放 EXE。它仍检查该游戏全部关联进程；第三方加载器须自行配置。\n- 绿色标签表示**实际部署**，悬停可查看目录；修改选择不会自动替换已部署文件。从游戏库移除条目也不等于卸载。\n\n设置保存在 `%LOCALAPPDATA%\\RTXFGManager`；清理缓存会保留游戏库和偏好。": [
-    "- Click a game row to focus it; use checkboxes for batches and double-click or right-click to open its folder. Scheme, entry and presets are remembered per game; batches use each game's settings.\n- Executables from one installation are grouped; installation and removal cover the listed folders. Launchers, anti-cheat tools, Steam clients and server builds are excluded. Add a missed EXE manually. Search refreshes after rescans change contents or order.\n- **Add folder** associates a separate plugin destination without requiring an EXE inside it. All associated game processes are still checked; configure any third-party loader yourself.\n- Green badges show **actual deployments**; hover for folders. Changing a selection does not replace installed files. Removing a library entry does not uninstall its patch.\n\nSettings are stored in `%LOCALAPPDATA%\\RTXFGManager`; cache cleanup preserves the library and preferences.",
-    "- Щелчок выбирает текущую игру; флажки используются для пакетных операций, двойной или правый щелчок открывает папку. Схема, DLL и пресеты сохраняются для каждой игры; пакет использует её настройки.\n- EXE одной установки объединяются; установка и удаление обрабатывают перечисленные папки. Лаунчеры, античиты, Steam и серверные сборки исключаются. Пропущенный EXE можно добавить вручную. Поиск обновляется после изменения состава или порядка при сканировании.\n- **Добавить папку** связывает отдельную папку плагинов без EXE внутри. Проверяются все связанные процессы игры; сторонний загрузчик настройте самостоятельно.\n- Зелёные метки показывают **фактическую установку**; наведите курсор для просмотра папок. Изменение выбора не заменяет файлы. Удаление записи из библиотеки не удаляет патч.\n\nНастройки хранятся в `%LOCALAPPDATA%\\RTXFGManager`; очистка кэша сохраняет библиотеку и предпочтения.",
-    "- 行をクリックしてゲームを選び、チェックボックスで一括操作します。ダブルクリックや右クリックでフォルダーを開けます。方式、入口、プリセットはゲーム別に記憶し、一括配置にも各設定を使います。\n- 同じインストールの EXE はまとめ、表示された各フォルダーに配置・削除します。ランチャー、アンチチート、Steam クライアント、サーバービルドは除外します。漏れた EXE は手動追加でき、再スキャン後の検索は内容と順序に追従します。\n- **フォルダーを追加**で別のプラグイン配置先を関連付けられます。その中に EXE は不要ですが、関連するゲームプロセスはすべて確認します。外部ローダーは別途設定してください。\n- 緑のラベルは**実際の配置**です。マウスを重ねると各フォルダーを確認できます。選択変更だけでは配置済みファイルを置換しません。ライブラリからの削除もアンインストールではありません。\n\n設定先は `%LOCALAPPDATA%\\RTXFGManager` です。キャッシュ削除ではライブラリと設定を保持します。",
-    "- 게임 행을 클릭해 선택하고 체크박스로 일괄 작업합니다. 더블클릭이나 오른쪽 클릭으로 폴더를 엽니다. 방식, 진입점, 프리셋은 게임별로 기억하며 일괄 설치도 각 게임의 설정을 사용합니다.\n- 같은 설치의 EXE는 묶어서 표시하며 나열된 폴더에 설치·제거합니다. 실행기, 안티치트, Steam 클라이언트, 서버 빌드는 제외합니다. 누락된 EXE는 직접 추가하고 재검색 결과의 내용·순서에 맞춰 검색을 갱신합니다.\n- **폴더 추가**로 별도 플러그인 경로를 연결합니다. 폴더 안에 EXE가 없어도 연결된 모든 게임 프로세스를 확인합니다. 외부 로더는 직접 설정하세요.\n- 녹색 태그는 **실제 설치 상태**이며 마우스를 올리면 폴더를 확인합니다. 선택 변경만으로 설치 파일을 바꾸지 않습니다. 라이브러리 항목 삭제도 패치 제거와 다릅니다.\n\n설정은 `%LOCALAPPDATA%\\RTXFGManager`에 저장합니다. 캐시 정리는 라이브러리와 설정을 유지합니다."
   ],
   "方案与 DLL 入口": [
     "Schemes and DLL entries",
@@ -3450,23 +3443,11 @@
     "更新・ダウンロード・キャッシュ",
     "업데이트, 다운로드, 캐시"
   ],
-  "- 默认国内 Gitee 优先，失败时说明原因并尝试 GitHub；设置也可改为 GitHub 优先，同时影响补丁、目录与软件更新。更新直接读取固定清单，不依赖 Gitee Release API。\n- 下载显示进度、大小和速度；缓存须完整校验后才能复用。软件更新检查大小、SHA-256、版本和发布者签名，替换前仍需确认。\n- DLL 准备与软件更新共用缓存时**可等待、可取消**，超时后提示重试。繁忙期间收到的最新云端目录在任务结束后应用，不改变执行中的配置。\n- **清理缓存**处理下载、更新暂存及未使用的已识别组件；保留库、参数和归属记录。共享运行时缓存不随单个游戏卸载。\n- 管理器升级保留库与偏好，**不会自动替换游戏 DLL**。设置页可离线查看当前与历史更新日志；旧清单无说明时可打开发行页面。": [
-    "- Gitee is preferred by default; failures show a reason and try GitHub. You can prefer GitHub instead for patches, catalogs and manager updates. Update checks read static manifests without the Gitee Release API.\n- Downloads show progress, size and speed; cached files must pass full verification before reuse. Manager updates verify size, SHA-256, version and publisher signature, and replacement still requires confirmation.\n- DLL preparation and manager downloads **wait cancellably** for shared caches; retry after a timeout. New catalogs received while busy apply after the task without changing its active settings.\n- **Clear cache** removes downloads, update staging and unused recognized components; library, parameters and ownership records remain. Shared runtime caches are not removed with one game's patch.\n- Manager upgrades preserve the library and preferences and **do not automatically replace game DLLs**. Read current and historical notes offline in Settings; open the release page when an old manifest has no notes.",
-    "- По умолчанию используется Gitee; при ошибке показывается причина и выполняется переход на GitHub. Можно выбрать GitHub первым для патчей, каталогов и обновлений. Проверка использует статические файлы без Gitee Release API.\n- Показываются прогресс, размер и скорость; кэш повторно используется только после полной проверки. Обновление проверяет размер, SHA-256, версию и подпись издателя; замена требует подтверждения.\n- Подготовка DLL и загрузка менеджера **ожидают общий кэш с возможностью отмены**; после тайм-аута повторите попытку. Новый каталог применяется после текущей задачи, не меняя её настройки.\n- **Очистить кэш** удаляет загрузки, временные обновления и неиспользуемые распознанные компоненты, сохраняя библиотеку, параметры и записи принадлежности. Общий кэш среды не удаляется вместе с одной игрой.\n- Обновление сохраняет библиотеку и предпочтения и **не заменяет DLL игр автоматически**. Текущие и прошлые изменения доступны в настройках без сети; если старый файл не содержит описания, откройте страницу релиза.",
-    "- 既定は Gitee 優先で、失敗理由を表示して GitHub を試します。パッチ、カタログ、管理器更新を GitHub 優先にもできます。更新確認は固定情報を直接読み、Gitee Release API に依存しません。\n- 進捗、サイズ、速度を表示し、キャッシュは完全検証後に再利用します。更新はサイズ、SHA-256、版、発行者署名を確認し、置換前に確認を求めます。\n- DLL 準備と管理器更新は共有キャッシュを**キャンセル可能な待機**で使います。タイムアウト後は再試行してください。繁忙中の最新カタログは処理後に適用し、実行中の設定を変えません。\n- **キャッシュ削除**は取得物、更新一時ファイル、未使用の既知コンポーネントを対象とし、ライブラリ、設定、所有記録を保持します。共有ランタイムキャッシュは一つのゲームの削除では消しません。\n- 管理器更新はライブラリと設定を保持し、**ゲーム DLL を自動置換しません**。設定から現在と過去の履歴をオフラインで読めます。旧情報に説明がない場合はリリースページを開けます。",
-    "- 기본은 Gitee 우선이며 실패 이유를 표시하고 GitHub를 시도합니다. 패치, 카탈로그, 관리기 업데이트를 GitHub 우선으로 바꿀 수 있습니다. 업데이트 확인은 고정 목록을 읽으며 Gitee Release API에 의존하지 않습니다.\n- 진행률, 크기, 속도를 표시하며 캐시는 전체 검증 후 재사용합니다. 업데이트는 크기, SHA-256, 버전, 게시자 서명을 검증하고 교체 전 확인을 요청합니다.\n- DLL 준비와 관리기 다운로드는 공유 캐시에 **취소 가능한 대기**를 사용합니다. 시간 초과 후 재시도하세요. 작업 중 받은 최신 카탈로그는 작업 후 적용하며 진행 중 설정을 바꾸지 않습니다.\n- **캐시 정리**는 다운로드, 업데이트 임시 파일과 미사용 식별 구성 요소를 지우고 라이브러리, 설정, 소유 기록은 유지합니다. 공유 런타임 캐시는 한 게임 제거 시 삭제하지 않습니다.\n- 관리기 업데이트는 라이브러리와 설정을 보존하며 **게임 DLL을 자동 교체하지 않습니다**. 설정에서 현재·이전 변경 내역을 오프라인으로 읽고, 이전 목록에 설명이 없으면 릴리스 페이지를 엽니다."
-  ],
   "主题与语言": [
     "Themes and language",
     "Темы и язык",
     "テーマと言語",
     "테마와 언어"
-  ],
-  "1. 点击左侧**调色板**，搜索、滚动浏览 38 个离线浅色／深色配色。\n2. 悬停或方向键预览，点击或 `Enter` 保存；`Esc` 或点击外部取消并恢复原主题，不保存预览。\n3. **跟随系统**分别记住浅色和深色配色并自动切换。\n4. 在**设置**切换简体中文、英语、俄语、日语或韩语，选择会保存。": [
-    "1. Open the sidebar **palette** to search and scroll through 38 offline light/dark color schemes.\n2. Hover or use arrows to preview, then click or press `Enter` to save. `Esc` or clicking outside cancels and restores the previous theme without saving the preview.\n3. **Follow system** remembers separate light and dark choices and switches automatically.\n4. In **Settings**, choose Simplified Chinese, English, Russian, Japanese or Korean; your choice is saved.",
-    "1. Откройте **палитру** на боковой панели для поиска и прокрутки 38 светлых/тёмных схем без сети.\n2. Наведение или стрелки включают предпросмотр; щелчок или `Enter` сохраняет выбор. `Esc` или щелчок снаружи отменяет предпросмотр и возвращает прежнюю тему.\n3. **Следовать системе** отдельно запоминает светлый и тёмный варианты и переключает их автоматически.\n4. В **настройках** выберите упрощённый китайский, английский, русский, японский или корейский; выбор сохраняется.",
-    "1. サイドバーの**パレット**で 38 個のオフライン配色を検索・スクロールできます。\n2. マウス移動や矢印でプレビューし、クリックや `Enter` で保存します。`Esc` または外側のクリックで取り消し、元のテーマに戻ります。\n3. **システムに従う**はライトとダークを個別に記憶し、自動で切り替えます。\n4. **設定**で簡体字中国語、英語、ロシア語、日本語、韓国語を選べます。選択は保存されます。",
-    "1. 사이드바 **팔레트**에서 오프라인 라이트·다크 색상 38가지를 검색하고 스크롤합니다.\n2. 마우스나 방향키로 미리 보고 클릭 또는 `Enter`로 저장합니다. `Esc`나 바깥 클릭은 미리보기를 저장하지 않고 원래 테마로 복원합니다.\n3. **시스템 따르기**는 라이트·다크 선택을 각각 기억하고 자동 전환합니다.\n4. **설정**에서 간체 중국어, 영어, 러시아어, 일본어, 한국어를 선택하며 선택은 저장됩니다."
   ],
   "卸载与问题排查": [
     "Removal and troubleshooting",
@@ -3474,16 +3455,202 @@
     "削除とトラブル対処",
     "제거 및 문제 해결"
   ],
-  "- **先退出游戏，再卸载补丁**。只清理已确认归属的补丁、配置、日志和独立组件缓存；保护原游戏、其他 MOD、未知文件与旧测试备份，不整目录删除。\n- 文件被占用、缓存待清理或临时文件待核验时，报告未完成并警告，保留记录供重试。关闭占用程序、确认未知文件后再操作；不要手改归属记录强行删除。\n- 复现问题时可提高当前游戏日志级别，之后恢复默认；0.2.6 Vulkan 桥接日志不受此选项控制。旧版安装后《绝区零》崩溃，可退出游戏，用原方案与 `d3d12.dll` 重新安装应用；管理器只修正旧缓存路径，保留自定义路径。0.3.5 默认空 `CacheDirectory` 使用用户目录缓存。\n\n> 数字签名和管理员权限不代表游戏或反作弊允许加载。显卡改名只改变 Windows 名称，不改变设备 ID 或硬件能力。离线测试不等于目标游戏／GPU 验证。": [
-    "- **Exit the game before removing its patch.** Cleanup targets owned patches, configuration, logs and separate component caches. Original game files, other mods, unknown files and old test backups are protected; entire folders are not indiscriminately deleted.\n- Locked files, pending cache cleanup or temporary files awaiting verification produce an incomplete result and warning, keeping recovery records. Close locking programs and review unknown files before retrying; do not edit ownership records to force deletion.\n- Raise the current game's logging level to reproduce an issue, then restore defaults; this does not control 0.2.6 Vulkan bridge logs. If an older install causes Zenless Zone Zero to crash, exit and reinstall the original scheme with `d3d12.dll`; only the old manager cache path is corrected, preserving custom paths. 0.3.5's empty `CacheDirectory` uses the user cache.\n\n> Signatures and administrator rights do not establish game or anti-cheat permission. GPU renaming changes only its Windows name, not device IDs or hardware capabilities. Offline tests are not target-game/GPU validation.",
-    "- **Закройте игру перед удалением патча.** Удаляются только принадлежащие ему файлы, настройки, журналы и отдельный кэш компонентов. Файлы игры, другие моды, неизвестные файлы и старые тестовые копии защищены; папки не удаляются целиком без разбора.\n- Занятые файлы, остатки кэша или временные файлы для проверки дают незавершённый результат и предупреждение с сохранением записей восстановления. Закройте блокирующие программы и проверьте неизвестные файлы перед повтором; не меняйте записи принадлежности для принудительного удаления.\n- Для воспроизведения ошибки повысьте уровень журнала игры, затем верните стандартный; это не управляет журналами моста Vulkan 0.2.6. При сбое Zenless Zone Zero после старой установки закройте игру и переустановите прежнюю схему с `d3d12.dll`: исправляется только старый путь кэша менеджера, пользовательские пути сохраняются. Пустой `CacheDirectory` в 0.3.5 использует кэш пользователя.\n\n> Подпись и права администратора не означают разрешения игры или античита. Переименование GPU меняет только имя Windows, не ID устройства или возможности. Автономные тесты не подтверждают работу целевой игры/GPU.",
-    "- **ゲームを終了してからパッチを削除**します。所有確認済みのパッチ、設定、ログ、独立キャッシュだけが対象です。元のゲーム、他 MOD、未知ファイル、過去のテストバックアップを保護し、フォルダーを一括削除しません。\n- 使用中のファイル、未削除キャッシュ、確認待ち一時ファイルが残ると警告付きの未完了となり、復旧記録を保持します。使用中のプログラムを閉じ、未知ファイルを確認して再試行してください。所有記録を改変して強制削除しないでください。\n- 問題再現時はゲームのログレベルを上げ、終了後に戻します。0.2.6 Vulkan ブリッジのログは対象外です。旧版配置後にゼンレスゾーンゼロがクラッシュする場合、終了して元の方式と `d3d12.dll` で再配置します。管理器の旧キャッシュパスだけを修正し、独自パスは保持します。0.3.5 の空の `CacheDirectory` はユーザーキャッシュを使用します。\n\n> 署名や管理者権限はゲームやアンチチートの許可を意味しません。GPU 改名は Windows の名前だけを変更し、デバイス ID や性能は変えません。オフラインテストは対象ゲーム／GPU の検証ではありません。",
-    "- **게임을 종료한 뒤 패치를 제거**합니다. 소유가 확인된 패치, 설정, 로그, 별도 구성 요소 캐시만 정리합니다. 원본 게임, 다른 모드, 미확인 파일, 이전 테스트 백업을 보호하며 폴더를 통째로 지우지 않습니다.\n- 사용 중인 파일, 정리 대기 캐시, 검증 대기 임시 파일은 경고와 미완료 결과를 표시하고 복구 기록을 유지합니다. 점유 프로그램을 닫고 미확인 파일을 확인한 뒤 재시도하세요. 소유 기록을 고쳐 강제로 삭제하지 마세요.\n- 문제 재현 시 게임 로그 수준을 높였다가 기본값으로 되돌립니다. 0.2.6 Vulkan 브리지 로그는 이 옵션의 영향을 받지 않습니다. 이전 설치 후 젠레스 존 제로가 충돌하면 게임을 종료하고 원래 방식과 `d3d12.dll`로 다시 설치하세요. 이전 관리기 캐시 경로만 수정하며 사용자 경로는 보존합니다. 0.3.5의 빈 `CacheDirectory`는 사용자 캐시를 사용합니다.\n\n> 서명과 관리자 권한이 게임이나 안티치트의 허용을 의미하지 않습니다. GPU 이름 변경은 Windows 이름만 바꾸며 장치 ID나 하드웨어 기능은 바꾸지 않습니다. 오프라인 테스트는 대상 게임·GPU 검증이 아닙니다."
-  ],
   "- 修改后显示**有修改，待应用**。同一方案已部署时，**应用参数到当前游戏**只更新 INI/JSON，不下载 DLL；高级参数可展开。动态模式使用动态目标，固定限帧值保留但不启用。\n- **三角洲**：添加 `Binaries/Win64/DeltaForceClient-Win64-Shipping.exe`，选择专用方案。默认 4X，可选跟随游戏／2X／3X／4X；跟随游戏和 2X 使用原运行时，3X/4X 使用独立缓存，不覆盖原有 `sl.*.dll`。旧组件已加载时保留原运行时，不增加游戏菜单。\n- **4.2.8**仅为三角洲专用新增 **RTX40（SM89）**；沿用已有签名 DLL，不重建 DLL、不修改设备 ID。上游原版仍默认，其他方案范围不变，实际目标游戏由用户实机验收。\n- **Transfusion 快捷键**：`Ctrl+Alt+2—6` 切换倍率，`Ctrl+Alt+G` 跟随游戏，`Ctrl+Alt+D` 动态，`Ctrl+Alt+O` 统计。Vulkan 统计需要可选 ReShade，本版不捆绑 ASI/ReShade。\n\n> 请求 4X 不代表四倍 FPS；画质、延迟和性能必须在目标游戏实测。": [
     "- Edits show **Changes pending**. With the same scheme installed, **Apply parameters to current game** updates only INI/JSON without downloading DLLs; expand advanced settings as needed. Dynamic mode uses its target; fixed FPS limits remain saved but inactive.\n- **Delta Force**: add `Binaries/Win64/DeltaForceClient-Win64-Shipping.exe` and choose its dedicated scheme. Default 4X; choose Follow game / 2X / 3X / 4X. Follow game and 2X use the original runtime; 3X/4X use separate caches without replacing original `sl.*.dll`. Already-loaded old components retain the original runtime; no game menu is added.\n- **4.2.8** adds **RTX40 (SM89)** only to Delta Force, reusing signed DLLs without rebuilding or changing device IDs. Original upstream remains the default, other schemes keep their ranges, and users must validate the actual game on hardware.\n- **Transfusion shortcuts**: `Ctrl+Alt+2–6` changes multiplier, `Ctrl+Alt+G` follows the game, `Ctrl+Alt+D` selects Dynamic and `Ctrl+Alt+O` toggles statistics. Vulkan statistics need optional ReShade; ASI/ReShade are not bundled.\n\n> Requesting 4X does not promise four times the FPS; test image quality, latency and performance in the target game.",
     "- Изменения отмечаются как **Ожидают применения**. При установленной той же схеме **Применить параметры к текущей игре** обновляет только INI/JSON без загрузки DLL; дополнительные параметры можно раскрыть. Динамический режим использует свою цель; фиксированный лимит FPS сохраняется, но не действует.\n- **Delta Force**: добавьте `Binaries/Win64/DeltaForceClient-Win64-Shipping.exe` и выберите специальную схему. По умолчанию 4X; доступны По игре / 2X / 3X / 4X. Первые два используют исходную среду, 3X/4X — отдельный кэш без замены `sl.*.dll`. Если старые компоненты уже загружены, сохраняется исходная среда. Меню игры не добавляется.\n- **4.2.8** добавляет **RTX40 (SM89)** только для Delta Force, используя подписанные DLL без пересборки и изменения ID устройств. Оригинал остаётся по умолчанию; диапазоны других схем не меняются. Игру проверяет пользователь на реальном оборудовании.\n- **Клавиши Transfusion**: `Ctrl+Alt+2–6` — множитель, `Ctrl+Alt+G` — по игре, `Ctrl+Alt+D` — динамический режим, `Ctrl+Alt+O` — статистика. Статистика Vulkan требует необязательного ReShade; ASI/ReShade не включены.\n\n> Запрос 4X не гарантирует четырёхкратный FPS; качество, задержку и производительность проверяйте в целевой игре.",
     "- 編集後は**変更あり・適用待ち**となります。同じ方式が配置済みなら**現在のゲームに設定を適用**で INI/JSON だけを更新し、DLL は取得しません。詳細設定は展開できます。動的モードは動的目標を使い、固定 FPS 制限は保持しますが有効にしません。\n- **三角洲**：`Binaries/Win64/DeltaForceClient-Win64-Shipping.exe` を追加して専用方式を選びます。既定は 4X、ゲームに従う／2X／3X／4X を選べます。前二つは元のランタイム、3X/4X は独立キャッシュを使い、元の `sl.*.dll` は置換しません。旧コンポーネントが読み込み済みなら元のランタイムを維持し、ゲームメニューは追加しません。\n- **4.2.8**は三角洲専用だけに **RTX40（SM89）** を追加。署名済み DLL を再利用し、再ビルドやデバイス ID の変更はしません。上流原版は既定のまま、他方式の範囲も変わりません。対象ゲームはユーザーによる実機確認が必要です。\n- **Transfusion キー**：`Ctrl+Alt+2～6` は倍率、`Ctrl+Alt+G` はゲームに従う、`Ctrl+Alt+D` は動的、`Ctrl+Alt+O` は統計。Vulkan 統計には任意の ReShade が必要です。ASI/ReShade は同梱しません。\n\n> 4X の指定は FPS 四倍の保証ではありません。画質、遅延、性能は対象ゲームで確認してください。",
     "- 변경하면 **수정됨, 적용 대기**로 표시됩니다. 같은 방식이 설치된 경우 **현재 게임에 매개변수 적용**은 DLL 다운로드 없이 INI/JSON만 갱신합니다. 고급 설정을 펼칠 수 있습니다. 동적 모드는 동적 목표를 사용하고 고정 FPS 제한은 저장하되 적용하지 않습니다.\n- **Delta Force**: `Binaries/Win64/DeltaForceClient-Win64-Shipping.exe`를 추가하고 전용 방식을 선택합니다. 기본 4X이며 게임 따르기 / 2X / 3X / 4X를 선택합니다. 앞의 두 옵션은 원본 런타임, 3X/4X는 별도 캐시를 사용하며 원본 `sl.*.dll`을 바꾸지 않습니다. 이전 구성 요소가 로드되었으면 원본 런타임을 유지하며 게임 메뉴를 추가하지 않습니다.\n- **4.2.8**는 Delta Force 전용에만 **RTX40(SM89)**을 추가합니다. 서명 DLL을 재사용하며 재빌드나 장치 ID 변경은 없습니다. 기본값은 원본이며 다른 방식 범위는 그대로입니다. 대상 게임은 사용자가 실기 검증해야 합니다.\n- **Transfusion 단축키**: `Ctrl+Alt+2–6` 배율, `Ctrl+Alt+G` 게임 따르기, `Ctrl+Alt+D` 동적, `Ctrl+Alt+O` 통계. Vulkan 통계는 선택적 ReShade가 필요하며 ASI/ReShade는 포함하지 않습니다.\n\n> 4X 요청은 FPS 네 배를 보장하지 않습니다. 화질, 지연 및 성능은 대상 게임에서 확인하세요."
+  ],
+  "请先修正高级参数中的无效输入，或恢复该项默认值。": [
+    "Fix the invalid advanced settings, or restore their defaults first.",
+    "Сначала исправьте неверные расширенные параметры или восстановите их значения по умолчанию.",
+    "詳細設定の無効な入力を修正するか、その項目を初期値に戻してください。",
+    "고급 설정의 잘못된 입력을 수정하거나 해당 항목을 기본값으로 복원하세요."
+  ],
+  "Encore 支持19个入口，每次选一个；只复制重命名，保留签名。入口名不增加图形API支持。Bink须先自行保留原文件为binkw64Hooked.dll或bink2w64Hooked.dll。": [
+    "Encore supports 19 entry names; choose one. Copying and renaming preserves the signature and does not add graphics API support. For Bink, first keep the original as binkw64Hooked.dll or bink2w64Hooked.dll.",
+    "Encore поддерживает 19 имён загрузки; выберите одно. Копирование и переименование сохраняют подпись и не добавляют поддержку графических API. Для Bink сначала сохраните оригинал как binkw64Hooked.dll или bink2w64Hooked.dll.",
+    "Encoreは19種類の読み込み名に対応しています。1つ選んでください。コピーと名前の変更では署名は維持されますが、対応する描画APIは増えません。Binkでは元のファイルをbinkw64Hooked.dllまたはbink2w64Hooked.dllとして先に保存してください。",
+    "Encore는 19가지 로딩 이름을 지원합니다. 하나만 선택하세요. 복사와 이름 변경은 서명을 유지하며 그래픽 API 지원을 추가하지 않습니다. Bink는 먼저 원본을 binkw64Hooked.dll 또는 bink2w64Hooked.dll로 보존하세요."
+  ],
+  "还原": [
+    "Restore",
+    "Восстановить",
+    "戻す",
+    "복원"
+  ],
+  "恢复此项默认值": [
+    "Restore this setting’s default",
+    "Восстановить значение по умолчанию",
+    "この項目を初期値に戻す",
+    "이 항목의 기본값 복원"
+  ],
+  "需重启": [
+    "Restart required",
+    "Нужен перезапуск",
+    "再起動が必要",
+    "재시작 필요"
+  ],
+  "允许范围：{0} — {1}": [
+    "Allowed range: {0} — {1}",
+    "Допустимый диапазон: {0} — {1}",
+    "入力範囲：{0} — {1}",
+    "허용 범위: {0} — {1}"
+  ],
+  "需先启用相关功能，并使用兼容的显卡系列。": [
+    "Enable the related feature and select a compatible GPU series first.",
+    "Сначала включите связанную функцию и выберите совместимую серию GPU.",
+    "関連機能を有効にして、対応するGPUシリーズを選択してください。",
+    "관련 기능을 켜고 호환되는 GPU 시리즈를 선택하세요."
+  ],
+  "输入无效，请按范围和说明填写。此项尚未保存。": [
+    "Invalid input. Follow the range and instructions; this value has not been saved.",
+    "Неверный ввод. Соблюдайте диапазон и инструкции; это значение не сохранено.",
+    "無効な入力です。範囲と説明を確認してください。この値は保存されていません。",
+    "잘못된 입력입니다. 범위와 설명을 확인하세요. 이 값은 저장되지 않았습니다."
+  ],
+  "帧生成": [
+    "Frame generation",
+    "Генерация кадров",
+    "フレーム生成",
+    "프레임 생성"
+  ],
+  "画质": [
+    "Image quality",
+    "Качество изображения",
+    "画質",
+    "화질"
+  ],
+  "菜单与叠加层": [
+    "Menu and overlay",
+    "Меню и оверлей",
+    "メニューとオーバーレイ",
+    "메뉴 및 오버레이"
+  ],
+  "兼容与热键": [
+    "Compatibility and hotkeys",
+    "Совместимость и горячие клавиши",
+    "互換性とホットキー",
+    "호환성 및 단축키"
+  ],
+  "游戏内按Insert打开菜单；首次启动自动显示。管理器中的修改须完全退出游戏后应用。": [
+    "Press Insert in game to open the menu; it opens automatically on first launch. Exit the game completely before applying changes from the manager.",
+    "Нажмите Insert в игре для открытия меню; при первом запуске оно открывается автоматически. Полностью закройте игру перед применением изменений из менеджера.",
+    "ゲーム内でInsertを押すとメニューが開きます。初回は自動で表示されます。管理器での変更はゲームを完全に終了してから適用してください。",
+    "게임에서 Insert를 누르면 메뉴가 열리며 첫 실행 시 자동으로 표시됩니다. 관리자에서 변경한 설정은 게임을 완전히 종료한 뒤 적용하세요."
+  ],
+  "搜索参数名称或说明": [
+    "Search settings or descriptions",
+    "Поиск по названию или описанию",
+    "設定名または説明を検索",
+    "설정 이름 또는 설명 검색"
+  ],
+  "当前仍为Transfusion。点击安装并应用升级为Encore后，才能直接应用新参数。": [
+    "Transfusion is still installed. Use Install and apply to upgrade to Encore before applying its new settings directly.",
+    "Пока установлен Transfusion. Нажмите «Установить и применить» для обновления до Encore, прежде чем применять новые параметры напрямую.",
+    "現在はTransfusionが導入されています。「インストールして適用」でEncoreに更新すると、新しい設定を直接適用できます。",
+    "현재 Transfusion이 설치되어 있습니다. 설치 및 적용을 눌러 Encore로 업그레이드한 후 새 설정을 직접 적용할 수 있습니다."
+  ],
+  "没有匹配的参数": [
+    "No matching settings",
+    "Нет подходящих параметров",
+    "一致する設定がありません",
+    "일치하는 설정 없음"
+  ],
+  "恢复本组默认": [
+    "Reset this group",
+    "Сбросить эту группу",
+    "このグループを初期化",
+    "이 그룹 초기화"
+  ],
+  "恢复全部默认": [
+    "Reset all settings",
+    "Сбросить все параметры",
+    "すべての設定を初期化",
+    "모든 설정 초기화"
+  ],
+  "RTX Encore：菜单、升级与高级功能": [
+    "RTX Encore: menu, upgrade and advanced features",
+    "RTX Encore: меню, обновление и дополнительные функции",
+    "RTX Encore：メニュー、更新と詳細機能",
+    "RTX Encore: 메뉴, 업그레이드 및 고급 기능"
+  ],
+  "Open引擎不支持RTX20；RTX30/40仍为高度实验功能。": [
+    "The Open engine does not support RTX20; it remains highly experimental on RTX30/40.",
+    "Движок Open не поддерживает RTX20; на RTX30/40 он остаётся крайне экспериментальным.",
+    "OpenエンジンはRTX20に非対応です。RTX30/40でも高度な実験機能です。",
+    "Open 엔진은 RTX20을 지원하지 않으며 RTX30/40에서도 매우 실험적입니다."
+  ],
+  "多目录游戏显示首个实际部署目录的参数；仅将明确修改项应用到每个目录。": [
+    "For games with multiple deployment folders, the first folder supplies displayed values. Only explicit edits are applied to each folder.",
+    "Для игр с несколькими папками установки отображаются параметры первой папки. В каждой папке применяются только явно изменённые значения.",
+    "複数の配置先があるゲームでは、最初の配置先の設定を表示します。各配置先には明示的に変更した項目だけを適用します。",
+    "설치 폴더가 여러 개인 게임은 첫 번째 폴더의 설정을 표시합니다. 각 폴더에는 명시적으로 수정한 항목만 적용됩니다."
+  ],
+  "无法读取当前参数，保留上次成功读取的值：{0}：{1}": [
+    "Cannot read current settings; keeping the last successful values: {0}: {1}",
+    "Не удалось прочитать текущие параметры; сохранены последние прочитанные значения: {0}: {1}",
+    "現在の設定を読み取れません。前回読み取れた値を保持します：{0}：{1}",
+    "현재 설정을 읽을 수 없어 마지막으로 읽은 값을 유지합니다: {0}: {1}"
+  ],
+  "参数写入后读取失败：{0}：{1}": [
+    "Settings were written, but could not be read back: {0}: {1}",
+    "Параметры записаны, но повторное чтение не удалось: {0}: {1}",
+    "設定は書き込まれましたが、再読み込みに失敗しました：{0}：{1}",
+    "설정을 썼지만 다시 읽지 못했습니다: {0}: {1}"
+  ],
+  "清除搜索后，可恢复当前分组默认值。": [
+    "Clear the search to reset the current group.",
+    "Очистите поиск, чтобы сбросить текущую группу.",
+    "検索を消去すると、現在のグループを初期化できます。",
+    "검색을 지우면 현재 그룹을 초기화할 수 있습니다."
+  ],
+  "**4.2.9候选，尚未发布。**\n\n1. 在Windows图形设置开启硬件加速GPU计划，重启后允许管理员权限。\n2. 退出游戏，添加实际游戏EXE，选择显卡、方案和入口。\n3. 点**安装并应用**，启动游戏并开启DLSS帧生成。确认游戏允许第三方补丁。": [
+    "**4.2.9 is an unpublished candidate.**\n\n1. Enable hardware-accelerated GPU scheduling in Windows Graphics settings, restart, and allow administrator access.\n2. Close the game, add its actual EXE, then choose the GPU, scheme and DLL entry.\n3. Click **Install and apply**, start the game and enable DLSS Frame Generation. Check that the game allows third-party mods.",
+    "**4.2.9 — ещё не опубликованная сборка-кандидат.**\n\n1. В параметрах графики Windows включите аппаратное планирование GPU, перезагрузите ПК и разрешите права администратора.\n2. Закройте игру, добавьте её основной EXE, выберите видеокарту, схему и DLL.\n3. Нажмите **Установить и применить**, запустите игру и включите DLSS Frame Generation. Убедитесь, что игра разрешает сторонние моды.",
+    "**4.2.9は未公開の候補版です。**\n\n1. Windowsのグラフィック設定でハードウェアアクセラレータによるGPUスケジューリングを有効にして再起動し、管理者権限を許可します。\n2. ゲームを終了し、実際のゲームEXEを追加してGPU・方式・DLLを選びます。\n3. **インストールして適用**を押し、ゲームを起動してDLSSフレーム生成を有効にします。第三者MODが許可されているか確認してください。",
+    "**4.2.9는 아직 공개되지 않은 후보 버전입니다.**\n\n1. Windows 그래픽 설정에서 하드웨어 가속 GPU 일정 예약을 켜고 재부팅한 뒤 관리자 권한을 허용하세요.\n2. 게임을 종료하고 실제 게임 EXE를 추가한 후 GPU, 방식, DLL 진입점을 선택하세요.\n3. **설치 및 적용**을 누른 뒤 게임에서 DLSS 프레임 생성을 켜세요. 게임이 외부 모드를 허용하는지 확인하세요."
+  ],
+  "- 单击选游戏，复选框批量操作；每款游戏记住设置。\n- 添加实际EXE，Unreal游戏通常在 `Binaries/Win64`；同一游戏列出的目录一起处理。\n- **添加文件夹**可选插件目录，加载器自行配置。绿色标签显示安装；移除库条目不会卸载。": [
+    "- Click a game to select it; use checkboxes for batch actions. Each game keeps its own settings.\n- Add the actual EXE, usually under `Binaries/Win64` for Unreal games. Listed directories are handled together.\n- **Add folder** selects a plugin folder; configure its loader yourself. Green labels show the installed setup. Removing a library entry does not uninstall the mod.",
+    "- Щелчок выбирает игру, флажки — несколько игр. У каждой игры свои настройки.\n- Добавляйте основной EXE; у игр Unreal он обычно в `Binaries/Win64`. Указанные каталоги обрабатываются вместе.\n- **Добавить папку** позволяет выбрать каталог плагинов; загрузчик настройте отдельно. Зелёная метка показывает установленную схему. Удаление записи из библиотеки не удаляет мод.",
+    "- クリックでゲームを選択し、チェックボックスで一括操作します。設定はゲームごとに保存されます。\n- 実際のEXEを追加します。Unrealゲームでは通常 `Binaries/Win64` にあります。表示された配置先はまとめて処理されます。\n- **フォルダーを追加**でプラグイン用フォルダーを選べます。ローダーは別途設定してください。緑の表示は実際の導入状態です。ライブラリから削除してもMODは削除されません。",
+    "- 클릭으로 게임을 선택하고 체크박스로 일괄 작업합니다. 설정은 게임별로 기억됩니다.\n- 실제 EXE를 추가하세요. Unreal 게임은 보통 `Binaries/Win64`에 있습니다. 표시된 배포 폴더를 함께 처리합니다.\n- **폴더 추가**로 플러그인 폴더를 선택할 수 있으며 로더는 별도 설정해야 합니다. 녹색 표시는 실제 설치 상태입니다. 목록에서 삭제해도 모드는 제거되지 않습니다."
+  ],
+  "- 不确定先用 **0.3.5原版**；三角洲选专用。**Dlssg-MFG-Vulkan**仅 `version.dll`，RTX20待实测。\n- **RTX MFG 1.4.2**：RTX40用，按 **Backspace**；Vulkan实验且无动态。\n- **Encore beta.2**：按 **Insert**。FG仅DX12/Vulkan且需游戏已有DLSS FG；RTX20及RTX20/30 Vulkan属实验。\n- 后两者19入口中单选，优先 `version.dll`。Bink原件保留为 `binkw64Hooked.dll` 或 `bink2w64Hooked.dll`，勿覆盖其他MOD。改名不增加API支持。": [
+    "- Start with **0.3.5 original**; use the dedicated scheme for Delta Force. **Dlssg-MFG-Vulkan** uses only `version.dll`; RTX20 remains untested on hardware.\n- **RTX MFG 1.4.2**: for RTX40 here; press **Backspace**. Vulkan is experimental and has no Dynamic mode.\n- **Encore beta.2**: press **Insert**. FG requires DX12/Vulkan and existing game DLSS FG support. RTX20, and Vulkan on RTX20/30, are experimental.\n- For the last two schemes, choose one of 19 entries; try `version.dll` first. Keep the original Bink file as `binkw64Hooked.dll` or `bink2w64Hooked.dll`; do not overwrite other mods. Renaming adds no API support.",
+    "- Начните с **оригинала 0.3.5**; для Delta Force выберите специальную схему. **Dlssg-MFG-Vulkan** использует только `version.dll`; RTX20 ещё не проверена на реальном оборудовании.\n- **RTX MFG 1.4.2**: здесь для RTX40, меню — **Backspace**. Vulkan экспериментален, динамический режим недоступен.\n- **Encore beta.2**: меню — **Insert**. FG требует DX12/Vulkan и DLSS FG в игре. RTX20 и Vulkan на RTX20/30 экспериментальны.\n- Для двух последних схем выберите один из 19 входов, сначала `version.dll`. Оригинал Bink сохраните как `binkw64Hooked.dll` или `bink2w64Hooked.dll`; не заменяйте другие моды. Переименование не добавляет поддержку API.",
+    "- 迷ったら **0.3.5原版**、Delta Forceには専用方式を選びます。**Dlssg-MFG-Vulkan**は `version.dll` のみで、RTX20は実機未検証です。\n- **RTX MFG 1.4.2**：本管理ツールではRTX40用。メニューは **Backspace**。Vulkanは実験段階で動的モード非対応です。\n- **Encore beta.2**：メニューは **Insert**。FGにはDX12/Vulkanとゲーム側のDLSS FGが必要です。RTX20、およびRTX20/30のVulkanは実験段階です。\n- 後の2方式は19入口から1つだけ選び、まず `version.dll` を試します。元のBinkは `binkw64Hooked.dll` または `bink2w64Hooked.dll` として残し、他のMODを上書きしないでください。改名で対応APIは増えません。",
+    "- 잘 모르겠다면 **0.3.5 원본**, Delta Force는 전용 방식을 선택하세요. **Dlssg-MFG-Vulkan**은 `version.dll`만 사용하며 RTX20은 실제 하드웨어 검증 전입니다.\n- **RTX MFG 1.4.2**: 이 관리기에서는 RTX40용이며 메뉴 키는 **Backspace**입니다. Vulkan은 실험적이며 동적 모드는 지원하지 않습니다.\n- **Encore beta.2**: 메뉴 키는 **Insert**입니다. FG에는 DX12/Vulkan과 게임의 DLSS FG 지원이 필요합니다. RTX20 및 RTX20/30의 Vulkan은 실험적입니다.\n- 마지막 두 방식은 19개 진입점 중 하나만 선택하며 `version.dll`부터 시도하세요. 원본 Bink는 `binkw64Hooked.dll` 또는 `bink2w64Hooked.dll`로 보관하고 다른 모드를 덮어쓰지 마세요. 이름을 바꿔도 지원 API는 늘지 않습니다."
+  ],
+  "- **退出游戏后**改参数，点**应用参数到当前游戏**；未安装时点**安装并应用**。“待应用”表示尚未写入游戏。\n- 用搜索找Encore参数，不确定就还原默认；其他设置会保留。需重启的选项按提示操作。\n- 三角洲默认4X，可选跟随游戏/2X/3X/4X；倍率不保证对应FPS，显存和延迟需实测。": [
+    "- **Close the game** before editing. Click **Apply to current game**, or **Install and apply** if not installed. Pending changes are not yet written to the game.\n- Search for Encore settings; reset uncertain choices to defaults. Other settings are kept. Restart when an option requires it.\n- Delta Force defaults to 4X; choose Game/2X/3X/4X. A multiplier does not guarantee matching FPS gains; check VRAM and latency in game.",
+    "- **Закройте игру** перед изменением параметров. Нажмите **Применить к текущей игре**, а до установки — **Установить и применить**. Ожидающие изменения ещё не записаны в игру.\n- Ищите параметры Encore через поиск; при сомнениях верните значения по умолчанию. Остальные настройки сохраняются. Перезапускайте игру, если это указано.\n- Delta Force: по умолчанию 4X, доступны управление игрой/2X/3X/4X. Множитель не гарантирует такой же рост FPS; проверяйте VRAM и задержку.",
+    "- **ゲームを終了してから**変更し、**現在のゲームに適用**を押します。未導入なら**インストールして適用**です。「未適用」の変更はまだゲームに書き込まれていません。\n- Encoreの項目は検索で探し、不明なら初期値に戻します。他の設定は保持されます。再起動が必要な項目は案内に従ってください。\n- Delta Forceは標準4Xで、ゲームに従う/2X/3X/4Xを選べます。倍率相当のFPSは保証されません。VRAMと遅延を実測してください。",
+    "- **게임을 종료한 뒤** 설정을 바꾸고 **현재 게임에 적용**을 누르세요. 미설치 상태라면 **설치 및 적용**을 누릅니다. 적용 대기 중인 변경은 아직 게임에 저장되지 않았습니다.\n- Encore 항목은 검색하고, 잘 모르면 기본값으로 되돌리세요. 다른 설정은 유지됩니다. 재시작이 필요한 항목은 안내를 따르세요.\n- Delta Force 기본값은 4X이며 게임 설정/2X/3X/4X를 선택할 수 있습니다. 배율만큼 FPS가 늘어난다는 보장은 없으므로 VRAM과 지연을 확인하세요."
+  ],
+  "- 下载默认Gitee优先，失败可切GitHub；已验证缓存可离线用。\n- **清理缓存**保留游戏库和参数。下载失败看错误、检查网络后重试。\n- 更新管理器**不会自动替换游戏DLL**；升级补丁前退出游戏。": [
+    "- Downloads use Gitee first; switch to GitHub if needed. Verified cached files work offline.\n- **Clear cache** keeps the library and settings. If a download fails, read the error, check the network and retry.\n- Updating the manager **does not replace game DLLs automatically**. Close the game before updating its mod.",
+    "- Сначала используется Gitee; при необходимости выберите GitHub. Проверенный кэш доступен без сети.\n- **Очистить кэш** сохраняет библиотеку и настройки. При ошибке загрузки прочитайте сообщение, проверьте сеть и повторите.\n- Обновление менеджера **не заменяет DLL игр автоматически**. Перед обновлением мода закройте игру.",
+    "- ダウンロードはGitee優先です。失敗時はGitHubに切り替えられます。検証済みキャッシュはオフラインでも使えます。\n- **キャッシュを削除**してもゲーム一覧と設定は残ります。失敗時はエラーと通信環境を確認し、再試行してください。\n- 管理ツールの更新では**ゲームDLLは自動更新されません**。MOD更新前にゲームを終了してください。",
+    "- 기본 다운로드는 Gitee 우선이며 필요하면 GitHub로 바꾸세요. 검증된 캐시는 오프라인에서도 사용할 수 있습니다.\n- **캐시 정리**는 게임 목록과 설정을 유지합니다. 다운로드 실패 시 오류와 네트워크를 확인하고 다시 시도하세요.\n- 관리기를 업데이트해도 **게임 DLL은 자동 교체되지 않습니다**. 모드 업데이트 전에 게임을 종료하세요."
+  ],
+  "- 左侧**调色板**可搜索配色：悬停预览，点击/Enter保存，Esc取消；也可跟随系统。\n- **设置**中选择语言。": [
+    "- Use the left **palette** to search themes: hover to preview, click/Enter to save, Esc to cancel. System mode is also available.\n- Choose a language in **Settings**.",
+    "- В левой **палитре** ищите темы: наведение — просмотр, щелчок/Enter — сохранение, Esc — отмена. Доступен системный режим.\n- Язык выбирается в **Настройках**.",
+    "- 左の**パレット**で配色を検索できます。ホバーでプレビュー、クリック/Enterで保存、Escで取消。システム連動も選べます。\n- **設定**で言語を選びます。",
+    "- 왼쪽 **팔레트**에서 색상을 검색하세요. 마우스를 올려 미리 보고 클릭/Enter로 저장, Esc로 취소합니다. 시스템 설정도 따를 수 있습니다.\n- **설정**에서 언어를 선택하세요."
+  ],
+  "- 换方案或入口前退出游戏并卸载旧补丁。只清理归属明确的文件，原游戏、其他MOD和未知文件保留。\n- 提示占用或待清理：关闭相关程序再试，不删除恢复记录。\n- 无菜单：核对EXE目录、入口和按键；无插帧：确认已开DLSS FG、方案/API匹配。\n- 仍异常请提供游戏名、显卡、驱动、API和日志；签名不代表反作弊允许。": [
+    "- Close the game and uninstall the old mod before changing scheme or entry. Only owned files are removed; game files, other mods and unknown files stay.\n- If files are busy or cleanup is pending, close the relevant apps and retry. Keep recovery records.\n- No menu: check the EXE folder, entry and shortcut. No FG: enable game DLSS FG and check the scheme/API.\n- Still failing? Provide the game, GPU, driver, API and logs. A signature does not mean anti-cheat permits the mod.",
+    "- Перед сменой схемы или входа закройте игру и удалите старый мод. Удаляются только принадлежащие ему файлы; файлы игры, другие моды и неизвестные файлы сохраняются.\n- Если файлы заняты или очистка не завершена, закройте соответствующие программы и повторите. Не удаляйте записи восстановления.\n- Нет меню: проверьте каталог EXE, вход и клавишу. Нет FG: включите DLSS FG в игре и проверьте схему/API.\n- Если сбой остаётся, сообщите игру, GPU, драйвер, API и приложите логи. Подпись не означает разрешение античита.",
+    "- 方式や入口を変える前にゲームを終了し、旧MODをアンインストールします。所有が確認できるファイルだけを削除し、元のゲーム・他のMOD・不明なファイルは残します。\n- 使用中や清掃待ちの表示が出たら、該当アプリを閉じて再試行してください。復旧記録は削除しないでください。\n- メニューが出ない：EXEの場所・入口・キーを確認。FGが動かない：ゲームのDLSS FGと方式/APIを確認。\n- 解決しない場合はゲーム名・GPU・ドライバー・API・ログを提示してください。署名はアンチチートの許可を意味しません。",
+    "- 방식이나 진입점을 바꾸기 전에 게임을 종료하고 기존 모드를 제거하세요. 소유가 확인된 파일만 정리하며 원본 게임, 다른 모드와 알 수 없는 파일은 보존합니다.\n- 사용 중이거나 정리 대기 중이면 관련 프로그램을 닫고 다시 시도하세요. 복구 기록은 지우지 마세요.\n- 메뉴가 없으면 EXE 폴더, 진입점, 단축키를 확인하세요. FG가 없으면 게임의 DLSS FG와 방식/API를 확인하세요.\n- 계속 문제가 생기면 게임명, GPU, 드라이버, API와 로그를 제공하세요. 서명이 있어도 안티치트의 허용을 뜻하지는 않습니다."
+  ],
+  "- 菜单首次自动打开，保留旧按键。5X/6X实验，动态默认最高4X。\n- 管理器部署的旧Transfusion：保留原条目，点**安装并应用**升级；勿先卸载丢设置。失败按提示恢复。\n- **NR默认关闭**：在补丁旁自行放 `nvngx_dlssnr.dll` **310.8.0**，开启DLSS SR/DLAA；Open不支持RTX20，可能增加耗时/显存。\n- **Smooth Motion默认关闭**：仅RTX30，驱动限 **617.42/617.14/616.92/616.64**，仅617.14有上游游戏验证。选实际DX11/DX12/Vulkan后重启；估算FPS不等于实际插值。[更多说明](https://github.com/SilyNoMeta/rtx-encore)": [
+    "- The menu opens on first launch; migrated settings retain a custom key. 5X/6X are experimental; Dynamic defaults to at most 4X.\n- For manager-owned Transfusion: keep its library entry and use **Install and apply** to upgrade. Do not uninstall first and lose settings. Follow recovery prompts on failure.\n- **NR is off by default**: supply `nvngx_dlssnr.dll` **310.8.0** beside the mod and enable DLSS SR/DLAA. Open does not support RTX20; NR can cost GPU time/VRAM.\n- **Smooth Motion is off by default**: RTX30 only, drivers **617.42/617.14/616.92/616.64** only; upstream game verification covers only 617.14. Select the actual DX11/DX12/Vulkan API and restart. Estimated FPS does not prove interpolation. [More details](https://github.com/SilyNoMeta/rtx-encore)",
+    "- Меню открывается при первом запуске; перенос настроек сохраняет изменённую клавишу. 5X/6X экспериментальны, динамический режим по умолчанию ограничен 4X.\n- Transfusion, установленный менеджером: сохраните запись игры и нажмите **Установить и применить**. Не удаляйте его заранее, чтобы не потерять настройки. При сбое следуйте подсказкам восстановления.\n- **NR по умолчанию выключен**: поместите свой `nvngx_dlssnr.dll` **310.8.0** рядом с модом и включите DLSS SR/DLAA. Open не поддерживает RTX20; NR может увеличить время GPU и расход VRAM.\n- **Smooth Motion по умолчанию выключен**: только RTX30 и драйверы **617.42/617.14/616.92/616.64**; автор проверил в игре только 617.14. Выберите реальный API DX11/DX12/Vulkan и перезапустите игру. Расчётный FPS не доказывает интерполяцию. [Подробнее](https://github.com/SilyNoMeta/rtx-encore)",
+    "- 初回起動時にメニューが開きます。移行した設定では変更済みのキーを保持します。5X/6Xは実験段階で、動的モードは標準で最大4Xです。\n- 管理ツールで導入した旧Transfusionは、ゲーム項目を残して**インストールして適用**で更新します。設定を失うため先に削除しないでください。失敗時は復旧案内に従います。\n- **NRは標準でオフ**：自分で用意した `nvngx_dlssnr.dll` **310.8.0** をMODの隣に置き、DLSS SR/DLAAを有効にします。OpenはRTX20非対応で、NRはGPU時間やVRAMを増やすことがあります。\n- **Smooth Motionは標準でオフ**：RTX30専用、ドライバーは **617.42/617.14/616.92/616.64** のみ。上流でのゲーム検証は617.14のみです。実際のDX11/DX12/Vulkanを選んで再起動してください。推定FPSは補間成功の証明ではありません。[詳細](https://github.com/SilyNoMeta/rtx-encore)",
+    "- 첫 실행 시 메뉴가 열리며 이전 설정에서 바꾼 키는 유지됩니다. 5X/6X는 실험적이며 동적 모드는 기본 최대 4X입니다.\n- 관리기로 설치한 기존 Transfusion은 게임 항목을 유지하고 **설치 및 적용**으로 업데이트하세요. 설정을 잃지 않도록 먼저 제거하지 마세요. 실패 시 복구 안내를 따르세요.\n- **NR은 기본 꺼짐**: 직접 준비한 `nvngx_dlssnr.dll` **310.8.0**을 모드 옆에 두고 DLSS SR/DLAA를 켜세요. Open은 RTX20을 지원하지 않으며 NR은 GPU 시간과 VRAM을 늘릴 수 있습니다.\n- **Smooth Motion은 기본 꺼짐**: RTX30 전용이며 드라이버는 **617.42/617.14/616.92/616.64**만 허용합니다. 상위 프로젝트의 게임 검증은 617.14뿐입니다. 실제 DX11/DX12/Vulkan을 선택하고 재시작하세요. 예상 FPS는 실제 보간을 입증하지 않습니다. [자세히](https://github.com/SilyNoMeta/rtx-encore)"
   ]
 }

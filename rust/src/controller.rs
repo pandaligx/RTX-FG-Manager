@@ -35,6 +35,7 @@ pub enum Event {
         u64,
     ),
     PresetApplied(String, String, rtx_fg_manager::presets::Values),
+    PresetReadFailed(String, String, bool, u64),
     Devices(Vec<gpu_alias::Device>),
     Gpu(Vec<(String, i32)>),
     Icons(Vec<(String, Option<image::RgbaImage>)>),
@@ -133,6 +134,39 @@ fn ensure_directory_outside_data(
 }
 
 // Display-only metadata cache. All writes and ownership checks use core's full validation.
+fn parameter_target(game: &Game) -> core::DeploymentTarget {
+    // A library card may be a launcher in a different directory. Settings are
+    // represented by the first real deployment, just as installation is.
+    let paths = game.deployment_executables();
+    game.deployment_target(std::path::Path::new(paths.first().unwrap_or(&game.exe)))
+}
+
+fn uses_explicit_edits(profile: &str) -> bool {
+    matches!(
+        profile,
+        rtx_fg_manager::encore::PROFILE | rtx_fg_manager::rtxmfg::PROFILE
+    )
+}
+
+fn read_json_preset_values(
+    target: &core::DeploymentTarget,
+    profile: &str,
+) -> Result<rtx_fg_manager::presets::Values> {
+    let config = match profile {
+        rtx_fg_manager::encore::PROFILE => rtx_fg_manager::encore::CONFIG,
+        rtx_fg_manager::rtxmfg::PROFILE => rtx_fg_manager::rtxmfg::CONFIG,
+        _ => anyhow::bail!("不支持的配置协议"),
+    };
+    let path = core::no_links(&target.directory.join(config))?;
+    anyhow::ensure!(path.metadata()?.len() <= 1024 * 1024, "配置文件过大");
+    let bytes = std::fs::read(path)?;
+    if profile == rtx_fg_manager::encore::PROFILE {
+        rtx_fg_manager::encore::read(&bytes)
+    } else {
+        rtx_fg_manager::rtxmfg::read(&bytes)
+    }
+}
+
 fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
     use std::os::windows::fs::MetadataExt;
     let exe = core::no_links(&target.game_exe)?;
@@ -144,6 +178,10 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
             core::INI,
             rtx_fg_manager::rtxmfg::CONFIG,
             rtx_fg_manager::transfusion::CONFIG,
+            rtx_fg_manager::encore::CONFIG,
+            rtx_fg_manager::encore::NOTICES,
+            ".rtx-fg-v3/encore-upgrade.json",
+            ".rtx-fg-v3/rtxmfg-upgrade.json",
             "rtxfg_vk_bridge.dll",
             ".rtx-fg-script.json",
             ".rtx-fg-manager.json",
@@ -600,8 +638,13 @@ impl Controller {
                 }
             }
         }
-        if !dirty && let Some(disk) = self.disk_presets.get(&(exe.into(), scheme.clone())) {
+        if (!dirty || uses_explicit_edits(profile))
+            && let Some(disk) = self.disk_presets.get(&(exe.into(), scheme.clone()))
+        {
             values.extend(disk.clone());
+            if uses_explicit_edits(profile) {
+                values.extend(self.explicit_preset_values(exe, &scheme));
+            }
         }
         rtx_fg_manager::presets::Context::new(&scheme, policy, std::path::Path::new(exe))
             .normalize(&mut values);
@@ -609,6 +652,58 @@ impl Controller {
             values.insert("hardware_bilinear".into(), "0".into());
         }
         values
+    }
+    /// Saved snapshots are not edits. In particular, game-menu changes must win
+    /// over an old manager snapshot for every field the user has not edited.
+    fn explicit_preset_values(&self, exe: &str, scheme: &str) -> rtx_fg_manager::presets::Values {
+        let Some(game) = self.games.iter().find(|g| g.exe == exe) else {
+            return Default::default();
+        };
+        let saved = game
+            .extra
+            .get("preset_options_v2")
+            .and_then(|v| v.get(scheme));
+        let keys = game
+            .extra
+            .get("preset_dirty_keys")
+            .and_then(|v| v.get(scheme));
+        let legacy_dirty = game
+            .extra
+            .get("preset_dirty")
+            .and_then(|v| v.get(scheme))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let names: Vec<&str> = if let Some(keys) = keys.and_then(Value::as_array) {
+            keys.iter().filter_map(Value::as_str).collect()
+        } else if legacy_dirty
+            && self.catalog.scheme_policies[scheme].parameter_profile
+                == rtx_fg_manager::rtxmfg::PROFILE
+        {
+            vec![
+                "rtx_mode",
+                "rtx_target",
+                "rtx_preset",
+                "rtx_vsync",
+                "rtx_reflex_limit",
+            ]
+        } else if legacy_dirty {
+            vec!["tf_mode", "tf_target", "tf_dynamic56", "tf_overlay"]
+        } else {
+            Vec::new()
+        };
+        names
+            .into_iter()
+            .filter_map(|key| {
+                let value = saved?.get(key)?.as_str()?;
+                let item = BTreeMap::from([(key.to_owned(), value.to_owned())]);
+                rtx_fg_manager::presets::validate(
+                    &self.catalog.scheme_policies[scheme].parameter_profile,
+                    &item,
+                )
+                .ok()
+                .map(|()| (key.to_owned(), value.to_owned()))
+            })
+            .collect()
     }
     fn migrate_presets(&mut self) {
         let mut updates = Vec::new();
@@ -713,6 +808,20 @@ impl Controller {
             return;
         }
         let changed = self.disk_presets.get(&(exe.to_owned(), scheme.clone())) != Some(&values);
+        let mut dirty_keys: BTreeSet<String> = self
+            .explicit_preset_values(exe, &scheme)
+            .into_keys()
+            .collect();
+        if uses_explicit_edits(&profile) {
+            if key == "reset" {
+                dirty_keys.extend(values.keys().cloned());
+            } else {
+                dirty_keys.insert(key.into());
+            }
+            if let Some(disk) = self.disk_presets.get(&(exe.to_owned(), scheme.clone())) {
+                dirty_keys.retain(|key| disk.get(key) != values.get(key));
+            }
+        }
         if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
             let entry = game
                 .extra
@@ -730,6 +839,17 @@ impl Controller {
                 *dirty = json!({});
             }
             dirty[&scheme] = json!(changed);
+            if uses_explicit_edits(&profile) {
+                dirty[&scheme] = json!(!dirty_keys.is_empty());
+                let keys = game
+                    .extra
+                    .entry("preset_dirty_keys")
+                    .or_insert_with(|| json!({}));
+                if !keys.is_object() {
+                    *keys = json!({});
+                }
+                keys[&scheme] = json!(dirty_keys);
+            }
             self.save();
         }
     }
@@ -818,7 +938,11 @@ impl Controller {
         let paths = game.deployment_executables();
         let scheme = self.cloud_scheme();
         let policy = self.catalog.scheme_policies[&scheme].clone();
-        let values = self.preset_values(&exe);
+        let values = if uses_explicit_edits(&policy.parameter_profile) {
+            self.explicit_preset_values(&exe, &scheme)
+        } else {
+            self.preset_values(&exe)
+        };
         let data = self.data.clone();
         self.busy = true;
         self.critical = true;
@@ -840,7 +964,11 @@ impl Controller {
                 }
                 match Some(core::record(&location.directory)) {
                     Some(Ok(Some(record)))
-                        if record.scheme_id.as_deref() == Some(scheme.as_str()) => {}
+                        if record.scheme_id.as_deref() == Some(scheme.as_str())
+                            && core::backend_matches_profile(
+                                &record.backend,
+                                &policy.parameter_profile,
+                            ) => {}
                     Some(Ok(_)) => unavailable.push(format!("{path}：已部署方案不同")),
                     Some(Err(error)) => unavailable.push(format!("{path}：{error}")),
                     None => unavailable.push(format!("{path}：游戏目录无效")),
@@ -881,8 +1009,21 @@ impl Controller {
                 ));
             }
             if errors.is_empty() {
-                c.send(Event::PresetApplied(exe.clone(), scheme, values));
-                c.send(Event::Log("参数已应用；下次启动游戏生效。".into()));
+                let actual = if uses_explicit_edits(&policy.parameter_profile) {
+                    read_json_preset_values(&parameter_target(&game), &policy.parameter_profile)
+                } else {
+                    Ok(values)
+                };
+                match actual {
+                    Ok(actual) => {
+                        c.send(Event::PresetApplied(exe.clone(), scheme, actual));
+                        c.send(Event::Log("参数已应用；下次启动游戏生效。".into()));
+                    }
+                    Err(error) => c.send(Event::Warning(format!(
+                        "参数写入后读取失败：{}：{error}",
+                        parameter_target(&game).directory.display()
+                    ))),
+                }
             } else {
                 c.send(Event::Warning(format!(
                     "参数仅应用于 {applied}/{total} 个目录；未完成项：\n{}",
@@ -1461,6 +1602,7 @@ impl Controller {
                     self.series_for(Some(&game.exe)),
                     self.proxies_for(Some(&game.exe)),
                     self.preset_values_for(&game.exe, &scheme),
+                    self.explicit_preset_values(&game.exe, &scheme),
                 ));
             }
         }
@@ -1482,7 +1624,7 @@ impl Controller {
         catalog.prefer_github = self.choice("download_source", "domestic") == "github";
         self.channel.operation(move |c| {
             let mut errors = Vec::new();
-            for (primary, targets, game, scheme, series, proxies, options) in jobs {
+            for (primary, targets, game, scheme, series, proxies, options, overrides) in jobs {
                 if cancel.load(Ordering::Relaxed) {
                     break;
                 }
@@ -1528,6 +1670,9 @@ impl Controller {
                     }
                 };
                 let mut all_ok = true;
+                let read_target = targets
+                    .first()
+                    .map(|exe| game.deployment_target(std::path::Path::new(exe)));
                 for exe in targets {
                     if cancel.load(Ordering::Relaxed) {
                         all_ok = false;
@@ -1548,7 +1693,7 @@ impl Controller {
                             );
                             let name = core::config_name(&payload.backend);
                             files.insert(name.into(), context.configure(&files[name], &options)?);
-                            core::deploy_prepared_context_at(
+                            core::deploy_prepared_context_at_with_overrides(
                                 &game.deployment_target(&p),
                                 &payload.backend,
                                 &proxies,
@@ -1556,6 +1701,8 @@ impl Controller {
                                 files,
                                 Some(&payload.version),
                                 Some(&context),
+                                Some(&overrides),
+                                payload.upstream_version.as_deref(),
                             )
                             .map(|message| cleanup::CleanOutcome {
                                 message,
@@ -1592,7 +1739,21 @@ impl Controller {
                     ));
                 }
                 if all_ok && !clean {
-                    c.send(Event::PresetApplied(primary, scheme, options));
+                    let profile = &catalog.scheme_policies[&scheme].parameter_profile;
+                    let actual = if uses_explicit_edits(profile) {
+                        read_target
+                            .as_ref()
+                            .ok_or_else(|| anyhow::anyhow!("没有实际部署目录"))
+                            .and_then(|target| read_json_preset_values(target, profile))
+                    } else {
+                        Ok(options)
+                    };
+                    match actual {
+                        Ok(actual) => c.send(Event::PresetApplied(primary, scheme, actual)),
+                        Err(error) => {
+                            errors.push(format!("参数写入后读取失败：{primary}：{error}"))
+                        }
+                    }
                 }
             }
             if !errors.is_empty() {
@@ -1686,22 +1847,25 @@ impl Controller {
                 .games
                 .iter()
                 .find(|g| g.exe == exe)
-                .map(|g| g.deployment_target(std::path::Path::new(&exe)))
+                .map(parameter_target)
                 .unwrap_or_else(|| core::DeploymentTarget::for_game(std::path::Path::new(&exe)));
             let catalog = self.catalog.clone();
             let epoch = self.status_epoch;
             self.channel.job(move |c| {
                 let running = core::assert_target_stopped(&location).is_err();
                 let values = rtx_fg_manager::presets::inspect_at(&location, &catalog);
-                if let Err(e) = &values {
-                    c.send(Event::Log(e.to_string()));
+                match values {
+                    Ok(values) => c.send(Event::PresetRead(target, values, running, epoch)),
+                    Err(error) => c.send(Event::PresetReadFailed(
+                        target,
+                        format!(
+                            "无法读取当前参数，保留上次成功读取的值：{}：{error}",
+                            location.directory.display()
+                        ),
+                        running,
+                        epoch,
+                    )),
                 }
-                c.send(Event::PresetRead(
-                    target,
-                    values.unwrap_or(None),
-                    running,
-                    epoch,
-                ));
                 Ok(())
             });
         }
@@ -2060,6 +2224,18 @@ impl Controller {
                         self.disk_presets.insert((exe, scheme), values);
                     }
                 }
+                Event::PresetReadFailed(exe, error, running, epoch) => {
+                    self.preset_reads.remove(&exe);
+                    if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
+                        if running {
+                            self.running_games.insert(exe);
+                        } else {
+                            self.running_games.remove(&exe);
+                        }
+                        self.log(&error);
+                        self.warning = Some(error);
+                    }
+                }
                 Event::PresetApplied(exe, scheme, values) => {
                     self.disk_presets
                         .insert((exe.clone(), scheme.clone()), values.clone());
@@ -2080,6 +2256,13 @@ impl Controller {
                             *dirty = json!({});
                         }
                         dirty[&scheme] = json!(false);
+                        if let Some(keys) = game
+                            .extra
+                            .get_mut("preset_dirty_keys")
+                            .and_then(Value::as_object_mut)
+                        {
+                            keys.remove(&scheme);
+                        }
                         self.save();
                     }
                 }
@@ -2289,6 +2472,217 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn grouped_encore_settings_read_rendering_directory_and_failed_read_preserves_last_values() {
+        use rtx_fg_manager::encore;
+        let (dir, mut c) = controller();
+        let render_dir = dir.path().join("Rendering/Binaries");
+        std::fs::create_dir_all(&render_dir).unwrap();
+        let game = Game {
+            exe: dir.path().join("Launcher.exe").display().to_string(),
+            targets: vec![render_dir.join("Game.exe").display().to_string()],
+            ..Default::default()
+        };
+        std::fs::write(render_dir.join(encore::CONFIG), encore::DEFAULT_CONFIG).unwrap();
+        assert_eq!(parameter_target(&game).directory, render_dir);
+        assert_eq!(
+            read_json_preset_values(&parameter_target(&game), encore::PROFILE).unwrap(),
+            encore::defaults()
+        );
+        let exe = game.exe.clone();
+        c.games = vec![game];
+        let values = encore::defaults();
+        c.disk_presets
+            .insert((exe.clone(), encore::SCHEME.into()), values.clone());
+        c.preset_reads.insert(exe.clone());
+        c.channel.send(Event::PresetReadFailed(
+            exe.clone(),
+            "broken config".into(),
+            false,
+            c.status_epoch,
+        ));
+        c.events();
+        assert_eq!(c.warning.as_deref(), Some("broken config"));
+        assert_eq!(
+            c.disk_presets[&(exe.clone(), encore::SCHEME.into())],
+            values
+        );
+        assert!(!c.preset_reads.contains(&exe));
+        c.warning = None;
+        c.channel.send(Event::PresetReadFailed(
+            exe,
+            "stale failure".into(),
+            false,
+            c.status_epoch + 1,
+        ));
+        c.events();
+        assert!(c.warning.is_none());
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn encore_dirty_fields_merge_over_latest_menu_values_and_clear_after_apply() {
+        use rtx_fg_manager::encore;
+        let (_dir, mut c) = controller();
+        let scheme = encore::SCHEME;
+        c.catalog
+            .scheme_policies
+            .get_mut(scheme)
+            .unwrap()
+            .parameter_profile = encore::PROFILE.into();
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![
+            Game {
+                exe: "Encore-A.exe".into(),
+                ..Default::default()
+            },
+            Game {
+                exe: "Encore-B.exe".into(),
+                ..Default::default()
+            },
+        ];
+        let mut disk = encore::defaults();
+        disk.insert("tf_mode".into(), "3".into());
+        disk.insert("reflexFrameLimit".into(), "117".into());
+        c.disk_presets
+            .insert(("Encore-A.exe".into(), scheme.into()), disk.clone());
+        c.set_game_option("Encore-A.exe", "tf_mode", "4");
+        assert_eq!(
+            c.explicit_preset_values("Encore-A.exe", scheme),
+            BTreeMap::from([("tf_mode".into(), "4".into())])
+        );
+        disk.insert("reflexFrameLimit".into(), "141".into());
+        disk.insert("tf_mode".into(), "2".into());
+        c.channel.send(Event::PresetRead(
+            "Encore-A.exe".into(),
+            Some((scheme.into(), disk)),
+            false,
+            c.status_epoch,
+        ));
+        c.events();
+        assert_eq!(c.preset_values("Encore-A.exe")["reflexFrameLimit"], "141");
+        assert_eq!(c.preset_values("Encore-A.exe")["tf_mode"], "4");
+        assert_eq!(c.preset_values("Encore-B.exe")["tf_mode"], "game");
+        c.set_game_option("Encore-A.exe", "reflexFrameLimit", "NaN");
+        assert_eq!(c.preset_values("Encore-A.exe")["reflexFrameLimit"], "141");
+        let applied = c.preset_values("Encore-A.exe");
+        c.channel.send(Event::PresetApplied(
+            "Encore-A.exe".into(),
+            scheme.into(),
+            applied,
+        ));
+        c.events();
+        assert!(!c.preset_dirty("Encore-A.exe"));
+        assert!(c.explicit_preset_values("Encore-A.exe", scheme).is_empty());
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn rtxmfg_edits_merge_with_latest_disk_values_and_legacy_keys_stay_bounded() {
+        use rtx_fg_manager::rtxmfg;
+        let (_dir, mut c) = controller();
+        let scheme = "rtx40mfg-1.3.3-hf2";
+        let exe = "RTXMFG-A.exe";
+        c.games = vec![Game {
+            exe: exe.into(),
+            extra: [
+                (
+                    "deployment_choice".into(),
+                    json!({"scheme":scheme,"series":2}),
+                ),
+                (
+                    "preset_options_v2".into(),
+                    json!({scheme:{"rtx_mode":"6","rtx_target":"90"}}),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }];
+        let mut disk = rtx_fg_manager::presets::defaults(rtxmfg::PROFILE, &BTreeMap::new());
+        disk.insert("rtx_mode".into(), "2".into());
+        disk.insert("rtx_target".into(), "117".into());
+        c.disk_presets
+            .insert((exe.into(), scheme.into()), disk.clone());
+        assert!(c.explicit_preset_values(exe, scheme).is_empty());
+        assert_eq!(c.preset_values(exe)["rtx_mode"], "2");
+        c.set_game_option(exe, "rtx_vsync", "1");
+        assert_eq!(
+            c.explicit_preset_values(exe, scheme),
+            BTreeMap::from([("rtx_vsync".into(), "1".into())])
+        );
+        disk.insert("rtx_mode".into(), "4".into());
+        disk.insert("rtx_target".into(), "141".into());
+        c.disk_presets.insert((exe.into(), scheme.into()), disk);
+        let values = c.preset_values(exe);
+        assert_eq!(values["rtx_mode"], "4");
+        assert_eq!(values["rtx_target"], "141");
+        assert_eq!(values["rtx_vsync"], "1");
+        c.channel
+            .send(Event::PresetApplied(exe.into(), scheme.into(), values));
+        c.events();
+        assert!(!c.preset_dirty(exe));
+        assert!(c.explicit_preset_values(exe, scheme).is_empty());
+        let game = &mut c.games[0];
+        game.extra.remove("preset_dirty_keys");
+        game.extra
+            .insert("preset_dirty".into(), json!({scheme:true}));
+        game.extra.insert(
+            "preset_options_v2".into(),
+            json!({scheme:{"rtx_mode":"3","rtx_target":"144","unrelated":"1"}}),
+        );
+        assert_eq!(
+            c.explicit_preset_values(exe, scheme),
+            BTreeMap::from([
+                ("rtx_mode".into(), "3".into()),
+                ("rtx_target".into(), "144".into())
+            ])
+        );
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn encore_legacy_dirty_flag_only_migrates_four_exposed_transfusion_preferences() {
+        use rtx_fg_manager::encore;
+        let (_dir, mut c) = controller();
+        let scheme = encore::SCHEME;
+        c.catalog
+            .scheme_policies
+            .get_mut(scheme)
+            .unwrap()
+            .parameter_profile = encore::PROFILE.into();
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: "Encore-Old.exe".into(),
+            extra: [
+                (
+                    "preset_options_v2".into(),
+                    json!({scheme:{"tf_mode":"6","tf_target":"200","nrEnabled":"1"}}),
+                ),
+                ("preset_dirty".into(), json!({scheme:true})),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }];
+        c.disk_presets
+            .insert(("Encore-Old.exe".into(), scheme.into()), encore::defaults());
+        assert_eq!(
+            c.explicit_preset_values("Encore-Old.exe", scheme),
+            BTreeMap::from([
+                ("tf_mode".into(), "6".into()),
+                ("tf_target".into(), "200".into()),
+            ])
+        );
+        assert_eq!(c.preset_values("Encore-Old.exe")["nrEnabled"], "0");
+        c.running_games.insert("Encore-Old.exe".into());
+        c.set_game_option("Encore-Old.exe", "tf_mode", "2");
+        assert_eq!(c.preset_values("Encore-Old.exe")["tf_mode"], "6");
+        c.close();
+        c.tick_close();
+    }
     #[test]
     fn active_data_directory_guard_normalizes_paths_without_blocking_siblings() {
         let dir = tempfile::tempdir().unwrap();

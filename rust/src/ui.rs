@@ -34,6 +34,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[path = "ui_encore.rs"]
+mod encore_editor;
+
 /// A local, selectable Markdown document. Sections stay separate so the native
 /// scroll handle can jump to headings without parsing translated anchor names.
 struct HelpDocumentView {
@@ -433,6 +436,8 @@ impl GameFilter {
 }
 pub struct Manager {
     choices: RefCell<HashMap<&'static str, ChoiceBinding>>,
+    encore_editor: RefCell<Option<(String, Entity<encore_editor::EncoreEditor>)>>,
+    encore_invalid: Rc<Cell<bool>>,
     c: Controller,
     search: Entity<InputState>,
     _subscription: Subscription,
@@ -488,6 +493,8 @@ impl Manager {
         let language = c.tr.language.clone();
         let mut view = Self {
             choices: RefCell::new(HashMap::new()),
+            encore_editor: RefCell::new(None),
+            encore_invalid: Rc::new(Cell::new(false)),
             c,
             search,
             _subscription: subscription,
@@ -569,6 +576,23 @@ impl Manager {
     }
     fn act(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         if self.c.closing {
+            return;
+        }
+        if self.encore_invalid.get()
+            && self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE
+            && self
+                .encore_editor
+                .borrow()
+                .as_ref()
+                .is_some_and(|(exe, _)| self.c.focus.as_ref() == Some(exe))
+            && (matches!(command, Command::ApplyPreset | Command::Patch(false))
+                || matches!(&command, Command::Commit(action) if action == "deploy_batch"))
+        {
+            self.c.warning = Some(
+                self.c
+                    .text("请先修正高级参数中的无效输入，或恢复该项默认值。"),
+            );
+            cx.notify();
             return;
         }
         match command {
@@ -1616,6 +1640,27 @@ impl Manager {
     }
     fn preset_panel(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let context = self.c.preset_context(self.c.focus.as_deref().unwrap_or(""));
+        if context.profile == rtx_fg_manager::encore::PROFILE
+            && let Some(exe) = self.c.focus.clone()
+        {
+            let mut editor = self.encore_editor.borrow_mut();
+            if editor.as_ref().is_none_or(|(current, _)| current != &exe) {
+                self.encore_invalid.set(false);
+                let owner = cx.entity();
+                let invalid = self.encore_invalid.clone();
+                let entity = cx.new(|cx| {
+                    encore_editor::EncoreEditor::new(
+                        exe.clone(),
+                        owner.downgrade(),
+                        invalid,
+                        window,
+                        cx,
+                    )
+                });
+                *editor = Some((exe, entity));
+            }
+            return editor.as_ref().unwrap().1.clone().into_any_element();
+        }
         let options = self.c.focus.as_deref().map(|exe| self.c.preset_values(exe));
         let mut fields = div().v_flex().gap_3().w_full().min_w_0();
         let mut common = div().v_flex().gap_3().w_full().min_w_0();
@@ -1852,6 +1897,8 @@ impl Manager {
         }
         let proxy_hint = if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
             "RTX40 使用单个通用 DLL，选择入口仅改名，签名不变；不会覆盖游戏或其他 MOD 的同名文件。Bink 入口须自行保留原始 Hooked 文件。"
+        } else if self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE {
+            "Encore 支持19个入口，每次选一个；只复制重命名，保留签名。入口名不增加图形API支持。Bink须先自行保留原文件为binkw64Hooked.dll或bink2w64Hooked.dll。"
         } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
             "此上游版本仅提供version.dll，请勿改名或混装其他方案的DLL。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {

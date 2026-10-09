@@ -274,7 +274,15 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
             .and_then(|i| i.1)
             .is_some_and(|h| listed("transfusion_images", &h))
     });
-    let config = if rtxmfg {
+    let encore = hashes.keys().any(|name| {
+        identity(&dir.join(name))
+            .ok()
+            .and_then(|i| i.1)
+            .is_some_and(|h| listed("encore_images", &h))
+    });
+    let config = if encore {
+        crate::encore::CONFIG
+    } else if rtxmfg {
         crate::rtxmfg::CONFIG
     } else if transfusion {
         crate::transfusion::CONFIG
@@ -290,9 +298,30 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
             core::hash(b"")
         },
     );
+    if encore {
+        let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
+        // A manually copied notice is owned only when it is byte-identical to
+        // the notice shipped with a verified cloud package, not by name alone.
+        let expected = crate::cloud::bundled()
+            .packages
+            .iter()
+            .flat_map(|p| &p.files)
+            .find(|f| f.name == crate::encore::NOTICES)
+            .map(|f| f.sha256.clone());
+        hashes.insert(
+            crate::encore::NOTICES.into(),
+            expected
+                .filter(|h| {
+                    notice.is_file() && core::digest(&notice).is_ok_and(|actual| actual == *h)
+                })
+                .unwrap_or_else(|| core::hash(b"")),
+        );
+    }
     Ok(Some(Record {
         schema: 3,
-        backend: if rtxmfg {
+        backend: if encore {
+            crate::encore::BACKEND
+        } else if rtxmfg {
             crate::rtxmfg::BACKEND
         } else if transfusion {
             crate::transfusion::BACKEND
@@ -301,6 +330,7 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
         }
         .into(),
         payload_version: None,
+        upstream_version: None,
         proxy: selected[0].clone(),
         proxies: selected,
         hashes,
@@ -382,6 +412,70 @@ fn scan_generated(
     }
     Ok(())
 }
+/// The Encore runtime owns fixed outputs in a fixed adjacent directory. Do not
+/// interpret paths in JSONC, recursively erase this directory, or claim arbitrary
+/// .log/.csv files placed here by another program.
+fn scan_encore_logs(
+    dir: &Path,
+    kept: &mut BTreeSet<PathBuf>,
+    targets: &mut BTreeMap<PathBuf, String>,
+    dirs: &mut BTreeSet<PathBuf>,
+) -> Result<()> {
+    let root = dir.join("rtx-encore-logs");
+    match fs::symlink_metadata(&root) {
+        Ok(metadata) if core::is_link(&metadata) => {
+            kept.insert(root);
+            return Ok(());
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    }
+    let root = core::no_links(&root)?;
+    if !root.exists() {
+        return Ok(());
+    }
+    if !root.is_dir() {
+        kept.insert(root);
+        return Ok(());
+    }
+    const NAMES: [&str; 5] = [
+        "rtx-encore.log",
+        "rtx-encore.crash.log",
+        "rtx-encore_perf.csv",
+        "rtx-encore_nr.csv",
+        "rtx-encore_nr_open_steps.csv",
+    ];
+    static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
+    let rotated = ROTATED.get_or_init(|| {
+        regex::Regex::new(
+            r"^rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log$",
+        )
+        .expect("fixed Encore session-log pattern")
+    });
+    for entry in fs::read_dir(&root)? {
+        let entry = entry?;
+        // Treat links as unknown and retain them. Never follow the target while
+        // determining ownership or fail cleanup of unrelated owned files.
+        let path = entry.path();
+        if core::is_link(&fs::symlink_metadata(&path)?) {
+            kept.insert(path);
+            continue;
+        }
+        let path = core::no_links(&path)?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if (NAMES.contains(&name.as_str()) || rotated.is_match(&name))
+            && path.is_file()
+            && path.metadata()?.len() <= 128 * 1024 * 1024
+        {
+            targets.insert(path.clone(), core::digest(&path)?);
+        } else {
+            kept.insert(path);
+        }
+    }
+    dirs.insert(root);
+    Ok(())
+}
 pub fn clean(exe: &Path) -> Result<String> {
     clean_at(&core::DeploymentTarget::for_game(exe))
 }
@@ -401,6 +495,8 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
     core::assert_target_stopped(&target)?;
+    crate::encore_upgrade::recover_locked(&target)?;
+    crate::rtxmfg_upgrade::recover_locked(&target)?;
     let root = core::no_links(&dir.join(OWN))?;
     let journal = core::no_links(&dir.join(".rtx-fg-v3-legacy.json"))?;
     let legacy = legacy_identity(&journal)?;
@@ -433,8 +529,12 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     let mut dirs = BTreeSet::new();
     let config = core::config_name(&record.backend);
     let ini = core::no_links(&dir.join(config))?;
-    let mut roots = if [crate::rtxmfg::BACKEND, crate::transfusion::BACKEND]
-        .contains(&record.backend.as_str())
+    let mut roots = if [
+        crate::rtxmfg::BACKEND,
+        crate::transfusion::BACKEND,
+        crate::encore::BACKEND,
+    ]
+    .contains(&record.backend.as_str())
     {
         BTreeMap::new()
     } else {
@@ -471,7 +571,9 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
             kept.insert(helper);
         }
     }
-    let logs: Vec<&str> = if record.backend == crate::rtxmfg::BACKEND {
+    let logs: Vec<&str> = if record.backend == crate::encore::BACKEND {
+        Vec::new()
+    } else if record.backend == crate::rtxmfg::BACKEND {
         crate::rtxmfg::SIDECARS.to_vec()
     } else if record.backend == crate::transfusion::BACKEND {
         vec!["DLSSG-Transfusion.log", "DLSSG-Transfusion_perf.csv"]
@@ -487,6 +589,24 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
                 kept.insert(q);
             }
         }
+    }
+    if record.backend == crate::encore::BACKEND {
+        let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
+        if notice.exists() {
+            if notice.is_file()
+                && record
+                    .hashes
+                    .get(crate::encore::NOTICES)
+                    .is_some_and(|expected| {
+                        core::digest(&notice).is_ok_and(|actual| &actual == expected)
+                    })
+            {
+                targets.insert(notice.clone(), core::digest(&notice)?);
+            } else {
+                kept.insert(notice);
+            }
+        }
+        scan_encore_logs(dir, &mut kept, &mut targets, &mut dirs)?;
     }
     if record.backend == crate::rtxmfg::BACKEND {
         for path in crate::rtxmfg::log_paths(&p) {

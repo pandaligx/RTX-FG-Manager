@@ -20,7 +20,7 @@ Gitee 的 DLL ZIP、管理器和 aria2 等工具 EXE 均优先由发布助手从
 
 ## 更新一次 DLL
 
-1. 对新 DLL 完成游戏测试、签名。每个 ZIP 只放一个代理 DLL 和匹配配置，文件放在 ZIP 根目录。现有方案使用 `dlssg_sm86.ini`；RTX40MFG 使用 `RTXMFG-Universal.json`。不要打包日志、缓存、原游戏 DLL 或子文件夹。
+1. 对新 DLL 完成相应验证和签名，明确记录是否做过真实游戏测试，不将离线验证等同于游戏验证。旧协议的每个 ZIP 仍严格只有两个成员：一个代理 DLL 和匹配配置；INI 方案使用 `dlssg_sm86.ini`，RTX40MFG 使用 `RTXMFG-Universal.json`，旧 Transfusion 使用 `DLSSG-Transfusion.json`。Encore 专用协议严格要求下节说明的三个成员，额外携带上游许可。所有文件放在 ZIP 根目录，不打包日志、缓存、原游戏 DLL 或子文件夹。
 2. 给 ZIP 新名称，例如 `upstream-0.3.6-version-r1.zip`。由助手从本机上传到 GitHub 主仓库和 Gitee 资源仓库各自的 **`payloads` 固定预发行**；保留其他附件。同名不同内容不允许覆盖；修改 INI 或重新签名，也需要新 ZIP 名称。
 3. 编辑 `cloud/schemes.json`，修改对应方案的 `version`、`name` 和 `archives`。已有方案的 `id` 保持不变，以保留用户参数记忆。参数协议没有变化时保留 `profile`。
 4. 提交后查看 **Publish verified DLL resources** 工作流。它核验 ZIP 内容和两站已有附件，匿名回下载核对，再发布索引，最后发布正式 catalog。若海外传输失败，保留旧清单，从本机补齐缺少的 ZIP 后重跑；不得跳过摘要核验。
@@ -55,19 +55,54 @@ Gitee 的 DLL ZIP、管理器和 aria2 等工具 EXE 均优先由发布助手从
 | `id` | 稳定身份；改名时不要修改它 |
 | `name` / 可选 `names` | 中文名称 / 按语言代码指定其他语言名称 |
 | `version` | ZIP 内 DLL 方案版本，三段数字 |
-| `profile` | 管理器已支持的参数协议（INI 或 JSON），不是展示名称 |
+| `upstream_version` | 可选完整上游版本；Encore 候选填写 `1.0.0-beta.2`，保留预发行后缀，数字主版本须与 `version` 一致 |
+| `profile` | 管理器已支持的参数协议（INI、JSON 或 JSONC），不是展示名称 |
 | `defaults` | 新配置默认值；留空对象表示使用该协议内置默认值 |
 | `archives` | 固定资源 Release 的 ZIP 文件名，不需要手填 URL 或 SHA-256 |
 | `min_manager_version` | 可选最低管理器版本；较老的新客户端会跳过该方案并提示升级 |
 | `capabilities` | 仅专项构建使用；不要给普通上游 DLL 添加三角洲能力标记 |
 
-当前协议为 `upstream035`、`upstream031`、`native026`、`initial`、`mfg_vulkan_sm86_7`、`rtxmfg_universal_133`。新 DLL 若改变参数字段或功能含义，需要先适配管理器和发布工具，不能只改版本号。
+当前协议为 `upstream035`、`upstream031`、`native026`、`initial`、`mfg_vulkan_sm86_7`、`rtxmfg_universal_133`、`transfusion_json_v3`，4.2.9 候选另支持 `rtx_encore_json_v4`。新 DLL 若改变参数字段或功能含义，需要先适配管理器和发布工具，不能只改版本号。
 
-RTX40 使用 `rtxmfg_universal_133`，最低管理器版本为 `4.2.5`。只上传一个 ZIP：将已签的通用 DLL 原样命名为 `version.dll`，与 `RTXMFG-Universal.json` 放在根目录。管理器按用户所选入口改名，不修改签名字节。不要按 19 个支持名称复制上传，也不要加入 `dbghelp.dll`。默认参数可留空；可写 `rtx_mode`（`follow`、`1`—`6` 或 `dynamic`）、`rtx_target`（`0`—`1000`，0 跟随刷新率）、`rtx_preset`（`0`、`1`、`2`）。这些键仅用于云端预设，不是 JSON 原始字段名。
+4.2.9 候选的 **RTX40 MFG · 1.4.2** 保留方案 ID `rtx40mfg-1.3.3-hf2` 与 `profile: "rtxmfg_universal_133"`，`version` 更新为 `1.4.2`。参数协议兼容，`min_manager_version` 继续为 `4.2.6`，不要随本次管理器候选版本上调。只上传一个 ZIP：将已签的通用 DLL 原样命名为 `version.dll`，与 `RTXMFG-Universal.json` 放在根目录。管理器按用户所选入口改名，不修改签名字节。不要按 19 个支持名称复制上传，也不要加入 `dbghelp.dll`。默认参数可留空；可写 `rtx_mode`（`follow`、`1`—`6` 或 `dynamic`）、`rtx_target`（`0`—`1000`，0 跟随刷新率）、`rtx_preset`（`0`、`1`、`2`）。这些键仅用于云端预设，不是 JSON 原始字段名。
 
 包含内嵌后端的方案，先签内部后端，再嵌回外层、更新对应资源摘要，最后签外层 DLL。嵌入操作会使旧外层签名失效。签名有效不等于所有游戏或反作弊允许加载。
 
 `initial` 方案的两条 GPU 路由使用 `{ "file": "文件.zip", "gpu": "rtx20" }` 和 `rtx30`。兼容既有包身份时允许可选 `id`。其他方案通常直接写文件名即可。所有整数和开关默认值使用字符串，例如 `"1"`。
+
+## 4.2.9 候选：Encore 通用包协议
+
+此节描述尚未发布的候选格式，不表示正式资源和管理器已经上线。Encore 接替原 Transfusion 时保留稳定方案 ID `dlssg-transfusion-1.4.5.3`，但必须切换到独立 `profile: "rtx_encore_json_v4"`，并明确设置 `min_manager_version: "4.2.9"`。旧客户端跳过新协议，不能把 Encore 包当成旧 Transfusion 配置使用。方案条目示例如下，不要用它单独覆盖完整生产清单：
+
+```json
+{
+  "id": "dlssg-transfusion-1.4.5.3",
+  "name": "RTX Encore · 1.0.0-beta.2",
+  "profile": "rtx_encore_json_v4",
+  "min_manager_version": "4.2.9",
+  "version": "1.0.0",
+  "upstream_version": "1.0.0-beta.2",
+  "source_url": "https://github.com/SilyNoMeta/rtx-encore",
+  "defaults": {},
+  "archives": ["rtx-encore-1.0.0-beta.2-v429-universal.zip"]
+}
+```
+
+`version` 继续使用客户端兼容的三段数字；`upstream_version` 保留完整上游版本并贯通资源索引、准备结果和部署记录，不能把 beta.2 显示为正式 1.0.0。索引中的 backend 为 `encore`，对应 `encore_json` 策略，允许 SM75 / SM86 / SM89 选择；这些路由不代表各显卡或游戏已经实测。
+
+每个 Encore 方案恰好一个通用 ZIP，根目录严格只有以下三个成员：
+
+| 成员 | 来源与约束 |
+| --- | --- |
+| `version.dll` | 已签名 `rtx-encore.dll` 的同字节副本，只改文件名，不修改代码、导出表、资源或签名 |
+| `rtx-encore.jsonc` | 真实 schema 4 默认配置，`configVersion` 为整数 `4`，已知字段必须使用完整正确的嵌套路径、类型和范围 |
+| `rtx-encore-THIRD-PARTY-NOTICES.md` | 上游 `THIRD-PARTY-NOTICES.md` 原文，仅改名；部署时随 DLL 保留，不省略或改写许可内容 |
+
+包内初始配置保持 `frameGeneration.mode="game"`、`general.gpuSeries="auto"`、`smoothMotion.smoothMotionEnabled=false`、`neuralRendering.core.nrEnabled=false`。使用真实模板和共享字段元数据校验，不能把上游设置文档的摘要表当作完整 JSON 层级，也不能凭猜测生成高级默认值。包、成员大小和 SHA-256 均由工具生成并校验，不手填摘要。旧协议仍只接受两个成员，不能为了带许可而随意给旧包增加第三个文件。
+
+客户端下载这一份包后，把唯一 canonical `version.dll` 原样重映射为所选入口，每次只允许一个：`version.dll`、`dinput8.dll`、`winmm.dll`、`dxgi.dll`、`d3d9.dll`、`d3d10.dll`、`d3d11.dll`、`d3d12.dll`、`dsound.dll`、`wininet.dll`、`winhttp.dll`、`binkw64.dll`、`bink2w64.dll`、`xinput1_1.dll`、`xinput1_2.dll`、`xinput1_3.dll`、`xinput1_4.dll`、`xinput9_1_0.dll`、`xinputuap.dll`。不要打包或上传十九份副本，也不要混入 ASI、独立 `alternative-proxies` 构建、NVIDIA NR DLL 或游戏原文件。Bink 原件须由用户预先在旁边保留为相应 `binkw64Hooked.dll` / `bink2w64Hooked.dll`，不属于云包成员。改名保持同一签名内容，但入口名称不增加图形 API 支持。
+
+发布顺序仍为：本地生成候选并核验签名与内容 → 两站不可变 ZIP 上传及完整回下载校验 → 两站索引发布及回读 → catalog 提升及客户端固定 URL 回读 → 已签管理器 EXE 双站上传与核验 → 最后发布 `update.json`。资源验证失败时保留原正式 catalog/index；本地候选生成不等于发布。正式资源尚未提升时，旧缓存或在线刷新可能仍返回 Transfusion，不应为掩盖候选状态绕过正式清单门槛。原历史 ZIP 和不可变索引继续保留。
 
 ## 安全顺序和失败恢复
 

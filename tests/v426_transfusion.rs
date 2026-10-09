@@ -86,12 +86,18 @@ fn exact_proxy_names_and_config_protocols_cannot_be_mixed() -> Result<()> {
         )
         .is_err()
     );
-    let catalog = cloud::bundled();
-    let packages: Vec<_> = catalog
-        .packages
+    // The stable ID now upgrades to Encore. Keep this historical regression
+    // tied to the immutable 4.2.6 index that actually shipped these four DLLs.
+    let historical: serde_json::Value = serde_json::from_str(include_str!(
+        "../cloud/indexes/payload-index-r-27e17f68f3e68de7a12c.json"
+    ))?;
+    let packages: Vec<cloud::Package> = historical["packages"]
+        .as_array()
+        .unwrap()
         .iter()
-        .filter(|p| p.scheme_id == "dlssg-transfusion-1.4.5.3")
-        .collect();
+        .filter(|p| p["scheme_id"] == "dlssg-transfusion-1.4.5.3")
+        .map(|p| serde_json::from_value(p.clone()))
+        .collect::<std::result::Result<_, _>>()?;
     assert_eq!(packages.len(), 4);
     for p in packages {
         assert_eq!(p.backends, [transfusion::BACKEND]);

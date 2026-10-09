@@ -1,4 +1,4 @@
-//! RTXMFG Universal v1.3.3 HF2 / v1.4.1 HF1 use their own JSON protocol,
+//! RTXMFG Universal v1.3.3 HF2 through v1.4.2 use their own JSON protocol,
 //! not dlssg_sm86.ini. Keep the profile ID stable for existing game settings.
 use crate::presets::{Parameter, Values};
 use anyhow::{Result, ensure};
@@ -112,6 +112,9 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
         serde_json::from_slice(bytes.strip_prefix(&[239, 187, 191]).unwrap_or(bytes))?;
     ensure!(data.is_object(), "RTXMFG JSON 必须是对象");
     crate::presets::validate(PROFILE, values)?;
+    if values.is_empty() {
+        return Ok(bytes.to_vec());
+    }
     if let Some(mode) = values.get("rtx_mode") {
         data["followGame"] = json!(mode == "follow");
         data["mode"] = json!(if mode == "follow" {
@@ -210,6 +213,14 @@ pub fn log_paths(exe: &std::path::Path) -> Vec<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn no_explicit_edits_preserve_original_json_bytes() -> Result<()> {
+        let before = b"\xef\xbb\xbf{\r\n  \"followGame\": true, \"custom\": {\"keep\": 7}\r\n}\r\n";
+        assert_eq!(configure(before, &Values::new())?, before);
+        assert!(configure(b"[]", &Values::new()).is_err());
+        Ok(())
+    }
 
     #[test]
     fn presentation_fields_preserve_other_settings_and_custom_frame_limit() -> Result<()> {

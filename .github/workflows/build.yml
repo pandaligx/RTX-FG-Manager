@@ -32,6 +32,15 @@ jobs:
         run: cargo check --locked
       - name: Unit and filesystem regression tests
         run: cargo test --locked
+      - name: Offline cloud and publication protocol tests
+        shell: pwsh
+        run: |
+          python -B tools/cloud_release.py self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_encore_cloud.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_publication.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Build release

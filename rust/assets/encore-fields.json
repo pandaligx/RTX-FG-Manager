@@ -1,0 +1,2220 @@
+[
+  {
+    "key": "tf_mode",
+    "path": [
+      "frameGeneration",
+      "mode"
+    ],
+    "label": "请求倍率",
+    "group": "frames",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "2",
+        "label": "2X"
+      },
+      {
+        "value": "3",
+        "label": "3X"
+      },
+      {
+        "value": "4",
+        "label": "4X"
+      },
+      {
+        "value": "5",
+        "label": "5X（实验）"
+      },
+      {
+        "value": "6",
+        "label": "6X（实验）"
+      },
+      {
+        "value": "dynamic",
+        "label": "动态倍率"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "游戏内仍需开启DLSS帧生成。5X/6X为实验功能，会增加显存占用。",
+    "optional": false,
+    "source_help": "fixed (the multiplier below), dynamic (DLSS-G picks the multiplier to reach the target FPS) or game (the game or NVIDIA Profile Inspector decides)."
+  },
+  {
+    "key": "tf_target",
+    "path": [
+      "frameGeneration",
+      "dynamicTargetFrameRate"
+    ],
+    "label": "动态目标帧率",
+    "group": "frames",
+    "kind": "integer",
+    "default": "0",
+    "min": 0,
+    "max": 1000,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_mode=dynamic"
+    ],
+    "help": "0跟随显示器刷新率，仅动态模式使用。",
+    "optional": false,
+    "source_help": "Dynamic mode target FPS. 0 follows the refresh rate of the monitor showing the game."
+  },
+  {
+    "key": "tf_dynamic56",
+    "path": [
+      "frameGeneration",
+      "dynamicExperimental56"
+    ],
+    "label": "动态允许5X/6X",
+    "group": "frames",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_mode=dynamic"
+    ],
+    "help": "关闭时动态倍率最多4X；开启会增加显存需求。",
+    "optional": false,
+    "source_help": "Let Dynamic mode go up to 5x and 6x (needs plenty of VRAM). Off: Dynamic stays at 4x or less."
+  },
+  {
+    "key": "smoothMotionEnabled",
+    "path": [
+      "smoothMotion",
+      "smoothMotionEnabled"
+    ],
+    "label": "Smooth Motion",
+    "group": "frames",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "仅RTX30且匹配受支持驱动；与DLSS帧生成是不同功能。",
+    "optional": false,
+    "source_help": "Driver Smooth Motion for RTX 30, with the NVIDIA 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply."
+  },
+  {
+    "key": "smoothMotionApi",
+    "path": [
+      "smoothMotion",
+      "smoothMotionApi"
+    ],
+    "label": "Smooth Motion图形接口",
+    "group": "frames",
+    "kind": "choice",
+    "default": "d3d12",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "d3d12",
+        "label": "DirectX12"
+      },
+      {
+        "value": "d3d11",
+        "label": "DirectX11"
+      },
+      {
+        "value": "vulkan",
+        "label": "Vulkan"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "smoothMotionEnabled=1"
+    ],
+    "help": "必须与游戏实际使用的图形接口一致。",
+    "optional": false,
+    "source_help": "d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply."
+  },
+  {
+    "key": "dlssRenderScale",
+    "path": [
+      "dlssSuperResolution",
+      "dlssRenderScale"
+    ],
+    "label": "DLSS渲染比例",
+    "group": "image",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "dlaa",
+        "label": "DLAA"
+      },
+      {
+        "value": "quality",
+        "label": "质量"
+      },
+      {
+        "value": "balanced",
+        "label": "平衡"
+      },
+      {
+        "value": "performance",
+        "label": "性能"
+      },
+      {
+        "value": "ultra-performance",
+        "label": "极致性能"
+      },
+      {
+        "value": "custom",
+        "label": "自定义"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "修改此项会调整DLSS渲染比例；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Force the DLSS render resolution: game, dlaa, quality, balanced, performance, ultra-performance or custom. The game must use DLSS already."
+  },
+  {
+    "key": "dlssCustomScale",
+    "path": [
+      "dlssSuperResolution",
+      "dlssCustomScale"
+    ],
+    "label": "DLSS自定义比例",
+    "group": "image",
+    "kind": "integer",
+    "default": "67",
+    "min": 50,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "dlssRenderScale=custom"
+    ],
+    "help": "仅DLSS自定义比例使用，单位为百分比。",
+    "optional": false,
+    "source_help": "Render scale in percent (50 to 100) when dlssRenderScale is custom."
+  },
+  {
+    "key": "reflexFrameLimit",
+    "path": [
+      "nativeMenuFeatures",
+      "reflexFrameLimit"
+    ],
+    "label": "Reflex渲染帧率上限",
+    "group": "frames",
+    "kind": "integer",
+    "default": "0",
+    "min": 0,
+    "max": 1000,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "0跟随游戏；限制实际渲染帧，不是插帧后的显示帧。",
+    "optional": false,
+    "source_help": "0 follows the game's Reflex frame limit; 1-1000 requests a render-frame cap. Requires a supported Reflex plugin. Applied at its owning options/sleep boundary."
+  },
+  {
+    "key": "vsyncOff",
+    "path": [
+      "nativeMenuFeatures",
+      "vsyncOff"
+    ],
+    "label": "请求关闭垂直同步",
+    "group": "frames",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "修改此项会调整请求关闭垂直同步；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Request interval zero on the application's own DXGI Present. Driver overrides keep priority; TEST/nested presents are preserved."
+  },
+  {
+    "key": "hairEnabled",
+    "path": [
+      "nativeMenuFeatures",
+      "hairEnabled"
+    ],
+    "label": "光追毛发转换",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "仅上游已验证的游戏、毛发、驱动和DXR设备组合生效。",
+    "optional": false,
+    "source_help": "Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change."
+  },
+  {
+    "key": "nrEnabled",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrEnabled"
+    ],
+    "label": "神经渲染",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "需要兼容DLSS及NVIDIA神经渲染运行库；开启可能显著增加显存与GPU负载。",
+    "optional": false,
+    "source_help": "DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0. The first launch prepares it in the background."
+  },
+  {
+    "key": "nrEngine",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrEngine"
+    ],
+    "label": "神经渲染引擎",
+    "group": "image",
+    "kind": "choice",
+    "default": "nvidia",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "nvidia",
+        "label": "NVIDIA"
+      },
+      {
+        "value": "opendlss",
+        "label": "Open（高度实验）"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "Open为高度实验引擎；切换后重启，没有引擎自动回退。",
+    "optional": false,
+    "source_help": "nvidia (default) or opendlss (experimental). Open runs dedicated in a Direct3D game (on its own device beside the game) and in-game in a Vulkan game (on the game's device). Restart to apply; no engine fallback."
+  },
+  {
+    "key": "nrPasses",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrPasses"
+    ],
+    "label": "神经渲染处理次数",
+    "group": "image",
+    "kind": "integer",
+    "default": "1",
+    "min": 1,
+    "max": 4,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "1到4次完整处理；次数越多GPU时间和显存开销越高。",
+    "optional": false,
+    "source_help": "Independent temporal NR passes, 1 to 4. Cost and VRAM grow. Only a complete chain is published; unsupported chain routes preserve SR."
+  },
+  {
+    "key": "nrLaterPassLocalTone",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrLaterPassLocalTone"
+    ],
+    "label": "后续处理局部色调",
+    "group": "image",
+    "kind": "decimal",
+    "default": "0",
+    "min": 0,
+    "max": 2,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=2"
+    ],
+    "help": "只作用于第2次及之后处理，默认0避免重复累积。",
+    "optional": false,
+    "source_help": "Tone applied after pass one, 0 to 2. Default zero avoids repeated tone accumulation."
+  },
+  {
+    "key": "nrResolution",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrResolution"
+    ],
+    "label": "神经渲染分辨率",
+    "group": "image",
+    "kind": "choice",
+    "default": "render",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "render",
+        "label": "跟随渲染分辨率"
+      },
+      {
+        "value": "output",
+        "label": "输出分辨率"
+      },
+      {
+        "value": "quality",
+        "label": "质量67%"
+      },
+      {
+        "value": "balanced",
+        "label": "平衡58%"
+      },
+      {
+        "value": "performance",
+        "label": "性能50%"
+      },
+      {
+        "value": "ultra-performance",
+        "label": "极致性能33%"
+      },
+      {
+        "value": "custom",
+        "label": "自定义"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "神经渲染处理尺寸独立于DLSS超分辨率的渲染比例。",
+    "optional": false,
+    "source_help": "Size NR runs at: render (follows the DLSS render size), output (full size), quality (67 percent of the output), balanced (58), performance (50), ultra-performance (33) or custom. Smaller is faster; DLSS keeps the fine detail."
+  },
+  {
+    "key": "nrResolutionScale",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrResolutionScale"
+    ],
+    "label": "神经渲染自定义比例",
+    "group": "image",
+    "kind": "integer",
+    "default": "67",
+    "min": 33,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrResolution=custom"
+    ],
+    "help": "仅神经渲染自定义比例使用，单位为输出尺寸百分比。",
+    "optional": false,
+    "source_help": "Percent of the output size (33 to 100) when nrResolution is custom."
+  },
+  {
+    "key": "nrIntensity",
+    "path": [
+      "neuralRendering",
+      "appearance",
+      "nrIntensity"
+    ],
+    "label": "效果强度",
+    "group": "image",
+    "kind": "decimal",
+    "default": "1",
+    "min": 0,
+    "max": 2,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "修改此项会调整效果强度；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Strength of the effect, 0 to 2."
+  },
+  {
+    "key": "nrStyle",
+    "path": [
+      "neuralRendering",
+      "appearance",
+      "nrStyle"
+    ],
+    "label": "全局图像风格",
+    "group": "image",
+    "kind": "choice",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "0",
+        "label": "默认"
+      },
+      {
+        "value": "1",
+        "label": "自然"
+      },
+      {
+        "value": "2",
+        "label": "电影"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "修改此项会调整全局图像风格；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Image style: 0 default (the runtime decides), 1 natural, 2 cinematic. Independent of the model profile."
+  },
+  {
+    "key": "nrLocalTone",
+    "path": [
+      "neuralRendering",
+      "appearance",
+      "nrLocalTone"
+    ],
+    "label": "局部色调",
+    "group": "image",
+    "kind": "decimal",
+    "default": "1",
+    "min": 0,
+    "max": 2,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "修改此项会调整局部色调；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Local tone strength, 0 to 2."
+  },
+  {
+    "key": "nrLocalStructure",
+    "path": [
+      "neuralRendering",
+      "appearance",
+      "nrLocalStructure"
+    ],
+    "label": "局部结构",
+    "group": "image",
+    "kind": "decimal",
+    "default": "1",
+    "min": 0,
+    "max": 2,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "修改此项会调整局部结构；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Local structure strength, 0 to 2."
+  },
+  {
+    "key": "nrAutoMask",
+    "path": [
+      "neuralRendering",
+      "appearance",
+      "nrAutoMask"
+    ],
+    "label": "自动角色遮罩",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "修改此项会调整自动角色遮罩；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Character mask: lets the model treat skin separately (needed for nrSkinStructure)."
+  },
+  {
+    "key": "nrSkinStructure",
+    "path": [
+      "neuralRendering",
+      "appearance",
+      "nrSkinStructure"
+    ],
+    "label": "皮肤结构",
+    "group": "image",
+    "kind": "decimal",
+    "default": "1",
+    "min": 0,
+    "max": 2,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrAutoMask=1"
+    ],
+    "help": "修改此项会调整皮肤结构；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Skin structure strength, 0 to 2. Only read with nrAutoMask."
+  },
+  {
+    "key": "nrHdrExposure",
+    "path": [
+      "neuralRendering",
+      "appearance",
+      "nrHdrExposure"
+    ],
+    "label": "HDR曝光",
+    "group": "image",
+    "kind": "decimal",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "HDR输入亮度，默认1；上游未公开稳定范围，通常保留默认。",
+    "optional": false,
+    "source_help": "HDR games: brightness given to the model (scene-linear output only)."
+  },
+  {
+    "key": "nrPass1Style",
+    "path": [
+      "neuralRendering",
+      "passStyles",
+      "nrPass1Style"
+    ],
+    "label": "第1次处理风格",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "跟随全局"
+      },
+      {
+        "value": "default",
+        "label": "默认"
+      },
+      {
+        "value": "natural",
+        "label": "自然"
+      },
+      {
+        "value": "cinematic",
+        "label": "电影"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=1"
+    ],
+    "help": "修改此项会调整第1次处理风格；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "inherit (default), default, natural or cinematic. Independent of the NVIDIA model profile. Invalid active styles preserve SR."
+  },
+  {
+    "key": "nrPass2Style",
+    "path": [
+      "neuralRendering",
+      "passStyles",
+      "nrPass2Style"
+    ],
+    "label": "第2次处理风格",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "跟随全局"
+      },
+      {
+        "value": "default",
+        "label": "默认"
+      },
+      {
+        "value": "natural",
+        "label": "自然"
+      },
+      {
+        "value": "cinematic",
+        "label": "电影"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=2"
+    ],
+    "help": "修改此项会调整第2次处理风格；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Style for pass 2, using the global style when inherit. Stored while inactive. Later-pass tone remains nrLaterPassLocalTone."
+  },
+  {
+    "key": "nrPass3Style",
+    "path": [
+      "neuralRendering",
+      "passStyles",
+      "nrPass3Style"
+    ],
+    "label": "第3次处理风格",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "跟随全局"
+      },
+      {
+        "value": "default",
+        "label": "默认"
+      },
+      {
+        "value": "natural",
+        "label": "自然"
+      },
+      {
+        "value": "cinematic",
+        "label": "电影"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=3"
+    ],
+    "help": "修改此项会调整第3次处理风格；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Style for pass 3: inherit, default, natural or cinematic. Stored while inactive; does not change active history until used."
+  },
+  {
+    "key": "nrPass4Style",
+    "path": [
+      "neuralRendering",
+      "passStyles",
+      "nrPass4Style"
+    ],
+    "label": "第4次处理风格",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "跟随全局"
+      },
+      {
+        "value": "default",
+        "label": "默认"
+      },
+      {
+        "value": "natural",
+        "label": "自然"
+      },
+      {
+        "value": "cinematic",
+        "label": "电影"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=4"
+    ],
+    "help": "修改此项会调整第4次处理风格；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Style for pass 4: inherit, default, natural or cinematic. Every pass re-encodes the preceding composed colour; only the complete chain is published."
+  },
+  {
+    "key": "nrPrecision",
+    "path": [
+      "neuralRendering",
+      "optimizations",
+      "nrPrecision"
+    ],
+    "label": "NVIDIA运算精度",
+    "group": "image",
+    "kind": "choice",
+    "default": "exact",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "exact",
+        "label": "精确"
+      },
+      {
+        "value": "fast",
+        "label": "快速"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=nvidia"
+    ],
+    "help": "精确模式保持NVIDIA结果；快速模式针对RTX20/30，可能有画面差异。",
+    "optional": false,
+    "source_help": "RTX 20/30: exact (same output as NVIDIA) or fast (quicker, small image differences). Gain and image differences vary by scene. No effect on RTX 40/50. Restart the game to apply."
+  },
+  {
+    "key": "nrFastProcessing",
+    "path": [
+      "neuralRendering",
+      "optimizations",
+      "nrFastProcessing"
+    ],
+    "label": "NVIDIA快速处理",
+    "group": "image",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=nvidia"
+    ],
+    "help": "上游称保持输出相同的快速处理；不是本管理器性能测试结果。",
+    "optional": false,
+    "source_help": "Faster NR processing with the same output bit for bit. Restart the game to apply."
+  },
+  {
+    "key": "nrPaddingAware",
+    "path": [
+      "neuralRendering",
+      "experimental",
+      "nrPaddingAware"
+    ],
+    "label": "尺寸填充优化",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "最多缩小每轴2%来减少填充开销，可能改变画面。",
+    "optional": false,
+    "source_help": "Optionally reduce NR's requested dimensions by up to 2 percent per axis to avoid model padding. May change the NR image; applied live. Does not change DLSS-SR render size."
+  },
+  {
+    "key": "nrMaxInFlight",
+    "path": [
+      "neuralRendering",
+      "experimental",
+      "nrMaxInFlight"
+    ],
+    "label": "NR并行帧数限制",
+    "group": "image",
+    "kind": "integer",
+    "default": "0",
+    "min": 0,
+    "max": 2,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=nvidia"
+    ],
+    "help": "实验D3D12调度限制，0不限制；开启帧生成时实际至少为2。",
+    "optional": false,
+    "source_help": "Experimental D3D12 NR run-ahead limit: 0 baseline, 1 or 2 outstanding NR evaluations. Waits before Reflex sleep; active FG uses at least 2 to retain producer overlap. Same NR image and model; applied live."
+  },
+  {
+    "key": "nrOpenBackend",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenBackend"
+    ],
+    "label": "Open硬件后端",
+    "group": "image",
+    "kind": "choice",
+    "default": "disabled",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "disabled",
+        "label": "未选择"
+      },
+      {
+        "value": "rtx30",
+        "label": "RTX30（实验）"
+      },
+      {
+        "value": "rtx40",
+        "label": "RTX40/50"
+      },
+      {
+        "value": "compat",
+        "label": "兼容验证（很慢）"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss"
+    ],
+    "help": "需要明确选择匹配硬件的Open后端；兼容模式非常慢。",
+    "optional": false,
+    "source_help": "disabled (choose explicitly), rtx40 (RTX 40/50), rtx30 (RTX 30, experimental) or compat (very slow, for qualification). Independent of NVIDIA precision. Restart to apply."
+  },
+  {
+    "key": "nrOpenExecution",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenExecution"
+    ],
+    "label": "Open执行路径",
+    "group": "image",
+    "kind": "choice",
+    "default": "dedicated",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "dedicated",
+        "label": "独立设备"
+      },
+      {
+        "value": "shared",
+        "label": "共享设备（实验）"
+      },
+      {
+        "value": "in_game",
+        "label": "游戏命令列表（实验）"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss"
+    ],
+    "help": "共享路径仅D3D12单次处理；Vulkan始终在游戏设备内执行。",
+    "optional": false,
+    "source_help": "Direct3D games only, where Open runs: dedicated (default; on its own device beside the game), shared (experimental, Direct3D 12 only, one NR pass: on the game's device, on a queue of its own) or in_game (experimental: in the game's own command list). Restart to apply; no fallback between them. A Vulkan game always runs it in-game."
+  },
+  {
+    "key": "nrOpenVramForSpeed",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenVramForSpeed"
+    ],
+    "label": "Open显存换速度",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss",
+      "nrOpenBackend=rtx30"
+    ],
+    "help": "仅Open/RTX30；更快但会增加显存，显存紧张时关闭。",
+    "optional": false,
+    "source_help": "Open on RTX 30 only: shorter NR time, same image, for more VRAM: about 160 MB at 1440p DLSS Balanced. Leave off when VRAM is nearly full. Restart to apply."
+  },
+  {
+    "key": "nrOpenFastProjection",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenFastProjection"
+    ],
+    "label": "Open快速投影",
+    "group": "image",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss",
+      "nrOpenBackend=rtx30"
+    ],
+    "help": "仅Open/RTX30；可能产生小幅图像差异。",
+    "optional": false,
+    "source_help": "Open on RTX 30 only: shorter NR time, with a slightly different image. Restart to apply."
+  },
+  {
+    "key": "nrOpenSharedLoads",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenSharedLoads"
+    ],
+    "label": "Open共享加载",
+    "group": "image",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss",
+      "nrOpenBackend=rtx40"
+    ],
+    "help": "仅Open/RTX40或50。",
+    "optional": false,
+    "source_help": "Open on RTX 40/50 only: shorter NR time on large sizes, same output. Restart to apply."
+  },
+  {
+    "key": "nrOpenFast",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenFast"
+    ],
+    "label": "Open快速精度",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss",
+      "nrOpenBackend=rtx30"
+    ],
+    "help": "仅Open/RTX30；不增加显存，可能有小幅图像差异。",
+    "optional": false,
+    "source_help": "Open on RTX 30 only: fast precision. Shorter NR time, no extra VRAM, a slightly different image. Restart to apply."
+  },
+  {
+    "key": "nrOpenUltraFast",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenUltraFast"
+    ],
+    "label": "Open超快速模式",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss",
+      "nrPasses=1"
+    ],
+    "help": "仅Open单次处理；可能出现运动拖影和细节延迟，增加少量显存。",
+    "optional": false,
+    "source_help": "Open, one NR pass: ultra-fast mode. About half the NR time, the same on every frame. The image changes: the NR layer follows the image one frame late and can lag or smear in motion; a surface just uncovered or just come on screen is given what NR had made of look-alike surfaces nearby (the two tolerances below). A few MB of VRAM. Restart to apply."
+  },
+  {
+    "key": "nrOpenUltraFastGhostTolerance",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenUltraFastGhostTolerance"
+    ],
+    "label": "超快速拖影容差",
+    "group": "image",
+    "kind": "decimal",
+    "default": "0.03",
+    "min": 0,
+    "max": 0.3,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss",
+      "nrOpenUltraFast=1",
+      "nrPasses=1"
+    ],
+    "help": "越低越少拖影，但更多区域暂时等待神经渲染。",
+    "optional": false,
+    "source_help": "nrOpenUltraFast only: how far the previous frame may differ, where a pixel was, before what NR had made there is dropped (0 to 0.3 of the code range). Lower: fewer ghosts behind what moves, more surface left to fill. Whatever this value, what moved unlike the pixel there (a character the camera turns round) is dropped. Applied live."
+  },
+  {
+    "key": "nrOpenUltraFastFillTolerance",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenUltraFastFillTolerance"
+    ],
+    "label": "超快速填充容差",
+    "group": "image",
+    "kind": "decimal",
+    "default": "0.03",
+    "min": 0,
+    "max": 0.3,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss",
+      "nrOpenUltraFast=1",
+      "nrPasses=1"
+    ],
+    "help": "0关闭新露出区域的邻近填充。",
+    "optional": false,
+    "source_help": "nrOpenUltraFast only: a surface just uncovered or just come on screen takes what NR had made of surfaces of the previous frame that look like it; this is how alike they must be (0 to 0.3). 0: no filling, such a surface shows without NR until the network reaches it. Applied live."
+  },
+  {
+    "key": "nrOpenSeed",
+    "path": [
+      "neuralRendering",
+      "openExperimental",
+      "nrOpenSeed"
+    ],
+    "label": "Open噪声种子",
+    "group": "image",
+    "kind": "integer",
+    "default": "0",
+    "min": 0,
+    "max": 4294967295,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=opendlss"
+    ],
+    "help": "Open确定性噪声种子，修改会重置历史。",
+    "optional": false,
+    "source_help": "Open deterministic noise seed. Applied live with history reset."
+  },
+  {
+    "key": "nrUiCorrection",
+    "path": [
+      "neuralRendering",
+      "advanced",
+      "nrUiCorrection"
+    ],
+    "label": "模型界面修正",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "修改此项会调整模型界面修正；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Model UI correction."
+  },
+  {
+    "key": "nrPreset",
+    "path": [
+      "neuralRendering",
+      "advanced",
+      "nrPreset"
+    ],
+    "label": "NVIDIA模型配置",
+    "group": "image",
+    "kind": "choice",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "0",
+        "label": "自动（推荐）"
+      },
+      {
+        "value": "1",
+        "label": "配置1"
+      },
+      {
+        "value": "2",
+        "label": "配置2"
+      },
+      {
+        "value": "3",
+        "label": "配置3"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrEngine=nvidia"
+    ],
+    "help": "模型编号没有公开的质量或速度排序；推荐自动。",
+    "optional": false,
+    "source_help": "NVIDIA model profile: 0 Automatic (recommended), 1-3 numbered profiles. No documented quality/speed ranking; separate from image style."
+  },
+  {
+    "key": "tf_overlay",
+    "path": [
+      "overlay",
+      "showOverlay"
+    ],
+    "label": "显示统计浮层",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "修改此项会调整显示统计浮层；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Show the in-game multiplier and FPS overlay."
+  },
+  {
+    "key": "overlayPosition",
+    "path": [
+      "overlay",
+      "overlayPosition"
+    ],
+    "label": "浮层位置",
+    "group": "overlay",
+    "kind": "choice",
+    "default": "top-left",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "top-left",
+        "label": "左上"
+      },
+      {
+        "value": "top-right",
+        "label": "右上"
+      },
+      {
+        "value": "bottom-left",
+        "label": "左下"
+      },
+      {
+        "value": "bottom-right",
+        "label": "右下"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整浮层位置；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "top-left, top-right, bottom-left or bottom-right."
+  },
+  {
+    "key": "overlayFontSize",
+    "path": [
+      "overlay",
+      "overlayFontSize"
+    ],
+    "label": "浮层字号",
+    "group": "overlay",
+    "kind": "integer",
+    "default": "14",
+    "min": 10,
+    "max": 32,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整浮层字号；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Overlay text size in pixels: 10 to 32."
+  },
+  {
+    "key": "overlayShowNr",
+    "path": [
+      "overlay",
+      "metrics",
+      "overlayShowNr"
+    ],
+    "label": "显示神经渲染状态",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示神经渲染状态；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line when DLSS Neural Rendering is on: its state and the size it runs at."
+  },
+  {
+    "key": "overlayShowFramePacing",
+    "path": [
+      "overlay",
+      "metrics",
+      "overlayShowFramePacing"
+    ],
+    "label": "显示帧时间",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示帧时间；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line: displayed frame time (average, 99th percentile, jitter)."
+  },
+  {
+    "key": "overlayShowGpu",
+    "path": [
+      "overlay",
+      "metrics",
+      "overlayShowGpu"
+    ],
+    "label": "显示GPU信息",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示GPU信息；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line: GPU load, temperature, power and clocks (NVML)."
+  },
+  {
+    "key": "overlayShowVram",
+    "path": [
+      "overlay",
+      "metrics",
+      "overlayShowVram"
+    ],
+    "label": "显示显存信息",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示显存信息；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line: VRAM used / total on the GPU (all processes)."
+  },
+  {
+    "key": "overlayShowVersions",
+    "path": [
+      "overlay",
+      "metrics",
+      "overlayShowVersions"
+    ],
+    "label": "显示组件版本",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示组件版本；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line: DLSS (SR), DLSS-G (FG) and Streamline (SL) versions loaded by the game."
+  },
+  {
+    "key": "overlayShowUiRecomposition",
+    "path": [
+      "overlay",
+      "diagnostics",
+      "overlayShowUiRecomposition"
+    ],
+    "label": "显示UI重组状态",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示UI重组状态；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line: whether DLSS-G UI recomposition (UIR) is on."
+  },
+  {
+    "key": "overlayShowHudless",
+    "path": [
+      "overlay",
+      "diagnostics",
+      "overlayShowHudless"
+    ],
+    "label": "显示无HUD场景来源",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示无HUD场景来源；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line: where the HUD-less scene comes from (game, UI assist capture or none)."
+  },
+  {
+    "key": "overlayShowUiAlpha",
+    "path": [
+      "overlay",
+      "diagnostics",
+      "overlayShowUiAlpha"
+    ],
+    "label": "显示UI透明层来源",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示UI透明层来源；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line: where the UI alpha comes from (game, UI assist injection or none)."
+  },
+  {
+    "key": "overlayShowDebug",
+    "path": [
+      "overlay",
+      "diagnostics",
+      "overlayShowDebug"
+    ],
+    "label": "显示调试信息",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "修改此项会调整显示调试信息；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Extra line: mode, generated-frame ceiling, Dynamic pacer, last Streamline result, route."
+  },
+  {
+    "key": "highMultiplierQuality",
+    "path": [
+      "imageQuality",
+      "highMultiplierQuality"
+    ],
+    "label": "高倍率画质保护",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "修改此项会调整高倍率画质保护；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Keeps generated frames clean from 3x to 6x. Leave on. Restart the game to apply."
+  },
+  {
+    "key": "frameProtection",
+    "path": [
+      "imageQuality",
+      "frameProtection"
+    ],
+    "label": "生成帧保护",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "修改此项会调整生成帧保护；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). Restart the game to apply."
+  },
+  {
+    "key": "fastFrameGeneration",
+    "path": [
+      "imageQuality",
+      "fastFrameGeneration"
+    ],
+    "label": "快速帧生成",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "修改此项会调整快速帧生成；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Lowers the GPU cost of each generated frame, same image. Restart the game to apply."
+  },
+  {
+    "key": "protectionTuning",
+    "path": [
+      "imageQuality",
+      "protectionTuning"
+    ],
+    "label": "帧保护策略",
+    "group": "frames",
+    "kind": "choice",
+    "default": "refined",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "refined",
+        "label": "精细"
+      },
+      {
+        "value": "classic",
+        "label": "经典"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "修改此项会调整帧保护策略；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Protection tuning: refined (default) or classic. Restart the game to apply."
+  },
+  {
+    "key": "autoUiRecomposition",
+    "path": [
+      "hudUi",
+      "autoUiRecomposition"
+    ],
+    "label": "自动UI重组",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "无人深空推荐关闭，避免生成帧重复。",
+    "optional": false,
+    "source_help": "Turn UI recomposition on when compatible HUD-less inputs are available without the game asking for it. False follows the game. No Man's Sky: use false to avoid generated-frame duplication. See docs/COMPATIBILITY.md."
+  },
+  {
+    "key": "uiAssist",
+    "path": [
+      "hudUi",
+      "uiAssist"
+    ],
+    "label": "D3D12界面辅助",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "仅DirectX12；游戏未提供所需输入时尝试构造界面层。",
+    "optional": false,
+    "source_help": "D3D12: capture the HUD-less scene and build the UI layer when the game does not tag them."
+  },
+  {
+    "key": "forceUiRecomposition",
+    "path": [
+      "hudUi",
+      "forceUiRecomposition"
+    ],
+    "label": "强制UI重组",
+    "group": "frames",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "修改此项会调整强制UI重组；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Ask DLSS-G to recompose the HUD separately even when the game does not request it."
+  },
+  {
+    "key": "gpuSeries",
+    "path": [
+      "general",
+      "gpuSeries"
+    ],
+    "label": "GPU系列覆盖",
+    "group": "system",
+    "kind": "choice",
+    "default": "auto",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "auto",
+        "label": "自动检测"
+      },
+      {
+        "value": "rtx20",
+        "label": "RTX20"
+      },
+      {
+        "value": "rtx30",
+        "label": "RTX30"
+      },
+      {
+        "value": "rtx40",
+        "label": "RTX40"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "通常使用自动检测；强制选择不会让不支持的显卡获得支持。",
+    "optional": false,
+    "source_help": "auto, rtx40, rtx30 or rtx20. Leave on auto unless detection fails. Restart the game to apply."
+  },
+  {
+    "key": "disableMenuDetection",
+    "path": [
+      "compatibility",
+      "disableMenuDetection"
+    ],
+    "label": "关闭游戏菜单检测",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "推荐关闭；游戏菜单和载入界面维持1X有助避免设备挂起。",
+    "optional": false,
+    "source_help": "Keep frame generation running in menus and loading screens. Leave false: idling at 1x there avoids device-hang crashes."
+  },
+  {
+    "key": "forceOTA",
+    "path": [
+      "compatibility",
+      "forceOTA"
+    ],
+    "label": "使用NVIDIA App模型",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "使用NVIDIA App已下载的帧生成模型。",
+    "optional": false,
+    "source_help": "Load the Frame Generation models downloaded by the NVIDIA App. Restart the game to apply."
+  },
+  {
+    "key": "flipMeteringBypass",
+    "path": [
+      "compatibility",
+      "flipMeteringBypass"
+    ],
+    "label": "OptiScaler翻转计量绕过",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "仅用于需要该兼容项的OptiScaler组合。",
+    "optional": false,
+    "source_help": "OptiScaler flip metering bypass, only for setups that need it. Restart the game to apply."
+  },
+  {
+    "key": "disableMvDilation",
+    "path": [
+      "compatibility",
+      "disableMvDilation"
+    ],
+    "label": "跳过运动矢量膨胀",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "旧实验项，通常保持关闭。",
+    "optional": false,
+    "source_help": "Legacy experiment: declare the motion vectors as already dilated. Leave false."
+  },
+  {
+    "key": "logPerformance",
+    "path": [
+      "diagnostics",
+      "logPerformance"
+    ],
+    "label": "性能CSV日志",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "修改此项会调整性能CSV日志；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Write FPS and frame times to rtx-encore_perf.csv, in rtx-encore-logs."
+  },
+  {
+    "key": "logNr",
+    "path": [
+      "diagnostics",
+      "logNr"
+    ],
+    "label": "神经渲染诊断",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "修改此项会调整神经渲染诊断；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "DLSS Neural Rendering: log what DLSS gives each frame and what NR does (10 frames after enabling, then every 300). Applied live."
+  },
+  {
+    "key": "profileNrGpu",
+    "path": [
+      "diagnostics",
+      "profileNrGpu"
+    ],
+    "label": "神经渲染GPU计时",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "修改此项会调整神经渲染GPU计时；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Record NR GPU timestamps and source-frame waits to rtx-encore_nr.csv (NVIDIA engine), or log a [NR-Open timing] line every five seconds (Open engine on Direct3D 12, with logNr; on the shared and in-game routes, also one row per step in rtx-encore_nr_open_steps.csv). The files are in rtx-encore-logs. Optional diagnostics; applied live."
+  },
+  {
+    "key": "logHudUi",
+    "path": [
+      "diagnostics",
+      "logHudUi"
+    ],
+    "label": "HUD诊断",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "修改此项会调整HUD诊断；不确定时保留上游默认。",
+    "optional": false,
+    "source_help": "Trace the first three game HUD-less copies and D3D12 barrier steps. Applied live."
+  },
+  {
+    "key": "logMotionTracing",
+    "path": [
+      "diagnostics",
+      "logMotionTracing"
+    ],
+    "label": "详细运动矢量日志",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "非常详细的调试日志，日常使用保持关闭。",
+    "optional": false,
+    "source_help": "Very verbose motion-vector diagnostics, for debugging only."
+  },
+  {
+    "key": "logFilesKept",
+    "path": [
+      "diagnostics",
+      "logFilesKept"
+    ],
+    "label": "保留日志数量",
+    "group": "system",
+    "kind": "integer",
+    "default": "3",
+    "min": 1,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "保留1到100份会话日志，含当前会话；启动时由模组清理旧日志。",
+    "optional": false,
+    "source_help": "Session logs kept in rtx-encore-logs, the current one included: 1 to 100. Older ones are deleted when the game starts."
+  },
+  {
+    "key": "hotkeyFixed2",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyFixed2"
+    ],
+    "label": "固定2X快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+2, Ctrl+Alt+Num2",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": "Combinations such as Ctrl+Alt+4 or Ctrl+Shift+F5; several separated by commas; empty disables the action."
+  },
+  {
+    "key": "hotkeyFixed3",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyFixed3"
+    ],
+    "label": "固定3X快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+3, Ctrl+Alt+Num3",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyFixed4",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyFixed4"
+    ],
+    "label": "固定4X快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+4, Ctrl+Alt+Num4",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyFixed5",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyFixed5"
+    ],
+    "label": "固定5X快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+5, Ctrl+Alt+Num5",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyFixed6",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyFixed6"
+    ],
+    "label": "固定6X快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+6, Ctrl+Alt+Num6",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyMultiplierUp",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyMultiplierUp"
+    ],
+    "label": "增加倍率快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+PageUp",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyMultiplierDown",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyMultiplierDown"
+    ],
+    "label": "减少倍率快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+PageDown",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyToggleDynamic",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyToggleDynamic"
+    ],
+    "label": "切换动态倍率快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+D",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyTargetFpsUp",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyTargetFpsUp"
+    ],
+    "label": "提高目标帧率快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+Up, Ctrl+Alt+Plus, Ctrl+Alt+NumAdd",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyTargetFpsDown",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyTargetFpsDown"
+    ],
+    "label": "降低目标帧率快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+Down, Ctrl+Alt+Minus, Ctrl+Alt+NumSubtract",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyGameMode",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyGameMode"
+    ],
+    "label": "跟随游戏快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+G",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyOverlay",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyOverlay"
+    ],
+    "label": "显示浮层快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+O",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "hotkeyOverlayPosition",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyOverlayPosition"
+    ],
+    "label": "移动浮层快捷键",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+P",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "支持Ctrl/Alt/Shift/Win组合，多个组合用逗号分隔；留空禁用此操作。",
+    "optional": false,
+    "source_help": ""
+  },
+  {
+    "key": "disableKeybinds",
+    "path": [
+      "keyboardShortcuts",
+      "disableKeybinds"
+    ],
+    "label": "禁用全部快捷键",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "上游JSON兼容开关，关闭所有功能快捷键。",
+    "optional": false,
+    "source_help": "Legacy JSON-only switch: disable all shortcuts. Intentionally not exposed in the menu."
+  },
+  {
+    "key": "menuKey",
+    "path": [
+      "menuState",
+      "menuKey"
+    ],
+    "label": "游戏菜单按键",
+    "group": "system",
+    "kind": "integer",
+    "default": "45",
+    "min": 1,
+    "max": 255,
+    "choices": [
+      {
+        "value": "45",
+        "label": "Insert"
+      },
+      {
+        "value": "36",
+        "label": "Home"
+      },
+      {
+        "value": "35",
+        "label": "End"
+      },
+      {
+        "value": "46",
+        "label": "Delete"
+      },
+      {
+        "value": "112",
+        "label": "F1"
+      },
+      {
+        "value": "113",
+        "label": "F2"
+      },
+      {
+        "value": "114",
+        "label": "F3"
+      },
+      {
+        "value": "115",
+        "label": "F4"
+      },
+      {
+        "value": "116",
+        "label": "F5"
+      },
+      {
+        "value": "117",
+        "label": "F6"
+      },
+      {
+        "value": "118",
+        "label": "F7"
+      },
+      {
+        "value": "119",
+        "label": "F8"
+      },
+      {
+        "value": "120",
+        "label": "F9"
+      },
+      {
+        "value": "121",
+        "label": "F10"
+      },
+      {
+        "value": "122",
+        "label": "F11"
+      },
+      {
+        "value": "123",
+        "label": "F12"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "默认Insert。游戏菜单快捷键为单个按键，不能使用Ctrl等组合。",
+    "optional": true,
+    "source_help": "INSERT default documented; numeric VK range 1..255 verified in beta.2 RVA 0x189659."
+  }
+]
