@@ -24,6 +24,11 @@ API='https://gitee.com/api/v5/repos/'+REPO
 # Keep in step with tools/export-source.ps1. This is deliberately not a recursive
 # copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
 ALLOWED = {
+    'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py',
+    'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json',
+    '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md',
+    'community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore',
+    'community/wrangler.example.jsonc', 'community/README.md', 'cloud/help.json',
     'update.json',
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore', '.gitattributes',
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
@@ -49,6 +54,12 @@ ALLOWED = {
     'docs/screenshot-home-zh.png',
 }
 TREES = (
+    (r'help/[^/]+', {'.html', '.css', '.js'}),
+    (r'community/src/[^/]+', {'.mjs', '.json'}),
+    (r'community/public/[^/]+', {'.html', '.css', '.js'}),
+    (r'community/tests/[^/]+', {'.mjs'}),
+    (r'community/migrations/[^/]+', {'.sql'}),
+    (r'cloud/v3/(?:catalog|indexes/r-[0-9a-f]{20})\.json', {'.json'}),
     (r'rust/src/.+', {'.rs'}),
     (r'rust/assets/.+', {'.json', '.jsonc', '.svg', '.png', '.ico', '.txt', '.md'}),
     (r'vendor/gpui_fast_windows/src/.+', {'.rs', '.hlsl'}),

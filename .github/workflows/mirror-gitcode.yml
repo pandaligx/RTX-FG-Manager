@@ -1,0 +1,51 @@
+name: Mirror reviewed sources and assets to GitCode
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      github_tag:
+        description: 'Optional GitHub release to mirror (EXE must be uploaded locally)'
+        type: string
+      gitcode_tag:
+        description: 'Destination tag; payloads-v430 maps to v430'
+        type: string
+      payloads:
+        description: 'Use the separate domestic payload repository'
+        type: boolean
+        default: false
+      asset_name:
+        description: 'Optional single resource filename for a bounded sync speed test'
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: rtxfg-gitcode-publish
+  cancel-in-progress: false
+jobs:
+  mirror:
+    if: github.repository == 'pandaligx/RTX-FG-Manager'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify publisher guards
+        run: python -m unittest discover -s tests -p test_gitcode_publish.py -v
+      - name: Mirror release resources, then fast-forward source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.github_tag }}
+          DESTINATION_TAG: ${{ inputs.gitcode_tag }}
+          PAYLOADS: ${{ inputs.payloads }}
+          ASSET_NAME: ${{ inputs.asset_name }}
+        run: python tools/gitcode_ci.py
