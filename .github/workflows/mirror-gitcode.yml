@@ -44,6 +44,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          RTXFG_RESOURCE_RECEIPTS: ${{ vars.RTXFG_RESOURCE_RECEIPTS }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.github_tag }}
           DESTINATION_TAG: ${{ inputs.gitcode_tag }}
           PAYLOADS: ${{ inputs.payloads }}

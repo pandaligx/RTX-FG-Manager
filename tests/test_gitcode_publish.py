@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, Mock
 
 spec=importlib.util.spec_from_file_location('gitcode_publish',Path(__file__).resolve().parents[1]/'tools/gitcode_publish.py')
@@ -13,6 +14,36 @@ spec.loader.exec_module(pub)
 
 
 class PublicationTests(unittest.TestCase):
+    def test_exact_approved_immutable_readback_is_reused_only_for_bound_metadata(self):
+        digest = 'a'*64
+        url = pub.asset_url(pub.PAYLOAD_REPO, 'v430', 'patch-' + digest[:12] + '.zip')
+        receipt = {'schema':1, 'scope':'immutable-resource-readback',
+                   'verified_at':datetime.now(timezone.utc).isoformat(),
+                   'metadata_sha256':['b'*64], 'assets':{url:{'bytes':10,'sha256':digest}}}
+        with patch.dict(os.environ, {'RTXFG_RESOURCE_RECEIPTS':json.dumps(receipt)}), patch.object(pub,'verify') as verify:
+            pub.verify_metadata_artifact(url,10,digest,'b'*64)
+            verify.assert_not_called()
+            pub.verify_metadata_artifact(url,10,digest,'c'*64)
+            pub.verify_metadata_artifact(url,11,digest,'b'*64)
+            pub.verify_metadata_artifact(url,10,'d'*64,'b'*64)
+            self.assertEqual(verify.call_count,3)
+        receipt['verified_at']=(datetime.now(timezone.utc)-timedelta(days=8)).isoformat()
+        with patch.dict(os.environ, {'RTXFG_RESOURCE_RECEIPTS':json.dumps(receipt)}), patch.object(pub,'verify') as verify:
+            pub.verify_metadata_artifact(url,10,digest,'b'*64)
+            verify.assert_called_once()
+
+    def test_receipts_never_approve_exe_or_nonimmutable_resource(self):
+        for name in ['RTXManager-v4.3.0-x64.exe', 'update.json', 'mutable.zip']:
+            url=pub.asset_url(pub.PAYLOAD_REPO,'v430',name)
+            receipt={'schema':1,'scope':'immutable-resource-readback',
+                     'verified_at':datetime.now(timezone.utc).isoformat(),
+                     'metadata_sha256':['b'*64],'assets':{url:{'bytes':10,'sha256':'a'*64}}}
+            with patch.dict(os.environ,{'RTXFG_RESOURCE_RECEIPTS':json.dumps(receipt)}), patch.object(pub,'verify') as verify:
+                pub.verify_metadata_artifact(url,10,'a'*64,'b'*64)
+                verify.assert_called_once()
+        with patch.dict(os.environ,{'RTXFG_RESOURCE_RECEIPTS':'{}'}), self.assertRaisesRegex(RuntimeError,'Invalid publisher'):
+            pub.verify_metadata_artifact(url,10,'a'*64,'b'*64)
+
     def test_ci_cannot_upload_exe_even_with_override(self):
         with tempfile.TemporaryDirectory() as d:
             p=Path(d)/'RTXManager-v4.3.0-x64.exe';p.write_bytes(b'unsigned fixture')

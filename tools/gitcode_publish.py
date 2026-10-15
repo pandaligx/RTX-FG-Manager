@@ -5,6 +5,7 @@ uploads signed EXEs; CI can mirror resource ZIPs and small release metadata.
 GitCode API: docs.gitcode.com/docs/apis/get-api-v-5-repos-owner-repo-releases-tag-upload-url
 """
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import importlib.util
 import json
@@ -23,6 +24,41 @@ GC_REPO = 'gcw_qWIjmve7/RTX-FG-Manager'
 PAYLOAD_REPO = GC_REPO + '-payloads'
 API = 'https://api.gitcode.com/api/v5/repos/'
 VERIFIED = set()
+
+
+def verify_metadata_artifact(url, size, digest, metadata_digest):
+    """Reuse a publisher-approved readback for identical immutable resources only.
+
+    RTXFG_RESOURCE_RECEIPTS is a maintainer-controlled Actions repository variable,
+    populated from completed local anonymous downloads, never from PR inputs.
+    This cache cannot approve executables or advance a client update manifest.
+    Missing, expired or nonmatching receipts use the normal download verifier.
+    """
+    encoded = os.environ.get('RTXFG_RESOURCE_RECEIPTS', '')
+    if encoded:
+        try:
+            if len(encoded) > 48000:
+                raise ValueError('oversized')
+            receipt = json.loads(encoded)
+            checked = datetime.fromisoformat(receipt['verified_at'])
+            age = (datetime.now(timezone.utc) - checked).total_seconds()
+            valid = (receipt['schema'] == 1 and receipt['scope'] == 'immutable-resource-readback'
+                     and 0 <= age <= 7 * 86400 and metadata_digest in receipt['metadata_sha256'])
+            prefixes = ('https://gitcode.com/' + PAYLOAD_REPO + '/releases/download/',
+                        'https://github.com/' + GH_REPO + '/releases/download/')
+            name = url.rsplit('/', 1)[-1]
+            immutable = (url.startswith(prefixes) and (
+                re.fullmatch(r'r-[0-9a-f]{20}\.json', name)
+                or (re.fullmatch(r'[A-Za-z0-9._-]+-[0-9a-f]{12}\.zip', name)
+                    and name.endswith('-' + digest[:12] + '.zip'))))
+            if valid and immutable and type(size) is int and 0 < size <= 256 * 1024 * 1024:
+                row = receipt['assets'].get(url)
+                if row == {'bytes': size, 'sha256': digest} and re.fullmatch('[0-9a-f]{64}', digest):
+                    print('Reused completed anonymous readback: ' + name)
+                    return
+        except (ValueError, KeyError, TypeError, AttributeError):
+            raise RuntimeError('Invalid publisher resource receipt') from None
+    verify(url, size, digest)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -279,11 +315,12 @@ def verify_metadata_changes(root, review, before, after):
         expected_index = asset_url(PAYLOAD_REPO, 'v430', c['revision'] + '.json')
         if index['url'] != expected_index:
             raise RuntimeError('Unexpected domestic index location')
-        verify(expected_index, len(raw), hashlib.sha256(raw).hexdigest())
+        metadata_digest = hashlib.sha256(blob(catalog_path)).hexdigest()
+        verify_metadata_artifact(expected_index, len(raw), hashlib.sha256(raw).hexdigest(), metadata_digest)
         for package in json.loads(raw)['packages']:
             url = package.get('urls', {}).get('domestic') or c['sources']['domestic']['base_url'] + package['archive']
             if url.startswith('https://gitcode.com/' + PAYLOAD_REPO + '/releases/download/'):
-                verify(url, package['bytes'], package['sha256'])
+                verify_metadata_artifact(url, package['bytes'], package['sha256'], metadata_digest)
             elif not package.get('urls', {}).get('domestic', '').startswith('https://gitee.com/pandaligx/RTX-FG-Manager-payloads/'):
                 raise RuntimeError('Unexpected legacy package source')
     for path, entry in after.items():
@@ -300,7 +337,7 @@ def verify_metadata_changes(root, review, before, after):
             if version(h['version']) <= version(old['version']):
                 raise RuntimeError('Changed help requires a newer content version')
         for url in h['urls']:
-            verify(url, h['bytes'], h['sha256'])
+            verify_metadata_artifact(url, h['bytes'], h['sha256'], hashlib.sha256(blob('cloud/help.json')).hexdigest())
 
 
 def main():
