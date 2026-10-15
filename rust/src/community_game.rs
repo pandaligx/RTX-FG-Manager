@@ -14,6 +14,8 @@ struct Mapping {
     schema: u32,
     directory: String,
     game: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
 }
 fn mapping_path(target: &core::DeploymentTarget) -> Result<PathBuf> {
     Ok(config_store::history_root(target)?.join("game-mapping.json"))
@@ -26,16 +28,60 @@ pub fn save_mapping(target: &core::DeploymentTarget, game: &str) -> Result<()> {
             schema: 1,
             directory: core::key(&target.directory),
             game: game.into(),
+            name: None,
         },
     )
 }
-pub fn identify(target: &core::DeploymentTarget) -> Result<Option<String>> {
-    if let Some(id) = steam(&target.game_exe) {
-        return Ok(Some(id));
-    }
+/// An explicit player-confirmed name, never inferred from a path or executable.
+pub fn named_game(name: &str) -> Result<(String, String)> {
+    ensure!(
+        crate::community::safe_text(name, 120),
+        "请填写游戏名称，不要填写路径或个人信息"
+    );
+    let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    ensure!(!name.is_empty(), "请填写游戏名称");
+    let id = format!(
+        "game:n-{}",
+        crate::community_identity::digest(name.to_ascii_lowercase().as_bytes())
+    );
+    Ok((id, name))
+}
+pub fn save_named_mapping(target: &core::DeploymentTarget, name: &str) -> Result<String> {
+    let (game, name) = named_game(name)?;
+    core::atomic_json(
+        &mapping_path(target)?,
+        &Mapping {
+            schema: 1,
+            directory: core::key(&target.directory),
+            game: game.clone(),
+            name: Some(name),
+        },
+    )?;
+    Ok(game)
+}
+pub fn mapped_name(target: &core::DeploymentTarget, game: &str) -> Result<Option<String>> {
     let path = mapping_path(target)?;
     if !path.try_exists()? {
         return Ok(None);
+    }
+    let map: Mapping = serde_json::from_value(core::read_json(&path, 4096)?)?;
+    ensure!(
+        map.schema == 1 && map.directory == core::key(&target.directory),
+        "本地游戏映射无效"
+    );
+    if map.game != game {
+        return Ok(None);
+    }
+    if let Some(name) = map.name {
+        ensure!(named_game(&name)?.0 == game, "游戏名称与标识不一致");
+        return Ok(Some(name));
+    }
+    Ok(None)
+}
+pub fn identify(target: &core::DeploymentTarget) -> Result<Option<String>> {
+    let path = mapping_path(target)?;
+    if !path.try_exists()? {
+        return Ok(steam(&target.game_exe));
     }
     let map: Mapping = serde_json::from_value(core::read_json(&path, 4096)?)?;
     ensure!(
@@ -117,6 +163,22 @@ fn steam(exe: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn explicit_names_are_stable_private_safe_and_game_specific() {
+        assert_eq!(
+            named_game("Example Game").unwrap().0,
+            named_game(" example  GAME ").unwrap().0
+        );
+        assert_ne!(
+            named_game("Example Game 2").unwrap().0,
+            named_game("Example Game").unwrap().0
+        );
+        assert!(config_store::valid_game(
+            &named_game("三角洲行动（国服）").unwrap().0
+        ));
+        assert!(named_game("C:\\Users\\Player\\game").is_err());
+        assert!(named_game(" ").is_err());
+    }
     #[test]
     fn steam_requires_manifest_id_and_installdir_not_exe_name() {
         let d = tempfile::tempdir().unwrap();

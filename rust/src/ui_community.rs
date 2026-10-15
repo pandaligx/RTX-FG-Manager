@@ -18,6 +18,7 @@ enum Update {
     AutoProfiles(String, std::result::Result<community::BrowseResult, String>),
     Interactions(String, u32, community::Interactions),
     Games(Vec<community::Game>),
+    BoundGame(String),
     Local(
         Option<String>,
         Vec<History>,
@@ -25,6 +26,8 @@ enum Update {
         Option<community_identity::PublicIdentity>,
         Vec<Hardware>,
         Option<String>,
+        Option<community::BrowseResult>,
+        Vec<community::Game>,
     ),
     Named(Vec<(String, Envelope)>),
     Profiles(String, community::BrowseResult),
@@ -37,7 +40,7 @@ enum Update {
     CommunityPreview(Profile, Preview, String),
     Identity(community_identity::PublicIdentity, String),
     Preview(String, Preview),
-    Publish(String, Content),
+    Publish(String, Content, presets::Context),
     Published(community_identity::PublicIdentity),
     Restore(community_identity::Identity, Option<String>),
     Notice(String),
@@ -148,8 +151,9 @@ impl CommunityView {
             game: cx.new(|cx| {
                 InputState::new(window, cx).placeholder(tr.t("Steam App ID 或已登记的游戏 ID"))
             }),
-            game_search: cx
-                .new(|cx| InputState::new(window, cx).placeholder(tr.t("搜索已登记游戏名称或 ID"))),
+            game_search: cx.new(|cx| {
+                InputState::new(window, cx).placeholder(tr.t("搜索游戏，或填写未收录的游戏名称"))
+            }),
             games: Vec::new(),
             name: cx.new(|cx| InputState::new(window, cx).placeholder(tr.t("配置名称"))),
             notes: cx.new(|cx| {
@@ -224,14 +228,20 @@ impl CommunityView {
     fn local(&mut self) {
         let target = self.target.clone();
         self.job(move || {
+            let game = community_game::identify(&target)?;
+            let cached = game
+                .as_ref()
+                .and_then(|id| community::cached_browse(id, "", "").ok());
             Ok(Update::Local(
-                community_game::identify(&target)?,
+                game,
                 config_store::history(&target)?,
                 rtx_fg_manager::operation_history::read(&target)?,
                 community_identity::current()?,
                 rtx_fg_manager::community_hardware::detect().unwrap_or_default(),
                 core::record(&target.directory)?
                     .and_then(|r| r.upstream_version.or(r.payload_version)),
+                cached,
+                community::cached_games().unwrap_or_default(),
             ))
         });
     }
@@ -268,8 +278,9 @@ impl CommunityView {
                             self.cached = result.cached;
                             self.profiles = result.index.profiles;
                             if !self.busy && !self.share_open && self.preview.is_none() {
-                                self.message =
-                                    result.message.unwrap_or_else(|| "玩家配置已刷新".into());
+                                self.message = result
+                                    .message
+                                    .unwrap_or_else(|| "玩家推荐方案已刷新".into());
                             }
                         }
                         Err(_) => {
@@ -293,6 +304,18 @@ impl CommunityView {
                     self.message = "反馈已更新".into();
                 }
                 Err(error) => self.message = error,
+                Ok(Update::BoundGame(game)) => {
+                    self.game
+                        .update(cx, |s, cx| s.set_value(game.clone(), window, cx));
+                    self.profiles.clear();
+                    self.interactions.clear();
+                    self.preview = None;
+                    self.publish = None;
+                    self.edit_target = None;
+                    self.edit_profile = None;
+                    self.next_refresh = Instant::now();
+                    self.message = "已记住此游戏；分享时自动收录到游戏目录".into();
+                }
                 Ok(Update::Games(games)) => {
                     self.games = games;
                     self.message =
@@ -306,11 +329,14 @@ impl CommunityView {
                     identity,
                     hardware,
                     installed_version,
+                    cached,
+                    games,
                 )) => {
                     if let Some(version) = installed_version {
                         self.patch_version = version;
                     }
                     if let Some(game) = game {
+                        self.observed_game = game.clone();
                         self.game.update(cx, |s, cx| s.set_value(game, window, cx));
                     }
                     self.history = history;
@@ -321,7 +347,13 @@ impl CommunityView {
                         self.metadata.set_hardware(h, window, cx);
                     }
                     self.hardware_options = hardware;
+                    self.games = games;
                     self.message = "已读取本地配置记录".into();
+                    if let Some(cached) = cached {
+                        self.profiles = cached.index.profiles;
+                        self.cached = true;
+                        self.message = cached.message.unwrap_or_default();
+                    }
                 }
                 Ok(Update::Named(named)) => {
                     self.named = named;
@@ -337,7 +369,7 @@ impl CommunityView {
                     self.profiles = result.index.profiles;
                     self.message = result
                         .message
-                        .unwrap_or_else(|| format!("{} 份玩家配置", self.profiles.len()));
+                        .unwrap_or_else(|| format!("{} 份玩家推荐方案", self.profiles.len()));
                     self.selection.visible = 12;
                 }
                 Ok(Update::Mine(game, result, identity)) => {
@@ -386,10 +418,14 @@ impl CommunityView {
                         "已核对当前游戏、补丁方案和入口；请检查参数差异，版本不同需自行确认。"
                             .into();
                 }
-                Ok(Update::Publish(game, content)) => {
+                Ok(Update::Publish(game, content, context)) => {
                     if game != self.game_id(cx) {
                         continue;
                     }
+                    self.name
+                        .update(cx, |s, cx| s.set_value(content.title.clone(), window, cx));
+                    self.context = context;
+                    self.patch_version = content.patch_version.clone();
                     self.publish = Some((game, content));
                     self.publish_details = false;
                     self.message = "以下为完整提交内容；确认后才会上传".into();
@@ -463,9 +499,23 @@ impl CommunityView {
     }
     fn prepare_publish(&mut self, edit: Option<Profile>, cx: &App) {
         let target = self.target.clone();
-        let context = self.context.clone();
+        let Some(owner) = self.owner.upgrade() else {
+            return;
+        };
+        let policies = owner.read(cx).c.catalog.scheme_policies.clone();
         let game = self.game_id(cx);
-        let name = self.name.read(cx).value().to_string();
+        let name = if self.name.read(cx).value().trim().is_empty() {
+            format!(
+                "{} · {}",
+                "我的有效方案",
+                self.hardware.gpu_model.as_deref().unwrap_or("我的方案")
+            )
+            .chars()
+            .take(80)
+            .collect::<String>()
+        } else {
+            self.name.read(cx).value().trim().to_owned()
+        };
         let notes = self.notes.read(cx).value().to_string();
         self.edit_target = edit.as_ref().map(|p| (p.id.clone(), p.revision));
         let hardware = match self.metadata.hardware(cx) {
@@ -484,6 +534,14 @@ impl CommunityView {
         };
         let (dlss_mode, ray_tracing) = self.metadata.quality(cx);
         self.job(move || {
+            let record =
+                core::record(&target.directory)?.context("请先安装并试用补丁，再分享有效方案")?;
+            let scheme = record
+                .scheme_id
+                .as_deref()
+                .context("安装记录缺少补丁方案")?;
+            let policy = policies.get(scheme).context("此已安装方案尚不支持分享")?;
+            let context = presets::Context::new(scheme, policy, &target.game_exe);
             if let Some(p) = edit {
                 anyhow::ensure!(
                     p.game == game && p.scheme == context.scheme && p.protocol == context.profile,
@@ -495,7 +553,6 @@ impl CommunityView {
                 community_game::identify(&target)?.as_deref() == Some(&game),
                 "请先确认并保存当前目录对应的游戏"
             );
-            let record = core::record(&target.directory)?.context("缺少安装记录")?;
             let entries = record.selected();
             anyhow::ensure!(entries.len() == 1, "分享前请选择一个 DLL / 插件入口");
             let patch_version = record
@@ -515,13 +572,31 @@ impl CommunityView {
                 measurement,
             };
             community::validate_content(&content, &context.scheme, &context.profile)?;
-            Ok(Update::Publish(game, content))
+            Ok(Update::Publish(game, content, context))
         });
     }
-    fn submit_share(&mut self) {
-        let Some((game, content)) = self.publish.clone() else {
+    fn share_content(&self, cx: &App) -> anyhow::Result<Content> {
+        let mut content = self.publish.as_ref().context("请先读取当前方案")?.1.clone();
+        content.title = self.name.read(cx).value().trim().to_owned();
+        content.notes = self.notes.read(cx).value().to_string();
+        content.hardware = self.metadata.hardware(cx)?;
+        content.measurement = self.metadata.measurement(cx)?;
+        (content.dlss_mode, content.ray_tracing) = self.metadata.quality(cx);
+        community::validate_content(&content, &self.context.scheme, &self.context.profile)?;
+        Ok(content)
+    }
+    fn submit_share(&mut self, cx: &App) {
+        let Some((game, _)) = self.publish.clone() else {
             return;
         };
+        let content = match self.share_content(cx) {
+            Ok(content) => content,
+            Err(error) => {
+                self.message = error.to_string();
+                return;
+            }
+        };
+        let target = self.target.clone();
         let context = self.context.clone();
         let edit = self.edit_target.clone();
         let cancel = self.cancel.clone();
@@ -531,7 +606,9 @@ impl CommunityView {
             if let Some((id, revision))=edit {
                 community::signed_with_verification(&identity,"PUT",&format!("/v1/profiles/{id}"),&json!({"revision":revision,"content":content}),&cancel)?;
             } else {
-                community::signed_with_verification(&identity,"POST","/v1/profiles",&json!({"game":game,"scheme":context.scheme,"protocol":context.profile,"content":content}),&cancel)?;
+                let mut data = json!({"game":game,"scheme":context.scheme,"protocol":context.profile,"content":content});
+                if let Some(name) = community_game::mapped_name(&target, &game)? { data["gameName"] = json!(name); }
+                community::signed_with_verification(&identity,"POST","/v1/profiles",&data,&cancel)?;
             }
             Ok(Update::Published(identity.public()))
         });
@@ -609,7 +686,7 @@ impl CommunityView {
             .child(format!("{} · {} · {}", community::scheme_name(&profile.scheme), profile.content.patch_version,
                 profile.content.entry.as_deref().unwrap_or("未提供加载入口")))
             .child(format!("管理器当前提供版本：{current}。版本不同请参考玩家备注，不能保证效果相同。"))
-            .child(self.t("先退出游戏；已有不同补丁时先卸载，再安装此方案。安装后重新打开玩家配置，预览并应用参数。"))
+            .child(self.t("先退出游戏；已有不同补丁时先卸载，再安装此方案。安装后重新打开玩家推荐方案，预览并应用参数。"))
             .child(self.t("ASI 需要已有加载器；MFG 插件需要已有 OptiScaler 10。入口只决定加载方式，不增加图形 API 支持。"))
             .child(Button::new("community-setup-select").primary().label(self.t("选用此方案，返回安装"))
                 .disabled(self.busy || profile.game != self.game_id(cx) || profile.content.entry.is_none())
@@ -627,7 +704,7 @@ impl CommunityView {
                         owner.c.focus = Some(exe);
                         let series = owner.c.cloud_series();
                         owner.c.set_selection(profile.scheme.clone(), series, vec![entry]);
-                        owner.c.notice = Some("已为此游戏选好方案与入口；请按正常流程卸载旧补丁并安装，再返回玩家配置应用参数。".into());
+                        owner.c.notice = Some("已为此游戏选好方案与入口；请按正常流程卸载旧补丁并安装，再返回玩家推荐方案应用参数。".into());
                         cx.notify();
                         Ok(())
                     });
@@ -831,7 +908,7 @@ impl CommunityView {
                             let source = this.preview_source.clone();
                             if source.as_ref().is_some_and(|p| p.game != this.game_id(cx)) {
                                 this.preview = None;
-                                this.message = "游戏已改变，请重新选择玩家配置".into();
+                                this.message = "游戏已改变，请重新选择玩家推荐方案".into();
                                 cx.notify();
                                 return;
                             }
@@ -1159,8 +1236,7 @@ impl CommunityView {
                             this.share_open = true;
                             this.edit_profile = Some(edit.clone());
                             this.publish = None;
-                            this.message =
-                                "已载入标题与备注；请编辑下方内容，再预览当前游戏配置的更新".into();
+                            this.prepare_publish(Some(edit.clone()), cx);
                             cx.notify();
                         })),
                 )
@@ -1233,18 +1309,19 @@ impl CommunityView {
                     .child(
                         Button::new("community-share")
                             .primary()
-                            .label(self.t("分享我的配置"))
-                            .disabled(self.busy)
+                            .label(self.t("分享我的方案"))
+                            .disabled(self.busy || !config_store::valid_game(&self.game_id(cx)))
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.share_open = !this.share_open;
                                 this.publish = None;
+                                if this.share_open { this.prepare_publish(this.edit_profile.clone(), cx); }
                                 cx.notify();
                             })),
                     )
                     .child(
                         Button::new("community-mine")
                             .label(self.t(if self.mine_open {
-                                "返回玩家配置"
+                                "返回玩家推荐方案"
                             } else {
                                 "我的分享"
                             }))
@@ -1286,7 +1363,7 @@ impl CommunityView {
                             })),
                     ),
             )
-            .child(format!("{} · {}", self.t("仅推荐当前游戏的配置"), self.game_id(cx)))
+            .child(self.t("仅推荐当前游戏的配置"))
             .child(self.t("同一游戏内比较不同方案，先匹配显卡型号和驱动版本，再参考可用确认和点赞；每 30 秒自动刷新。"))
             .child(
                 Checkbox::new("other-gpus")
@@ -1299,6 +1376,9 @@ impl CommunityView {
             );
         if self.share_open {
             panel = panel.child(self.share_panel(cx));
+            if self.publish.is_some() {
+                panel = panel.child(self.publish_panel(cx));
+            }
         }
         if self.advanced_open {
             let mut filters = div().h_flex().flex_wrap().gap_2();
@@ -1324,7 +1404,11 @@ impl CommunityView {
             panel = panel.child(filters).child(Input::new(&self.report_reason));
         }
         if matches.total == 0 {
-            panel = panel.child(self.t(if self.profiles.is_empty() {
+            panel = panel.child(self.t(if !config_store::valid_game(&self.game_id(cx)) {
+                "先确认当前游戏，即可查看对应推荐方案。"
+            } else if self.profiles.is_empty() && (self.cached || self.refresh_inflight) {
+                "暂未取得推荐方案，正在等待云端响应；可稍后刷新。"
+            } else if self.profiles.is_empty() {
                 "这里还没有玩家分享。你可以分享当前有效配置，帮助相近硬件的玩家。"
             } else {
                 "当前筛选没有结果，可显示其他显卡或调整高级筛选。"
@@ -1402,16 +1486,18 @@ impl CommunityView {
                 .child(self.metadata.render(&self.tr))
                 .child(self.t("测量数据由玩家提供"));
         }
-        panel = panel.child(
-            Button::new("publish-preview")
-                .primary()
-                .label(self.t("下一步：预览分享内容"))
-                .disabled(self.busy)
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.prepare_publish(this.edit_profile.clone(), cx);
-                    cx.notify();
-                })),
-        );
+        if self.publish.is_none() || self.metadata_open {
+            panel = panel.child(
+                Button::new("publish-preview")
+                    .primary()
+                    .label(self.t("重新读取当前方案"))
+                    .disabled(self.busy)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.prepare_publish(this.edit_profile.clone(), cx);
+                        cx.notify();
+                    })),
+            );
+        }
         if self.edit_profile.is_some() {
             panel = panel.child(
                 Button::new("edit-abandon")
@@ -1446,9 +1532,18 @@ impl CommunityView {
             );
         }
         if self.tab == 2 && !config_store::valid_game(&self.game_id(cx)) {
-            panel = panel.child(
-                self.t("尚未识别此游戏，请先选择对应游戏；也可在高级选项填写 Steam App ID。"),
-            );
+            panel = panel
+                .child(self.t("Steam、Epic、GOG、Xbox、WeGame 或独立安装均可分享。先搜索同一游戏；未收录时填写正式名称，并区分国服、国际服或重制版。"))
+                .child(Input::new(&self.game_search))
+                .child(Button::new("game-create-name")
+                    .label(self.t("未收录：使用此游戏名称"))
+                    .disabled(self.busy || self.game_search.read(cx).value().trim().is_empty())
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        let name = this.game_search.read(cx).value().to_string();
+                        let target = this.target.clone();
+                        this.job(move || Ok(Update::BoundGame(community_game::save_named_mapping(&target, &name)?)));
+                        cx.notify();
+                    })));
         }
         let fallback_notice = match self.tr.language.as_str() {
             "ru" => Some("Новые разделы сообщества пока частично доступны на английском."),
@@ -1500,7 +1595,9 @@ impl CommunityView {
             && (self.advanced_open || !config_store::valid_game(&self.game_id(cx)))
             && !self.games.is_empty()
         {
-            panel = panel.child(Input::new(&self.game_search));
+            if config_store::valid_game(&self.game_id(cx)) {
+                panel = panel.child(Input::new(&self.game_search));
+            }
             let query = self.game_search.read(cx).value().to_lowercase();
             for game in self
                 .games
@@ -1530,7 +1627,7 @@ impl CommunityView {
                             this.next_refresh = Instant::now();
                             this.job(move || {
                                 community_game::save_mapping(&target, &id)?;
-                                Ok(Update::Notice("已选择游戏，正在查找玩家配置".into()))
+                                Ok(Update::Notice("已选择游戏，正在查找玩家推荐方案".into()))
                             });
                             cx.notify();
                         })),
@@ -1597,13 +1694,14 @@ impl CommunityView {
                         })),
                 );
             if self.publish_details {
-                panel=panel.child(div().text_sm().child(serde_json::to_string_pretty(&json!({"game":game,"scheme":self.context.scheme,"protocol":self.context.profile,"content":content})).unwrap_or_default()));
+                let details = self.share_content(cx).and_then(|content| Ok(serde_json::to_string_pretty(&json!({"game":game,"scheme":self.context.scheme,"protocol":self.context.profile,"content":content}))?)).unwrap_or_else(|error| error.to_string());
+                panel = panel.child(div().text_sm().child(details));
             }
             panel = panel
                 .child(
                     Button::new("publish-confirm")
                         .primary()
-                        .label(self.t("确认分享"))
+                        .label(self.t("一键分享"))
                         .disabled(self.busy)
                         .on_click(cx.listener(|this, _, _, cx| {
                             if this
@@ -1616,7 +1714,7 @@ impl CommunityView {
                                 cx.notify();
                                 return;
                             }
-                            this.submit_share();
+                            this.submit_share(cx);
                             cx.notify();
                         })),
                 )
@@ -1626,6 +1724,7 @@ impl CommunityView {
                         .disabled(self.busy)
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.publish = None;
+                            this.share_open = false;
                             this.edit_target = None;
                             cx.notify();
                         })),
@@ -1811,7 +1910,7 @@ impl Render for CommunityView {
         if self.setup.is_some() {
             panel = panel.child(self.setup_panel(cx));
         }
-        if self.publish.is_some() {
+        if self.publish.is_some() && !self.share_open {
             panel = panel.child(self.publish_panel(cx));
         }
         if self.delete_target.is_some() {

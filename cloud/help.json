@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "4.3.0.4",
+  "version": "4.3.0.5",
   "min_client": "4.3.0",
   "max_client": null,
   "languages": [
@@ -11,15 +11,15 @@
     "ko"
   ],
   "urls": [
-    "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/help-4.3.0.4/rtxfg-help-4.3.0.4-1b15267619af.zip",
-    "https://github.com/pandaligx/RTX-FG-Manager/releases/download/help-4.3.0.4/rtxfg-help-4.3.0.4-1b15267619af.zip"
+    "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/help-4.3.0.5/rtxfg-help-4.3.0.5-3d506e73ff46.zip",
+    "https://github.com/pandaligx/RTX-FG-Manager/releases/download/help-4.3.0.5/rtxfg-help-4.3.0.5-3d506e73ff46.zip"
   ],
-  "bytes": 18990,
-  "sha256": "1b15267619aff21333ca450663625a84939062395c8901e8438efe1081740cb3",
+  "bytes": 19450,
+  "sha256": "3d506e73ff469ecfbbc2a90289ff0f52f120ac0fb8267b22e8666c1540143fbd",
   "files": {
     "index.html": "618e5ce6a4e69e3e3579235d259643c72ffeaacf34862db0e21fb55586ae90bf",
     "style.css": "0dbb5e717823bb4e17932cafa2861a317101ee57b28c441d9f5f7411812e67bd",
-    "content.js": "fbb7096dfd3b2bf34ba196cfd261bcb5207f495cdf1152a4dac96c71d6960f79",
-    "app.js": "6bb9a1bb53c2fdd8a138af3850e8ccb8a2deee736c41aae24f709f1e65787eba"
+    "content.js": "2192e4bc8c5e38c47f8751d8601511baf8827c977e1d3836812c8271f6f184ae",
+    "app.js": "00dbec62946ae8931b0fb403cae1b72585b25d067fc4c20f647e6cccc236e9b4"
   }
 }

@@ -48,7 +48,7 @@ function render(){
   $('eyebrow').textContent='THE FIELD GUIDE / 06 PATCHES';$('edition').textContent='GUIDE · '+(/^\d+\.\d+\.\d+$/.test(params.get('version'))?'v'+params.get('version'):'v4.3.0');
   $('nav-title').textContent=c.contents;$('offline').textContent=c.offline;$('offline-badge').textContent=c.badge;$('begin').textContent=c.begin;$('explore').textContent=c.explore;
   $('search').placeholder=c.search;$('search').setAttribute('aria-label',c.search);$('theme').setAttribute('aria-label',c.theme);$('top').textContent=c.top;
-  $('content-version').textContent=c.version+' 4.3.0.4';$('empty').textContent=c.empty;$('fallback').hidden=!c.fallback;$('fallback').textContent=c.fallback||'';
+  $('content-version').textContent=c.version+' 4.3.0.5';$('empty').textContent=c.empty;$('fallback').hidden=!c.fallback;$('fallback').textContent=c.fallback||'';
   $('navigation').replaceChildren();$('sections').replaceChildren();$('shortcuts').replaceChildren();
   for(const [name,key] of [['Encore','Insert'],['MFG Unlocker','Backspace'],['Vulkan MFG','Ctrl+F2—F6']]){const card=make('a',null,'shortcut');card.href='#menus';card.append(make('small',name),make('strong',key));$('shortcuts').append(card);}
   c.sections.forEach((name,i)=>{const a=make('a');a.href='#'+sectionIds[i];a.append(make('span',String(i+1).padStart(2,'0')),make('b',name));$('navigation').append(a);});

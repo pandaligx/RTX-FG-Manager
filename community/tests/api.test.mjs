@@ -7,6 +7,27 @@ import { sha256, signingText } from '../src/security.mjs';
 import { createIdentity, unlock, headers } from '../public/admin-identity.js';
 const scheme='upstream-0.3.5-310-9', protocol='upstream040';
 const b64 = bytes => Buffer.from(bytes).toString('base64');
+test('non-Steam names are registered atomically by verified shares without mixing games', async () => {
+  const env = environment(), a = await identity(env);
+  const game = 'game:n-' + await sha256('example game');
+  const first = await create(env, a, { game, gameName: ' Example  GAME ' });
+  assert.equal(first.status, 201);
+  const second = await create(env, a, { game, gameName: 'Example Game' });
+  assert.equal(second.status, 201);
+  assert.equal(env.db.prepare('SELECT count(*) AS n FROM games WHERE id=?').get(game).n, 1);
+  assert.equal((await create(env,a,{game,gameName:'Another Game'})).status,400);
+  assert.equal((await create(env,a,{game,gameName:'C:\\Users\\Player\\Game'})).status,400);
+  assert.equal((await create(env,a,{game:'game:unknown'})).status,400);
+  const other = 'game:n-' + await sha256('example game 2');
+  assert.equal((await create(env,a,{game:other,gameName:'Example Game 2'})).status,201);
+  const response = await api.fetch(new Request('https://test.example/v1/profiles?game='+game),env);
+  assert.deepEqual(new Set((await response.json()).profiles.map(p=>p.id)),new Set([first.id,second.id]));
+  const bad = 'game:n-' + await sha256('bad game');
+  assert.equal((await create(env,a,{game:bad,gameName:'Bad Game',content:{...content(),settings:{LogPath:'private'}}})).status,400);
+  assert.equal(env.db.prepare('SELECT id FROM games WHERE id=?').get(bad),undefined);
+  const anonymous = await api.fetch(new Request('https://test.example/v1/profiles',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({game,gameName:'Example Game',scheme,protocol,content:content()})}),env);
+  assert.equal(anonymous.status,401);
+});
 function environment() {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync(new URL('../migrations/0001_community.sql',import.meta.url),'utf8'));

@@ -17,6 +17,7 @@ const FILES: [(&str, &[u8]); 4] = [
     ("app.js", include_bytes!("../../help/app.js")),
 ];
 const LIMIT: u64 = 8 * 1024 * 1024;
+const BUNDLED_VERSION: &str = "4.3.0.5";
 static UPDATING: AtomicBool = AtomicBool::new(false);
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Manifest {
@@ -139,6 +140,7 @@ fn current_at(root: &Path) -> Result<PathBuf> {
     if let Ok(value) = core::read_json(&root.join("current.json"), 32768)
         && let Ok(manifest) = serde_json::from_value::<Manifest>(value)
         && manifest.validate().is_ok()
+        && core_version(&manifest.version).ok() >= core_version(BUNDLED_VERSION).ok()
     {
         let directory = root.join(&manifest.sha256);
         if validate_directory(&directory, &manifest).is_ok() {
@@ -359,19 +361,19 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path();
         assert!(current_at(root).unwrap().is_file());
-        let (first, bytes) = bundle("1.0.0", false);
+        let (first, bytes) = bundle("5.0.0", false);
         install_at(root, &first, &bytes).unwrap();
         let previous = current_at(root).unwrap();
         let pointer = fs::read(root.join("current.json")).unwrap();
-        let (next, mut broken) = bundle("1.0.1", false);
+        let (next, mut broken) = bundle("5.0.1", false);
         broken[0] ^= 1;
         assert!(install_at(root, &next, &broken).is_err());
         assert_eq!(fs::read(root.join("current.json")).unwrap(), pointer);
         assert_eq!(current_at(root).unwrap(), previous);
-        let (escape, bytes) = bundle("1.0.1", true);
+        let (escape, bytes) = bundle("5.0.1", true);
         assert!(install_at(root, &escape, &bytes).is_err());
         assert!(!root.join("escape.js").exists());
-        let (older, bytes) = bundle("0.9.0", false);
+        let (older, bytes) = bundle("4.9.0", false);
         assert!(install_at(root, &older, &bytes).is_err());
         assert_eq!(fs::read(root.join("current.json")).unwrap(), pointer);
         fs::write(previous.parent().unwrap().join("app.js"), b"changed").unwrap();

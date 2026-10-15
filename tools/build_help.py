@@ -51,7 +51,7 @@ def build(destination, version, minimum):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--version',default='4.3.0.4')
+    parser.add_argument('--version',default='4.3.0.5')
     parser.add_argument('--min-client',default='4.3.0')
     args=parser.parse_args()
     build(args.output,args.version,args.min_client)

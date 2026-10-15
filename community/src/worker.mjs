@@ -1,4 +1,4 @@
-import { ApiError, requireThat, readBody, authenticate, verifyTurnstile, safeText } from './security.mjs';
+import { ApiError, requireThat, readBody, authenticate, verifyTurnstile, safeText, sha256 } from './security.mjs';
 import { validateContent, validateRoute, validateGame } from './contracts.mjs';
 import { moderator, moderatorKeys } from './moderator.mjs';
 
@@ -101,14 +101,21 @@ async function handle(request, env) {
     return json({ profiles: rows.results.map(row => ({ ...publicProfile(row), status: row.status })) });
   }
   if (path === '/v1/profiles' && request.method === 'POST') {
-    requireThat(Object.keys(data).every(k => ['game','scheme','protocol','content'].includes(k)), 'unsupported_field');
+    requireThat(Object.keys(data).every(k => ['game','gameName','scheme','protocol','content'].includes(k)), 'unsupported_field');
     validateRoute(data.game, data.scheme, data.protocol);
     const content = validateContent(data.content, data.scheme, data.protocol);
     const game = await query(env, 'SELECT id FROM games WHERE id=?', data.game).first();
-    requireThat(game || data.game.startsWith('steam:'), 'choose_known_game');
+    let gameName;
+    if (data.gameName !== undefined) {
+      gameName = safeText(data.gameName, 120).split(/\s+/u).join(' ');
+      requireThat(gameName.length > 0, 'game_name_required');
+      const normalized = gameName.replace(/[A-Z]/g, c => c.toLowerCase());
+      requireThat(data.game === 'game:n-' + await sha256(normalized), 'game_name_mismatch');
+    }
+    requireThat(game || data.game.startsWith('steam:') || gameName, 'choose_known_game');
     const id = crypto.randomUUID();
     const statements = [];
-    if (!game) statements.push(query(env, 'INSERT INTO games(id,name,created_at) VALUES(?,?,?) ON CONFLICT(id) DO NOTHING', data.game, 'Steam ' + data.game.slice(6), now));
+    if (!game) statements.push(query(env, 'INSERT INTO games(id,name,created_at) VALUES(?,?,?) ON CONFLICT(id) DO NOTHING', data.game, gameName || 'Steam ' + data.game.slice(6), now));
     statements.push(
       query(env, 'INSERT INTO profiles(id,author,game,scheme,protocol,created_at,updated_at) VALUES(?,?,?,?,?,?,?)', id, auth.identity, data.game, data.scheme, data.protocol, now, now),
       query(env, 'INSERT INTO revisions(profile,revision,content,created_at) VALUES(?,1,?,?)', id, JSON.stringify(content), now),

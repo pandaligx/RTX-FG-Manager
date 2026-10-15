@@ -2,6 +2,8 @@
 
 ## 4.3.0 (candidate, unreleased)
 
+- Changelog opens online release notes using the domestic/GitHub source preference. Remove the old embedded changelog dialog so published notes can change independently of client signing.
+
 - dlssg_for_sm86 0.4.0, MFG Unlocker 1.5.0 and RTX Encore rc.3, retaining legacy schemes and managed configuration migration.
 - Transactional component deployment, dedicated proxies/ASI, exclusive OptiScaler 10 plugin mode with conditional restoration, and game-owned log cleanup.
 - Advisory GPU detection with unrestricted scheme selection and manual legacy component choice.

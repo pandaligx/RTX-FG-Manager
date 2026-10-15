@@ -147,23 +147,29 @@ pub fn installation_issue(profile: &Profile, record: Option<&core::Record>) -> O
     if record.scheme_id.as_deref() != Some(&profile.scheme)
         || !core::backend_matches_profile(&record.backend, &profile.protocol)
     {
-        return Some("当前安装的补丁方案与玩家配置不同".into());
+        return Some("当前安装的补丁方案与玩家推荐方案不同".into());
     }
     if let Some(entry) = &profile.content.entry
         && record.selected() != [entry.clone()]
     {
-        return Some("当前安装的 DLL / 插件入口与玩家配置不同".into());
+        return Some("当前安装的 DLL / 插件入口与玩家推荐方案不同".into());
     }
     None
 }
 fn client() -> Result<reqwest::blocking::Client> {
-    Ok(reqwest::blocking::Client::builder()
+    static CLIENT: std::sync::OnceLock<reqwest::blocking::Client> = std::sync::OnceLock::new();
+    if let Some(client) = CLIENT.get() {
+        return Ok(client.clone());
+    }
+    let client = reqwest::blocking::Client::builder()
         .https_only(true)
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(Duration::from_secs(8))
         .timeout(Duration::from_secs(25))
         .user_agent(concat!("RTXFGManager/", env!("CARGO_PKG_VERSION")))
-        .build()?)
+        .build()?;
+    let _ = CLIENT.set(client.clone());
+    Ok(CLIENT.get().cloned().unwrap_or(client))
 }
 fn response(response: reqwest::blocking::Response) -> Result<serde_json::Value> {
     let status = response.status();
@@ -201,7 +207,7 @@ fn validate_route(game: &str, scheme: &str, protocol: &str) -> Result<()> {
     config_store::accepted(scheme, protocol, &Values::new())?;
     Ok(())
 }
-fn safe_text(text: &str, max: usize) -> bool {
+pub(crate) fn safe_text(text: &str, max: usize) -> bool {
     static PRIVATE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     text.chars().count()<=max && !text.chars().any(|c|c.is_control()||"<>".contains(c)) && !PRIVATE.get_or_init(||regex::Regex::new(r"(?i)([a-z]:[\\/]|\\\\|/(home|users|tmp|var)/|%[a-z_]+%|https?://|\S+@\S+\.\S+)").unwrap()).is_match(text)
 }
@@ -293,7 +299,10 @@ pub fn games() -> Result<Vec<Game>> {
         games: Vec<Game>,
     }
     let data: List = serde_json::from_value(response(
-        client()?.get(format!("{ORIGIN}/v1/games")).send()?,
+        client()?
+            .get(format!("{ORIGIN}/v1/games"))
+            .timeout(Duration::from_secs(8))
+            .send()?,
     )?)?;
     ensure!(
         data.games.len() <= 2000
@@ -303,17 +312,51 @@ pub fn games() -> Result<Vec<Game>> {
                 .all(|g| config_store::valid_game(&g.id) && safe_text(&g.name, 120)),
         "游戏列表无效"
     );
+    let _ = core::atomic_json(
+        &assets::cache_root()?.join("community-games.json"),
+        &data.games,
+    );
     Ok(data.games)
+}
+pub fn cached_games() -> Result<Vec<Game>> {
+    let data: Vec<Game> = serde_json::from_value(core::read_json(
+        &assets::cache_root()?.join("community-games.json"),
+        1024 * 1024,
+    )?)?;
+    ensure!(
+        data.len() <= 2000
+            && data
+                .iter()
+                .all(|g| config_store::valid_game(&g.id) && safe_text(&g.name, 120)),
+        "游戏列表无效"
+    );
+    Ok(data)
+}
+fn index_path(game: &str, scheme: &str, protocol: &str) -> Result<std::path::PathBuf> {
+    Ok(assets::cache_root()?.join("community-index").join(format!(
+        "{}.json",
+        community_identity::digest(format!("{game}\n{scheme}\n{protocol}").as_bytes())
+    )))
+}
+pub fn cached_browse(game: &str, scheme: &str, protocol: &str) -> Result<BrowseResult> {
+    ensure!(config_store::valid_game(game), "请选择明确的游戏 ID");
+    let index: Index = serde_json::from_value(core::read_json(
+        &index_path(game, scheme, protocol)?,
+        32 * 1024 * 1024,
+    )?)?;
+    check_profiles(&index.profiles, game, scheme, protocol)?;
+    Ok(BrowseResult {
+        index,
+        cached: true,
+        message: Some("已显示上次缓存，正在后台刷新；缓存方案可能已被修改或下架".into()),
+    })
 }
 pub fn browse(game: &str, scheme: &str, protocol: &str) -> Result<BrowseResult> {
     ensure!(config_store::valid_game(game), "请选择明确的游戏 ID");
     if !scheme.is_empty() || !protocol.is_empty() {
         validate_route(game, scheme, protocol)?;
     }
-    let path = assets::cache_root()?.join("community-index").join(format!(
-        "{}.json",
-        community_identity::digest(format!("{game}\n{scheme}\n{protocol}").as_bytes())
-    ));
+    let path = index_path(game, scheme, protocol)?;
     let online = (|| -> Result<Index> {
         let client = client()?;
         let mut profiles = Vec::new();
@@ -335,7 +378,9 @@ pub fn browse(game: &str, scheme: &str, protocol: &str) -> Result<BrowseResult> 
                 profiles: Vec<Profile>,
                 next: Option<String>,
             }
-            let page: Page = serde_json::from_value(response(client.get(url).send()?)?)?;
+            let page: Page = serde_json::from_value(response(
+                client.get(url).timeout(Duration::from_secs(8)).send()?,
+            )?)?;
             ensure!(page.profiles.len() <= 120, "社区分页无效");
             profiles.extend(page.profiles);
             ensure!(profiles.len() <= 12000, "社区配置过多，请稍后重试");

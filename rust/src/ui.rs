@@ -266,60 +266,6 @@ impl Render for HelpDocumentView {
     }
 }
 
-/// Local modal state: selecting a version does not change game preferences.
-struct ReleaseNotesView {
-    entries: Vec<(String, String)>,
-    selected: usize,
-    height: Pixels,
-}
-impl Render for ReleaseNotesView {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let selected = self.selected;
-        let versions = self
-            .entries
-            .iter()
-            .map(|(v, _)| format!("v{v}"))
-            .collect::<Vec<_>>();
-        let view = cx.entity().downgrade();
-        div()
-            .v_flex()
-            .gap_3()
-            .w_full()
-            .min_w_0()
-            .child(
-                Button::new("release-version")
-                    .small()
-                    .w_full()
-                    .label(versions[selected].clone())
-                    .icon(IconName::ChevronDown)
-                    .dropdown_menu(move |mut menu, _, _| {
-                        for (i, version) in versions.iter().enumerate() {
-                            let view = view.clone();
-                            menu = menu.item(
-                                PopupMenuItem::new(version.clone())
-                                    .checked(i == selected)
-                                    .on_click(move |_, _, cx| {
-                                        let _ = view.update(cx, |this, cx| {
-                                            this.selected = i;
-                                            cx.notify();
-                                        });
-                                    }),
-                            );
-                        }
-                        menu
-                    }),
-            )
-            .child(
-                div()
-                    .id(("release-notes-body", selected))
-                    .max_h(self.height)
-                    .overflow_y_scroll()
-                    .text_sm()
-                    .child(self.entries[selected].1.clone()),
-            )
-    }
-}
-
 #[derive(Clone, PartialEq)]
 enum Command {
     Page(u8),
@@ -1585,7 +1531,7 @@ impl Manager {
                             .child({
                                 let exe = game.exe.clone();
                                 Button::new(("game-community", index))
-                                    .label(self.t("玩家配置"))
+                                    .label(self.t("玩家推荐方案"))
                                     .small()
                                     .compact()
                                     .flex_shrink_0()
@@ -2008,7 +1954,7 @@ impl Manager {
         });
         let view = cx.entity().downgrade();
         let title = self.t(if community {
-            "玩家配置"
+            "玩家推荐方案"
         } else {
             "游戏详情"
         });
@@ -2064,7 +2010,7 @@ impl Manager {
                     .text_xs()
                     .text_color(cx.theme().muted_foreground)
                     .child(self.t(if self.player_configs_open {
-                        "选择玩家配置，预览差异后应用；也可以分享自己的有效配置。"
+                        "选择玩家推荐方案，预览差异后应用；也可以分享自己的有效配置。"
                     } else {
                         "修改会记住在此游戏；更换方案或入口后，先卸载再安装应用。"
                     })),
@@ -3067,47 +3013,13 @@ impl Manager {
                 })
         });
     }
-    fn release_notes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.dialog_active {
-            return;
-        }
-        self.dialog_active = true;
-        let mut entries = vec![(
-            VERSION.to_owned(),
-            rtx_fg_manager::release_notes::current(&self.language),
-        )];
-        entries.extend(rtx_fg_manager::release_notes::history(&self.language));
-        if let Some(m) = &self.c.update
-            && m.version != VERSION
-            && let Some(remote) = rtx_fg_manager::release_notes::select(&m.notes, &self.language)
-        {
-            entries.insert(0, (m.version.clone(), remote.to_owned()));
-        }
-        let title = self.t("更新日志");
-        let ok = self.t("确定");
-        let history = self.t("在线发布页");
-        let view = cx.entity().downgrade();
-        let height = (window.viewport_size().height - px(240.)).clamp(px(160.), px(450.));
-        let width = (window.viewport_size().width - px(80.)).min(px(680.));
-        let notes_view = cx.new(|_| ReleaseNotesView {
-            entries,
-            selected: 0,
-            height,
-        });
-        window.open_dialog(cx, move |dialog, _, _| {
-            let close_view = view.clone();
-            let link_view = view.clone();
-            dialog.title(title.clone()).width(width)
-                .footer(DialogFooter::new()
-                    .child(Button::new("release-history").small().label(history.clone()).icon(IconName::ExternalLink)
-                        .on_click(move |_, window, cx| {
-                            let _ = link_view.update(cx, |this, cx| this.act(Command::Open("https://github.com/pandaligx/RTX-FG-Manager/releases".into()), window, cx));
-                        }))
-                    .child(Button::new("release-notes-ok").small().primary().label(ok.clone())
-                        .on_click(|_, window, cx| window.dispatch_action(Box::new(Confirm { secondary: false }), cx))))
-                .child(notes_view.clone())
-                .on_close(move |_, _, cx| { let _ = close_view.update(cx, |this, cx| { this.dialog_active=false; cx.notify(); }); })
-        });
+    fn release_notes(&mut self, _: &mut Window, _: &mut Context<Self>) {
+        let url = if self.c.choice("download_source", "domestic") == "github" {
+            "https://github.com/pandaligx/RTX-FG-Manager/releases"
+        } else {
+            "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases"
+        };
+        self.c.channel.job(move |_| win::open(url));
     }
     fn update_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.c.update_offer = false;
