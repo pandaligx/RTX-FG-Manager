@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -120,13 +121,38 @@ def upload(repo, tag, path, allow_exe=False):
     headers = ticket['headers']
     if any(k.lower() not in ('content-type', 'x-obs-meta-project-id', 'x-obs-acl', 'x-obs-callback') for k in headers):
         raise RuntimeError('Unexpected upload delegation headers')
-    try:
-        with urllib.request.build_opener(NoRedirect).open(urllib.request.Request(endpoint, data=data, headers=headers, method='PUT'), timeout=180):
-            pass
-    except (urllib.error.URLError, TimeoutError):
-        raise RuntimeError('GitCode attachment upload failed; signed upload URL withheld') from None
+    upload_ticket(endpoint, headers, path)
     verify(url, len(data), digest)
     print('Uploaded and verified: ' + path.name, flush=True)
+
+
+def upload_ticket(endpoint, headers, path):
+    # curl supplies bounded connect/transfer timings and IPv4 explicitly.
+    # Delegated credentials stay on stdin, never in argv, a file or error logs.
+    def quote(value):
+        if any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise RuntimeError('Invalid upload delegation value')
+        return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    config = 'url = ' + quote(endpoint) + '\n'
+    config += ''.join('header = ' + quote(k + ': ' + v) + '\n' for k,v in headers.items())
+    stats = '{"http_code":%{http_code},"uploaded_bytes":%{size_upload},"bytes_per_second":%{speed_upload},"seconds":%{time_total},"connect_seconds":%{time_connect}}'
+    started = time.monotonic()
+    try:
+        result = subprocess.run(['curl','--config','-','--ipv4','--silent','--show-error',
+            '--proto','=https','--connect-timeout','15','--max-time','180',
+            '--upload-file',str(path),'--output',os.devnull,'--write-out',stats],
+            input=config,text=True,capture_output=True,timeout=190)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError('GitCode upload exceeded 190 seconds; delegation withheld') from None
+    try:
+        report = json.loads(result.stdout)
+        report = {k:report[k] for k in ('http_code','uploaded_bytes','bytes_per_second','seconds','connect_seconds')}
+    except (ValueError,KeyError):
+        report = {'seconds':round(time.monotonic()-started,3)}
+    report['curl_exit'] = result.returncode
+    print('GitCode upload transfer: '+json.dumps(report),flush=True)
+    if result.returncode or not 200 <= report.get('http_code',0) < 300:
+        raise RuntimeError('GitCode attachment upload failed; signed upload URL withheld')
 
 
 def create_release(repo, tag, commit, title, body):
