@@ -1,0 +1,8 @@
+{
+  "name": "rtx-fg-community",
+  "version": "4.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test tests/*.test.mjs", "dev": "wrangler dev", "deploy": "wrangler deploy" },
+  "devDependencies": { "wrangler": "4.85.0" }
+}

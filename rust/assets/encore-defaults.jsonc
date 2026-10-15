@@ -7,15 +7,22 @@
     "dynamicExperimental56": false           // Let Dynamic mode go up to 5x and 6x (needs plenty of VRAM). Off: Dynamic stays at 4x or less.
   },
   "smoothMotion": {
-    "smoothMotionEnabled": false,            // Driver Smooth Motion for RTX 30, with the NVIDIA 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply.
-    "smoothMotionApi": "d3d12"               // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
+    "smoothMotionEnabled": false,            // Driver Smooth Motion for RTX 30, with the NVIDIA 620.12, 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply.
+    "smoothMotionApi": "d3d12",              // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
+    "smoothMotionForce": false               // Vulkan: run Smooth Motion even where the game's NVIDIA profile excludes it. Unexpected results are possible. Restart the game to apply.
   },
   "dlssSuperResolution": {
     "dlssRenderScale": "game",               // Force the DLSS render resolution: game, dlaa, quality, balanced, performance, ultra-performance or custom. The game must use DLSS already.
     "dlssCustomScale": 67                    // Render scale in percent (50 to 100) when dlssRenderScale is custom.
   },
+  "dlssPresets": {
+    "dlssSrPreset": "game",                  // SR preset: game (no override), default, a-f (legacy), j, k, l or m. Applies to all quality modes; supported models depend on the DLSS DLL. Restart to apply.
+    "dlssRrPreset": "game",                  // RR preset: game (no override), default, a-c (legacy), d or e. Does not enable RR. Driver/model selection may override SR/RR hints. Restart to apply.
+    "dlssFgPreset": "game",                  // FG preset: game (no override), a, b or c. A/B use Normal; C automatically enables Lite (faster, with image-quality trade-offs) and needs 310.9.16.0. Fast frame generation remains independent for every preset. Qualified NVIDIA releases 310.6.0.0, 310.7.0.0, 310.7.128.0, 310.7.129.0, 310.8.0.0, 310.9.0.0, 310.9.1.0 and 310.9.16.0; unknown binaries are untouched and logged. B needs compatible HUD-less/UI inputs. Lite keeps NVIDIA's native image policy: frameProtection, protectionTuning and UI recomposition are unavailable. No driver-profile writes. Restart to apply.
+    "dlssFgLite": "game"                     // Diagnostic-only JSON override; not shown as a menu setting. Leave game to follow the preset (A/B Normal, C Lite) or the game/driver. Only for diagnostics with qualified 310.9.16.0: off forces Normal, on forces Lite, taking priority over the preset. Restart to apply.
+  },
   "nativeMenuFeatures": {
-    "reflexFrameLimit": 0,                   // 0 follows the game's Reflex frame limit; 1-1000 requests a render-frame cap. Requires a supported Reflex plugin. Applied at its owning options/sleep boundary.
+    "reflexFrameLimit": 0,                   // 0 restores the game's Reflex settings; 1-1000 requests a Reflex FPS limit. FG may count toward it depending on the game/driver. Applied on options updates or the next available Reflex sleep boundary.
     "vsyncOff": false,                       // Request interval zero on the application's own DXGI Present. Driver overrides keep priority; TEST/nested presents are preserved.
     "hairEnabled": true                      // Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change.
   },
@@ -88,8 +95,8 @@
   },
   "imageQuality": {
     "highMultiplierQuality": true,           // Keeps generated frames clean from 3x to 6x. Leave on. Restart the game to apply.
-    "frameProtection": true,                 // Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). Restart the game to apply.
-    "fastFrameGeneration": true,             // Lowers the GPU cost of each generated frame, same image. Restart the game to apply.
+    "frameProtection": true,                 // Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). No effect with Lite composition. Restart the game to apply.
+    "fastFrameGeneration": true,             // Lowers the GPU cost of each generated frame, same image. Independent of the FG preset: applies to A/B Normal and C Lite using the optimizations available for each path. Restart the game to apply.
     "protectionTuning": "refined"            // Protection tuning: refined (default) or classic. Restart the game to apply.
   },
   "hudUi": {
@@ -107,12 +114,14 @@
     "disableMvDilation": false               // Legacy experiment: declare the motion vectors as already dilated. Leave false.
   },
   "diagnostics": {
-    "logPerformance": false,                 // Write FPS and frame times to rtx-encore_perf.csv, in rtx-encore-logs.
+    "logGraphics": false,                    // Trace graphics creation, COM interface upgrades, swapchain lifetime, initial presentation and resize. Applied live; enable before launch for startup crashes.
+    "logStreamline": false,                  // Extra verbose Streamline and NGX messages. Basic messages and failure reasons are logged automatically. Restart required; disable and restart after collecting the log. May reduce performance.
+    "logPerformance": false,                 // Write FPS and frame times to rtx-encore_perf.csv, plus one GPU/power diagnostic sample per second in the session log (rtx-encore-logs).
     "logNr": false,                          // DLSS Neural Rendering: log what DLSS gives each frame and what NR does (10 frames after enabling, then every 300). Applied live.
     "profileNrGpu": false,                   // Record NR GPU timestamps and source-frame waits to rtx-encore_nr.csv (NVIDIA engine), or log a [NR-Open timing] line every five seconds (Open engine on Direct3D 12, with logNr; on the shared and in-game routes, also one row per step in rtx-encore_nr_open_steps.csv). The files are in rtx-encore-logs. Optional diagnostics; applied live.
     "logHudUi": false,                       // Trace the first three game HUD-less copies and D3D12 barrier steps. Applied live.
     "logMotionTracing": false,               // Very verbose motion-vector diagnostics, for debugging only.
-    "logFilesKept": 3                        // Session logs kept in rtx-encore-logs, the current one included: 1 to 100. Older ones are deleted when the game starts.
+    "logFilesKept": 3                        // Logs kept in rtx-encore-logs: 1 to 100 sessions plus the same number of exception logs. Active files are preserved. Older closed files are deleted at startup.
   },
   "keyboardShortcuts": {
     "hotkeyFixed2": "Ctrl+Alt+2, Ctrl+Alt+Num2", // Combinations such as Ctrl+Alt+4 or Ctrl+Shift+F5; several separated by commas; empty disables the action.

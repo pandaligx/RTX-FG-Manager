@@ -55,14 +55,38 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
     target.validate_record(&j.old)?;
     target.validate_record(&j.new)?;
     ensure!(
-        j.old.backend == transfusion::BACKEND
-            && j.new.backend == encore::BACKEND
+        matches!(
+            j.old.backend.as_str(),
+            transfusion::BACKEND | encore::BACKEND
+        ) && j.new.backend == encore::BACKEND
             && j.old.scheme_id.as_deref() == Some(SCHEME)
             && j.new.scheme_id.as_deref() == Some(SCHEME)
             && !j.old.cache_pending
             && !j.new.cache_pending,
         "升级恢复记录的方案不匹配"
     );
+    if j.old.backend == encore::BACKEND {
+        ensure!(
+            j.old.selected() == j.new.selected(),
+            "Encore 升级需保持入口；换入口前请先卸载"
+        );
+        let old = j
+            .old
+            .upstream_version
+            .as_ref()
+            .or(j.old.payload_version.as_ref())
+            .context("旧 Encore 缺少版本")?;
+        let new = j
+            .new
+            .upstream_version
+            .as_ref()
+            .or(j.new.payload_version.as_ref())
+            .context("新 Encore 缺少版本")?;
+        ensure!(
+            semver::Version::parse(new)? > semver::Version::parse(old)?,
+            "Encore 只允许升级到更高版本"
+        );
+    }
     ensure!(
         j.old.cleanup_dirs.is_empty()
             && j.old.delta_cache_ids.is_empty()
@@ -82,7 +106,7 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
     );
     for (name, hash) in &j.before {
         ensure!(
-            name == transfusion::CONFIG || j.old.hashes.get(name) == Some(hash),
+            name == core::config_name(&j.old.backend) || j.old.hashes.get(name) == Some(hash),
             "原 DLL 与升级归属记录不一致"
         );
     }
@@ -242,11 +266,11 @@ pub fn upgrade_locked(
     target.validate_record(old)?;
     target.validate_record(&new)?;
     ensure!(
-        old.backend == transfusion::BACKEND
+        matches!(old.backend.as_str(), transfusion::BACKEND | encore::BACKEND)
             && new.backend == encore::BACKEND
             && old.scheme_id.as_deref() == Some(SCHEME)
             && new.scheme_id.as_deref() == Some(SCHEME),
-        "只有本管理器记录的 Transfusion 安装可以原位升级"
+        "只有本管理器记录的 Transfusion 或 Encore 安装可以原位升级"
     );
     let dir = &target.directory;
     let root = core::no_links(&dir.join(core::OWN))?;
@@ -260,31 +284,33 @@ pub fn upgrade_locked(
     for (name, hash) in &old.hashes {
         let bytes = checked_bytes(
             &dir.join(name),
-            if name == transfusion::CONFIG {
+            if name == core::config_name(&old.backend) {
                 1024 * 1024
             } else {
                 MAX_FILE
             },
         )?;
         ensure!(
-            name == transfusion::CONFIG || core::hash(&bytes) == *hash,
+            name == core::config_name(&old.backend) || core::hash(&bytes) == *hash,
             "旧补丁 DLL 已变化，请先检查再升级"
         );
         originals.insert(name.clone(), bytes);
     }
     let empty = presets::Values::new();
-    let migrated = encore::migrate(
-        originals
-            .get(transfusion::CONFIG)
-            .context("旧配置文件缺失")?,
-        explicit_overrides.unwrap_or(&empty),
-    )?;
+    let original = originals
+        .get(core::config_name(&old.backend))
+        .context("旧配置文件缺失")?;
+    let migrated = if old.backend == encore::BACKEND {
+        encore::configure(original, explicit_overrides.unwrap_or(&empty))?
+    } else {
+        encore::migrate(original, explicit_overrides.unwrap_or(&empty))?
+    };
     ensure!(migrated.len() <= 1024 * 1024, "迁移后配置超过大小限制");
     files.insert(encore::CONFIG.into(), migrated);
     ensure!(
         files.iter().all(|(name, bytes)| !bytes.is_empty()
             && bytes.len() as u64
-                <= if name.ends_with(".dll") {
+                <= if name.ends_with(".dll") || name.ends_with(".asi") {
                     MAX_FILE
                 } else {
                     1024 * 1024
@@ -373,7 +399,7 @@ pub fn upgrade_locked(
         // The DLL is exposed last so an accidental launch cannot observe the
         // new runtime with an absent configuration or license notice.
         let mut names = files.keys().collect::<Vec<_>>();
-        names.sort_by_key(|n| n.ends_with(".dll"));
+        names.sort_by_key(|n| j.new.selected().contains(n));
         for name in names {
             let stage = core::no_links(&work.join(format!("next.{name}")))?;
             ensure!(matches(&stage, &j.new.hashes[name])?, "升级暂存文件已变化");
@@ -499,6 +525,50 @@ mod tests {
         let mut map = BTreeMap::new();
         visit(root, root, &mut map)?;
         Ok(map)
+    }
+
+    #[test]
+    fn encore_prerelease_upgrade_preserves_exact_jsonc_and_rejects_downgrade() -> Result<()> {
+        let (_temp, target) = fixture()?;
+        install(&target)?;
+        let original = b"\xef\xbb\xbf{\r\n// user comment\r\n\"configVersion\":4,\"frameGeneration\":{\"mode\":\"fixed\",\"multiplier\":3},\"menuState\":{\"menuKey\":36,\"window\":123},\"unknown\":true}\r\n";
+        fs::write(target.directory.join(encore::CONFIG), original)?;
+        let upgrade = |version: &str, identity| {
+            core::deploy_prepared_context_at_with_overrides(
+                &target,
+                encore::BACKEND,
+                &["dinput8.dll".into()],
+                None,
+                BTreeMap::from([
+                    ("dinput8.dll".into(), pe(true, identity)),
+                    (encore::CONFIG.into(), encore::DEFAULT_CONFIG.to_vec()),
+                    (encore::NOTICES.into(), b"updated notices".to_vec()),
+                ]),
+                Some("1.0.0"),
+                Some(&context(encore::PROFILE)),
+                None,
+                Some(version),
+            )
+        };
+        upgrade("1.0.0-rc.3", 3)?;
+        assert_eq!(fs::read(target.directory.join(encore::CONFIG))?, original);
+        let installed = snapshot(&target.directory)?;
+        assert!(upgrade("1.0.0-beta.2", 4).is_err());
+        assert_eq!(snapshot(&target.directory)?, installed);
+        let logs = target.directory.join("rtx-encore-logs");
+        fs::create_dir_all(&logs)?;
+        fs::write(
+            logs.join("rtx-encore-13512-134365138303574349.crash.log"),
+            b"generated exception",
+        )?;
+        fs::write(
+            logs.join("rtx-encore-13512-134365138303574349.log"),
+            b"generated session",
+        )?;
+        fs::write(logs.join("manual-capture.csv"), b"user capture")?;
+        crate::cleanup::clean_at(&target)?;
+        assert_eq!(fs::read_dir(logs)?.count(), 1);
+        Ok(())
     }
     fn fault(point: &str, crash: bool) {
         FAULT.with(|f| *f.borrow_mut() = Some((point.into(), crash)));

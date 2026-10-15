@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 pub const PROFILE: &str = "rtxmfg_universal_133";
 pub const BACKEND: &str = "rtx40mfg";
 pub const CONFIG: &str = "RTXMFG-Universal.json";
+pub const NOTICES: &str = "MFG-Unlocker-NOTICES.txt";
 /// Fixed upstream sidecars only; never derive deletion targets from JSON values.
 pub const SIDECARS: [&str; 3] = [
     "RTXMFG-Universal.status.json",
@@ -34,6 +35,15 @@ pub const PROXIES: [&str; 19] = [
     "xinput9_1_0.dll",
     "xinputuap.dll",
 ];
+pub const ENTRIES: [&str; 20] = {
+    let mut entries = [crate::mfg_plugin::ENTRY; 20];
+    let mut i = 0;
+    while i < PROXIES.len() {
+        entries[i] = PROXIES[i];
+        i += 1;
+    }
+    entries
+};
 pub fn parameters() -> Vec<Parameter> {
     vec![
         Parameter {
@@ -75,9 +85,14 @@ pub fn parameters() -> Vec<Parameter> {
             key: "rtx_preset",
             section: "",
             ini_key: "dlssgPreset",
-            label: "UI 重组预设",
+            label: "DLSS 帧生成预设",
             default: "0",
-            choices: vec![("0", "跟随游戏 / 驱动"), ("1", "A"), ("2", "B")],
+            choices: vec![
+                ("0", "跟随游戏 / 驱动"),
+                ("1", "A"),
+                ("2", "B"),
+                ("3", "C · 性能模式"),
+            ],
         },
         Parameter {
             key: "rtx_vsync",

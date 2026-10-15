@@ -218,14 +218,11 @@ impl EncoreEditor {
                         let owner = owner.clone();
                         let key = key.clone();
                         let value = value.clone();
-                        let unsupported = key == "nrEngine" && value == "opendlss" && gpu == 0;
-                        menu = menu.item(
-                            PopupMenuItem::new(label.clone())
-                                .disabled(unsupported)
-                                .on_click(move |_, _, cx| {
-                                    let _ = owner.update(cx, |this, cx| this.set(&key, &value, cx));
-                                }),
-                        );
+                        menu = menu.item(PopupMenuItem::new(label.clone()).on_click(
+                            move |_, _, cx| {
+                                let _ = owner.update(cx, |this, cx| this.set(&key, &value, cx));
+                            },
+                        ));
                     }
                     menu
                 })

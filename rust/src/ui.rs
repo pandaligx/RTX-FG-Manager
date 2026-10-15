@@ -34,6 +34,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[path = "ui_community.rs"]
+mod community_view;
 #[path = "ui_encore.rs"]
 mod encore_editor;
 
@@ -435,6 +437,10 @@ impl GameFilter {
     }
 }
 pub struct Manager {
+    player_configs_open: bool,
+    detail_tab: u8,
+    smoke_detail_tabs: Cell<u8>,
+    community_view: Option<Entity<community_view::CommunityView>>,
     choices: RefCell<HashMap<&'static str, ChoiceBinding>>,
     encore_editor: RefCell<Option<(String, Entity<encore_editor::EncoreEditor>)>>,
     encore_invalid: Rc<Cell<bool>>,
@@ -492,6 +498,10 @@ impl Manager {
         let theme_choice = c.choice("theme", "跟随系统");
         let language = c.tr.language.clone();
         let mut view = Self {
+            player_configs_open: false,
+            detail_tab: 0,
+            smoke_detail_tabs: Cell::new(0),
+            community_view: None,
             choices: RefCell::new(HashMap::new()),
             encore_editor: RefCell::new(None),
             encore_invalid: Rc::new(Cell::new(false)),
@@ -1571,7 +1581,22 @@ impl Manager {
                                 .icon(Icon::new(IconName::Settings2).size(px(14.)))
                                 .flex_shrink_0()
                                 .disabled(self.c.busy),
-                            ),
+                            )
+                            .child({
+                                let exe = game.exe.clone();
+                                Button::new(("game-community", index))
+                                    .label(self.t("玩家配置"))
+                                    .small()
+                                    .compact()
+                                    .flex_shrink_0()
+                                    .disabled(self.c.busy)
+                                    .on_click(cx.listener(move |this, _, window, cx| {
+                                        this.c.focus = Some(exe.clone());
+                                        this.c.inspect(exe.clone());
+                                        this.open_game_details(true, window, cx);
+                                        cx.notify();
+                                    }))
+                            }),
                     ),
             )
             .context_menu(move |menu, _, _| {
@@ -1896,13 +1921,15 @@ impl Manager {
             );
         }
         let proxy_hint = if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
-            "RTX40 使用单个通用 DLL，选择入口仅改名，签名不变；不会覆盖游戏或其他 MOD 的同名文件。Bink 入口须自行保留原始 Hooked 文件。"
+            "MFG 独立代理与已有 OptiScaler 10 插件二选一；插件安装到默认 plugins 目录，不自动安装 OptiScaler。独立菜单 Backspace，插件使用 OptiScaler 菜单。"
         } else if self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE {
-            "Encore 支持19个入口，每次选一个；只复制重命名，保留签名。入口名不增加图形API支持。Bink须先自行保留原文件为binkw64Hooked.dll或bink2w64Hooked.dll。"
+            "Encore 每次选择一个代理或 ASI；专用入口使用对应签名文件，其他入口使用主 DLL。菜单 Insert。Bink 原件须保留为 binkw64Hooked.dll 或 bink2w64Hooked.dll；入口名不增加图形 API 支持。"
         } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
             "此上游版本仅提供version.dll，请勿改名或混装其他方案的DLL。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {
             "Transfusion 每次只安装一个入口；优先 version.dll，冲突时可改选 dinput8、dxgi 或 winmm。保留其他 MOD，配置使用独立 JSON。"
+        } else if self.c.parameter_profile() == rtx_fg_manager::upstream040::PROFILE {
+            "0.4.0 六种代理使用各自对应文件，每次安装一个入口。首次同时下载必需组件和超分组件；更换入口复用缓存。"
         } else if self.c.cloud_scheme().starts_with("upstream") {
             "上游支持多选入口；游戏先加载的 DLL 生效，其余仅转发。优先 version/winmm/dinput8/dbghelp；dxgi/d3d12 按需使用。"
         } else {
@@ -1929,10 +1956,48 @@ impl Manager {
             .into_any_element()
     }
     fn game_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_game_details(false, window, cx);
+    }
+    fn open_game_details(&mut self, community: bool, window: &mut Window, cx: &mut Context<Self>) {
         if self.dialog_active {
             return;
         }
         self.dialog_active = true;
+        self.player_configs_open = community;
+        self.detail_tab = if community { 2 } else { 0 };
+        self.community_view = self
+            .c
+            .focus
+            .as_ref()
+            .and_then(|exe| self.c.games.iter().find(|g| &g.exe == exe))
+            .map(|game| {
+                let targets = game
+                    .deployment_executables()
+                    .iter()
+                    .map(|exe| game.deployment_target(std::path::Path::new(exe)))
+                    .collect();
+                let context = self.c.preset_context(&game.exe);
+                let package = self.c.catalog.selected(&context.scheme);
+                let version = package
+                    .upstream_version
+                    .clone()
+                    .unwrap_or_else(|| package.version.clone());
+                let model = self.c.gpu.split('|').next().unwrap_or("").trim().to_owned();
+                let hardware = rtx_fg_manager::community::Hardware {
+                    gpu_model: (!model.is_empty()).then_some(model),
+                    ..Default::default()
+                };
+                let owner = cx.entity().downgrade();
+                let details = community_view::GameDetails {
+                    initial_tab: self.detail_tab,
+                    targets,
+                    context,
+                    patch_version: version,
+                    hardware,
+                    language: self.c.tr.language.clone(),
+                };
+                cx.new(|cx| community_view::CommunityView::new(owner, details, window, cx))
+            });
         self.c.state["preset_help_open"] = json!(false);
         let owner = cx.entity();
         let editor = cx.new(|cx| {
@@ -1942,8 +2007,12 @@ impl Manager {
             }
         });
         let view = cx.entity().downgrade();
-        let title = self.t("预设参数");
-        let width = (window.viewport_size().width - px(64.)).min(px(560.));
+        let title = self.t(if community {
+            "玩家配置"
+        } else {
+            "游戏详情"
+        });
+        let width = (window.viewport_size().width - px(64.)).min(px(860.));
         window.open_dialog(cx, move |dialog, _, _| {
             let close_view = view.clone();
             dialog
@@ -1953,12 +2022,17 @@ impl Manager {
                 .on_close(move |_, _, cx| {
                     let _ = close_view.update(cx, |this, cx| {
                         this.dialog_active = false;
+                        this.community_view = None;
                         cx.notify();
                     });
                 })
         });
     }
     fn game_editor_body(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        if self.c.smoke.is_some() {
+            self.smoke_detail_tabs
+                .set(self.smoke_detail_tabs.get() | (1 << self.detail_tab));
+        }
         let game = self
             .c
             .focus
@@ -1989,11 +2063,65 @@ impl Manager {
                 div()
                     .text_xs()
                     .text_color(cx.theme().muted_foreground)
-                    .child(self.t("修改会记住在此游戏；更换方案或入口后，先卸载再安装应用。")),
+                    .child(self.t(if self.player_configs_open {
+                        "选择玩家配置，预览差异后应用；也可以分享自己的有效配置。"
+                    } else {
+                        "修改会记住在此游戏；更换方案或入口后，先卸载再安装应用。"
+                    })),
             );
-        content = content.child(self.preset_panel(window, cx));
-        if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
-            content = content.child(Alert::info("rtxmfg-help", self.t("RTX40 专用 JSON；Backspace 打开游戏内菜单。游戏须已有 DLSS 帧生成；Vulkan 为实验支持且不支持动态倍率，倍率还受驱动与游戏限制。")).small());
+        let mut tabs = div().h_flex().flex_wrap().gap_2();
+        for (index, label) in [(0usize, "概览"), (1, "配置"), (3, "记录与恢复")] {
+            tabs = tabs.child(
+                Button::new(("game-detail-tab", index))
+                    .label(self.t(label))
+                    .selected(self.detail_tab == index as u8)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.detail_tab = index as u8;
+                        if let Some(view) = &this.community_view {
+                            view.update(cx, |v, cx| {
+                                v.tab = index as u8;
+                                cx.notify();
+                            });
+                        }
+                        cx.notify();
+                    })),
+            );
+        }
+        if !self.player_configs_open {
+            content = content.child(tabs);
+        }
+        if self.detail_tab == 0 {
+            if let Some(exe) = &self.c.focus
+                && let Some(snapshot) = self.c.deployments.get(exe)
+            {
+                content = content.child(snapshot.status.clone());
+                for detail in &snapshot.details {
+                    content = content.child(detail.clone());
+                }
+            }
+            content=content.child(self.t("管理器更新不会自动替换游戏补丁。可自由选择方案；检测结果仅供参考。"))
+                .child(self.t("游戏内菜单：Encore 按 Insert；MFG 独立模式按 Backspace；插件模式使用 OptiScaler 菜单。"));
+        } else {
+            if self.detail_tab == 1 {
+                content = content.child(self.preset_panel(window, cx));
+            }
+            if self.detail_tab == 3 {
+                content = content.child(
+                    Button::new("detail-uninstall")
+                        .label(self.t("卸载补丁"))
+                        .disabled(self.c.busy)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.c.request_focused_cleanup();
+                            window.close_dialog(cx);
+                            this.dialog_active = false;
+                            this.community_view = None;
+                            cx.notify();
+                        })),
+                );
+            }
+            if let Some(view) = &self.community_view {
+                content = content.child(view.clone());
+            }
         }
         div()
             .id("game-editor-scroll")
@@ -2773,6 +2901,17 @@ impl Manager {
             .into_any_element()
     }
     fn config_help(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if [
+            rtx_fg_manager::encore::PROFILE,
+            rtx_fg_manager::rtxmfg::PROFILE,
+            rtx_fg_manager::upstream040::PROFILE,
+        ]
+        .contains(&self.c.parameter_profile().as_str())
+            && rtx_fg_manager::help::open(&self.language, cx.theme().mode.is_dark(), "patches")
+                .is_ok()
+        {
+            return;
+        }
         if self.dialog_active {
             return;
         }
@@ -2798,7 +2937,7 @@ impl Manager {
             sections = vec![
                 (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
                 (self.t("使用说明"), self.t("Backspace 菜单仍为上游英文；可在管理器的预设参数中调整倍率、动态目标、UI预设、垂直同步及固定模式Reflex限帧。动态模式使用动态目标，固定限帧值会保留但不启用。")),
-                (self.t("兼容性"), self.t("RTX40 专用 JSON；Backspace 打开游戏内菜单。游戏须已有 DLSS 帧生成；Vulkan 为实验支持且不支持动态倍率，倍率还受驱动与游戏限制。")),
+                (self.t("兼容性"), self.t("MFG Unlocker 使用独立 JSON。独立代理按 Backspace；OptiScaler 10 插件使用 OptiScaler 菜单。两种入口只能选择一种，管理器不会安装 OptiScaler。实际可用功能由显卡、驱动和游戏决定。")),
             ];
         } else if profile == rtx_fg_manager::presets::MFG_VULKAN {
             sections.remove(2);
@@ -2806,6 +2945,12 @@ impl Manager {
             sections.insert(2, (self.t("动态多帧与优化"), self.t("动态多帧默认关闭，仅兼容的DX12路径支持；目标帧率0跟随游戏。四项优化按作者默认开启，可能影响画质或兼容性，出问题可逐项关闭。日志是开关，不是0—3级别。")));
             sections.insert(3, (self.t("保留作者配置"), self.t("RenderScale保持游戏控制；BlackwellScatter/BlackwellBlend默认关闭，作者记录过GPU挂起，不在此提供开关。其余高级设置和快捷键原样保留。Ctrl+F2—F6请求2X—6X，Ctrl+F11跟随游戏，Ctrl+F12恢复启动INI。")));
             sections.insert(1, (self.t("Vulkan 支持范围"), self.t("sm86-7发布说明新增Vulkan（含RTX Remix示例），不等于所有Vulkan游戏可用。作者仅有RTX3070，RTX20支持尚待实测。此方案独立于Smooth Motion和三角洲专项，只提供version.dll。")));
+        } else if profile == "upstream040" {
+            sections = vec![
+                (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
+                (self.t("使用说明"), self.t("首次完整下载 0.4.0 组件，六种代理只安装一个入口。默认 Optimized=2，SR 关闭；升级时保留已有设置。")),
+                (self.t("怎样生效"), self.t("游戏完全退出后安装或应用参数。帧生成、超分与 Runtime 分别设置；选择方案不会增加游戏原本没有的图形接口支持。")),
+            ];
         } else if profile.starts_with("upstream") {
             sections.insert(1,(self.t("内核模式"),self.t("0 为原厂数值；1 为逐位一致优化（默认）；2/3 进一步加速但有画质损失，仅新版 310.9 方案支持。保持默认即可。")));
             sections.insert(2,(self.t("UI 重组预设"),self.t("Auto 由游戏或驱动决定。A 关闭 UI 重组；B 尝试让生成帧里的 HUD 更干净，但多数游戏不会提供所需的 UI 平面。")));
@@ -2867,6 +3012,13 @@ impl Manager {
         });
     }
     fn help(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if rtx_fg_manager::help::open(&self.language, cx.theme().mode.is_dark(), "start").is_ok() {
+            if self.c.boolean("welcome_pending", false) {
+                self.c.state["welcome_pending"] = json!(false);
+                self.c.save();
+            }
+            return;
+        }
         if self.dialog_active {
             return;
         }
@@ -3267,6 +3419,15 @@ impl Manager {
                             self.help(window, cx);
                         }
                     }
+                    2..=4 if self.c.state["smoke_editor"].is_string() && self.dialog_active => {
+                        self.detail_tab = next - 1;
+                        if let Some(view) = &self.community_view {
+                            view.update(cx, |view, cx| {
+                                view.tab = self.detail_tab;
+                                cx.notify();
+                            });
+                        }
+                    }
                     2 => {
                         window.close_dialog(cx);
                         self.c.page = 1;
@@ -3280,7 +3441,7 @@ impl Manager {
                         }
                     }
                     5 => {
-                        let report = json!({"first_ui_ms":self.first_render_ms,"frames":self.frames,"heartbeats":self.ticks,"max_event_gap_ms":self.max_gap_ms,"language":self.c.tr.language,"dark":cx.theme().mode.is_dark(),"light_palette":cx.theme().light_theme.name,"dark_palette":cx.theme().dark_theme.name,"renderer":"GPUI Fast D3D11","python_runtime":false,"scan_exercised":self.c.boolean("smoke_scan",false),"scan_busy_at_close":self.c.busy,"width":f32::from(window.viewport_size().width),"height":f32::from(window.viewport_size().height)});
+                        let report = json!({"detail_tabs":self.smoke_detail_tabs.get(),"first_ui_ms":self.first_render_ms,"frames":self.frames,"heartbeats":self.ticks,"max_event_gap_ms":self.max_gap_ms,"language":self.c.tr.language,"dark":cx.theme().mode.is_dark(),"light_palette":cx.theme().light_theme.name,"dark_palette":cx.theme().dark_theme.name,"renderer":"GPUI Fast D3D11","python_runtime":false,"scan_exercised":self.c.boolean("smoke_scan",false),"scan_busy_at_close":self.c.busy,"width":f32::from(window.viewport_size().width),"height":f32::from(window.viewport_size().height)});
                         self.c.channel.job(move |c| {
                             core::atomic_json(&out, &report)?;
                             c.send(Event::SmokeWritten);

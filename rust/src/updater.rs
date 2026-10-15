@@ -11,6 +11,19 @@ use std::{
     time::{Duration, Instant},
 };
 pub const REPO: &str = "pandaligx/RTX-FG-Manager";
+pub const GITCODE_REPO: &str = "gcw_qWIjmve7/RTX-FG-Manager";
+fn release_base(source: &str, version: &str) -> Result<String> {
+    let repo = match source {
+        "gitcode" => GITCODE_REPO,
+        "github" | "gitee" => REPO,
+        _ => bail!("更新来源无效"),
+    };
+    self::version(version)?;
+    Ok(format!(
+        "https://{source}.com/{repo}/releases/download/v{}",
+        version.trim_start_matches('v')
+    ))
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
     pub schema: u32,
@@ -102,6 +115,9 @@ fn release_with_fetch(
     // Public static files need neither an API quota nor an embedded account token.
     // Only the release publisher promotes these after verifying both sites.
     let urls = match source {
+        "gitcode" => vec![format!(
+            "https://api.gitcode.com/api/v5/repos/{GITCODE_REPO}/raw/update.json?ref=main"
+        )],
         "gitee" => vec![format!("https://gitee.com/{REPO}/raw/main/update.json")],
         "github" => vec![
             format!("https://raw.githubusercontent.com/{REPO}/main/update.json"),
@@ -117,10 +133,7 @@ fn release_with_fetch(
             m.version = m.version.trim_start_matches('v').into();
             // Never accept a manifest-supplied EXE URL or source, even if the
             // JSON came from an official host. Construct the versioned route.
-            m.url = format!(
-                "https://{source}.com/{REPO}/releases/download/v{}/{}",
-                m.version, m.file
-            );
+            m.url = format!("{}/{}", release_base(source, &m.version)?, m.file);
             m.source = source.into();
             Ok(m)
         })();
@@ -138,9 +151,9 @@ fn source_order(choice: &str) -> [&'static str; 2] {
     // An explicit GitHub preference is retained; auto/legacy settings now use
     // domestic first, independent of Windows region or VPN configuration.
     if choice == "github" {
-        ["github", "gitee"]
+        ["github", "gitcode"]
     } else {
-        ["gitee", "github"]
+        ["gitcode", "github"]
     }
 }
 pub fn check_with_cancel(choice: &str, cancel: &AtomicBool) -> Result<Option<Manifest>> {
@@ -163,11 +176,7 @@ fn check_with_fetch(
     bail!("检查更新失败，请稍后重试。{}", errors.join("；"))
 }
 fn mirror_release(m: &Manifest, source: &str, cancel: &AtomicBool) -> Result<Manifest> {
-    ensure!(["github", "gitee"].contains(&source), "更新来源无效");
-    let base = format!(
-        "https://{source}.com/{REPO}/releases/download/v{}",
-        m.version
-    );
+    let base = release_base(source, &m.version)?;
     let other: Manifest = serde_json::from_value(get_json_with_cancel(
         &format!("{base}/update.json"),
         cancel,
@@ -175,14 +184,11 @@ fn mirror_release(m: &Manifest, source: &str, cancel: &AtomicBool) -> Result<Man
     matching_mirror(m, source, other)
 }
 fn matching_mirror(m: &Manifest, source: &str, mut other: Manifest) -> Result<Manifest> {
-    ensure!(["github", "gitee"].contains(&source), "更新来源无效");
+    let base = release_base(source, &m.version)?;
     other.validate(&m.version)?;
     ensure!(m.same_file(&other), "更新附件尚未同步完成");
     other.source = source.into();
-    other.url = format!(
-        "https://{source}.com/{REPO}/releases/download/v{}/{}",
-        m.version, m.file
-    );
+    other.url = format!("{base}/{}", m.file);
     Ok(other)
 }
 pub fn verify(path: &Path, m: &Manifest) -> Result<()> {
@@ -651,7 +657,7 @@ mod download_tests {
     }
 
     #[test]
-    fn domestic_check_uses_static_json_without_api_or_github() -> Result<()> {
+    fn domestic_check_uses_anonymous_gitcode_file_without_github() -> Result<()> {
         let cancel = AtomicBool::new(false);
         let mut calls = Vec::new();
         let mut supplied = checked_github_manifest();
@@ -661,18 +667,25 @@ mod download_tests {
             calls.push(url.to_owned());
             Ok(serde_json::to_value(&supplied)?)
         };
-        let actual = release_with_fetch("gitee", &cancel, &mut fetch)?;
-        assert_eq!(actual.source, "gitee");
+        let actual = release_with_fetch("gitcode", &cancel, &mut fetch)?;
+        assert_eq!(actual.source, "gitcode");
         assert_eq!(
             actual.url,
-            format!("https://gitee.com/{REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe")
+            format!(
+                "https://gitcode.com/{GITCODE_REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
+            )
         );
         // An older published manifest still counts as a successful check, and
         // must not fall through to the inaccessible overseas service.
         assert!(check_with_fetch("auto", &cancel, &mut fetch)?.is_none());
         assert_eq!(
             calls,
-            vec![format!("https://gitee.com/{REPO}/raw/main/update.json"); 2]
+            vec![
+                format!(
+                    "https://api.gitcode.com/api/v5/repos/{GITCODE_REPO}/raw/update.json?ref=main"
+                );
+                2
+            ]
         );
         Ok(())
     }
@@ -687,7 +700,7 @@ mod download_tests {
             m.file = "RTXManager-v9999.0.0-x64.exe".into();
             let mut fetch = |url: &str, _: &AtomicBool| {
                 calls.push(url.to_owned());
-                if url.starts_with("https://gitee.com/") {
+                if url.starts_with("https://api.gitcode.com/") {
                     if malformed {
                         return Ok(serde_json::json!({"message": "403 Forbidden"}));
                     }
@@ -698,9 +711,9 @@ mod download_tests {
             let result = check_with_fetch("domestic", &cancel, &mut fetch)?.unwrap();
             assert_eq!(result.source, "github");
             assert_eq!(calls.len(), 2);
-            assert!(calls[0].contains("gitee.com"));
+            assert!(calls[0].contains("api.gitcode.com"));
             assert!(calls[1].contains("raw.githubusercontent.com"));
-            assert!(!calls.iter().any(|u| u.contains("/api/")));
+            assert!(!calls.iter().any(|u| u.contains("access_token")));
         }
         Ok(())
     }
@@ -758,21 +771,21 @@ mod download_tests {
     fn changed_preference_selects_domestic_without_rewriting_checked_identity() -> Result<()> {
         let checked = checked_github_manifest();
         let original = checked.clone();
-        assert_eq!(source_order("github"), ["github", "gitee"]);
+        assert_eq!(source_order("github"), ["github", "gitcode"]);
         // The check has already completed on GitHub. A later source change
         // (including a cancelled download's retry) must not use checked.source.
-        for current_preference in ["domestic", "gitee", "auto"] {
+        for current_preference in ["domestic", "gitee", "gitcode", "auto"] {
             let [first, fallback] = source_order(current_preference);
-            assert_eq!((first, fallback), ("gitee", "github"));
+            assert_eq!((first, fallback), ("gitcode", "github"));
             let mut mirror_json = checked.clone();
             mirror_json.source.clear();
             mirror_json.url.clear();
             let active = matching_mirror(&checked, first, mirror_json)?;
-            assert_eq!(active.source, "gitee");
+            assert_eq!(active.source, "gitcode");
             assert_eq!(
                 active.url,
                 format!(
-                    "https://gitee.com/{REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
+                    "https://gitcode.com/{GITCODE_REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
                 )
             );
             assert!(checked.same_file(&active));

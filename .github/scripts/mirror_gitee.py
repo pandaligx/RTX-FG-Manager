@@ -24,7 +24,7 @@ API='https://gitee.com/api/v5/repos/'+REPO
 # Keep in step with tools/export-source.ps1. This is deliberately not a recursive
 # copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
 ALLOWED = {
-    'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py',
+    'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py',
     'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json',
     '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md',
     'community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore',
@@ -65,7 +65,7 @@ TREES = (
     (r'vendor/gpui_fast_windows/src/.+', {'.rs', '.hlsl'}),
     (r'vendor/gpui_fast_windows/resources/.+', {'.rc', '.xml', '.manifest', '.ico'}),
     (r'tests/[^/]+', {'.rs'}),
-    (r'tests/fixtures/catalog(?:420|421|422|425)/.+', {'.json'}),
+    (r'tests/fixtures/catalog(?:420|421|422|425|429)/.+', {'.json'}),
     (r'cloud/indexes/.+', {'.json'}),
 )
 FORBIDDEN = re.compile(

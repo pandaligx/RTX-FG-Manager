@@ -1,4 +1,4 @@
-//! RTX Encore beta.2 JSONC v4. Field metadata comes from an isolated upstream
+//! RTX Encore rc.3 JSONC v4. Field metadata comes from an isolated upstream
 //! configuration extraction; deployment never requires a fixed DLL hash.
 use crate::{jsonc::Document, presets::Values};
 use anyhow::{Context, Result, bail, ensure};
@@ -33,6 +33,15 @@ pub const PROXIES: [&str; 19] = [
     "xinput9_1_0.dll",
     "xinputuap.dll",
 ];
+pub const ENTRIES: [&str; 20] = {
+    let mut entries = ["rtx-encore.asi"; 20];
+    let mut i = 0;
+    while i < PROXIES.len() {
+        entries[i] = PROXIES[i];
+        i += 1;
+    }
+    entries
+};
 pub const DEFAULT_CONFIG: &[u8] = include_bytes!("../assets/encore-defaults.jsonc");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -185,7 +194,7 @@ pub fn validate_values(values: &Values) -> Result<()> {
     }
     Ok(())
 }
-pub fn field_enabled(key: &str, values: &Values, gpu: Option<i32>) -> bool {
+pub fn field_enabled(key: &str, values: &Values, _gpu: Option<i32>) -> bool {
     let Some(f) = field(key) else {
         return false;
     };
@@ -195,7 +204,7 @@ pub fn field_enabled(key: &str, values: &Values, gpu: Option<i32>) -> bool {
             .map(String::as_str)
             .or_else(|| field(k).map(|f| f.default.as_str()))
     };
-    let dependencies = f.dependencies.iter().all(|dep| {
+    f.dependencies.iter().all(|dep| {
         if let Some((k, v)) = dep.split_once(">=") {
             get(k)
                 .and_then(|n| n.parse::<u32>().ok())
@@ -206,14 +215,7 @@ pub fn field_enabled(key: &str, values: &Values, gpu: Option<i32>) -> bool {
         } else {
             false
         }
-    });
-    dependencies
-        && match (key, gpu) {
-            (key, Some(0)) if key.starts_with("nrOpen") => false,
-            ("smoothMotionEnabled" | "smoothMotionApi", Some(series)) => series == 1,
-            ("nrPrecision", Some(series)) => series == 0 || series == 1,
-            _ => true,
-        }
+    })
 }
 
 fn document(bytes: &[u8]) -> Result<Document> {

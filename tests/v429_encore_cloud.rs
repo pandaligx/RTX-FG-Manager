@@ -32,6 +32,8 @@ fn fixture(config: &[u8]) -> Result<(cloud::Catalog, Vec<u8>)> {
     }
     let bytes = archive.finish()?.into_inner();
     let package = cloud::Package {
+        component: false,
+        urls: std::collections::BTreeMap::new(),
         id: "rtx-encore-1.0.0-beta.2-v429-universal".into(),
         scheme_id: encore::SCHEME.into(),
         label: "RTX Encore · 1.0.0-beta.2".into(),

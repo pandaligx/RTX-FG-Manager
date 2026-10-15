@@ -172,7 +172,7 @@ fn compact_catalog() -> Result<(Value, Vec<u8>)> {
     let package = c
         .packages
         .iter()
-        .find(|p| p.scheme_id == c.default_scheme)
+        .find(|p| p.scheme_id == cloud::DELTA_SCHEME)
         .unwrap();
     let policy = &c.scheme_policies[&package.scheme_id];
     let index = serde_json::to_vec(&json!({"schema":1,"packages":[package]}))?;

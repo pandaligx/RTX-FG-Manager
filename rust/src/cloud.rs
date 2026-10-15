@@ -11,10 +11,23 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-pub const DOMESTIC: &str = "https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/cloud/catalog.json";
+pub const DOMESTIC: &str = "https://api.gitcode.com/api/v5/repos/gcw_qWIjmve7/RTX-FG-Manager/raw/cloud/v3/catalog.json?ref=main";
 pub const GITHUB: &str =
-    "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/catalog.json";
+    "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/v3/catalog.json";
 pub const DELTA_SCHEME: &str = "rtxfg-0.3.5-dx12-vulkan";
+
+fn source_name(url: &str) -> &'static str {
+    match reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_owned))
+        .as_deref()
+    {
+        Some("gitcode.com" | "api.gitcode.com" | "raw.gitcode.com") => "gitcode",
+        Some("gitee.com") => "gitee",
+        Some("github.com" | "raw.githubusercontent.com") => "github",
+        _ => "domestic",
+    }
+}
 
 fn delta_sm89(id: &str, policy: &Policy) -> bool {
     id == DELTA_SCHEME
@@ -52,6 +65,10 @@ pub struct Package {
     pub bytes: u64,
     pub sha256: String,
     pub files: Vec<File>,
+    #[serde(default)]
+    pub component: bool,
+    #[serde(default)]
+    pub urls: BTreeMap<String, String>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Policy {
@@ -130,7 +147,7 @@ impl CompactCatalog {
     fn expand_for_manager_version(self, index: &[u8], manager_version: &str) -> Result<Catalog> {
         let manager_version = crate::updater::version(manager_version)?;
         ensure!(
-            self.schema == 2 && !self.schemes.is_empty() && self.schemes.len() <= 32,
+            matches!(self.schema, 2 | 3) && !self.schemes.is_empty() && self.schemes.len() <= 32,
             "Invalid compact catalog"
         );
         ensure!(
@@ -147,7 +164,7 @@ impl CompactCatalog {
         }
         let index: Index = serde_json::from_slice(index)?;
         ensure!(
-            index.schema == 1 && index.packages.len() <= 256,
+            matches!(index.schema, 1 | 2) && index.packages.len() <= 256,
             "Invalid cloud index"
         );
         let mut packages = Vec::new();
@@ -176,6 +193,7 @@ impl CompactCatalog {
             );
             let (ini_policy, max_selected_proxies) = match s.profile.as_str() {
                 "initial" => ("initial", 1),
+                crate::upstream040::PROFILE => ("upstream040", 1),
                 crate::rtxmfg::PROFILE => ("rtxmfg_json", 1),
                 crate::transfusion::PROFILE => ("transfusion_json", 1),
                 crate::encore::PROFILE => ("encore_json", 1),
@@ -232,7 +250,7 @@ impl CompactCatalog {
         };
         let mut c = Catalog {
             prefer_github: false,
-            schema: 2,
+            schema: self.schema,
             revision: self.revision,
             default_scheme,
             sources: self.sources,
@@ -251,7 +269,7 @@ fn safe_url(value: &str) -> Result<reqwest::Url> {
 impl Catalog {
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.schema == 2 && !self.packages.is_empty() && self.packages.len() <= 256,
+            matches!(self.schema, 2 | 3) && !self.packages.is_empty() && self.packages.len() <= 256,
             "Unsupported cloud catalog"
         );
         ensure!(
@@ -303,10 +321,17 @@ impl Catalog {
             ensure!(
                 match policy.parameter_profile.as_str() {
                     "initial" => policy.ini_policy == "initial",
+                    crate::upstream040::PROFILE =>
+                        policy.ini_policy == "upstream040"
+                            && policy.max_selected_proxies == 1
+                            && p.backends == [crate::upstream040::BACKEND],
                     crate::encore::PROFILE =>
                         policy.ini_policy == "encore_json"
                             && policy.max_selected_proxies == 1
-                            && p.proxy == "version.dll"
+                            && crate::encore::ENTRIES.contains(&p.proxy.as_str())
+                            && (p.proxy == "version.dll"
+                                || (self.schema == 3
+                                    && policy.capabilities.contains("encore_dedicated_entries")))
                             && p.backends == [crate::encore::BACKEND]
                             && policy.gpu_paths == ["SM75", "SM86", "SM89"],
                     crate::transfusion::PROFILE =>
@@ -335,10 +360,70 @@ impl Catalog {
                     "Invalid upstream package version"
                 );
             }
+            for (source, url) in &p.urls {
+                ensure!(
+                    ["domestic", "github"].contains(&source.as_str()),
+                    "Unknown package source"
+                );
+                safe_url(url)?;
+            }
+            if policy.parameter_profile == crate::upstream040::PROFILE {
+                ensure!(
+                    self.schema == 3
+                        && p.bytes > 0
+                        && p.bytes <= LIMIT
+                        && core::valid_hash(&p.sha256),
+                    "Invalid component size/hash"
+                );
+                ensure!(
+                    !p.archive.is_empty()
+                        && p.archive.ends_with(".zip")
+                        && p.archive
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),
+                    "Invalid component archive"
+                );
+                let allowed = core::deployment_names(
+                    crate::upstream040::BACKEND,
+                    std::slice::from_ref(&p.proxy),
+                )?;
+                ensure!(
+                    !p.files.is_empty() && p.files.len() <= allowed.len(),
+                    "Invalid component entries"
+                );
+                let mut seen = BTreeSet::new();
+                for f in &p.files {
+                    ensure!(
+                        allowed.contains(&f.name)
+                            && seen.insert(&f.name)
+                            && f.bytes > 0
+                            && f.bytes <= LIMIT
+                            && core::valid_hash(&f.sha256),
+                        "Invalid component file"
+                    );
+                    ensure!(
+                        !p.component || crate::upstream040::COMPONENTS.contains(&f.name.as_str()),
+                        "Component contains an entry proxy"
+                    );
+                }
+                if !p.component {
+                    ensure!(
+                        p.files.len() == 2
+                            && p.files.iter().any(|f| f.name == p.proxy)
+                            && p.files.iter().any(|f| f.name == core::INI)
+                            && routes.insert((&p.scheme_id, &p.backends[0], &p.proxy)),
+                        "Missing/ambiguous entry proxy or INI"
+                    );
+                }
+                continue;
+            }
+            ensure!(!p.component, "Components require a directory protocol");
             let encore = policy.parameter_profile == crate::encore::PROFILE;
+            let mfg_notice = policy.parameter_profile == crate::rtxmfg::PROFILE
+                && crate::mfg_plugin::supported(p.upstream_version.as_deref());
             ensure!(
                 core::PROXIES.contains(&p.proxy.as_str())
-                    && p.files.len() == if encore { 3 } else { 2 },
+                    && p.files.len() == if encore || mfg_notice { 3 } else { 2 },
                 "Invalid cloud proxy"
             );
             ensure!(
@@ -368,6 +453,9 @@ impl Catalog {
             ]);
             if encore {
                 expected_entries.insert(crate::encore::NOTICES);
+            }
+            if mfg_notice {
+                expected_entries.insert(crate::rtxmfg::NOTICES);
             }
             ensure!(
                 p.files
@@ -451,21 +539,51 @@ impl Catalog {
                 );
             }
         }
+        for (scheme, policy) in &self.scheme_policies {
+            if policy.parameter_profile != crate::upstream040::PROFILE {
+                continue;
+            }
+            let mut components = BTreeSet::new();
+            let entries: Vec<_> = self
+                .packages
+                .iter()
+                .filter(|p| &p.scheme_id == scheme && !p.component)
+                .collect();
+            ensure!(!entries.is_empty(), "Component scheme has no entry proxy");
+            for package in self
+                .packages
+                .iter()
+                .filter(|p| &p.scheme_id == scheme && p.component)
+            {
+                ensure!(
+                    entries.iter().all(|p| p.version == package.version),
+                    "Component version mismatch"
+                );
+                for file in &package.files {
+                    ensure!(
+                        components.insert(file.name.as_str()),
+                        "Duplicate component destination"
+                    );
+                }
+            }
+            ensure!(
+                components == crate::upstream040::COMPONENTS.into_iter().collect(),
+                "Incomplete component bundle"
+            );
+        }
         Ok(())
     }
     pub fn schemes(&self) -> Vec<&Package> {
         let mut seen = BTreeSet::new();
         self.packages
             .iter()
-            .filter(|p| seen.insert(&p.scheme_id))
+            .filter(|p| p.scheme_id != "initial" && seen.insert(&p.scheme_id))
             .collect()
     }
     pub fn supports_series(&self, id: &str, series: usize) -> bool {
-        ["SM75", "SM86", "SM89"].get(series).is_some_and(|gpu| {
-            self.scheme_policies
-                .get(id)
-                .is_some_and(|policy| policy.gpu_paths.iter().any(|path| path.as_str() == *gpu))
-        })
+        // Retain historical metadata for recognition and owned restoration,
+        // but do not offer the retired first-release scheme for installation.
+        series <= 2 && id != "initial" && self.scheme_policies.contains_key(id)
     }
     /// Older cloud clients derived this legacy pair from `upstream035`.
     /// Only the identified Delta MFG implementation also has an automatic SM89 path.
@@ -482,7 +600,7 @@ impl Catalog {
         Some(match policy.parameter_profile.as_str() {
             crate::encore::PROFILE => crate::encore::SOURCE,
             crate::transfusion::PROFILE => crate::transfusion::SOURCE,
-            crate::rtxmfg::PROFILE => "https://github.com/dashdogy/RTX40MFG-Unlock",
+            crate::rtxmfg::PROFILE => "https://github.com/dashdogy/MFG-Unlocker",
             crate::presets::MFG_VULKAN => {
                 "https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version"
             }
@@ -511,14 +629,32 @@ impl Catalog {
             .get(id)
             .is_some_and(|p| p.parameter_profile == crate::encore::PROFILE)
         {
-            return crate::encore::PROXIES.iter().map(|s| (*s).into()).collect();
+            let policy = &self.scheme_policies[id];
+            return crate::encore::ENTRIES
+                .iter()
+                .filter(|name| {
+                    self.packages
+                        .iter()
+                        .any(|p| p.scheme_id == id && package_supports_entry(p, policy, name))
+                })
+                .map(|s| (*s).into())
+                .collect();
         }
         if self
             .scheme_policies
             .get(id)
             .is_some_and(|p| p.parameter_profile == crate::rtxmfg::PROFILE)
         {
-            return crate::rtxmfg::PROXIES.iter().map(|s| (*s).into()).collect();
+            let policy = &self.scheme_policies[id];
+            return crate::rtxmfg::ENTRIES
+                .iter()
+                .filter(|name| {
+                    self.packages
+                        .iter()
+                        .any(|p| p.scheme_id == id && package_supports_entry(p, policy, name))
+                })
+                .map(|s| (*s).into())
+                .collect();
         }
         self.packages
             .iter()
@@ -528,6 +664,34 @@ impl Catalog {
             .into_iter()
             .collect()
     }
+}
+/// Dedicated Encore builds must never become the fallback for other aliases.
+/// Only MFG's universal build may be renamed to its ASI plugin entry.
+fn package_supports_entry(p: &Package, policy: &Policy, name: &str) -> bool {
+    if p.component {
+        return false;
+    }
+    if p.proxy == name {
+        return true;
+    }
+    if policy.parameter_profile == crate::rtxmfg::PROFILE {
+        return p.proxy == "version.dll"
+            && crate::rtxmfg::ENTRIES.contains(&name)
+            && (name != crate::mfg_plugin::ENTRY
+                || crate::mfg_plugin::supported(p.upstream_version.as_deref()));
+    }
+    if policy.parameter_profile == crate::encore::PROFILE {
+        if name.ends_with(".asi") {
+            return false;
+        }
+        if policy.capabilities.contains("encore_dedicated_entries") {
+            return p.proxy == "winhttp.dll"
+                && !["version.dll", "winmm.dll", "dxgi.dll", "dinput8.dll"].contains(&name)
+                && crate::encore::ENTRIES.contains(&name);
+        }
+        return p.proxy == "version.dll" && crate::encore::ENTRIES.contains(&name);
+    }
+    false
 }
 pub fn bundled() -> Catalog {
     let mut c: Catalog = serde_json::from_str(include_str!("../cloud-catalog.json"))
@@ -539,7 +703,13 @@ pub fn bundled() -> Catalog {
 pub fn cached() -> Catalog {
     assets::cache_root()
         .ok()
-        .and_then(|r| core::read_json(&r.join("cloud-catalog.json"), 1024 * 1024).ok())
+        .map(|r| cached_at(&r))
+        .unwrap_or_else(bundled)
+}
+fn cached_at(root: &Path) -> Catalog {
+    // Keep schema-2 clients and their offline cache independent of this upgrade.
+    core::read_json(&root.join("cloud-catalog-v3.json"), 1024 * 1024)
+        .ok()
         .and_then(|v| serde_json::from_value::<Catalog>(v).ok())
         .map(|mut c| {
             c.enable_legacy_delta_sm89();
@@ -558,9 +728,9 @@ pub fn refresh_with_options(
     mut progress: impl FnMut(crate::transfer::Progress),
 ) -> Result<Catalog> {
     let sources = if prefer_github {
-        [("github", GITHUB), ("gitee", DOMESTIC)]
+        [("github", GITHUB), ("gitcode", DOMESTIC)]
     } else {
-        [("gitee", DOMESTIC), ("github", GITHUB)]
+        [("gitcode", DOMESTIC), ("github", GITHUB)]
     };
     let mut errors = Vec::new();
     for (name, url) in sources {
@@ -590,11 +760,11 @@ pub fn refresh_with_options(
             let urls = if prefer_github {
                 [
                     (&compact.index.fallback_url, "github"),
-                    (&compact.index.url, "gitee"),
+                    (&compact.index.url, source_name(&compact.index.url)),
                 ]
             } else {
                 [
-                    (&compact.index.url, "gitee"),
+                    (&compact.index.url, source_name(&compact.index.url)),
                     (&compact.index.fallback_url, "github"),
                 ]
             };
@@ -630,7 +800,7 @@ pub fn refresh_with_options(
             c.validate()?;
             ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
             stage = "云端目录缓存写入失败";
-            core::atomic_json(&root.join("cloud-catalog.json"), &c)?;
+            core::atomic_json(&root.join("cloud-catalog-v3.json"), &c)?;
             Ok(c)
         })();
         match result {
@@ -681,7 +851,7 @@ pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
             b.len() as u64 == f.bytes && core::hash(&b) == f.sha256 && !out.contains_key(&f.name),
             "Cloud entry integrity mismatch"
         );
-        if f.name.ends_with(".dll") {
+        if f.name.ends_with(".dll") || f.name.ends_with(".asi") {
             ensure!(b.len() >= 64 && &b[..2] == b"MZ", "Invalid DLL header");
             let n = u32::from_le_bytes(b[60..64].try_into()?) as usize;
             let h = b
@@ -757,13 +927,16 @@ fn archive(
     let request = crate::transfer::Request {
         sources: order
             .into_iter()
-            .map(|name| crate::transfer::Source {
-                name: if name == "domestic" && c.sources[name].base_url.contains("gitee.com/") {
-                    "gitee".into()
-                } else {
-                    name.into()
-                },
-                url: c.sources[name].base_url.clone() + &p.archive,
+            .map(|name| {
+                let url = p
+                    .urls
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_else(|| c.sources[name].base_url.clone() + &p.archive);
+                crate::transfer::Source {
+                    name: source_name(&url).into(),
+                    url,
+                }
             })
             .collect(),
         bytes: Some(p.bytes),
@@ -843,13 +1016,6 @@ pub fn prepare_with_progress(
         .scheme_policies
         .get(scheme)
         .context("Scheme no longer available")?;
-    ensure!(
-        policy
-            .gpu_paths
-            .iter()
-            .any(|g| g == ["SM75", "SM86", "SM89"][series]),
-        "This scheme does not support the selected GPU path"
-    );
     let selected = core::normalize_proxies(proxies)?;
     ensure!(
         selected.iter().all(|name| c.proxies(scheme).contains(name)),
@@ -869,14 +1035,14 @@ pub fn prepare_with_progress(
         let p = c
             .packages
             .iter()
-            .find(|p| {
+            .filter(|p| {
                 p.scheme_id == scheme
-                    && (p.proxy == proxy
-                        || matches!(
-                            policy.parameter_profile.as_str(),
-                            crate::rtxmfg::PROFILE | crate::encore::PROFILE
-                        ))
+                    && !p.component
+                    && package_supports_entry(p, policy, &proxy)
                     && p.backends.iter().any(|b| {
+                        if policy.parameter_profile == crate::upstream040::PROFILE {
+                            return b == crate::upstream040::BACKEND;
+                        }
                         if policy.parameter_profile == crate::rtxmfg::PROFILE {
                             b == crate::rtxmfg::BACKEND
                         } else if policy.parameter_profile == crate::transfusion::PROFILE {
@@ -890,11 +1056,15 @@ pub fn prepare_with_progress(
                         }
                     })
             })
+            .min_by_key(|p| usize::from(p.proxy != proxy))
             .context("Proxy unavailable in this scheme")?;
         let b = p
             .backends
             .iter()
             .find(|b| {
+                if policy.parameter_profile == crate::upstream040::PROFILE {
+                    return b.as_str() == crate::upstream040::BACKEND;
+                }
                 if policy.parameter_profile == crate::rtxmfg::PROFILE {
                     b.as_str() == crate::rtxmfg::BACKEND
                 } else if policy.parameter_profile == crate::transfusion::PROFILE {
@@ -942,6 +1112,24 @@ pub fn prepare_with_progress(
             out.insert(name, bytes);
         }
     }
+    for p in c
+        .packages
+        .iter()
+        .filter(|p| p.scheme_id == scheme && p.component)
+    {
+        let mut component_progress = |transfer| {
+            report(CloudProgress {
+                transfer,
+                proxy: p.label.clone(),
+                package_index: 1,
+                package_count: 1,
+            })
+        };
+        for (name, bytes) in archive(c, p, cancel, &mut component_progress)? {
+            ensure!(!out.contains_key(&name), "Duplicate component destination");
+            out.insert(name, bytes);
+        }
+    }
     let backend = backend.context("No package selected")?;
     if policy.parameter_profile != crate::presets::MFG_VULKAN {
         core::configure_package(&backend, &mut out)?;
@@ -967,7 +1155,7 @@ fn remember_images(files: &BTreeMap<String, Vec<u8>>) -> Result<()> {
         BTreeSet::new()
     };
     for (n, b) in files {
-        if n.ends_with(".dll") {
+        if n.ends_with(".dll") || n.ends_with(".asi") {
             hashes.insert(crate::cleanup::image_digest(b).context("Invalid DLL image identity")?);
         }
     }
@@ -993,6 +1181,87 @@ pub fn known_image(image: &str) -> bool {
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn dedicated_encore_and_mfg_plugin_routes_do_not_cross_load() {
+        let c = super::bundled();
+        let mut encore = c
+            .packages
+            .iter()
+            .find(|p| p.scheme_id == crate::encore::SCHEME)
+            .unwrap()
+            .clone();
+        let mut policy = c.scheme_policies[crate::encore::SCHEME].clone();
+        encore.proxy = "version.dll".into();
+        assert!(!super::package_supports_entry(
+            &encore,
+            &policy,
+            "rtx-encore.asi"
+        ));
+        policy
+            .capabilities
+            .insert("encore_dedicated_entries".into());
+        assert!(!super::package_supports_entry(
+            &encore,
+            &policy,
+            "winmm.dll"
+        ));
+        assert!(!super::package_supports_entry(
+            &encore,
+            &policy,
+            "binkw64.dll"
+        ));
+        encore.proxy = "winhttp.dll".into();
+        assert!(super::package_supports_entry(
+            &encore,
+            &policy,
+            "binkw64.dll"
+        ));
+        assert!(!super::package_supports_entry(
+            &encore,
+            &policy,
+            "version.dll"
+        ));
+        assert!(!super::package_supports_entry(
+            &encore,
+            &policy,
+            "rtx-encore.asi"
+        ));
+        encore.proxy = "rtx-encore.asi".into();
+        assert!(super::package_supports_entry(
+            &encore,
+            &policy,
+            "rtx-encore.asi"
+        ));
+        assert!(!super::package_supports_entry(
+            &encore,
+            &policy,
+            "winhttp.dll"
+        ));
+        let mut mfg = c
+            .packages
+            .iter()
+            .find(|p| p.scheme_id == crate::rtxmfg_upgrade::SCHEME)
+            .unwrap()
+            .clone();
+        let policy = &c.scheme_policies[crate::rtxmfg_upgrade::SCHEME];
+        mfg.upstream_version = Some("1.4.2".into());
+        assert!(!super::package_supports_entry(
+            &mfg,
+            policy,
+            crate::mfg_plugin::ENTRY
+        ));
+        mfg.upstream_version = Some("1.5.0".into());
+        assert!(super::package_supports_entry(
+            &mfg,
+            policy,
+            crate::mfg_plugin::ENTRY
+        ));
+        assert!(!super::package_supports_entry(
+            &mfg,
+            policy,
+            "rtx-encore.asi"
+        ));
+    }
     use super::*;
     #[test]
     fn older_manager_skips_encore_before_resolving_archives_and_falls_back() {
@@ -1045,6 +1314,14 @@ mod tests {
     }
 
     #[test]
+    fn initial_scheme_is_retired_without_losing_legacy_metadata() {
+        let c = bundled();
+        assert!(!c.schemes().iter().any(|p| p.scheme_id == "initial"));
+        assert!((0..3).all(|series| !c.supports_series("initial", series)));
+        assert_eq!(c.selected("initial").scheme_id, "initial");
+        assert!(c.scheme_policies.contains_key("initial"));
+    }
+    #[test]
     fn legacy_delta_policy_migration_is_idempotent_and_narrow() {
         let mut c = bundled();
         c.scheme_policies.get_mut(DELTA_SCHEME).unwrap().gpu_paths =
@@ -1055,10 +1332,12 @@ mod tests {
             c.scheme_policies[DELTA_SCHEME].gpu_paths,
             ["SM75", "SM86", "SM89"]
         );
-        assert!(!c.supports_series(&c.default_scheme, 2));
+        assert!(c.supports_series(&c.default_scheme, 2));
         c.scheme_policies.get_mut(DELTA_SCHEME).unwrap().gpu_paths = vec!["SM86".into()];
         c.enable_legacy_delta_sm89();
-        assert!(!c.supports_series(DELTA_SCHEME, 2));
+        // Hardware hints must never gate a user's explicit scheme selection.
+        assert_eq!(c.scheme_policies[DELTA_SCHEME].gpu_paths, ["SM86"]);
+        assert!(c.supports_series(DELTA_SCHEME, 2));
     }
     #[test]
     fn transfusion_routes_are_single_exact_proxy_and_independent_json() {
@@ -1121,7 +1400,7 @@ mod tests {
             .unwrap()
             .name = crate::rtxmfg::CONFIG.into();
         assert!(invalid.validate().is_err());
-        assert!(!c.supports_series("rtx40mfg-1.3.3-hf2", 0));
+        assert!(c.supports_series("rtx40mfg-1.3.3-hf2", 0));
         assert!(c.supports_series("rtx40mfg-1.3.3-hf2", 2));
     }
     #[test]
@@ -1196,6 +1475,23 @@ mod tests {
                 }
             }
         }
+    }
+    #[test]
+    fn schema3_offline_start_does_not_regress_to_the_previous_clients_cache() {
+        let root = tempfile::tempdir().unwrap();
+        let old = include_bytes!("../../tests/fixtures/catalog429/catalog.json");
+        fs::write(root.path().join("cloud-catalog.json"), old).unwrap();
+        assert_eq!(cached_at(root.path()).revision, bundled().revision);
+        assert_eq!(
+            fs::read(root.path().join("cloud-catalog.json")).unwrap(),
+            old
+        );
+        let mut next = bundled();
+        next.prefer_github = true;
+        core::atomic_json(&root.path().join("cloud-catalog-v3.json"), &next).unwrap();
+        assert_eq!(cached_at(root.path()).schema, 3);
+        fs::write(root.path().join("cloud-catalog-v3.json"), b"broken").unwrap();
+        assert_eq!(cached_at(root.path()).revision, bundled().revision);
     }
     #[test]
     fn reject_invalid_catalog_and_urls() {

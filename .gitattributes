@@ -3,4 +3,7 @@
 /tests/fixtures/catalog*/index.json -text
 /cloud/indexes/*.json -text
 /cloud/catalog.json -text
+/cloud/v3/indexes/*.json -text
+/cloud/v3/catalog.json -text
+/cloud/help.json -text
 /update.json -text

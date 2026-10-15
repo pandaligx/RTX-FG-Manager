@@ -6,12 +6,14 @@ use rtx_fg_manager::{cleanup, core, presets};
 use std::collections::BTreeMap;
 use std::{fs, path::Path};
 #[test]
-fn compact_catalog_expands_three_schemes_and_checks_index() -> Result<()> {
+fn compact_catalog_retains_three_policies_and_hides_retired_initial_scheme() -> Result<()> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/catalog420");
     let bytes = fs::read(root.join("catalog.json"))?;
     let index = fs::read(root.join("index.json"))?;
     let c = serde_json::from_slice::<cloud::CompactCatalog>(&bytes)?.expand(&index)?;
-    assert_eq!(c.schemes().len(), 3);
+    assert_eq!(c.schemes().len(), 2);
+    assert_eq!(c.scheme_policies.len(), 3);
+    assert!(c.schemes().iter().all(|p| p.scheme_id != "initial"));
     assert_eq!(c.packages.len(), 13);
     assert_eq!(c.default_scheme, "upstream-0.3.5-310-9");
     assert_eq!(c.proxies("initial"), vec!["version.dll"]);

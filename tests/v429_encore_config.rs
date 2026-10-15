@@ -11,7 +11,7 @@ fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults
     encore::validate_cloud_config(encore::DEFAULT_CONFIG).unwrap();
     let read = encore::read(encore::DEFAULT_CONFIG).unwrap();
     assert_eq!(read, encore::defaults());
-    assert_eq!(encore::fields().len(), 88);
+    assert_eq!(encore::fields().len(), 95);
     assert_eq!(read["menuKey"], "45");
     assert_eq!(read["nrOpenFastProjection"], "1");
     assert_eq!(read["nrFastProcessing"], "1");
@@ -24,11 +24,11 @@ fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults
 }
 
 #[test]
-fn open_engine_controls_keep_values_but_disable_unsupported_rtx20() {
+fn gpu_detection_does_not_gate_explicit_parameter_selection() {
     let mut settings = encore::defaults();
     settings.insert("nrEnabled".into(), "1".into());
     settings.insert("nrEngine".into(), "opendlss".into());
-    assert!(!encore::field_enabled("nrOpenBackend", &settings, Some(0)));
+    assert!(encore::field_enabled("nrOpenBackend", &settings, Some(0)));
     assert!(encore::field_enabled("nrOpenBackend", &settings, Some(1)));
     assert!(encore::field_enabled("nrOpenBackend", &settings, Some(2)));
     assert_eq!(settings["nrEngine"], "opendlss");
@@ -51,12 +51,12 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
             out.insert(path.clone());
         }
     }
-    // This is the verbatim JSONC emitted by the signed beta.2 DLL in an isolated
+    // This is the verbatim JSONC emitted by the signed rc.3 DLL in an isolated
     // no-window host, not a configuration synthesized from our field metadata.
     let captured = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG).unwrap();
     let mut actual = std::collections::BTreeSet::new();
     leaves(&captured.value, &mut Vec::new(), &mut actual);
-    assert_eq!(actual.len(), 89);
+    assert_eq!(actual.len(), 96);
     let represented: std::collections::BTreeSet<_> =
         encore::fields().iter().map(|f| f.path.clone()).collect();
     let absent: Vec<_> = actual.difference(&represented).cloned().collect();
@@ -250,7 +250,7 @@ fn hotkey_grammar_and_dependencies_are_shared_with_the_ui() {
     assert!(!encore::field_enabled("nrPrecision", &v, None));
     assert!(!encore::field_enabled("nrPass3Style", &v, None));
     assert!(encore::field_enabled("smoothMotionEnabled", &v, Some(1)));
-    assert!(!encore::field_enabled("smoothMotionEnabled", &v, Some(0)));
+    assert!(encore::field_enabled("smoothMotionEnabled", &v, Some(0)));
 }
 
 #[test]

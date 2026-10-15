@@ -50,7 +50,9 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
         serde_json::from_slice(&fs::read(folder.join("catalog.json"))?)?;
     let c = compact.expand(&fs::read(folder.join("index.json"))?)?;
     assert_eq!(c.packages.len(), 20);
-    assert_eq!(c.schemes().len(), 5);
+    assert_eq!(c.schemes().len(), 4);
+    assert_eq!(c.scheme_policies.len(), 5); // Retired initial scheme stays readable for recovery.
+    assert!(c.schemes().iter().all(|p| p.scheme_id != "initial"));
     assert_eq!(c.default_scheme, "upstream-0.3.5-310-9");
     assert_eq!(c.proxies(SCHEME), ["version.dll"]);
     assert_eq!(c.proxies("rtxfg-0.3.5-dx12-vulkan").len(), 6);
@@ -77,8 +79,13 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
     for (id, old) in &c.scheme_policies {
         let new = &current.scheme_policies[id];
         assert_eq!(new.gpu_paths, old.gpu_paths, "{id}");
-        assert_eq!(new.parameter_profile, old.parameter_profile, "{id}");
-        assert_eq!(new.max_selected_proxies, old.max_selected_proxies, "{id}");
+        if id == &current.default_scheme {
+            assert_eq!(new.parameter_profile, "upstream040");
+            assert_eq!(new.max_selected_proxies, 1);
+        } else {
+            assert_eq!(new.parameter_profile, old.parameter_profile, "{id}");
+            assert_eq!(new.max_selected_proxies, old.max_selected_proxies, "{id}");
+        }
     }
     let unchanged = c
         .packages
@@ -91,6 +98,9 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
         let sorted = |p: &cloud::Package| -> Result<serde_json::Value> {
             let mut p = p.clone();
             p.files.sort_by(|a, b| a.name.cmp(&b.name));
+            // Schema 3 makes the legacy download URLs explicit; bytes and
+            // deployment identities remain unchanged.
+            p.urls.clear();
             Ok(serde_json::to_value(p)?)
         };
         assert_eq!(sorted(new)?, sorted(old)?);

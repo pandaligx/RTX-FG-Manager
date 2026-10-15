@@ -136,6 +136,9 @@ pub struct Parameter {
     pub choices: Vec<(&'static str, &'static str)>,
 }
 pub fn parameters(profile: &str) -> Vec<Parameter> {
+    if profile == crate::upstream040::PROFILE {
+        return crate::upstream040::parameters();
+    }
     if profile == crate::encore::PROFILE {
         return crate::encore::fields()
             .iter()
@@ -259,6 +262,7 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
         matches!(
             profile,
             "upstream035"
+                | crate::upstream040::PROFILE
                 | "upstream031"
                 | "native026"
                 | "initial"
@@ -331,6 +335,9 @@ pub fn defaults(profile: &str, overrides: &Values) -> Values {
     values
 }
 pub fn configure(bytes: &[u8], profile: &str, values: &Values) -> Result<Vec<u8>> {
+    if profile == crate::upstream040::PROFILE {
+        return crate::upstream040::configure(bytes, values);
+    }
     if profile == crate::encore::PROFILE {
         return crate::encore::configure(bytes, values);
     }

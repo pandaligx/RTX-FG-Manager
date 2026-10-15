@@ -348,11 +348,20 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
     }))
 }
 fn is_log(name: &str) -> bool {
-    ["loader_", "backend_", "native_"].iter().any(|p| {
-        name.strip_prefix(p)
-            .and_then(|n| n.strip_suffix(".jsonl"))
-            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
-    })
+    if name
+        .strip_prefix("ngx_log_")
+        .and_then(|s| s.strip_suffix(".txt"))
+        .is_some_and(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return true;
+    }
+    ["loader_", "backend_", "native_", "frames_"]
+        .iter()
+        .any(|p| {
+            name.strip_prefix(p)
+                .and_then(|n| n.strip_suffix(".jsonl"))
+                .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        })
 }
 fn cache_owned(path: &Path, name: &str) -> Result<bool> {
     if !path.is_file() || path.metadata()?.len() > 128 * 1024 * 1024 {
@@ -449,7 +458,7 @@ fn scan_encore_logs(
     static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
     let rotated = ROTATED.get_or_init(|| {
         regex::Regex::new(
-            r"^rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log$",
+            r"^(rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}(\.crash)?\.log)$",
         )
         .expect("fixed Encore session-log pattern")
     });
@@ -497,6 +506,7 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     core::assert_target_stopped(&target)?;
     crate::encore_upgrade::recover_locked(&target)?;
     crate::rtxmfg_upgrade::recover_locked(&target)?;
+    crate::upstream040_upgrade::recover_locked(&target)?;
     let root = core::no_links(&dir.join(OWN))?;
     let journal = core::no_links(&dir.join(".rtx-fg-v3-legacy.json"))?;
     let legacy = legacy_identity(&journal)?;
@@ -563,6 +573,24 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         }
         kept.insert(q);
     }
+    if record.backend == crate::upstream040::BACKEND {
+        for name in crate::upstream040::COMPONENTS {
+            let path = core::no_links(&dir.join(name))?;
+            if path.is_file()
+                && record
+                    .hashes
+                    .get(name)
+                    .is_some_and(|h| core::digest(&path).is_ok_and(|actual| &actual == h))
+            {
+                targets.insert(path.clone(), core::digest(&path)?);
+            } else if path.exists() {
+                kept.insert(path.clone());
+            }
+            if let Some(parent) = path.parent() {
+                dirs.insert(parent.to_path_buf());
+            }
+        }
+    }
     let helper = core::no_links(&dir.join(HELPER))?;
     if helper.exists() {
         if helper.is_file() && known_helper(&helper)? {
@@ -609,6 +637,14 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         scan_encore_logs(dir, &mut kept, &mut targets, &mut dirs)?;
     }
     if record.backend == crate::rtxmfg::BACKEND {
+        if let Some(expected) = record.hashes.get(crate::rtxmfg::NOTICES) {
+            let notice = core::no_links(&dir.join(crate::rtxmfg::NOTICES))?;
+            if notice.is_file() && core::digest(&notice)? == *expected {
+                targets.insert(notice, expected.clone());
+            } else if notice.exists() {
+                kept.insert(notice);
+            }
+        }
         for path in crate::rtxmfg::log_paths(&p) {
             let path = core::no_links(&path)?;
             if path.is_file() && path.metadata()?.len() <= 128 * 1024 * 1024 {
@@ -621,8 +657,11 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         .into_iter()
         .collect();
     let mut stage_pending = Vec::new();
-    for name in core::deployment_names(&record.backend, &record.selected())? {
-        let n = format!("{name}.stage");
+    if record.backend == crate::rtxmfg::BACKEND && record.selected() == [crate::mfg_plugin::ENTRY] {
+        allowed.insert(crate::mfg_plugin::JOURNAL.into());
+    }
+    for name in record.hashes.keys() {
+        let n = core::stage_name(name);
         allowed.insert(n.clone());
         let candidate = root.join(&n);
         let checked = (|| -> Result<Option<(PathBuf, String)>> {
@@ -632,13 +671,13 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
             }
             ensure!(stage.is_file(), "临时文件不是普通文件");
             let h = core::digest(&stage)?;
-            if record.hashes.get(&name) != Some(&h) {
+            if record.hashes.get(name) != Some(&h) {
                 // Cloud-only packages have no embedded source. An unverifiable
                 // fragment must not block removal of independently owned DLLs.
                 let package = core::package(&record.backend, &record.selected())?;
-                let bytes = package.get(&name).context("缺少匹配的临时文件安装源")?;
+                let bytes = package.get(name).context("缺少匹配的临时文件安装源")?;
                 ensure!(
-                    record.hashes.get(&name) == Some(&core::hash(bytes))
+                    record.hashes.get(name) == Some(&core::hash(bytes))
                         && stage.metadata()?.len() <= bytes.len() as u64
                         && bytes.starts_with(&fs::read(&stage)?),
                     "临时文件不完整且安装源已变化，请恢复原安装源后重试"
@@ -733,14 +772,7 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         core::atomic_json(&root.join(MARKER), &record)?;
     }
     let mut ordered = targets.keys().cloned().collect::<Vec<_>>();
-    ordered.sort_by_key(|q| {
-        (
-            !(q.parent() == Some(dir)
-                && q.file_name()
-                    .is_some_and(|n| PROXIES.iter().any(|p| n == *p))),
-            q.clone(),
-        )
-    });
+    ordered.sort_by_key(|q| (!PROXIES.iter().any(|p| *q == dir.join(p)), q.clone()));
     for q in ordered {
         core::no_links(&q)?;
         ensure!(
@@ -791,6 +823,9 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         });
     }
     let marker = core::no_links(&root.join(MARKER))?;
+    if record.backend == crate::rtxmfg::BACKEND && record.selected() == [crate::mfg_plugin::ENTRY] {
+        crate::mfg_plugin::restore_locked(&target)?;
+    }
     let bytes = fs::read(&marker)?;
     fs::remove_file(&marker)?;
     if fs::read_dir(&root)?.next().is_none()

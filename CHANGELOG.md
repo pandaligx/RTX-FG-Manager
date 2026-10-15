@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.3.0 (candidate, unreleased)
+
+- dlssg_for_sm86 0.4.0, MFG Unlocker 1.5.0 and RTX Encore rc.3, retaining legacy schemes and managed configuration migration.
+- Transactional component deployment, dedicated proxies/ASI, exclusive OptiScaler 10 plugin mode with conditional restoration, and game-owned log cleanup.
+- Advisory GPU detection with unrestricted scheme selection and manual legacy component choice.
+- Retire the first-release installation option while preserving legacy recognition and cleanup; interactive web help covers all six remaining schemes.
+- Separate Player configurations entry with simplified sharing; local settings, named configurations, selected import diffs, exact-byte undo and operation history remain under Preset parameters.
+- Independently updated offline HTML help with WebView2 and browser fallback.
+- Independent signed community identities; match only GPU model and driver version, then working confirmations and likes. Refresh every 30 seconds, with publication preview, revision-specific interactions and moderation.
+- GitCode domestic resources, GitHub fallback and Gitee transition; older client metadata remains compatible.
+
+Release follows combined acceptance and publisher signing. These changes do not establish game/GPU performance or anti-cheat compatibility.
+
 ## 4.2.9
 
 Adapt [RTX MFG 1.4.2](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.2) and [RTX Encore 1.0.0-beta.2](https://github.com/SilyNoMeta/rtx-encore), which succeeds DLSSG-Transfusion 1.4.5.3. Existing scheme identities and per-game selections are retained.

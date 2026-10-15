@@ -1384,5 +1384,191 @@
     "Поддерживает сочетания Ctrl/Alt/Shift/Win. Разделяйте варианты запятыми; пустое значение отключает действие.",
     "Ctrl/Alt/Shift/Winの組み合わせに対応します。複数候補はカンマで区切り、空欄で操作を無効にします。",
     "Ctrl/Alt/Shift/Win 조합을 지원합니다. 여러 조합은 쉼표로 구분하며 비워 두면 해당 동작이 꺼집니다."
+  ],
+  "DLL 默认": [
+    "DLL default",
+    "По умолчанию DLL",
+    "DLL の既定",
+    "DLL 기본값"
+  ],
+  "DLSS 帧生成预设": [
+    "DLSS FG preset",
+    "Пресет DLSS FG",
+    "DLSS FG プリセット",
+    "DLSS FG 프리셋"
+  ],
+  "DLSS 超分预设": [
+    "DLSS SR preset",
+    "Пресет DLSS SR",
+    "DLSS SR プリセット",
+    "DLSS SR 프리셋"
+  ],
+  "光线重建预设": [
+    "Ray Reconstruction preset",
+    "Пресет реконструкции лучей",
+    "Ray Reconstruction プリセット",
+    "레이 재구성 프리셋"
+  ],
+  "FG Lite 诊断覆盖": [
+    "FG Lite diagnostic override",
+    "Диагностическое переопределение FG Lite",
+    "FG Lite 診断用上書き",
+    "FG Lite 진단 재정의"
+  ],
+  "强制 Vulkan Smooth Motion": [
+    "Force Vulkan Smooth Motion",
+    "Принудительный Vulkan Smooth Motion",
+    "Vulkan Smooth Motion を強制",
+    "Vulkan Smooth Motion 강제"
+  ],
+  "图形初始化日志": [
+    "Graphics initialization log",
+    "Журнал инициализации графики",
+    "グラフィックス初期化ログ",
+    "그래픽 초기화 로그"
+  ],
+  "详细 Streamline 日志": [
+    "Verbose Streamline logging",
+    "Подробный журнал Streamline",
+    "詳細な Streamline ログ",
+    "상세 Streamline 로그"
+  ],
+  "跟随游戏 / 预设": [
+    "Follow game / preset",
+    "Следовать игре / пресету",
+    "ゲーム / プリセットに従う",
+    "게임 / 프리셋 따르기"
+  ],
+  "关闭": [
+    "Off",
+    "Выкл.",
+    "オフ",
+    "끄기"
+  ],
+  "开启": [
+    "On",
+    "Вкл.",
+    "オン",
+    "켜기"
+  ],
+  "C 自动开启 Lite，需要上游支持的 310.9.16.0；有画质取舍。B 需要游戏提供无 HUD/UI 输入；需要重启。": [
+    "C enables Lite and requires qualified 310.9.16.0, with quality trade-offs. B needs HUD-less/UI inputs. Restart required.",
+    "C включает Lite и требует поддерживаемую 310.9.16.0; возможна потеря качества. B требует входов без HUD/UI. Нужен перезапуск.",
+    "C は Lite を有効にし、対応する 310.9.16.0 が必要です。画質への影響があります。B は HUD なし / UI 入力が必要。再起動が必要です。",
+    "C는 Lite를 켜며 지원되는 310.9.16.0이 필요하고 화질 손실이 있을 수 있습니다. B는 HUD 없는 화면 / UI 입력이 필요합니다. 재시작 필요."
+  ],
+  "不会自动开启光线重建。驱动覆盖或模型回退可能优先生效；需要重启。": [
+    "Does not enable Ray Reconstruction. Driver overrides or model fallback may take precedence. Restart required.",
+    "Не включает реконструкцию лучей. Настройки драйвера или резервная модель могут иметь приоритет. Нужен перезапуск.",
+    "Ray Reconstruction 自体は有効になりません。ドライバー設定やモデルのフォールバックが優先される場合があります。再起動が必要。",
+    "레이 재구성을 자동으로 켜지 않습니다. 드라이버 설정이나 대체 모델이 우선할 수 있습니다. 재시작 필요."
+  ],
+  "仅诊断使用，通常保持跟随预设。Lite 下帧保护、保护策略及 UI 重组不生效；需要重启。": [
+    "Diagnostics only; normally follow the preset. Frame protection, protection tuning and UI recomposition are unavailable in Lite. Restart required.",
+    "Только диагностика; обычно следуйте пресету. В Lite недоступны защита кадров, её настройка и перекомпоновка UI. Нужен перезапуск.",
+    "診断専用。通常はプリセットに従ってください。Lite ではフレーム保護、保護調整、UI 再合成は無効です。再起動が必要。",
+    "진단 전용이며 보통 프리셋을 따르세요. Lite에서는 프레임 보호, 보호 조정, UI 재구성이 작동하지 않습니다. 재시작 필요."
+  ],
+  "保留1到100份常规会话日志及相同数量的异常日志；补丁启动时保留仍占用的文件。": [
+    "Keep 1–100 session logs and the same number of exception logs. Files still in use are preserved at startup.",
+    "Хранить 1–100 журналов сеансов и столько же журналов исключений. Занятые файлы сохраняются при запуске.",
+    "セッションログと同数の例外ログを各 1～100 件保持。起動時に使用中のファイルは保持します。",
+    "세션 로그와 같은 수의 예외 로그를 각각 1~100개 보관합니다. 시작 시 사용 중인 파일은 보존합니다."
+  ],
+  "减少生成帧撕裂和重影；Lite 模式下不生效。需要重启。": [
+    "Reduce tearing and ghosting in generated frames. Unavailable in Lite. Restart required.",
+    "Уменьшает разрывы и шлейфы в сгенерированных кадрах. Не работает в Lite. Нужен перезапуск.",
+    "生成フレームのティアリングや残像を抑えます。Lite では無効。再起動が必要。",
+    "생성 프레임의 찢어짐과 잔상을 줄입니다. Lite에서는 작동하지 않습니다. 재시작 필요."
+  ],
+  "忽略游戏 NVIDIA 配置中的排除项；可能产生异常。仅 Vulkan，需要重启。": [
+    "Ignore exclusions in the game NVIDIA profile; unexpected results are possible. Vulkan only. Restart required.",
+    "Игнорировать исключения профиля NVIDIA игры; возможны ошибки. Только Vulkan. Нужен перезапуск.",
+    "ゲームの NVIDIA プロファイルの除外指定を無視します。予期しない結果の可能性があります。Vulkan 専用、再起動が必要。",
+    "게임 NVIDIA 프로필의 제외 설정을 무시하며 예기치 않은 결과가 생길 수 있습니다. Vulkan 전용, 재시작 필요."
+  ],
+  "记录图形创建、交换链和窗口调整。诊断启动崩溃时在启动前开启，日常关闭。": [
+    "Trace graphics creation, swapchains and resizing. Enable before launch for startup diagnostics; normally leave off.",
+    "Запись создания графики, цепочек обмена и размеров окна. Включите перед запуском для диагностики; обычно выключено.",
+    "グラフィックス作成、スワップチェーン、リサイズを記録。起動時の診断では起動前に有効化。通常はオフ。",
+    "그래픽 생성, 스왑체인, 크기 변경을 기록합니다. 시작 오류 진단 시 실행 전에 켜고 평소에는 끄세요."
+  ],
+  "详细记录 Streamline 和 NGX；可能降低性能。收集后关闭并重启游戏。": [
+    "Verbose Streamline and NGX logs may reduce performance. Disable after collection and restart the game.",
+    "Подробные журналы Streamline и NGX могут снижать производительность. После сбора отключите и перезапустите игру.",
+    "Streamline と NGX の詳細ログは性能に影響する場合があります。収集後は無効化しゲームを再起動してください。",
+    "Streamline 및 NGX 상세 로그는 성능을 낮출 수 있습니다. 수집 후 끄고 게임을 재시작하세요."
+  ],
+  "选择模型不会改变分辨率。实际模型取决于 DLL、驱动和游戏；需要重启。": [
+    "Model selection does not change resolution. The actual model depends on the DLL, driver and game. Restart required.",
+    "Выбор модели не меняет разрешение. Модель зависит от DLL, драйвера и игры. Нужен перезапуск.",
+    "モデル選択は解像度を変更しません。実際のモデルは DLL、ドライバー、ゲームに依存します。再起動が必要。",
+    "모델 선택은 해상도를 바꾸지 않습니다. 실제 모델은 DLL, 드라이버, 게임에 따라 달라집니다. 재시작 필요."
+  ],
+  "降低生成帧 GPU 开销，与 FG 预设独立；仅启用当前 Normal/Lite 模式可用的优化。需要重启。": [
+    "Lower generated-frame GPU cost, independently of the FG preset. Uses only optimizations available for Normal/Lite. Restart required.",
+    "Снижает нагрузку GPU независимо от пресета FG. Использует оптимизации, доступные в Normal/Lite. Нужен перезапуск.",
+    "FG プリセットと独立して生成フレームの GPU 負荷を軽減。Normal/Lite で利用可能な最適化のみ使用。再起動が必要。",
+    "FG 프리셋과 별개로 생성 프레임 GPU 부하를 줄입니다. Normal/Lite에서 가능한 최적화만 사용합니다. 재시작 필요."
+  ],
+  "A": [
+    "A",
+    "A",
+    "A",
+    "A"
+  ],
+  "B": [
+    "B",
+    "B",
+    "B",
+    "B"
+  ],
+  "C": [
+    "C",
+    "C",
+    "C",
+    "C"
+  ],
+  "D": [
+    "D",
+    "D",
+    "D",
+    "D"
+  ],
+  "E": [
+    "E",
+    "E",
+    "E",
+    "E"
+  ],
+  "F": [
+    "F",
+    "F",
+    "F",
+    "F"
+  ],
+  "J": [
+    "J",
+    "J",
+    "J",
+    "J"
+  ],
+  "K": [
+    "K",
+    "K",
+    "K",
+    "K"
+  ],
+  "L": [
+    "L",
+    "L",
+    "L",
+    "L"
+  ],
+  "M": [
+    "M",
+    "M",
+    "M",
+    "M"
   ]
 }

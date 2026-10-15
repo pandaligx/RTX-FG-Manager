@@ -138,6 +138,27 @@ pub fn edit_ini(bytes: &[u8], section: &str, key: &str, value: &str) -> Result<V
     }
     Ok(encode_ini(&lines.concat(), encoding))
 }
+/// Remove exactly one key without rewriting unrelated lines or changing encoding.
+pub fn remove_ini_key(bytes: &[u8], section: &str, key: &str) -> Result<Vec<u8>> {
+    let (text, encoding) = decode_ini(bytes)?;
+    ini_value(&text, section, key)?; // Reject ambiguous duplicate sections/keys.
+    let mut inside = false;
+    let mut result = String::new();
+    for line in text.split_inclusive('\n') {
+        let s = line.trim();
+        if s.starts_with('[') && s.ends_with(']') {
+            inside = s[1..s.len() - 1].trim().eq_ignore_ascii_case(section);
+        } else if inside
+            && !s.starts_with([';', '#'])
+            && s.split_once('=')
+                .is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(key))
+        {
+            continue;
+        }
+        result.push_str(line);
+    }
+    Ok(encode_ini(&result, encoding))
+}
 pub fn game_level(exe: &Path) -> Result<Option<u8>> {
     let path = core::location(exe, false)?
         .parent()

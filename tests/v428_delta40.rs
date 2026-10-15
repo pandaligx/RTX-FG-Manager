@@ -4,12 +4,12 @@ use serde_json::json;
 use std::{collections::BTreeMap, path::Path};
 
 #[test]
-fn bundled_and_existing_online_catalogs_enable_only_delta_sm89() -> Result<()> {
+fn free_scheme_selection_preserves_delta_capability_validation() -> Result<()> {
     let c = cloud::bundled();
     c.validate()?;
     assert!(c.supports_series(cloud::DELTA_SCHEME, 2));
     assert_eq!(c.proxies(cloud::DELTA_SCHEME).len(), 6);
-    assert!(!c.supports_series(&c.default_scheme, 2));
+    assert!(c.supports_series(&c.default_scheme, 2));
     let index = serde_json::to_vec(&json!({"schema":1,"packages":c.packages}))?;
     let schemes = c.schemes().iter().map(|p| {
         let policy = &c.scheme_policies[&p.scheme_id];
@@ -17,7 +17,7 @@ fn bundled_and_existing_online_catalogs_enable_only_delta_sm89() -> Result<()> {
             "defaults":policy.defaults,"capabilities":policy.capabilities,
             "archives":c.packages.iter().filter(|q| q.scheme_id == p.scheme_id).map(|q| &q.archive).collect::<Vec<_>>()})
     }).collect::<Vec<_>>();
-    let compact = json!({"schema":2,"revision":c.revision,"default_scheme":c.default_scheme,
+    let compact = json!({"schema":3,"revision":c.revision,"default_scheme":c.default_scheme,
         "sources":c.sources,"schemes":schemes,"index":{
         "url":"https://gitee.com/pandaligx/RTX-FG-Manager/raw/main/index.json",
         "fallback_url":"https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/index.json",
@@ -25,7 +25,7 @@ fn bundled_and_existing_online_catalogs_enable_only_delta_sm89() -> Result<()> {
     let expanded =
         serde_json::from_value::<cloud::CompactCatalog>(compact.clone())?.expand(&index)?;
     assert!(expanded.supports_series(cloud::DELTA_SCHEME, 2));
-    assert!(!expanded.supports_series(&expanded.default_scheme, 2));
+    assert!(expanded.supports_series(&expanded.default_scheme, 2));
     let mut no_capability = compact;
     for scheme in no_capability["schemes"].as_array_mut().unwrap() {
         if scheme["id"] == cloud::DELTA_SCHEME {
@@ -34,14 +34,13 @@ fn bundled_and_existing_online_catalogs_enable_only_delta_sm89() -> Result<()> {
     }
     let expanded =
         serde_json::from_value::<cloud::CompactCatalog>(no_capability)?.expand(&index)?;
-    assert!(!expanded.supports_series(cloud::DELTA_SCHEME, 2));
+    assert!(expanded.supports_series(cloud::DELTA_SCHEME, 2));
     let mut invalid = c.clone();
     invalid
         .scheme_policies
-        .get_mut(&c.default_scheme)
+        .get_mut(cloud::DELTA_SCHEME)
         .unwrap()
-        .gpu_paths
-        .push("SM89".into());
+        .parameter_profile = "upstream040".into();
     assert!(invalid.validate().is_err());
     let mut invalid = c;
     invalid

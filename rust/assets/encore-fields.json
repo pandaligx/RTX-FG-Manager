@@ -106,7 +106,7 @@
     "dependencies": [],
     "help": "仅RTX30且匹配受支持驱动；与DLSS帧生成是不同功能。",
     "optional": false,
-    "source_help": "Driver Smooth Motion for RTX 30, with the NVIDIA 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply."
+    "source_help": "Driver Smooth Motion for RTX 30, with the NVIDIA 620.12, 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply."
   },
   {
     "key": "smoothMotionApi",
@@ -228,7 +228,7 @@
     "dependencies": [],
     "help": "0跟随游戏；限制实际渲染帧，不是插帧后的显示帧。",
     "optional": false,
-    "source_help": "0 follows the game's Reflex frame limit; 1-1000 requests a render-frame cap. Requires a supported Reflex plugin. Applied at its owning options/sleep boundary."
+    "source_help": "0 restores the game's Reflex settings; 1-1000 requests a Reflex FPS limit. FG may count toward it depending on the game/driver. Applied on options updates or the next available Reflex sleep boundary."
   },
   {
     "key": "vsyncOff",
@@ -1507,9 +1507,9 @@
     "choices": [],
     "restart": true,
     "dependencies": [],
-    "help": "修改此项会调整生成帧保护；不确定时保留上游默认。",
+    "help": "减少生成帧撕裂和重影；Lite 模式下不生效。需要重启。",
     "optional": false,
-    "source_help": "Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). Restart the game to apply."
+    "source_help": "Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). No effect with Lite composition. Restart the game to apply."
   },
   {
     "key": "fastFrameGeneration",
@@ -1526,9 +1526,9 @@
     "choices": [],
     "restart": true,
     "dependencies": [],
-    "help": "修改此项会调整快速帧生成；不确定时保留上游默认。",
+    "help": "降低生成帧 GPU 开销，与 FG 预设独立；仅启用当前 Normal/Lite 模式可用的优化。需要重启。",
     "optional": false,
-    "source_help": "Lowers the GPU cost of each generated frame, same image. Restart the game to apply."
+    "source_help": "Lowers the GPU cost of each generated frame, same image. Independent of the FG preset: applies to A/B Normal and C Lite using the optimizations available for each path. Restart the game to apply."
   },
   {
     "key": "protectionTuning",
@@ -1744,7 +1744,7 @@
     "dependencies": [],
     "help": "修改此项会调整性能CSV日志；不确定时保留上游默认。",
     "optional": false,
-    "source_help": "Write FPS and frame times to rtx-encore_perf.csv, in rtx-encore-logs."
+    "source_help": "Write FPS and frame times to rtx-encore_perf.csv, plus one GPU/power diagnostic sample per second in the session log (rtx-encore-logs)."
   },
   {
     "key": "logNr",
@@ -1837,9 +1837,9 @@
     "choices": [],
     "restart": false,
     "dependencies": [],
-    "help": "保留1到100份会话日志，含当前会话；启动时由模组清理旧日志。",
+    "help": "保留1到100份常规会话日志及相同数量的异常日志；补丁启动时保留仍占用的文件。",
     "optional": false,
-    "source_help": "Session logs kept in rtx-encore-logs, the current one included: 1 to 100. Older ones are deleted when the game starts."
+    "source_help": "Logs kept in rtx-encore-logs: 1 to 100 sessions plus the same number of exception logs. Active files are preserved. Older closed files are deleted at startup."
   },
   {
     "key": "hotkeyFixed2",
@@ -2216,5 +2216,249 @@
     "help": "默认Insert。游戏菜单快捷键为单个按键，不能使用Ctrl等组合。",
     "optional": true,
     "source_help": "INSERT default documented; numeric VK range 1..255 verified in beta.2 RVA 0x189659."
+  },
+  {
+    "key": "smoothMotionForce",
+    "path": [
+      "smoothMotion",
+      "smoothMotionForce"
+    ],
+    "label": "强制 Vulkan Smooth Motion",
+    "group": "frames",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [
+      "smoothMotionEnabled=1",
+      "smoothMotionApi=vulkan"
+    ],
+    "help": "忽略游戏 NVIDIA 配置中的排除项；可能产生异常。仅 Vulkan，需要重启。",
+    "optional": false,
+    "source_help": "Vulkan: run Smooth Motion even where the game's NVIDIA profile excludes it. Unexpected results are possible. Restart the game to apply."
+  },
+  {
+    "key": "dlssSrPreset",
+    "path": [
+      "dlssPresets",
+      "dlssSrPreset"
+    ],
+    "label": "DLSS 超分预设",
+    "group": "image",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏 / 预设"
+      },
+      {
+        "value": "default",
+        "label": "DLL 默认"
+      },
+      {
+        "value": "a",
+        "label": "A"
+      },
+      {
+        "value": "b",
+        "label": "B"
+      },
+      {
+        "value": "c",
+        "label": "C"
+      },
+      {
+        "value": "d",
+        "label": "D"
+      },
+      {
+        "value": "e",
+        "label": "E"
+      },
+      {
+        "value": "f",
+        "label": "F"
+      },
+      {
+        "value": "j",
+        "label": "J"
+      },
+      {
+        "value": "k",
+        "label": "K"
+      },
+      {
+        "value": "l",
+        "label": "L"
+      },
+      {
+        "value": "m",
+        "label": "M"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "选择模型不会改变分辨率。实际模型取决于 DLL、驱动和游戏；需要重启。",
+    "optional": false,
+    "source_help": "SR preset: game (no override), default, a-f (legacy), j, k, l or m. Applies to all quality modes; supported models depend on the DLSS DLL. Restart to apply."
+  },
+  {
+    "key": "dlssRrPreset",
+    "path": [
+      "dlssPresets",
+      "dlssRrPreset"
+    ],
+    "label": "光线重建预设",
+    "group": "image",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏 / 预设"
+      },
+      {
+        "value": "default",
+        "label": "DLL 默认"
+      },
+      {
+        "value": "a",
+        "label": "A"
+      },
+      {
+        "value": "b",
+        "label": "B"
+      },
+      {
+        "value": "c",
+        "label": "C"
+      },
+      {
+        "value": "d",
+        "label": "D"
+      },
+      {
+        "value": "e",
+        "label": "E"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "不会自动开启光线重建。驱动覆盖或模型回退可能优先生效；需要重启。",
+    "optional": false,
+    "source_help": "RR preset: game (no override), default, a-c (legacy), d or e. Does not enable RR. Driver/model selection may override SR/RR hints. Restart to apply."
+  },
+  {
+    "key": "dlssFgPreset",
+    "path": [
+      "dlssPresets",
+      "dlssFgPreset"
+    ],
+    "label": "DLSS 帧生成预设",
+    "group": "frames",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏 / 预设"
+      },
+      {
+        "value": "a",
+        "label": "A"
+      },
+      {
+        "value": "b",
+        "label": "B"
+      },
+      {
+        "value": "c",
+        "label": "C"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "C 自动开启 Lite，需要上游支持的 310.9.16.0；有画质取舍。B 需要游戏提供无 HUD/UI 输入；需要重启。",
+    "optional": false,
+    "source_help": "FG preset: game (no override), a, b or c. A/B use Normal; C automatically enables Lite (faster, with image-quality trade-offs) and needs 310.9.16.0. Fast frame generation remains independent for every preset. Qualified NVIDIA releases 310.6.0.0, 310.7.0.0, 310.7.128.0, 310.7.129.0, 310.8.0.0, 310.9.0.0, 310.9.1.0 and 310.9.16.0; unknown binaries are untouched and logged. B needs compatible HUD-less/UI inputs. Lite keeps NVIDIA's native image policy: frameProtection, protectionTuning and UI recomposition are unavailable. No driver-profile writes. Restart to apply."
+  },
+  {
+    "key": "dlssFgLite",
+    "path": [
+      "dlssPresets",
+      "dlssFgLite"
+    ],
+    "label": "FG Lite 诊断覆盖",
+    "group": "system",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏 / 预设"
+      },
+      {
+        "value": "off",
+        "label": "关闭"
+      },
+      {
+        "value": "on",
+        "label": "开启"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "仅诊断使用，通常保持跟随预设。Lite 下帧保护、保护策略及 UI 重组不生效；需要重启。",
+    "optional": false,
+    "source_help": "Diagnostic-only JSON override; not shown as a menu setting. Leave game to follow the preset (A/B Normal, C Lite) or the game/driver. Only for diagnostics with qualified 310.9.16.0: off forces Normal, on forces Lite, taking priority over the preset. Restart to apply."
+  },
+  {
+    "key": "logGraphics",
+    "path": [
+      "diagnostics",
+      "logGraphics"
+    ],
+    "label": "图形初始化日志",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "记录图形创建、交换链和窗口调整。诊断启动崩溃时在启动前开启，日常关闭。",
+    "optional": false,
+    "source_help": "Trace graphics creation, COM interface upgrades, swapchain lifetime, initial presentation and resize. Applied live; enable before launch for startup crashes."
+  },
+  {
+    "key": "logStreamline",
+    "path": [
+      "diagnostics",
+      "logStreamline"
+    ],
+    "label": "详细 Streamline 日志",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "详细记录 Streamline 和 NGX；可能降低性能。收集后关闭并重启游戏。",
+    "optional": false,
+    "source_help": "Extra verbose Streamline and NGX messages. Basic messages and failure reasons are logged automatically. Restart required; disable and restart after collecting the log. May reduce performance."
   }
 ]

@@ -3652,5 +3652,83 @@
     "- Меню открывается при первом запуске; перенос настроек сохраняет изменённую клавишу. 5X/6X экспериментальны, динамический режим по умолчанию ограничен 4X.\n- Transfusion, установленный менеджером: сохраните запись игры и нажмите **Установить и применить**. Не удаляйте его заранее, чтобы не потерять настройки. При сбое следуйте подсказкам восстановления.\n- **NR по умолчанию выключен**: поместите свой `nvngx_dlssnr.dll` **310.8.0** рядом с модом и включите DLSS SR/DLAA. Open не поддерживает RTX20; NR может увеличить время GPU и расход VRAM.\n- **Smooth Motion по умолчанию выключен**: только RTX30 и драйверы **617.42/617.14/616.92/616.64**; автор проверил в игре только 617.14. Выберите реальный API DX11/DX12/Vulkan и перезапустите игру. Расчётный FPS не доказывает интерполяцию. [Подробнее](https://github.com/SilyNoMeta/rtx-encore)",
     "- 初回起動時にメニューが開きます。移行した設定では変更済みのキーを保持します。5X/6Xは実験段階で、動的モードは標準で最大4Xです。\n- 管理ツールで導入した旧Transfusionは、ゲーム項目を残して**インストールして適用**で更新します。設定を失うため先に削除しないでください。失敗時は復旧案内に従います。\n- **NRは標準でオフ**：自分で用意した `nvngx_dlssnr.dll` **310.8.0** をMODの隣に置き、DLSS SR/DLAAを有効にします。OpenはRTX20非対応で、NRはGPU時間やVRAMを増やすことがあります。\n- **Smooth Motionは標準でオフ**：RTX30専用、ドライバーは **617.42/617.14/616.92/616.64** のみ。上流でのゲーム検証は617.14のみです。実際のDX11/DX12/Vulkanを選んで再起動してください。推定FPSは補間成功の証明ではありません。[詳細](https://github.com/SilyNoMeta/rtx-encore)",
     "- 첫 실행 시 메뉴가 열리며 이전 설정에서 바꾼 키는 유지됩니다. 5X/6X는 실험적이며 동적 모드는 기본 최대 4X입니다.\n- 관리기로 설치한 기존 Transfusion은 게임 항목을 유지하고 **설치 및 적용**으로 업데이트하세요. 설정을 잃지 않도록 먼저 제거하지 마세요. 실패 시 복구 안내를 따르세요.\n- **NR은 기본 꺼짐**: 직접 준비한 `nvngx_dlssnr.dll` **310.8.0**을 모드 옆에 두고 DLSS SR/DLAA를 켜세요. Open은 RTX20을 지원하지 않으며 NR은 GPU 시간과 VRAM을 늘릴 수 있습니다.\n- **Smooth Motion은 기본 꺼짐**: RTX30 전용이며 드라이버는 **617.42/617.14/616.92/616.64**만 허용합니다. 상위 프로젝트의 게임 검증은 617.14뿐입니다. 실제 DX11/DX12/Vulkan을 선택하고 재시작하세요. 예상 FPS는 실제 보간을 입증하지 않습니다. [자세히](https://github.com/SilyNoMeta/rtx-encore)"
+  ],
+  "首次完整下载 0.4.0 组件，六种代理只安装一个入口。默认 Optimized=2，SR 关闭；升级时保留已有设置。": [
+    "Install all 0.4.0 components and choose one of six matching proxies. Defaults: Optimized=2, SR off. Upgrades preserve existing settings.",
+    "Загрузите все компоненты 0.4.0 и выберите один из шести соответствующих прокси. По умолчанию Optimized=2, SR выключен. Обновление сохраняет настройки.",
+    "0.4.0 の全コンポーネントを取得し、6 種類から対応するプロキシを一つ選びます。初期値は Optimized=2、SR オフ。更新時は既存設定を保持します。",
+    "0.4.0 구성 요소 전체를 받고 대응하는 프록시 6개 중 하나를 선택하세요. 기본값은 Optimized=2, SR 끄기이며 업데이트 시 기존 설정을 유지합니다."
+  ],
+  "游戏完全退出后安装或应用参数。帧生成、超分与 Runtime 分别设置；选择方案不会增加游戏原本没有的图形接口支持。": [
+    "Exit the game before installing or applying settings. Frame generation, super resolution and runtime settings are separate. Choosing a patch does not add graphics API support.",
+    "Перед установкой или применением параметров закройте игру. Генерация кадров, масштабирование и Runtime настраиваются отдельно. Выбор патча не добавляет поддержку графических API.",
+    "ゲームを完全に終了してからインストールまたは設定を適用してください。フレーム生成、超解像、Runtime は個別設定です。パッチの選択で対応 API は増えません。",
+    "게임을 완전히 종료한 뒤 설치하거나 설정을 적용하세요. 프레임 생성, 초해상도와 Runtime은 별도 설정입니다. 패치를 선택해도 지원 그래픽 API가 늘어나지는 않습니다."
+  ],
+  "MFG Unlocker 使用独立 JSON。独立代理按 Backspace；OptiScaler 10 插件使用 OptiScaler 菜单。两种入口只能选择一种，管理器不会安装 OptiScaler。实际可用功能由显卡、驱动和游戏决定。": [
+    "MFG Unlocker has its own JSON. Standalone proxy: Backspace. OptiScaler 10 plugin: OptiScaler menu. Choose one mode. The manager does not install OptiScaler; features depend on the GPU, driver and game.",
+    "MFG Unlocker использует отдельный JSON. Отдельный прокси: Backspace. Плагин OptiScaler 10: меню OptiScaler. Выберите один режим. Менеджер не устанавливает OptiScaler; функции зависят от GPU, драйвера и игры.",
+    "MFG Unlocker は専用 JSON を使用します。単独プロキシは Backspace、OptiScaler 10 プラグインは OptiScaler メニューを使います。モードは一つ選択。OptiScaler は自動導入されず、機能は GPU・ドライバー・ゲームに依存します。",
+    "MFG Unlocker는 별도 JSON을 사용합니다. 독립 프록시는 Backspace, OptiScaler 10 플러그인은 OptiScaler 메뉴를 사용합니다. 한 모드만 선택하세요. OptiScaler를 자동 설치하지 않으며 기능은 GPU, 드라이버, 게임에 따라 달라집니다."
+  ],
+  "游戏详情": [
+    "Game details",
+    "Сведения об игре",
+    "ゲーム詳細",
+    "게임 상세"
+  ],
+  "概览": [
+    "Overview",
+    "Обзор",
+    "概要",
+    "개요"
+  ],
+  "配置": [
+    "Configuration",
+    "Настройки",
+    "設定",
+    "설정"
+  ],
+  "社区": [
+    "Community",
+    "Сообщество",
+    "コミュニティ",
+    "커뮤니티"
+  ],
+  "记录与恢复": [
+    "History and recovery",
+    "История и восстановление",
+    "履歴と復元",
+    "기록 및 복원"
+  ],
+  "管理器更新不会自动替换游戏补丁。可自由选择方案；检测结果仅供参考。": [
+    "Manager updates do not replace game patches automatically. Choose freely; detection is advisory.",
+    "Обновление менеджера не заменяет патчи автоматически. Выбор свободный; обнаружение носит справочный характер.",
+    "管理器の更新でゲームのパッチは自動置換されません。方式は自由に選択でき、検出結果は参考情報です。",
+    "관리기 업데이트는 게임 패치를 자동 교체하지 않습니다. 자유롭게 선택할 수 있으며 감지 결과는 참고용입니다。"
+  ],
+  "游戏内菜单：Encore 按 Insert；MFG 独立模式按 Backspace；插件模式使用 OptiScaler 菜单。": [
+    "In-game menu: Encore — Insert; standalone MFG — Backspace; plugin — OptiScaler menu.",
+    "Меню в игре: Encore — Insert; отдельный MFG — Backspace; плагин — меню OptiScaler.",
+    "ゲーム内メニュー：Encore は Insert、MFG 単独モードは Backspace、プラグインは OptiScaler メニュー。",
+    "게임 내 메뉴: Encore는 Insert, 독립 MFG는 Backspace, 플러그인은 OptiScaler 메뉴."
+  ],
+  "MFG 独立代理与已有 OptiScaler 10 插件二选一；插件安装到默认 plugins 目录，不自动安装 OptiScaler。独立菜单 Backspace，插件使用 OptiScaler 菜单。": [
+    "Choose a standalone MFG proxy or a plugin for an existing OptiScaler 10 installation. The plugin uses the default plugins folder. Menu: Backspace standalone, OptiScaler menu for the plugin.",
+    "Выберите самостоятельную прокси MFG или плагин для установленного OptiScaler 10 (стандартная папка plugins). Меню: Backspace или меню OptiScaler.",
+    "MFG 単体プロキシか、導入済み OptiScaler 10 のプラグインを選択します。標準 plugins フォルダーを使用。単体メニューは Backspace、プラグインは OptiScaler メニューです。",
+    "MFG 독립 프록시 또는 설치된 OptiScaler 10 플러그인을 선택합니다. 기본 plugins 폴더를 사용합니다. 독립 메뉴는 Backspace, 플러그인은 OptiScaler 메뉴입니다."
+  ],
+  "Encore 每次选择一个代理或 ASI；专用入口使用对应签名文件，其他入口使用主 DLL。菜单 Insert。Bink 原件须保留为 binkw64Hooked.dll 或 bink2w64Hooked.dll；入口名不增加图形 API 支持。": [
+    "Choose one Encore proxy or ASI. Dedicated entries use their matching signed files; other entries use the main DLL. Menu: Insert. Preserve original Bink files as binkw64Hooked.dll or bink2w64Hooked.dll. Renaming does not add graphics API support.",
+    "Выберите одну прокси Encore или ASI. Специальные точки входа используют отдельные подписанные файлы; остальные — основной DLL. Меню: Insert. Сохраните оригинальный Bink как binkw64Hooked.dll или bink2w64Hooked.dll. Имя не добавляет поддержку API.",
+    "Encore のプロキシまたは ASI を一つ選択します。専用エントリは対応する署名済みファイルを使用。メニューは Insert。元の Bink は binkw64Hooked.dll または bink2w64Hooked.dll として保持してください。名前変更で対応 API は増えません。",
+    "Encore 프록시 또는 ASI를 하나 선택합니다. 전용 항목은 해당 서명 파일을 사용합니다. 메뉴: Insert. 원본 Bink는 binkw64Hooked.dll 또는 bink2w64Hooked.dll로 보존하세요. 이름을 바꿔도 지원 API는 늘지 않습니다."
+  ],
+  "0.4.0 六种代理使用各自对应文件，每次安装一个入口。首次同时下载必需组件和超分组件；更换入口复用缓存。": [
+    "Each of the six 0.4.0 proxies uses its own file. Install one entry at a time. The first download includes required and super-resolution components; switching entries reuses the cache.",
+    "Каждая из шести прокси 0.4.0 использует отдельный файл. Устанавливайте одну точку входа. Первая загрузка включает обязательные компоненты и суперразрешение; кэш используется повторно.",
+    "0.4.0 の六つのプロキシは各専用ファイルを使用し、一度に一つだけ導入します。初回は必須・超解像コンポーネントを取得し、切り替え時はキャッシュを再利用します。",
+    "0.4.0의 6개 프록시는 각각 전용 파일을 사용하며 한 번에 하나만 설치합니다. 처음에는 필수 및 초해상도 구성 요소를 다운로드하고 이후 캐시를 재사용합니다."
   ]
 }

@@ -63,7 +63,17 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
                 )
             } else if r.backend == crate::rtxmfg::BACKEND {
                 format!(
-                    "RTX40 MFG · {}",
+                    "MFG Unlocker · {}",
+                    r.upstream_version
+                        .as_deref()
+                        .or(r.payload_version.as_deref())
+                        .unwrap_or("?")
+                )
+            } else if scheme == crate::upstream040::SCHEME {
+                // The stable scheme ID spans 0.3.5 and 0.4.0. Never label an
+                // installed old DLL with the available catalog's new version.
+                format!(
+                    "{} · Github-sdli1995",
                     r.upstream_version
                         .as_deref()
                         .or(r.payload_version.as_deref())

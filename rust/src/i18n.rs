@@ -40,6 +40,14 @@ impl Translator {
                 catalog.entry(key).or_insert_with(|| values[index].clone());
             }
         }
+        if language != "zh-CN" {
+            let fallback: BTreeMap<String, String> =
+                serde_json::from_str(include_str!("../assets/community-translations-en.json"))
+                    .expect("community English fallback");
+            for (key, value) in fallback {
+                catalog.entry(key).or_insert(value);
+            }
+        }
         let mut patterns = Vec::new();
         for (k, v) in &catalog {
             if k.contains("{0}") {

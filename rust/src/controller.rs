@@ -577,11 +577,13 @@ impl Controller {
         let profile = &policy.parameter_profile;
         let mut values = rtx_fg_manager::presets::defaults(profile, &policy.defaults);
         if let Some(game) = self.games.iter().find(|g| g.exe == exe) {
-            if let Some(saved) = game
-                .extra
-                .get("preset_options")
-                .and_then(|v| v.get(profile))
-            {
+            if let Some(saved) = game.extra.get("preset_options").and_then(|v| {
+                v.get(profile).or_else(|| {
+                    (profile == rtx_fg_manager::upstream040::PROFILE)
+                        .then(|| v.get("upstream035"))
+                        .flatten()
+                })
+            }) {
                 if let Ok(saved) =
                     serde_json::from_value::<rtx_fg_manager::presets::Values>(saved.clone())
                 {
@@ -1556,6 +1558,26 @@ impl Controller {
             })
             .unwrap_or_default()
     }
+    /// The detail dialog always targets its own game, independent of library
+    /// multi-selection. Freeze that scope before showing the confirmation.
+    pub fn request_focused_cleanup(&mut self) {
+        if self.closing || self.busy || self.pending_patch.is_some() {
+            return;
+        }
+        let games = self
+            .games
+            .iter()
+            .filter(|g| self.focus.as_ref() == Some(&g.exe))
+            .collect();
+        let targets = self.patch_targets_for(games, true);
+        if !targets.is_empty() {
+            self.pending_patch = Some(PatchRequest {
+                clean: true,
+                targets,
+            });
+            self.confirm = Some("clean_batch".into());
+        }
+    }
     pub fn confirm_patch(&mut self) {
         if let Some(p) = self.pending_patch.take() {
             self.perform(p.clean, p.targets);
@@ -1679,6 +1701,8 @@ impl Controller {
                         break;
                     }
                     let p = PathBuf::from(&exe);
+                    let journal_target = game.deployment_target(&p);
+                    let previous = core::record(&journal_target.directory).ok().flatten();
                     let result = if let Some(ref payload) = prepared {
                         (|| {
                             ensure_directory_outside_data(
@@ -1712,6 +1736,55 @@ impl Controller {
                     } else {
                         cleanup::clean_outcome_at(&game.deployment_target(&p))
                     };
+                    let action = if clean {
+                        "卸载"
+                    } else if previous.as_ref().is_some_and(|old| {
+                        prepared.as_ref().is_some_and(|new| {
+                            old.upstream_version != new.upstream_version
+                                || old.payload_version.as_deref() != Some(new.version.as_str())
+                        })
+                    }) {
+                        "升级"
+                    } else if previous.is_some() {
+                        "安装或应用"
+                    } else {
+                        "安装"
+                    };
+                    let entry = rtx_fg_manager::operation_history::Entry {
+                        created: chrono::Local::now().to_rfc3339(),
+                        action: action.into(),
+                        scheme: if clean {
+                            previous
+                                .as_ref()
+                                .and_then(|r| r.scheme_id.clone())
+                                .unwrap_or_default()
+                        } else {
+                            scheme.clone()
+                        },
+                        version: prepared
+                            .as_ref()
+                            .map(|p| {
+                                p.upstream_version
+                                    .clone()
+                                    .unwrap_or_else(|| p.version.clone())
+                            })
+                            .or_else(|| {
+                                previous.as_ref().and_then(|r| {
+                                    r.upstream_version.clone().or(r.payload_version.clone())
+                                })
+                            })
+                            .unwrap_or_default(),
+                        complete: result.as_ref().is_ok_and(|r| r.complete),
+                        detail: match &result {
+                            Ok(r) => r.message.clone(),
+                            Err(e) => e.to_string(),
+                        },
+                    };
+                    if let Err(e) =
+                        rtx_fg_manager::operation_history::append(&journal_target, &entry)
+                    {
+                        errors.push(format!("操作结果已返回，但本地历史未保存：{e}"));
+                    }
                     match result {
                         Ok(outcome) => {
                             let ok = outcome.complete;
@@ -1776,8 +1849,11 @@ impl Controller {
     }
     /// Installation operates once per verified rendering directory, never on a launcher.
     pub fn patch_targets(&self, clean: bool) -> BTreeSet<String> {
+        self.patch_targets_for(self.target_games(), clean)
+    }
+    fn patch_targets_for(&self, games: Vec<&Game>, clean: bool) -> BTreeSet<String> {
         let mut directories = BTreeMap::new();
-        for game in self.target_games() {
+        for game in games {
             let targets = game.deployment_executables();
             for target in targets
                 .iter()
@@ -1950,7 +2026,7 @@ impl Controller {
         let source = if self.choice("download_source", "domestic") == "github" {
             "github"
         } else {
-            "gitee"
+            "gitcode"
         }
         .to_owned();
         self.channel.job(move |c| {
@@ -2000,7 +2076,7 @@ impl Controller {
             source: if preference == "github" {
                 "github"
             } else {
-                "gitee"
+                "gitcode"
             }
             .into(),
             ..Default::default()
@@ -2758,7 +2834,7 @@ mod tests {
         c.tick_close();
     }
     #[test]
-    fn series_switch_selects_compatible_scheme_without_affecting_other_games() {
+    fn series_switch_preserves_free_scheme_choice_without_affecting_other_games() {
         let (_dir, mut c) = controller();
         c.games = vec![
             Game {
@@ -2784,9 +2860,10 @@ mod tests {
         assert_eq!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
         assert_eq!(c.proxies(), ["dxgi.dll"]);
         c.set_selection("rtx40mfg-1.3.3-hf2".into(), 0, vec!["version.dll".into()]);
-        assert_eq!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
+        assert_eq!(c.cloud_scheme(), "rtx40mfg-1.3.3-hf2");
+        assert_eq!(c.proxies(), ["version.dll"]);
         c.focus = Some("B.exe".into());
-        assert_ne!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
+        assert_ne!(c.cloud_scheme(), "rtx40mfg-1.3.3-hf2");
     }
     #[test]
     fn custom_folder_event_keeps_grouped_paths_for_restoration_and_rescan() {
@@ -3521,6 +3598,28 @@ mod tests {
         c.tick_close();
     }
     #[test]
+    fn detail_cleanup_ignores_other_selected_games_and_freezes_scope() {
+        let (_dir, mut c) = controller();
+        c.games = ["A.exe", "B.exe"]
+            .into_iter()
+            .map(|exe| Game {
+                exe: exe.into(),
+                ..Default::default()
+            })
+            .collect();
+        c.focus = Some("A.exe".into());
+        c.selected = BTreeSet::from(["B.exe".into()]);
+        c.request_focused_cleanup();
+        assert_eq!(c.confirm.as_deref(), Some("clean_batch"));
+        assert_eq!(c.pending_patch_list(), "1. A.exe");
+        c.focus = Some("B.exe".into());
+        assert_eq!(c.pending_patch_list(), "1. A.exe");
+        assert_eq!(c.selected, BTreeSet::from(["B.exe".into()]));
+        c.cancel_patch();
+        c.close();
+        c.tick_close();
+    }
+    #[test]
     fn upstream_options_are_independent_per_game_and_validated() {
         let (_dir, mut c) = controller();
         c.games = ["A.exe", "B.exe"]
@@ -3541,10 +3640,49 @@ mod tests {
         assert_eq!(a["optimized"], "0");
         assert_eq!(
             c.preset_values("B.exe"),
-            rtx_fg_manager::presets::defaults("upstream035", &BTreeMap::new())
+            rtx_fg_manager::presets::defaults("upstream040", &BTreeMap::new())
         );
         c.set_game_option("A.exe", "max_generated_frames", "99");
         assert_eq!(c.preset_values("A.exe"), a);
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn legacy_035_settings_migrate_to_040_without_overwriting_scheme_values() {
+        let (_dir, mut c) = controller();
+        let scheme = c.catalog.default_scheme.clone();
+        c.games = vec![Game {
+            exe: "A.exe".into(),
+            extra: [(
+                "preset_options".into(),
+                json!({"upstream035":{
+                    "max_generated_frames":"5", "optimized":"3", "preset":"B",
+                    "logging_level":"2", "unknown_old_field":"keep only in old storage"
+                }}),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }];
+        c.migrate_presets();
+        let values = c.preset_values("A.exe");
+        assert_eq!(values["max_generated_frames"], "5");
+        assert_eq!(values["optimized"], "3");
+        assert_eq!(values["preset"], "B");
+        assert_eq!(values["logging_level"], "2");
+        assert_eq!(values["sr_mode"], "Off");
+        assert!(!values.contains_key("unknown_old_field"));
+        c.set_game_option("A.exe", "max_generated_frames", "2");
+        c.migrate_presets();
+        assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "2");
+        assert_eq!(
+            c.games[0].extra["preset_options"]["upstream035"]["max_generated_frames"],
+            "5"
+        );
+        assert_eq!(
+            c.games[0].extra["preset_options_v2"][&scheme]["max_generated_frames"],
+            "2"
+        );
         c.close();
         c.tick_close();
     }
@@ -3562,8 +3700,9 @@ mod tests {
         assert!(!c.preset_values("A.exe").contains_key("optimized"));
         c.set_game_option("A.exe", "max_generated_frames", "2");
         c.state["cloud_scheme"] = json!("initial-rtx20");
-        assert_eq!(c.cloud_scheme(), "initial");
-        assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "3");
+        assert_eq!(c.cloud_scheme(), c.catalog.default_scheme);
+        assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "5");
+        assert_eq!(c.state["cloud_scheme"], "initial-rtx20");
         c.state["proxies"] = json!(["winhttp.dll", "version.dll"]);
         assert_eq!(c.proxies(), vec!["version.dll"]);
         c.state["cloud_scheme"] = json!("upstream-0.3.1-310-9");
@@ -3571,7 +3710,7 @@ mod tests {
         assert_eq!(c.preset_values("A.exe")["optimized"], "3");
         assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "5");
         c.set_game_option("A.exe", "reset", "");
-        assert_eq!(c.preset_values("A.exe")["optimized"], "1");
+        assert_eq!(c.preset_values("A.exe")["optimized"], "2");
         c.close();
         c.tick_close();
     }
@@ -3580,6 +3719,12 @@ mod tests {
         let (_dir, mut c) = controller();
         let original = c.catalog.default_scheme.clone();
         let extended = "rtxfg-0.3.5-dx12-vulkan";
+        // Exercise the historical shared-0.3.5 settings migration explicitly;
+        // the current default now has a different protocol (0.4.0).
+        let original_policy = c.catalog.scheme_policies.get_mut(&original).unwrap();
+        original_policy.parameter_profile = "upstream035".into();
+        original_policy.defaults =
+            rtx_fg_manager::presets::defaults("upstream035", &BTreeMap::new());
         let mut policy = c.catalog.scheme_policies[&original].clone();
         policy
             .capabilities

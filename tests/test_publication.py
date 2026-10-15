@@ -20,19 +20,20 @@ def current_source_export_files():
     lists = re.findall(
         r'foreach \(\$name in @\((.*?)\)\) \{ Add-File \$name(?: \$false)? \}',
         script, re.S)
-    if len(lists) != 5:
+    if len(lists) != 6:
         raise AssertionError('Review the source exporter Add-File list structure')
     for group in lists:
         files.update(re.findall(r"'([^']+)'", group))
     files.update(re.findall(r"Add-File '([^']+)'", script))
     trees = re.findall(r"Add-Tree '([^']+)' @\(([^)]*)\)", script)
-    if len(trees) != 5:
+    if len(trees) != 11:
         raise AssertionError('Review the source exporter Add-Tree structure')
     for directory, group in trees:
         extensions = set(re.findall(r"'([^']+)'", group))
         files.update(p.relative_to(ROOT).as_posix()
                      for p in (ROOT / directory).rglob('*')
-                     if p.is_file() and p.suffix.lower() in extensions)
+                     if p.is_file() and p.suffix.lower() in extensions
+                     and not (directory == 'community/public' and p.relative_to(ROOT / directory).parts[0] == 'help'))
     files.update(p.relative_to(ROOT).as_posix() for p in (ROOT / 'tests').glob('*.rs'))
     fixture_list = re.search(r'foreach \(\$version in @\(([^)]*)\)\)', script)
     if not fixture_list:

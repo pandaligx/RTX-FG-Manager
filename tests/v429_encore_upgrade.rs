@@ -191,21 +191,35 @@ fn repeated_encore_install_uses_latest_disk_document_and_does_not_replace_dll() 
             encore::BACKEND,
             &["version.dll".into()],
             None,
-            different,
+            different.clone(),
             Some("1.0.0"),
             Some(&context(encore::PROFILE)),
             None,
-            Some("1.0.0-beta.3"),
+            Some("1.0.0-beta.2"),
         )
         .is_err()
     );
     assert_eq!(fs::read(target.directory.join("version.dll"))?, pe(true, 2));
+    let before_upgrade = fs::read(&config)?;
+    core::deploy_prepared_context_at_with_overrides(
+        &target,
+        encore::BACKEND,
+        &["version.dll".into()],
+        None,
+        different,
+        Some("1.0.0"),
+        Some(&context(encore::PROFILE)),
+        None,
+        Some("1.0.0-beta.3"),
+    )?;
+    assert_eq!(fs::read(target.directory.join("version.dll"))?, pe(true, 3));
+    assert_eq!(fs::read(&config)?, before_upgrade);
     Ok(())
 }
 
 #[test]
-fn all_nineteen_entries_deploy_same_bytes_and_bink_originals_survive_removal() -> Result<()> {
-    for proxy in encore::PROXIES {
+fn supported_entries_deploy_prepared_bytes_and_bink_originals_survive_removal() -> Result<()> {
+    for proxy in encore::ENTRIES {
         let (_temp, target) = fixture(false)?;
         let hooked = match proxy {
             "binkw64.dll" => Some("binkw64Hooked.dll"),
@@ -227,7 +241,7 @@ fn all_nineteen_entries_deploy_same_bytes_and_bink_originals_survive_removal() -
             assert_eq!(fs::read(target.directory.join(name))?, pe(true, 7));
         }
     }
-    assert!(core::deployment_names(encore::BACKEND, &["rtx-encore.asi".into()]).is_err());
+    assert!(core::deployment_names(encore::BACKEND, &["unknown.asi".into()]).is_err());
     assert!(
         core::deployment_names(encore::BACKEND, &["version.dll".into(), "dxgi.dll".into()])
             .is_err()

@@ -19,7 +19,12 @@ fn install(dir: &Path, scheme: &str, backend: &str, proxy: &str) -> Result<()> {
     let exe = dir.join("Game.exe");
     fs::write(&exe, pe(false))?;
     let c = cloud::bundled();
-    let context = presets::Context::new(scheme, &c.scheme_policies[scheme], &exe);
+    let mut policy = c.scheme_policies[scheme].clone();
+    // This fixture models a pre-4.3 installation, whose backend and INI are 0.3.5.
+    if backend == "upstream_sm86" {
+        policy.parameter_profile = "upstream035".into();
+    }
+    let context = presets::Context::new(scheme, &policy, &exe);
     let config = if backend == rtxmfg::BACKEND {
         b"{}".to_vec()
     } else {
@@ -38,7 +43,11 @@ fn install(dir: &Path, scheme: &str, backend: &str, proxy: &str) -> Result<()> {
                 context.configure(&config, &values)?,
             ),
         ]),
-        Some("1.3.3"),
+        Some(if backend == "upstream_sm86" {
+            "0.3.5"
+        } else {
+            "1.3.3"
+        }),
         Some(&context),
     )?;
     Ok(())
@@ -83,7 +92,7 @@ fn rtx40_json_protocol_is_separate_and_preserves_menu_settings() -> Result<()> {
     assert_eq!(merged["menuHotkey"], 119);
     let c = cloud::bundled();
     c.validate()?;
-    assert_eq!(c.proxies("rtx40mfg-1.3.3-hf2").len(), 19);
+    assert_eq!(c.proxies("rtx40mfg-1.3.3-hf2").len(), 20);
     assert_eq!(
         c.scheme_policies["rtx40mfg-1.3.3-hf2"].gpu_paths,
         vec!["SM89"]
@@ -113,11 +122,15 @@ fn grouped_status_retains_actual_scheme_proxy_and_partial_or_mixed_state() -> Re
     let c = cloud::bundled();
     let d = deployment::inspect(&game, &c);
     assert_eq!((d.installed, d.total), (2, 2));
-    assert!(d.can_apply("upstream-0.3.5-310-9"));
+    // Stable scheme IDs do not authorize writing 0.4.0 settings into a 0.3.5 DLL.
+    assert!(!d.can_apply("upstream-0.3.5-310-9"));
     assert!(
         d.details
             .iter()
-            .all(|d| d.contains("Github-sdli1995") && d.contains("d3d12.dll") && !d.contains("R2"))
+            .all(|d| d.contains("0.3.5 · Github-sdli1995")
+                && d.contains("d3d12.dll")
+                && !d.contains("0.4.0")
+                && !d.contains("R2"))
     );
     let mut r = core::record(&b)?.unwrap();
     r.scheme_id = Some("rtxfg-0.3.5-dx12-vulkan".into());

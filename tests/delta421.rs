@@ -17,7 +17,8 @@ fn new_cloud_capability_is_optional_and_generic_packages_stay_off() -> Result<()
     let bytes = fs::read(folder.join("catalog.json"))?;
     let index = fs::read(folder.join("index.json"))?;
     let catalog = serde_json::from_slice::<cloud::CompactCatalog>(&bytes)?.expand(&index)?;
-    assert_eq!(catalog.schemes().len(), 4);
+    assert_eq!(catalog.schemes().len(), 3);
+    assert_eq!(catalog.scheme_policies.len(), 4);
     assert_eq!(catalog.packages.len(), 19);
     assert_eq!(catalog.default_scheme, "upstream-0.3.5-310-9");
     assert!(
@@ -97,7 +98,7 @@ fn root() -> PathBuf {
 }
 fn context(exe: &Path) -> presets::Context {
     let c = cloud::bundled();
-    let mut p = c.scheme_policies[&c.default_scheme].clone();
+    let mut p = c.scheme_policies[SCHEME].clone();
     p.capabilities.insert(delta::CAPABILITY.into());
     presets::Context::new(SCHEME, &p, exe)
 }

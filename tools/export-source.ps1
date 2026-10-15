@@ -48,6 +48,8 @@ function Add-Tree([string]$Relative, [string[]]$Extensions) {
     while ($pending.Count) {
         $directory = $pending.Pop()
         foreach ($item in Get-ChildItem -LiteralPath $directory -Force) {
+            # Generated static deployment output; the reviewed source is help/.
+            if ($Relative -eq 'community/public' -and $item.PSIsContainer -and $item.Name -eq 'help') { continue }
             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Linked source entry is not permitted: $($item.FullName)" }
             if ($item.PSIsContainer) { $pending.Push($item.FullName); continue }
             if ($Extensions -contains $item.Extension.ToLowerInvariant()) {
@@ -74,17 +76,25 @@ foreach ($name in @(
 )) { Add-File $name }
 foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md')) { Add-File $name $false }
 Add-Tree 'rust/src' @('.rs')
+Add-Tree 'help' @('.html', '.css', '.js')
+foreach ($name in @('community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore', 'community/wrangler.example.jsonc', 'community/README.md', 'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json', '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md')) { Add-File $name }
+Add-Tree 'community/src' @('.mjs', '.json')
+Add-Tree 'community/public' @('.html', '.css', '.js')
+Add-Tree 'community/tests' @('.mjs')
+Add-Tree 'community/migrations' @('.sql')
 Add-Tree 'rust/assets' @('.json', '.jsonc', '.svg', '.png', '.ico', '.txt', '.md')
 Add-Tree 'vendor/gpui_fast_windows/src' @('.rs', '.hlsl')
 Add-Tree 'vendor/gpui_fast_windows/resources' @('.rc', '.xml', '.manifest', '.ico')
 foreach ($item in Get-ChildItem -LiteralPath (Join-Path $root 'tests') -File -Filter '*.rs') { Add-File "tests/$($item.Name)" }
-foreach ($version in @('420', '421', '422', '425')) { Add-Tree "tests/fixtures/catalog$version" @('.json') }
+foreach ($version in @('420', '421', '422', '425', '429')) { Add-Tree "tests/fixtures/catalog$version" @('.json') }
 # Public cloud metadata and publish automation are separately reviewed source inputs.
 foreach ($name in @('cloud/schemes.json', 'tools/cloud_release.py', 'docs/cloud-publishing.md', '.github/scripts/mirror_gitee.py')) { Add-File $name $false }
 if (-not $ExcludeCloudMetadata) {
     Add-File 'update.json' $false
     Add-File 'cloud/catalog.json' $false
     Add-Tree 'cloud/indexes' @('.json')
+    Add-Tree 'cloud/v3' @('.json')
+    Add-File 'cloud/help.json' $false
 }
 foreach ($name in @('.github/workflows/mirror-gitee.yml', '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml')) { Add-File $name $false }
 foreach ($name in @('docs/screenshot-home.png', 'docs/screenshot-home-zh.png', 'docs/screenshot-home-themes.png')) { Add-File $name $false }

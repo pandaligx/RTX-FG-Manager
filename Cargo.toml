@@ -1,6 +1,6 @@
 [package]
 name = "rtx-fg-manager"
-version = "4.2.9"
+version = "4.3.0"
 edition = "2024"
 publish = false
 build = "rust/build.rs"
@@ -8,6 +8,7 @@ include = [
     "Cargo.toml",
     "Cargo.lock",
     "rust/**",
+    "help/**",
     "tests/*.rs",
     "tests/fixture-manifest.json",
     "tests/fixtures/catalog*/**",
@@ -53,6 +54,12 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 rfd = "0.14"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+semver = "1.0"
+p256 = { version = "0.13.2", features = ["ecdsa"] }
+aes-gcm = "0.10.3"
+argon2 = "0.5.3"
+zeroize = "1.8"
+webview2-com = "=0.39.1"
 sha2 = "0.10"
 tempfile = "3.27"
 uuid = { version = "1", features = ["v4"] }

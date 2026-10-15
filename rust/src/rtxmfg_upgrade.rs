@@ -116,13 +116,13 @@ fn transaction_files(j: &Journal) -> BTreeMap<String, String> {
     files.extend(
         j.before
             .iter()
-            .map(|(n, h)| (format!("old.{n}"), h.clone())),
+            .map(|(n, h)| (format!("old.{}", n.replace('/', "__")), h.clone())),
     );
     files.extend(
         j.new
             .hashes
             .iter()
-            .map(|(n, h)| (format!("next.{n}"), h.clone())),
+            .map(|(n, h)| (format!("next.{}", n.replace('/', "__")), h.clone())),
     );
     files
 }
@@ -218,7 +218,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
                 "原文件位置已被其他文件占用：{name}"
             );
             ensure!(
-                matches(&work.join(format!("old.{name}")), hash)?,
+                matches(&work.join(format!("old.{}", name.replace('/', "__"))), hash)?,
                 "原件备份缺失或已改变：{name}"
             );
         }
@@ -238,7 +238,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
     for (name, hash) in &j.before {
         let path = core::no_links(&target.directory.join(name))?;
         if !path.exists() {
-            let backup = core::no_links(&work.join(format!("old.{name}")))?;
+            let backup = core::no_links(&work.join(format!("old.{}", name.replace('/', "__"))))?;
             ensure!(matches(&backup, hash)?, "原件备份在恢复期间改变：{name}");
             win::rename_no_replace(&backup, &path)?;
         }
@@ -363,11 +363,17 @@ pub fn upgrade_locked(
         core::write_new(&work.join("old.install.json"), &marker_bytes)?;
         checkpoint("marker-backup")?;
         for (name, bytes) in &originals {
-            core::write_new(&work.join(format!("old.{name}")), bytes)?;
+            core::write_new(
+                &work.join(format!("old.{}", name.replace('/', "__"))),
+                bytes,
+            )?;
             checkpoint(&format!("backup:{name}"))?;
         }
         for (name, bytes) in &files {
-            core::write_new(&work.join(format!("next.{name}")), bytes)?;
+            core::write_new(
+                &work.join(format!("next.{}", name.replace('/', "__"))),
+                bytes,
+            )?;
             checkpoint(&format!("stage:{name}"))?;
         }
         core::assert_target_stopped(target)?;
@@ -381,7 +387,7 @@ pub fn upgrade_locked(
                 "升级前原文件已变化：{name}"
             );
             ensure!(
-                matches(&work.join(format!("old.{name}")), hash)?,
+                matches(&work.join(format!("old.{}", name.replace('/', "__"))), hash)?,
                 "原件备份核验失败：{name}"
             );
         }
@@ -398,12 +404,12 @@ pub fn upgrade_locked(
         // The DLL is exposed last so an accidental launch cannot observe the
         // new runtime with an absent configuration.
         let mut names = files.keys().collect::<Vec<_>>();
-        names.sort_by_key(|n| n.ends_with(".dll"));
+        names.sort_by_key(|n| j.new.selected().contains(n));
         for name in names {
             if j.before.get(name) == j.new.hashes.get(name) {
                 continue;
             }
-            let stage = core::no_links(&work.join(format!("next.{name}")))?;
+            let stage = core::no_links(&work.join(format!("next.{}", name.replace('/', "__"))))?;
             ensure!(matches(&stage, &j.new.hashes[name])?, "升级暂存文件已变化");
             win::rename_no_replace(&stage, &core::no_links(&dir.join(name))?)?;
             checkpoint(&format!("publish:{name}"))?;
