@@ -15,7 +15,7 @@ fn free_scheme_selection_preserves_delta_capability_validation() -> Result<()> {
         let policy = &c.scheme_policies[&p.scheme_id];
         json!({"id":p.scheme_id,"name":p.label,"profile":policy.parameter_profile,
             "defaults":policy.defaults,"capabilities":policy.capabilities,
-            "archives":c.packages.iter().filter(|q| q.scheme_id == p.scheme_id).map(|q| &q.archive).collect::<Vec<_>>()})
+            "archives":c.packages.iter().filter(|q| q.scheme_id == p.scheme_id).map(|q| &q.archive).collect::<std::collections::BTreeSet<_>>()})
     }).collect::<Vec<_>>();
     let compact = json!({"schema":3,"revision":c.revision,"default_scheme":c.default_scheme,
         "sources":c.sources,"schemes":schemes,"index":{

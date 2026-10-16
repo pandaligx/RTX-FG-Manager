@@ -108,12 +108,15 @@
     "gpuSeries": "auto"                      // auto, rtx40, rtx30 or rtx20. Leave on auto unless detection fails. Restart the game to apply.
   },
   "compatibility": {
+    "disableInGameMenu": false, // Encore 1.0.0: for menu conflicts (e.g. Star Wars Outlaws). FG remains active. Insert cannot open the menu; turn this off here and restart to restore it.
     "disableMenuDetection": false,           // Keep frame generation running in menus and loading screens. Leave false: idling at 1x there avoids device-hang crashes.
     "forceOTA": false,                       // Load the Frame Generation models downloaded by the NVIDIA App. Restart the game to apply.
     "flipMeteringBypass": false,             // OptiScaler flip metering bypass, only for setups that need it. Restart the game to apply.
     "disableMvDilation": false               // Legacy experiment: declare the motion vectors as already dilated. Leave false.
   },
   "diagnostics": {
+    "logDxgiWrappers": false, // Encore 1.0.0: logs game calls to the menu swapchain to diagnose crashes after menu attachment. Off by default; restart required. Disable after collecting logs.
+    "crashDetails": false, // Encore 1.0.0: adds register/stack details and a .dmp on crashes (often tens of MB). Diagnostics only; disable afterwards and restart. Dumps may contain process memory; review before sharing.
     "logGraphics": false,                    // Trace graphics creation, COM interface upgrades, swapchain lifetime, initial presentation and resize. Applied live; enable before launch for startup crashes.
     "logStreamline": false,                  // Extra verbose Streamline and NGX messages. Basic messages and failure reasons are logged automatically. Restart required; disable and restart after collecting the log. May reduce performance.
     "logPerformance": false,                 // Write FPS and frame times to rtx-encore_perf.csv, plus one GPU/power diagnostic sample per second in the session log (rtx-encore-logs).

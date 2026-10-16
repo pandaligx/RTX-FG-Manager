@@ -188,6 +188,7 @@ pub enum Failure {
     Size,
     Timeout,
     Unauthorized,
+    NotFound,
     Disk,
     UnsafeUrl,
 }
@@ -205,6 +206,7 @@ impl Failure {
             Self::Size => "下载文件超过大小限制",
             Self::Timeout => "下载超时",
             Self::Unauthorized => "下载服务器需要授权",
+            Self::NotFound => "下载文件不存在（HTTP 404）",
             Self::Disk => "无法写入下载文件，请检查磁盘空间和权限",
             Self::UnsafeUrl => "下载重定向地址不符合安全要求",
         }
@@ -254,6 +256,8 @@ fn checked_response(error: reqwest::Error) -> anyhow::Error {
         Failure::Timeout
     } else if error.status().is_some_and(|s| s.as_u16() == 429) {
         Failure::RateLimited
+    } else if error.status().is_some_and(|s| s.as_u16() == 404) {
+        Failure::NotFound
     } else if error
         .status()
         .is_some_and(|s| matches!(s.as_u16(), 401 | 403))
@@ -285,7 +289,12 @@ fn check_cancel(cancel: &AtomicBool) -> Result<()> {
 
 /// This is a headers-only preflight, not a second file downloader. Do not claim
 /// that an aria2 request made afterwards is cryptographically bound to it.
-fn preflight(url: &str, policy: UrlPolicy, cancel: &AtomicBool) -> Result<reqwest::Url> {
+fn preflight(
+    url: &str,
+    policy: UrlPolicy,
+    metadata: bool,
+    cancel: &AtomicBool,
+) -> Result<reqwest::Url> {
     check_cancel(cancel)?;
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_secs(5))
@@ -300,19 +309,28 @@ fn preflight(url: &str, policy: UrlPolicy, cancel: &AtomicBool) -> Result<reqwes
         }))
         .build()?;
     let initial = validate_url(url, policy)?;
-    let mut response = client
-        .head(initial.clone())
-        .send()
-        .map_err(checked_response)?;
-    // Gitee's public release API returns 401 to HEAD but allows anonymous GET.
-    // Some public CDNs likewise reject HEAD. No credentials are added. Do
+    // Small manifests use GET directly: some hosts implement only GET for raw
+    // files. The body is not consumed here; aria2 still performs the transfer.
+    let mut response = if metadata {
+        client.get(initial.clone())
+    } else {
+        client.head(initial.clone())
+    }
+    .send()
+    .map_err(checked_response)?;
+    // GitCode raw files return 404 to HEAD while anonymous GET succeeds.
+    // Gitee and some CDNs also reject HEAD. No credentials are added. Do
     // not consume its body; aria2 receives the final checked URL below.
-    if matches!(response.status().as_u16(), 401 | 403 | 405 | 501) {
+    if !metadata && head_requires_get(response.status().as_u16()) {
         response = client.get(initial).send().map_err(checked_response)?;
     }
     check_cancel(cancel)?;
     let response = response.error_for_status().map_err(checked_response)?;
     validate_url(response.url().as_str(), policy)
+}
+
+fn head_requires_get(status: u16) -> bool {
+    matches!(status, 401 | 403 | 404 | 405 | 501)
 }
 
 pub(crate) struct Readout {
@@ -417,7 +435,7 @@ fn attempt(
         ..Default::default()
     };
     progress(status.clone());
-    let url = preflight(&source.url, request.policy, cancel)?;
+    let url = preflight(&source.url, request.policy, request.metadata, cancel)?;
     check_cancel(cancel)?;
     ensure!(Instant::now() < deadline, Failure::Timeout);
     let tool = assets::tool()?;
@@ -626,6 +644,7 @@ pub fn download(
                                 | Failure::UnsafeUrl
                                 | Failure::Disk
                                 | Failure::Unauthorized
+                                | Failure::NotFound
                         )
                     ) || Instant::now() >= deadline
                     {
@@ -669,4 +688,15 @@ pub fn fetch_metadata(
     )?;
     check_cancel(cancel)?;
     Ok(fs::read(path)?)
+}
+
+#[cfg(test)]
+mod head_tests {
+    #[test]
+    fn method_specific_not_found_still_attempts_get() {
+        assert!(super::head_requires_get(404));
+        assert!(super::head_requires_get(405));
+        assert!(!super::head_requires_get(200));
+        assert!(!super::head_requires_get(429));
+    }
 }

@@ -18,6 +18,9 @@ fn main() {
                 "--download-check",
                 "--cloud-check",
                 "--update-check",
+                "--catalog-check",
+                "--metadata-check",
+                "--bundle-check",
             ]
             .contains(&s.as_str())
         }) {
@@ -35,6 +38,50 @@ fn run() -> anyhow::Result<()> {
     let args: Vec<_> = std::env::args().collect();
     let arg = |n: usize| args.get(n).context("缺少命令参数");
     match args.get(1).map(String::as_str) {
+        Some("--bundle-check") => {
+            // Prepare one chosen entry in the download cache, never deploy it.
+            let catalog = rtx_fg_manager::cloud::bundled();
+            let scheme = arg(2)?;
+            anyhow::ensure!(
+                catalog.schemes().iter().any(|p| &p.scheme_id == scheme),
+                "Unknown scheme"
+            );
+            let mut events = Vec::new();
+            let prepared = rtx_fg_manager::cloud::prepare(
+                &catalog,
+                scheme,
+                1,
+                &["version.dll".into()],
+                &AtomicBool::new(false),
+                |event| events.push(event),
+            )?;
+            core::atomic_json(
+                &PathBuf::from(arg(3)?),
+                &serde_json::json!({
+                    "scheme":scheme, "version":prepared.version,
+                    "files":prepared.files.keys().collect::<Vec<_>>(), "events":events,
+                    "deployed":false
+                }),
+            )
+        }
+        Some("--catalog-check") => {
+            // Metadata only. Never loop over payloads or install into games.
+            let catalog = rtx_fg_manager::cloud::refresh()?;
+            core::atomic_json(&PathBuf::from(arg(2)?), &serde_json::to_value(catalog)?)
+        }
+        Some("--metadata-check") => {
+            let bytes = rtx_fg_manager::transfer::fetch_metadata(
+                vec![rtx_fg_manager::transfer::Source {
+                    name: "diagnostic".into(),
+                    url: arg(2)?.clone(),
+                }],
+                rtx_fg_manager::transfer::UrlPolicy::Official,
+                &AtomicBool::new(false),
+                |_| {},
+            )?;
+            let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+            core::atomic_json(&PathBuf::from(arg(3)?), &value)
+        }
         Some("--update-check") => {
             // Read-only updater smoke check; never downloads or starts an EXE.
             let manifest = updater::release(arg(2)?)?;

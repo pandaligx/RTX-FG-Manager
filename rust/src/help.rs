@@ -17,7 +17,7 @@ const FILES: [(&str, &[u8]); 4] = [
     ("app.js", include_bytes!("../../help/app.js")),
 ];
 const LIMIT: u64 = 8 * 1024 * 1024;
-const BUNDLED_VERSION: &str = "4.3.0.5";
+const BUNDLED_VERSION: &str = "4.3.1.1";
 static UPDATING: AtomicBool = AtomicBool::new(false);
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Manifest {
@@ -271,7 +271,7 @@ pub fn open(language: &str, dark: bool, topic: &str) -> Result<()> {
         "start",
         "patches",
         "menus",
-        "community",
+        "configuration",
         "maintenance",
         "faq",
     ]

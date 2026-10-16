@@ -31,6 +31,12 @@ pub fn parameters() -> Vec<Parameter> {
         if f.key == "optimized" {
             f.section = "DLSSG";
             f.default = "2";
+            f.choices = vec![
+                ("0", "0 · 原厂数值"),
+                ("1", "1 · 逐位一致"),
+                ("2", "2 · 上游默认（有损加速）"),
+                ("3", "3 · 最快（有损）"),
+            ];
         }
         if f.key == "preset" {
             f.section = "DLSSG";

@@ -243,8 +243,7 @@ fn supported_entries_deploy_prepared_bytes_and_bink_originals_survive_removal() 
     }
     assert!(core::deployment_names(encore::BACKEND, &["unknown.asi".into()]).is_err());
     assert!(
-        core::deployment_names(encore::BACKEND, &["version.dll".into(), "dxgi.dll".into()])
-            .is_err()
+        core::deployment_names(encore::BACKEND, &["version.dll".into(), "dxgi.dll".into()]).is_ok()
     );
     Ok(())
 }
@@ -288,6 +287,17 @@ fn cleanup_retains_modified_notice_and_unrecognized_files_inside_logs() -> Resul
     fs::write(logs.join("rtx-encore_perf.csv"), b"owned metrics")?;
     let rotated = "rtx-encore.log.previous-20261009-015707-625-12888.log";
     fs::write(logs.join(rotated), b"owned rotated session")?;
+    let dump = "rtx-encore-13512-134365138303574349.dump1.dmp";
+    fs::write(logs.join(dump), b"generated crash dump")?;
+    let retained_dumps = [
+        "manual-capture.dmp",
+        "rtx-encore-user.dump1.dmp",
+        "rtx-encore-13512-134365138303574349.dmp",
+        "rtx-encore-13512-134365138303574349.dump1.dmp.backup",
+    ];
+    for name in retained_dumps {
+        fs::write(logs.join(name), b"user capture")?;
+    }
     fs::write(
         logs.join("rtx-encore.log.previous-user-notes.log"),
         b"user notes",
@@ -304,6 +314,10 @@ fn cleanup_retains_modified_notice_and_unrecognized_files_inside_logs() -> Resul
     assert!(!logs.join("rtx-encore.log").exists());
     assert!(!logs.join("rtx-encore_perf.csv").exists());
     assert!(!logs.join(rotated).exists());
+    assert!(!logs.join(dump).exists());
+    for name in retained_dumps {
+        assert_eq!(fs::read(logs.join(name))?, b"user capture");
+    }
     assert_eq!(
         fs::read(logs.join("rtx-encore.log.previous-user-notes.log"))?,
         b"user notes"

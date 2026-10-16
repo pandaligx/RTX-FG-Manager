@@ -50,6 +50,7 @@ ALLOWED = {
     '.github/workflows/build.yml', '.github/workflows/mirror-gitee.yml',
     '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml',
     'docs/screenshot-home.png', 'docs/screenshot-home-themes.png',
+    'docs/brand-banner.svg', 'docs/download-en.svg', 'docs/download-zh.svg',
     # Existing public history has this screenshot; retaining its history is safe.
     'docs/screenshot-home-zh.png',
 }

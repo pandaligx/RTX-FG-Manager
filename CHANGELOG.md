@@ -1,6 +1,19 @@
 # Changelog
 
-## 4.3.0 (candidate, unreleased)
+## 4.3.1
+
+- Adapt signed RTX Encore 1.0.0 stable and MFG-Unlocker 1.5.0-hotfix.1, retaining the complete dlssg_for_sm86 0.4.0 and custom Delta Force/Vulkan routes.
+- Add three Encore opt-in controls: disableInGameMenu, logDxgiWrappers and crashDetails. All default off and require restart. Preserve existing JSONC bytes on upgrade, including comments and menu state.
+- Recognize Encore's generated session dump filenames during owned uninstall; retain unknown/manual captures and files beyond the safe cleanup size bound.
+- Rework navigation and inspector layout: default compact sidebar, static brand, resizable panels, game title/icon, GPU/HAGS on the right, theme switch in the title bar, and font size 12–18. Fix title-bar misalignment after resizing text.
+- Remove community recommendations, embedded help and the bottom log panel. Restore the single configuration editor. Retire initial/0.2.6 new-install choices and the GPU-series selector; retain legacy cleanup.
+- Permit multiple supported DLL entries while preserving ASI/plugin exclusivity. Remove game uses a trash icon without a count. Correct duplicate Encore version headings and dropdown/tooltip layout.
+- Fix metadata requests on services rejecting HEAD. Prefer GitCode, then GitHub. Distribute each scheme as one complete ZIP in the fixed Resources release; retain compatible older-client manifests.
+- Rebuild English/Chinese documentation with current workflows, menus, recovery guidance and retained GitHub download badges.
+
+Manager updates do not automatically replace game patches. Validation covers file/configuration transactions and the Windows UI; it is not game/GPU or anti-cheat validation.
+
+## 4.3.0
 
 - Changelog opens online release notes using the domestic/GitHub source preference. Remove the old embedded changelog dialog so published notes can change independently of client signing.
 
@@ -13,7 +26,7 @@
 - Independent signed community identities; match only GPU model and driver version, then working confirmations and likes. Refresh every 30 seconds, with publication preview, revision-specific interactions and moderation.
 - GitCode domestic resources, GitHub fallback and Gitee transition; older client metadata remains compatible.
 
-Release follows combined acceptance and publisher signing. These changes do not establish game/GPU performance or anti-cheat compatibility.
+Released on 2026-10-15. These changes do not establish game/GPU performance or anti-cheat compatibility. The community and embedded help described here were removed in 4.3.1.
 
 ## 4.2.9
 

@@ -552,8 +552,18 @@ mod tests {
         };
         upgrade("1.0.0-rc.3", 3)?;
         assert_eq!(fs::read(target.directory.join(encore::CONFIG))?, original);
+        upgrade("1.0.0", 4)?;
+        assert_eq!(fs::read(target.directory.join(encore::CONFIG))?, original);
+        assert_eq!(
+            core::record(&target.directory)?
+                .unwrap()
+                .upstream_version
+                .as_deref(),
+            Some("1.0.0")
+        );
         let installed = snapshot(&target.directory)?;
-        assert!(upgrade("1.0.0-beta.2", 4).is_err());
+        assert!(upgrade("1.0.0-rc.3", 3).is_err());
+        assert!(upgrade("1.0.0-beta.2", 5).is_err());
         assert_eq!(snapshot(&target.directory)?, installed);
         let logs = target.directory.join("rtx-encore-logs");
         fs::create_dir_all(&logs)?;

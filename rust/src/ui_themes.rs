@@ -3,7 +3,6 @@ use anyhow::{Context as _, Result};
 use gpui::{
     App,
     component::{Theme, ThemeConfig, ThemeMode, ThemeRegistry},
-    px,
 };
 use std::rc::Rc;
 
@@ -205,7 +204,6 @@ pub fn apply(mode: ThemeMode, light_name: &str, dark_name: &str, cx: &mut App) -
         && Rc::ptr_eq(&current.light_theme, &light)
         && Rc::ptr_eq(&current.dark_theme, &dark)
         && current.font_family.as_ref() == FONT_FAMILY
-        && current.font_size == px(14.)
     {
         return false;
     }
@@ -232,6 +230,7 @@ fn apply_config_with_defaults(
     // a theme that omits shadows, radii, fonts or highlighting cannot inherit
     // them from the previously selected theme. Keep interaction settings such
     // as scrollbar behavior, focus rings and motion policy on the live theme.
+    let font_size = theme.font_size;
     let mut defaults = Theme::default();
     defaults.apply_config(fallback);
     theme.font_family = defaults.font_family;
@@ -244,12 +243,27 @@ fn apply_config_with_defaults(
     theme.highlight_theme = defaults.highlight_theme;
     theme.apply_config(selected);
     theme.font_family = FONT_FAMILY.into();
-    theme.font_size = px(14.);
+    theme.font_size = font_size;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::px;
+    #[test]
+    fn theme_changes_keep_the_users_text_scale() {
+        for size in [12., 14., 18.] {
+            let mut theme = Theme {
+                font_size: px(size * 8. / 7.),
+                ..Default::default()
+            };
+            for mode in [ThemeMode::Light, ThemeMode::Dark] {
+                let fallback = default_theme(mode);
+                apply_config_with_defaults(&mut theme, &fallback, &fallback);
+                assert_eq!(theme.font_size, px(size * 8. / 7.));
+            }
+        }
+    }
     use gpui::component::ThemeSet;
     use std::collections::HashSet;
 
@@ -397,7 +411,7 @@ mod tests {
         apply_config_with_defaults(&mut theme, &fallback, &fallback);
         assert_eq!(theme.shadow, Theme::default().shadow);
         assert_eq!(theme.font_family, FONT_FAMILY);
-        assert_eq!(theme.font_size, px(14.));
+        assert_eq!(theme.font_size, px(16.));
     }
 
     #[test]
@@ -441,7 +455,7 @@ mod tests {
             assert_eq!(theme.highlight_theme.name, fallback.name.as_ref());
             assert_eq!(theme.highlight_theme.appearance, mode);
             assert_eq!(theme.font_family, FONT_FAMILY);
-            assert_eq!(theme.font_size, px(14.));
+            assert_eq!(theme.font_size, px(16.));
             assert!(!theme.focus_ring);
         }
     }

@@ -11,7 +11,7 @@ fn compact_catalog_retains_three_policies_and_hides_retired_initial_scheme() -> 
     let bytes = fs::read(root.join("catalog.json"))?;
     let index = fs::read(root.join("index.json"))?;
     let c = serde_json::from_slice::<cloud::CompactCatalog>(&bytes)?.expand(&index)?;
-    assert_eq!(c.schemes().len(), 2);
+    assert_eq!(c.schemes().len(), 1);
     assert_eq!(c.scheme_policies.len(), 3);
     assert!(c.schemes().iter().all(|p| p.scheme_id != "initial"));
     assert_eq!(c.packages.len(), 13);

@@ -10,6 +10,9 @@ impl AssetSource for Assets {
         if path == "app/refresh.svg" {
             return Ok(Some(Cow::Borrowed(include_bytes!("../assets/refresh.svg"))));
         }
+        if path == "app/trash.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!("../assets/trash.svg"))));
+        }
         if path == "app/bilibili.svg" {
             return Ok(Some(Cow::Borrowed(include_bytes!(
                 "../assets/bilibili.svg"
@@ -19,7 +22,12 @@ impl AssetSource for Assets {
     }
     fn list(&self, path: &str) -> anyhow::Result<Vec<SharedString>> {
         let mut files = gpui::assets::Assets.list(path)?;
-        for name in ["app/manager.png", "app/refresh.svg", "app/bilibili.svg"] {
+        for name in [
+            "app/manager.png",
+            "app/refresh.svg",
+            "app/trash.svg",
+            "app/bilibili.svg",
+        ] {
             if name.starts_with(path) {
                 files.push(name.into());
             }
@@ -44,6 +52,7 @@ mod tests {
         }
         for path in [
             "icons/cpu.svg",
+            "app/trash.svg",
             "icons/github.svg",
             "icons/layout-dashboard.svg",
             "icons/triangle-alert.svg",

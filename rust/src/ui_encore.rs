@@ -345,9 +345,8 @@ impl Render for EncoreEditor {
             );
         }
         let mut panel = div().v_flex().w_full().min_w_0().gap_3()
-            .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child("RTX Encore · 1.0.0-beta.2"))
             .child(div().text_xs().text_color(cx.theme().muted_foreground)
-                .child(self.t("游戏内按Insert打开菜单；首次启动自动显示。管理器中的修改须完全退出游戏后应用。")))
+                .child(self.t("游戏内默认按 Insert 打开菜单；禁用游戏内菜单后不可呼出。管理器中的修改须完全退出游戏后应用。")))
             .child(div().text_xs().child(self.t("搜索参数名称或说明")))
             .child(div().text_xs().text_color(cx.theme().muted_foreground)
                 .child(self.t("多目录游戏显示首个实际部署目录的参数；仅将明确修改项应用到每个目录。")))

@@ -349,10 +349,16 @@ pub fn folder(backend: &str) -> Result<&str> {
 pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>> {
     folder(backend)?;
     let mut names = normalize_proxies(proxies)?;
+    ensure!(
+        !names.iter().any(|n| n.ends_with(".asi")) || names.len() == 1,
+        "ASI 插件与 DLL 加载入口不能同时安装"
+    );
     if backend == crate::upstream040::BACKEND {
         ensure!(
-            names.len() == 1 && crate::upstream040::PROXIES.contains(&names[0].as_str()),
-            "0.4.0 只允许一个对应的代理入口"
+            names
+                .iter()
+                .all(|n| crate::upstream040::PROXIES.contains(&n.as_str())),
+            "0.4.0 不提供所选代理入口"
         );
         names.push(INI.into());
         names.extend(
@@ -364,24 +370,30 @@ pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>
     }
     if backend == crate::encore::BACKEND {
         ensure!(
-            names.len() == 1 && crate::encore::ENTRIES.contains(&names[0].as_str()),
-            "RTX Encore 只允许一个 DLL 入口"
+            names
+                .iter()
+                .all(|n| crate::encore::ENTRIES.contains(&n.as_str())),
+            "RTX Encore 不提供所选入口"
         );
         names.extend([crate::encore::CONFIG.into(), crate::encore::NOTICES.into()]);
         return Ok(names);
     }
     if backend == crate::transfusion::BACKEND {
         ensure!(
-            names.len() == 1 && crate::transfusion::PROXIES.contains(&names[0].as_str()),
-            "DLSSG-Transfusion 只允许一个入口"
+            names
+                .iter()
+                .all(|n| crate::transfusion::PROXIES.contains(&n.as_str())),
+            "DLSSG-Transfusion 不提供所选入口"
         );
         names.push(crate::transfusion::CONFIG.into());
         return Ok(names);
     }
     if backend == crate::rtxmfg::BACKEND {
         ensure!(
-            names.len() == 1 && crate::rtxmfg::ENTRIES.contains(&names[0].as_str()),
-            "RTX40 方案只允许一个入口"
+            names
+                .iter()
+                .all(|n| crate::rtxmfg::ENTRIES.contains(&n.as_str())),
+            "MFG Unlocker 不提供所选入口"
         );
         names.push(crate::rtxmfg::CONFIG.into());
         return Ok(names);
@@ -997,7 +1009,9 @@ pub fn deploy_prepared_context_at_with_overrides(
         && let Some(old) = existing.as_ref().filter(|r| {
             r.backend == crate::transfusion::BACKEND
                 || (r.backend == crate::encore::BACKEND
-                    && r.hashes.get(&selected[0]) != Some(&hash(&data[&selected[0]])))
+                    && selected
+                        .iter()
+                        .any(|n| r.hashes.get(n) != Some(&hash(&data[n]))))
         })
     {
         let new = Record {
@@ -1021,7 +1035,9 @@ pub fn deploy_prepared_context_at_with_overrides(
         && let Some(old) = existing.as_ref().filter(|record| {
             record.backend == crate::rtxmfg::BACKEND
                 && record.selected() == selected
-                && record.hashes.get(&selected[0]) != Some(&hash(&data[&selected[0]]))
+                && selected
+                    .iter()
+                    .any(|n| record.hashes.get(n) != Some(&hash(&data[n])))
         })
     {
         ensure!(
@@ -1050,7 +1066,9 @@ pub fn deploy_prepared_context_at_with_overrides(
     if let Some(old) = existing.as_ref()
         && backend == crate::upstream040::BACKEND
         && (old.backend != backend
-            || old.hashes.get(&selected[0]) != Some(&hash(&data[&selected[0]])))
+            || selected
+                .iter()
+                .any(|n| old.hashes.get(n) != Some(&hash(&data[n]))))
     {
         let new = Record {
             schema: 3,

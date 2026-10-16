@@ -16,7 +16,14 @@ const LIMIT: u64 = 1024 * 1024;
 pub fn supported(version: Option<&str>) -> bool {
     version
         .and_then(|s| semver::Version::parse(s.trim_start_matches('v')).ok())
-        .is_some_and(|v| v >= semver::Version::new(1, 5, 0))
+        .is_some_and(|v| {
+            let hotfix = v.pre.as_str().strip_prefix("hotfix.").is_some_and(|n| {
+                !n.is_empty()
+                    && n.bytes().all(|c| c.is_ascii_digit())
+                    && n.parse::<u16>().is_ok_and(|n| n > 0)
+            });
+            (v.major, v.minor, v.patch) >= (1, 5, 0) && (v.pre.is_empty() || hotfix)
+        })
 }
 
 fn read_config(dir: &Path) -> Result<Vec<u8>> {

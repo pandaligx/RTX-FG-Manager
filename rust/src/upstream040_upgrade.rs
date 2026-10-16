@@ -66,7 +66,14 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
         "升级恢复记录的方案不匹配"
     );
     ensure!(
-        j.new.selected().len() == 1 && j.old.selected().contains(&j.new.proxy),
+        if j.old.backend == upstream040::BACKEND {
+            j.new.selected() == j.old.selected()
+        } else {
+            j.new
+                .selected()
+                .iter()
+                .all(|n| j.old.selected().contains(n))
+        },
         "dlssg 0.4.0 更新须保留原 DLL 入口；换入口前请先卸载"
     );
     let old_version = j
@@ -84,7 +91,10 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
         "dlssg 0.4.0 只允许升级到更高版本；已有文件未覆盖"
     );
     ensure!(
-        j.old.hashes.get(&j.old.proxy) != j.new.hashes.get(&j.new.proxy),
+        j.new
+            .selected()
+            .iter()
+            .any(|n| j.old.hashes.get(n) != j.new.hashes.get(n)),
         "dlssg 0.4.0 DLL 内容未变化"
     );
     ensure!(

@@ -50,7 +50,7 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
         serde_json::from_slice(&fs::read(folder.join("catalog.json"))?)?;
     let c = compact.expand(&fs::read(folder.join("index.json"))?)?;
     assert_eq!(c.packages.len(), 20);
-    assert_eq!(c.schemes().len(), 4);
+    assert_eq!(c.schemes().len(), 3);
     assert_eq!(c.scheme_policies.len(), 5); // Retired initial scheme stays readable for recovery.
     assert!(c.schemes().iter().all(|p| p.scheme_id != "initial"));
     assert_eq!(c.default_scheme, "upstream-0.3.5-310-9");
@@ -77,6 +77,10 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
     // those ZIPs intentionally have new immutable names and identities. Keep
     // the stable scheme IDs and assert the *unchanged* 4.2.2 resources exactly.
     for (id, old) in &c.scheme_policies {
+        if id == "initial" {
+            assert!(!current.schemes().iter().any(|p| p.scheme_id == *id));
+            continue;
+        }
         let new = &current.scheme_policies[id];
         assert_eq!(new.gpu_paths, old.gpu_paths, "{id}");
         if id == &current.default_scheme {
@@ -101,6 +105,11 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
             // Schema 3 makes the legacy download URLs explicit; bytes and
             // deployment identities remain unchanged.
             p.urls.clear();
+            // 4.3.1 changes only packaging for these legacy schemes.
+            p.archive.clear();
+            p.archive_prefix.clear();
+            p.bytes = 0;
+            p.sha256.clear();
             Ok(serde_json::to_value(p)?)
         };
         assert_eq!(sorted(new)?, sorted(old)?);

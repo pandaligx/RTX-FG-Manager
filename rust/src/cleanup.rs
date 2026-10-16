@@ -423,7 +423,7 @@ fn scan_generated(
 }
 /// The Encore runtime owns fixed outputs in a fixed adjacent directory. Do not
 /// interpret paths in JSONC, recursively erase this directory, or claim arbitrary
-/// .log/.csv files placed here by another program.
+/// .log/.csv/.dmp files placed here by another program.
 fn scan_encore_logs(
     dir: &Path,
     kept: &mut BTreeSet<PathBuf>,
@@ -458,7 +458,7 @@ fn scan_encore_logs(
     static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
     let rotated = ROTATED.get_or_init(|| {
         regex::Regex::new(
-            r"^(rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}(\.crash)?\.log)$",
+            r"^(rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}((\.crash)?\.log|\.dump[0-9]{1,10}\.dmp))$",
         )
         .expect("fixed Encore session-log pattern")
     });

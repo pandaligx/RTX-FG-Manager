@@ -1,5 +1,6 @@
-//! RTX Encore rc.3 JSONC v4. Field metadata comes from an isolated upstream
-//! configuration extraction; deployment never requires a fixed DLL hash.
+//! RTX Encore 1.0.0 JSONC v4. Base field metadata comes from an isolated upstream
+//! configuration extraction, extended with the documented 1.0.0 switches.
+//! Deployment never requires a fixed DLL hash.
 use crate::{jsonc::Document, presets::Values};
 use anyhow::{Context, Result, bail, ensure};
 use serde::Deserialize;

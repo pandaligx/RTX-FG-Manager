@@ -1,7 +1,7 @@
 'use strict';
 const params = new URLSearchParams(location.search);
 const supported = ['zh','en','ru','ja','ko'];
-const sectionIds = ['start','patches','menus','community','maintenance','faq'];
+const sectionIds = ['start','patches','menus','configuration','maintenance','faq'];
 const $ = id => document.getElementById(id);
 const make = (tag,text,cls) => {const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;};
 const safeStore = {get(k){try{return localStorage.getItem(k);}catch{return null;}},set(k,v){try{localStorage.setItem(k,v);}catch{}}};
@@ -45,10 +45,10 @@ function render(){
   const c=content();observer?.disconnect();
   document.documentElement.lang={zh:'zh-CN',en:'en',ru:'ru',ja:'ja',ko:'ko'}[language];
   document.title=c.contents+' · RTX FG Manager';$('language').value=language;$('title').textContent=c.title;$('intro').textContent=c.intro;
-  $('eyebrow').textContent='THE FIELD GUIDE / 06 PATCHES';$('edition').textContent='GUIDE · '+(/^\d+\.\d+\.\d+$/.test(params.get('version'))?'v'+params.get('version'):'v4.3.0');
+  $('eyebrow').textContent='THE FIELD GUIDE / 06 PATCHES';$('edition').textContent='GUIDE · '+(/^\d+\.\d+\.\d+$/.test(params.get('version'))?'v'+params.get('version'):'v4.3.1');
   $('nav-title').textContent=c.contents;$('offline').textContent=c.offline;$('offline-badge').textContent=c.badge;$('begin').textContent=c.begin;$('explore').textContent=c.explore;
   $('search').placeholder=c.search;$('search').setAttribute('aria-label',c.search);$('theme').setAttribute('aria-label',c.theme);$('top').textContent=c.top;
-  $('content-version').textContent=c.version+' 4.3.0.5';$('empty').textContent=c.empty;$('fallback').hidden=!c.fallback;$('fallback').textContent=c.fallback||'';
+  $('content-version').textContent=c.version+' 4.3.1.1';$('empty').textContent=c.empty;$('fallback').hidden=!c.fallback;$('fallback').textContent=c.fallback||'';
   $('navigation').replaceChildren();$('sections').replaceChildren();$('shortcuts').replaceChildren();
   for(const [name,key] of [['Encore','Insert'],['MFG Unlocker','Backspace'],['Vulkan MFG','Ctrl+F2—F6']]){const card=make('a',null,'shortcut');card.href='#menus';card.append(make('small',name),make('strong',key));$('shortcuts').append(card);}
   c.sections.forEach((name,i)=>{const a=make('a');a.href='#'+sectionIds[i];a.append(make('span',String(i+1).padStart(2,'0')),make('b',name));$('navigation').append(a);});
@@ -63,7 +63,7 @@ function render(){
     tabs.append(button);
   });
   patches.append(make('p',c.patchIntro,'section-intro'),tabs);$('sections').append(patches);renderPatch();
-  for(const [id,texts] of [['menus',c.menus],['community',c.community],['maintenance',c.maintenance]]){const s=section(id,c.sections[sectionIds.indexOf(id)]);s.append(list(texts));$('sections').append(s);}
+  for(const [id,texts] of [['menus',c.menus],['configuration',c.configuration],['maintenance',c.maintenance]]){const s=section(id,c.sections[sectionIds.indexOf(id)]);s.append(list(texts));$('sections').append(s);}
   const faq=section('faq',c.sections[5]);for(const [q,a] of c.faq)faq.append(details(q,a));$('sections').append(faq);
   filter();observeSections();updateProgress();
 }

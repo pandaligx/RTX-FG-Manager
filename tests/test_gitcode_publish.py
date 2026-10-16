@@ -126,5 +126,27 @@ class PublicationTests(unittest.TestCase):
                 {'cloud/help.json':('100644','blob','old')},
                 {'cloud/help.json':('100644','blob','new')})
 
+    def test_complete_bundle_verifies_once_and_rejects_conflicting_identity(self):
+        revision='bundles-'+'e'*20
+        url=pub.asset_url(pub.PAYLOAD_REPO,'payloads','scheme-complete-'+'a'*12+'.zip')
+        package={'archive':url.rsplit('/',1)[1],'archive_prefix':'loader-one',
+                 'bytes':30,'sha256':'a'*64,'urls':{'domestic':url}}
+        def metadata(packages):
+            raw=json.dumps({'packages':packages}).encode()
+            catalog=json.dumps({'schema':3,'revision':revision,'index':{
+                'url':pub.asset_url(pub.PAYLOAD_REPO,'payloads',revision+'.json'),
+                'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}}).encode()
+            review=Mock()
+            review.git.side_effect=lambda root,*args,**kwargs:{'catalog':catalog,'index':raw}[args[-1]]
+            return review,{'cloud/bundles/catalog.json':('100644','blob','catalog'),
+                          'cloud/bundles/indexes/'+revision+'.json':('100644','blob','index')}
+        review,after=metadata([package,{**package,'archive_prefix':'loader-two'}])
+        with patch.object(pub,'verify') as verify:
+            pub.verify_metadata_changes(Path('.'),review,{},after)
+            self.assertEqual(verify.call_count,2) # one index, one complete archive
+        review,after=metadata([package,{**package,'bytes':31}])
+        with patch.object(pub,'verify'),self.assertRaisesRegex(RuntimeError,'Conflicting'):
+            pub.verify_metadata_changes(Path('.'),review,{},after)
+
 
 if __name__=='__main__':unittest.main()

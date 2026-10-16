@@ -11,7 +11,7 @@ fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults
     encore::validate_cloud_config(encore::DEFAULT_CONFIG).unwrap();
     let read = encore::read(encore::DEFAULT_CONFIG).unwrap();
     assert_eq!(read, encore::defaults());
-    assert_eq!(encore::fields().len(), 95);
+    assert_eq!(encore::fields().len(), 98);
     assert_eq!(read["menuKey"], "45");
     assert_eq!(read["nrOpenFastProjection"], "1");
     assert_eq!(read["nrFastProcessing"], "1");
@@ -35,6 +35,36 @@ fn gpu_detection_does_not_gate_explicit_parameter_selection() {
 }
 
 #[test]
+fn stable_switches_are_opt_in_and_old_configs_are_preserved_until_edited() {
+    let mut legacy = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG)
+        .unwrap()
+        .value;
+    legacy["compatibility"]
+        .as_object_mut()
+        .unwrap()
+        .remove("disableInGameMenu");
+    for key in ["logDxgiWrappers", "crashDetails"] {
+        legacy["diagnostics"].as_object_mut().unwrap().remove(key);
+    }
+    encore::validate_cloud_config(&serde_json::to_vec(&legacy).unwrap()).unwrap();
+    let old = b"{\r\n// keep user settings\r\n\"configVersion\":4,\"menuState\":{\"menuKey\":36},\"unknown\":7}\r\n";
+    assert_eq!(encore::configure(old, &Values::new()).unwrap(), old);
+    for key in ["disableInGameMenu", "logDxgiWrappers", "crashDetails"] {
+        let field = encore::fields().iter().find(|f| f.key == key).unwrap();
+        assert!(field.restart);
+        assert_eq!(encore::read(old).unwrap()[key], "0");
+        let out = encore::configure(old, &values(&[(key, "1")])).unwrap();
+        let text = std::str::from_utf8(&out).unwrap();
+        assert!(text.contains("// keep user settings\r\n"));
+        assert!(text.contains("\"menuState\":{\"menuKey\":36}"));
+        assert!(text.contains("\"unknown\":7"));
+        assert_eq!(encore::read(&out).unwrap()[key], "1");
+        assert_eq!(encore::read(&out).unwrap()["menuKey"], "36");
+        assert!(!encore::valid_value(key, "true"));
+    }
+}
+
+#[test]
 fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
     fn leaves(
         value: &serde_json::Value,
@@ -51,12 +81,12 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
             out.insert(path.clone());
         }
     }
-    // This is the verbatim JSONC emitted by the signed rc.3 DLL in an isolated
-    // no-window host, not a configuration synthesized from our field metadata.
+    // The base JSONC was captured from rc.3; the three 1.0.0 switches were
+    // added from upstream SETTINGS.md, without executing the new signed DLL.
     let captured = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG).unwrap();
     let mut actual = std::collections::BTreeSet::new();
     leaves(&captured.value, &mut Vec::new(), &mut actual);
-    assert_eq!(actual.len(), 96);
+    assert_eq!(actual.len(), 99);
     let represented: std::collections::BTreeSet<_> =
         encore::fields().iter().map(|f| f.path.clone()).collect();
     let absent: Vec<_> = actual.difference(&represented).cloned().collect();

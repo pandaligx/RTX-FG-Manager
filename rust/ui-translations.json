@@ -1,4 +1,28 @@
 {
+  "恢复默认": [
+    "Reset to default",
+    "По умолчанию",
+    "既定値に戻す",
+    "기본값 복원"
+  ],
+  "游戏内默认按 Insert 打开菜单；禁用游戏内菜单后不可呼出。管理器中的修改须完全退出游戏后应用。": [
+    "Press Insert by default to open the in-game menu; it cannot open when disabled. Exit the game completely before applying manager changes.",
+    "По умолчанию Insert открывает меню; отключённое меню открыть нельзя. Полностью закройте игру перед применением изменений менеджера.",
+    "既定では Insert でゲーム内メニューを開きます。無効化中は開けません。管理ソフトの変更はゲームを完全に終了してから適用してください。",
+    "기본적으로 Insert로 게임 내 메뉴를 엽니다. 비활성화된 메뉴는 열 수 없습니다. 관리자의 변경은 게임을 완전히 종료한 후 적용하세요."
+  ],
+  "DLL 加载入口（单选）": [
+    "DLL entry (choose one)",
+    "DLL-вход (один)",
+    "DLL 入口（単一選択）",
+    "DLL 진입점 (하나 선택)"
+  ],
+  "DLL 加载入口（可多选）": [
+    "DLL entries (multiple)",
+    "DLL-входы (несколько)",
+    "DLL 入口（複数選択可）",
+    "DLL 진입점 (여러 개 선택)"
+  ],
   "系统": [
     "System",
     "Система",
@@ -2315,11 +2339,11 @@
     "この上流版はversion.dllのみです。名前を変えたり他方式のDLLと混在させないでください。",
     "이 버전은 version.dll만 제공합니다. 이름을 바꾸거나 다른 방식의 DLL과 혼합하지 마세요."
   ],
-  "sdli1995原版使用D3D12；Vulkan可选0.2.6或独立Dlssg-MFG-Vulkan方案，兼容性需按游戏实测。": [
-    "The sdli1995 original uses D3D12. For Vulkan, choose 0.2.6 or the separate Dlssg-MFG-Vulkan scheme; test each game.",
-    "Оригинал sdli1995 использует D3D12. Для Vulkan выберите 0.2.6 или отдельную схему Dlssg-MFG-Vulkan; нужна проверка в каждой игре.",
-    "sdli1995原版はD3D12です。Vulkanは0.2.6または独立Dlssg-MFG-Vulkan方式を選び、ゲームごとに実測してください。",
-    "sdli1995 원본은 D3D12를 사용합니다. Vulkan은 0.2.6 또는 독립 Dlssg-MFG-Vulkan을 선택하고 게임별로 테스트하세요."
+  "此上游方案使用 D3D12；Vulkan 可选择三角洲扩展或独立 Vulkan 方案，兼容性需按游戏实测。": [
+    "This upstream scheme uses D3D12. For Vulkan, choose the Delta Force extension or the separate Vulkan scheme; test compatibility in each game.",
+    "Эта исходная схема использует D3D12. Для Vulkan выберите расширение Delta Force или отдельную схему Vulkan; проверьте совместимость в каждой игре.",
+    "この上流方式は D3D12 用です。Vulkan はデルタフォース拡張または独立 Vulkan 方式を選び、ゲームごとに互換性を確認してください。",
+    "이 업스트림 방식은 D3D12용입니다. Vulkan은 델타 포스 확장 또는 독립 Vulkan 방식을 선택하고 게임별 호환성을 확인하세요."
   ],
   "新上游方案：作者已宣布Vulkan支持，RTX20尚待实测；不包含三角洲专项。": [
     "New upstream scheme: Vulkan support announced; RTX20 needs testing. Delta Force-specific integration is not included.",
@@ -3730,5 +3754,107 @@
     "Каждая из шести прокси 0.4.0 использует отдельный файл. Устанавливайте одну точку входа. Первая загрузка включает обязательные компоненты и суперразрешение; кэш используется повторно.",
     "0.4.0 の六つのプロキシは各専用ファイルを使用し、一度に一つだけ導入します。初回は必須・超解像コンポーネントを取得し、切り替え時はキャッシュを再利用します。",
     "0.4.0의 6개 프록시는 각각 전용 파일을 사용하며 한 번에 하나만 설치합니다. 처음에는 필수 및 초해상도 구성 요소를 다운로드하고 이후 캐시를 재사용합니다."
+  ],
+  "GitCode 优先": [
+    "GitCode first",
+    "Сначала GitCode",
+    "GitCode を優先",
+    "GitCode 우선"
+  ],
+  "当前游戏": [
+    "Current game",
+    "Текущая игра",
+    "現在のゲーム",
+    "현재 게임"
+  ],
+  "请选择游戏": [
+    "Select a game",
+    "Выберите игру",
+    "ゲームを選択",
+    "게임 선택"
+  ],
+  "展开侧边栏": [
+    "Expand sidebar",
+    "Развернуть панель",
+    "サイドバーを展開",
+    "사이드바 펼치기"
+  ],
+  "收起侧边栏": [
+    "Collapse sidebar",
+    "Свернуть панель",
+    "サイドバーを折りたたむ",
+    "사이드바 접기"
+  ],
+  "1 · 逐位一致": [
+    "1 · Bit-identical",
+    "1 · Побитовое совпадение",
+    "1 · ビット単位で一致",
+    "1 · 비트 단위 일치"
+  ],
+  "2 · 上游默认（有损加速）": [
+    "2 · Upstream default (lossy acceleration)",
+    "2 · По умолчанию (ускорение с потерями)",
+    "2 · 開発元の既定値（非可逆の高速化）",
+    "2 · 원본 기본값 (손실 허용 가속)"
+  ],
+  "Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan": [
+    "Dlssg_for_sm86 · 0.3.5 · Delta Force support · DX12/Vulkan",
+    "Dlssg_for_sm86 · 0.3.5 · Поддержка Delta Force · DX12/Vulkan",
+    "Dlssg_for_sm86 · 0.3.5 · デルタフォース追加対応 · DX12/Vulkan",
+    "Dlssg_for_sm86 · 0.3.5 · 델타 포스 추가 지원 · DX12/Vulkan"
+  ],
+  "MFG 菜单 Backspace。DLL 可多选，OptiScaler 插件与 DLL 模式互斥。上游建议只装一个副本，多选可能重复加载。": [
+    "MFG menu: Backspace. Multiple DLLs allowed; OptiScaler plugin mode is exclusive. Upstream recommends one copy to avoid duplicate loading.",
+    "Меню MFG: Backspace. Можно выбрать несколько DLL; плагин OptiScaler используется отдельно. Автор рекомендует одну копию во избежание повторной загрузки.",
+    "MFG メニュー: Backspace。DLL は複数選択可。OptiScaler プラグインとは併用不可。重複ロードを避けるため、開発元は 1 コピーを推奨しています。",
+    "MFG 메뉴: Backspace. DLL 다중 선택 가능. OptiScaler 플러그인과 동시 사용 불가. 중복 로드를 피하려면 원작자는 한 개만 설치할 것을 권장합니다."
+  ],
+  "Encore 菜单 Insert。DLL 可多选，ASI 与 DLL 模式互斥。上游建议单入口，多选可能重复加载或崩溃。Bink 需保留原始 Hooked 文件。": [
+    "Encore menu: Insert. Multiple DLLs allowed; ASI mode is exclusive. Upstream recommends one entry; multiple copies may load twice or crash. Keep the original Bink Hooked file.",
+    "Меню Encore: Insert. Можно выбрать несколько DLL; ASI используется отдельно. Автор рекомендует один вход: возможна повторная загрузка или сбой. Сохраните исходный Bink Hooked.",
+    "Encore メニュー: Insert。DLL は複数選択可。ASI とは併用不可。開発元は単一入口を推奨。重複ロードやクラッシュの可能性があります。元の Bink Hooked は残してください。",
+    "Encore 메뉴: Insert. DLL 다중 선택 가능. ASI와 동시 사용 불가. 원작자는 단일 진입점을 권장하며 여러 개 사용 시 중복 로드나 충돌이 발생할 수 있습니다. 원본 Bink Hooked 파일을 보존하세요."
+  ],
+  "0.4.0 各代理使用对应文件，组件共用完整包。允许多选；上游建议只放一个入口，多选兼容性需自行测试。": [
+    "0.4.0 uses a dedicated file for each proxy, with shared components in one bundle. Multiple entries allowed; upstream recommends one. Compatibility must be tested in game.",
+    "0.4.0 использует отдельный файл для каждого прокси и общий пакет компонентов. Можно выбрать несколько входов; автор рекомендует один. Совместимость проверяется в игре.",
+    "0.4.0 は各プロキシ専用ファイルと共通の完全パッケージを使用します。複数選択可。開発元は単一入口を推奨。ゲームでの互換性確認が必要です。",
+    "0.4.0은 프록시별 전용 파일과 공통 전체 패키지를 사용합니다. 다중 선택 가능하지만 원작자는 단일 진입점을 권장합니다. 게임에서 호환성을 확인하세요."
+  ],
+  "字体大小": [
+    "Font size",
+    "Размер шрифта",
+    "文字サイズ",
+    "글자 크기"
+  ],
+  "缩小字体": [
+    "Smaller text",
+    "Уменьшить шрифт",
+    "文字を小さく",
+    "글자 축소"
+  ],
+  "放大字体": [
+    "Larger text",
+    "Увеличить шрифт",
+    "文字を大きく",
+    "글자 확대"
+  ],
+  "即时生效，控件与间距同步缩放": [
+    "Applies instantly; controls and spacing scale with text",
+    "Применяется сразу; элементы и отступы масштабируются вместе с текстом",
+    "すぐに反映。コントロールと間隔も拡大・縮小します",
+    "즉시 적용되며 컨트롤과 간격도 함께 조절됩니다"
+  ],
+  "移除游戏": [
+    "Remove games",
+    "Убрать игры",
+    "ゲームを削除",
+    "게임 제거"
+  ],
+  "窗口较窄，侧栏已自动收起": [
+    "Sidebar collapses automatically in narrow windows",
+    "Боковая панель свёрнута из-за узкого окна",
+    "狭いウィンドウではサイドバーが自動で折りたたまれます",
+    "좁은 창에서는 사이드바가 자동으로 접힙니다"
   ]
 }

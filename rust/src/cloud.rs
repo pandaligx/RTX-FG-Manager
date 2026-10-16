@@ -11,9 +11,9 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-pub const DOMESTIC: &str = "https://api.gitcode.com/api/v5/repos/gcw_qWIjmve7/RTX-FG-Manager/raw/cloud/v3/catalog.json?ref=main";
+pub const DOMESTIC: &str = "https://api.gitcode.com/api/v5/repos/gcw_qWIjmve7/RTX-FG-Manager/raw/cloud/bundles/catalog.json?ref=main";
 pub const GITHUB: &str =
-    "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/v3/catalog.json";
+    "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/bundles/catalog.json";
 pub const DELTA_SCHEME: &str = "rtxfg-0.3.5-dx12-vulkan";
 
 fn source_name(url: &str) -> &'static str {
@@ -65,6 +65,10 @@ pub struct Package {
     pub bytes: u64,
     pub sha256: String,
     pub files: Vec<File>,
+    /// A logical entry inside a complete scheme archive. Only this directory
+    /// is deployed; other loader variants in the ZIP remain in the cache.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub archive_prefix: String,
     #[serde(default)]
     pub component: bool,
     #[serde(default)]
@@ -207,12 +211,21 @@ impl CompactCatalog {
                     .iter()
                     .filter(|p| &p.archive == name)
                     .collect::<Vec<_>>();
-                ensure!(matches.len() == 1, "Missing or ambiguous archive: {name}");
-                let mut p = matches[0].clone();
-                p.scheme_id = s.id.clone();
-                p.label = s.name.clone();
-                p.labels = s.names.clone();
-                packages.push(p);
+                ensure!(
+                    !matches.is_empty()
+                        && (matches.len() == 1
+                            || matches
+                                .iter()
+                                .all(|p| !p.archive_prefix.is_empty() && p.scheme_id == s.id)),
+                    "Missing or ambiguous archive: {name}"
+                );
+                for item in matches {
+                    let mut p = item.clone();
+                    p.scheme_id = s.id.clone();
+                    p.label = s.name.clone();
+                    p.labels = s.names.clone();
+                    packages.push(p);
+                }
             }
             policies.insert(
                 s.id,
@@ -294,6 +307,16 @@ impl Catalog {
         let mut ids = BTreeSet::new();
         let mut routes = BTreeSet::new();
         for p in &self.packages {
+            ensure!(
+                p.archive_prefix.is_empty()
+                    || (p.archive_prefix.len() <= 150
+                        && p.archive_prefix
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+                        && p.archive_prefix != "."
+                        && p.archive_prefix != ".."),
+                "Invalid archive prefix"
+            );
             let policy = self
                 .scheme_policies
                 .get(&p.scheme_id)
@@ -362,7 +385,7 @@ impl Catalog {
             }
             for (source, url) in &p.urls {
                 ensure!(
-                    ["domestic", "github"].contains(&source.as_str()),
+                    ["domestic", "github", "gitee"].contains(&source.as_str()),
                     "Unknown package source"
                 );
                 safe_url(url)?;
@@ -575,15 +598,38 @@ impl Catalog {
     }
     pub fn schemes(&self) -> Vec<&Package> {
         let mut seen = BTreeSet::new();
-        self.packages
+        let mut schemes: Vec<_> = self
+            .packages
             .iter()
-            .filter(|p| p.scheme_id != "initial" && seen.insert(&p.scheme_id))
-            .collect()
+            .filter(|p| {
+                !matches!(p.scheme_id.as_str(), "initial" | "native-0.2.6-stable")
+                    && seen.insert(&p.scheme_id)
+            })
+            .collect();
+        const ORDER: [&str; 5] = [
+            "upstream-0.3.5-310-9",
+            "rtxfg-0.3.5-dx12-vulkan",
+            "pipotoufik-mfg-vulkan-sm86-7",
+            "rtx40mfg-1.3.3-hf2",
+            "dlssg-transfusion-1.4.5.3",
+        ];
+        schemes.sort_by_key(|p| {
+            (
+                ORDER
+                    .iter()
+                    .position(|id| *id == p.scheme_id)
+                    .unwrap_or(ORDER.len()),
+                p.scheme_id.as_str(),
+            )
+        });
+        schemes
     }
     pub fn supports_series(&self, id: &str, series: usize) -> bool {
         // Retain historical metadata for recognition and owned restoration,
         // but do not offer the retired first-release scheme for installation.
-        series <= 2 && id != "initial" && self.scheme_policies.contains_key(id)
+        series <= 2
+            && !matches!(id, "initial" | "native-0.2.6-stable")
+            && self.scheme_policies.contains_key(id)
     }
     /// Older cloud clients derived this legacy pair from `upstream035`.
     /// Only the identified Delta MFG implementation also has an automatic SM89 path.
@@ -622,6 +668,24 @@ impl Catalog {
                     .find(|p| p.scheme_id == self.default_scheme)
                     .unwrap()
             })
+    }
+    /// Current client capability. Legacy catalogs retain their single-entry
+    /// recommendation for older clients; only advertised entries are selectable.
+    pub fn selection_limit(&self, id: &str) -> usize {
+        let Some(policy) = self.scheme_policies.get(id) else {
+            return 0;
+        };
+        if matches!(
+            policy.parameter_profile.as_str(),
+            crate::upstream040::PROFILE
+                | crate::encore::PROFILE
+                | crate::rtxmfg::PROFILE
+                | crate::transfusion::PROFILE
+        ) {
+            self.proxies(id).len()
+        } else {
+            policy.max_selected_proxies
+        }
     }
     pub fn proxies(&self, id: &str) -> Vec<String> {
         if self
@@ -708,7 +772,7 @@ pub fn cached() -> Catalog {
 }
 fn cached_at(root: &Path) -> Catalog {
     // Keep schema-2 clients and their offline cache independent of this upgrade.
-    core::read_json(&root.join("cloud-catalog-v3.json"), 1024 * 1024)
+    core::read_json(&root.join("cloud-catalog-bundles.json"), 1024 * 1024)
         .ok()
         .and_then(|v| serde_json::from_value::<Catalog>(v).ok())
         .map(|mut c| {
@@ -800,14 +864,14 @@ pub fn refresh_with_options(
             c.validate()?;
             ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
             stage = "云端目录缓存写入失败";
-            core::atomic_json(&root.join("cloud-catalog-v3.json"), &c)?;
+            core::atomic_json(&root.join("cloud-catalog-bundles.json"), &c)?;
             Ok(c)
         })();
         match result {
             Ok(c) => return Ok(c),
-            Err(_) => {
+            Err(error) => {
                 ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
-                errors.push(format!("{name}: {stage}"));
+                errors.push(format!("{name}: {stage}（{error}）"));
                 progress(crate::transfer::Progress {
                     source: name.into(),
                     phase: crate::transfer::Phase::Switching,
@@ -818,10 +882,7 @@ pub fn refresh_with_options(
         }
     }
     ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
-    bail!(
-        "Cloud catalog unavailable; cached catalog retained: {}",
-        errors.join("；")
-    )
+    bail!("无法刷新补丁清单，已保留离线目录。{}", errors.join("；"))
 }
 
 pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
@@ -830,15 +891,47 @@ pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
         "Cloud archive integrity mismatch"
     );
     let mut z = zip::ZipArchive::new(Cursor::new(bytes))?;
-    ensure!(z.len() == p.files.len(), "Unexpected archive entries");
+    ensure!(
+        if p.archive_prefix.is_empty() {
+            z.len() == p.files.len()
+        } else {
+            z.len() >= p.files.len() && z.len() <= 512
+        },
+        "Unexpected archive entries"
+    );
     let mut out = BTreeMap::new();
+    // Validate the central directory even for entries not selected for deployment.
+    let mut names = BTreeSet::new();
+    let mut expanded = 0u64;
     for i in 0..z.len() {
-        let mut entry = z.by_index(i)?;
-        let f = p
-            .files
-            .iter()
-            .find(|f| f.name == entry.name())
-            .context("Unexpected archive path")?;
+        let entry = z.by_index(i)?;
+        let name = entry.name();
+        ensure!(
+            !entry.is_dir()
+                && !name.contains('\\')
+                && !name.contains(':')
+                && name
+                    .split('/')
+                    .all(|part| !part.is_empty() && part != "." && part != "..")
+                && names.insert(name.to_ascii_lowercase())
+                && entry.unix_mode().is_none_or(|m| m & 0o170000 != 0o120000),
+            "Invalid archive path"
+        );
+        expanded = expanded
+            .checked_add(entry.size())
+            .context("Archive size overflow")?;
+        ensure!(
+            entry.size() <= LIMIT && expanded <= 1024 * 1024 * 1024,
+            "Archive expands beyond limit"
+        );
+    }
+    for f in &p.files {
+        let path = if p.archive_prefix.is_empty() {
+            f.name.clone()
+        } else {
+            format!("{}/{}", p.archive_prefix, f.name)
+        };
+        let mut entry = z.by_name(&path).context("Missing archive member")?;
         ensure!(
             entry.size() == f.bytes
                 && !entry.is_dir()
@@ -920,13 +1013,16 @@ fn archive(
         fs::remove_file(core::no_links(&path)?)?;
     }
     let order = if c.prefer_github {
-        ["github", "domestic"]
+        ["github", "domestic", "gitee"]
     } else {
-        ["domestic", "github"]
+        ["domestic", "github", "gitee"]
     };
     let request = crate::transfer::Request {
         sources: order
             .into_iter()
+            .filter(|name| {
+                p.urls.contains_key(*name) || (*name != "gitee" && c.sources.contains_key(*name))
+            })
             .map(|name| {
                 let url = p
                     .urls
@@ -1012,6 +1108,10 @@ pub fn prepare_with_progress(
         });
     })?;
     ensure!(series <= 2, "Invalid GPU selection");
+    ensure!(
+        !matches!(scheme, "initial" | "native-0.2.6-stable"),
+        "Scheme retired; uninstall and restore remain available"
+    );
     let policy = c
         .scheme_policies
         .get(scheme)
@@ -1022,8 +1122,12 @@ pub fn prepare_with_progress(
         "Proxy unavailable in this scheme"
     );
     ensure!(
-        selected.len() <= policy.max_selected_proxies,
-        "This scheme requires a single DLL proxy"
+        selected.len() <= c.selection_limit(scheme),
+        "Too many entries for this scheme"
+    );
+    ensure!(
+        !selected.iter().any(|n| n.ends_with(".asi")) || selected.len() == 1,
+        "ASI plugin mode cannot be combined with DLL entries"
     );
     let mut out = BTreeMap::new();
     let mut backend = None;
@@ -1314,12 +1418,41 @@ mod tests {
     }
 
     #[test]
-    fn initial_scheme_is_retired_without_losing_legacy_metadata() {
+    fn initial_scheme_is_retired_and_stale_selection_falls_back() {
         let c = bundled();
         assert!(!c.schemes().iter().any(|p| p.scheme_id == "initial"));
         assert!((0..3).all(|series| !c.supports_series("initial", series)));
-        assert_eq!(c.selected("initial").scheme_id, "initial");
-        assert!(c.scheme_policies.contains_key("initial"));
+        assert_eq!(c.selected("initial").scheme_id, c.default_scheme);
+        assert!(!c.scheme_policies.contains_key("initial"));
+    }
+    #[test]
+    fn retired_026_is_hidden_and_scheme_order_is_stable() {
+        let mut c = bundled();
+        assert!((0..3).all(|series| !c.supports_series("native-0.2.6-stable", series)));
+        let expected = vec![
+            "upstream-0.3.5-310-9",
+            "rtxfg-0.3.5-dx12-vulkan",
+            "pipotoufik-mfg-vulkan-sm86-7",
+            "rtx40mfg-1.3.3-hf2",
+            "dlssg-transfusion-1.4.5.3",
+        ];
+        assert_eq!(
+            c.schemes()
+                .iter()
+                .map(|p| p.scheme_id.as_str())
+                .collect::<Vec<_>>(),
+            expected
+        );
+        c.packages.reverse();
+        assert_eq!(
+            c.schemes()
+                .iter()
+                .map(|p| p.scheme_id.as_str())
+                .collect::<Vec<_>>(),
+            expected
+        );
+        // Retired package metadata remains readable for owned cleanup/restoration.
+        assert!(c.scheme_policies.contains_key("native-0.2.6-stable"));
     }
     #[test]
     fn legacy_delta_policy_migration_is_idempotent_and_narrow() {
@@ -1477,7 +1610,7 @@ mod tests {
         }
     }
     #[test]
-    fn schema3_offline_start_does_not_regress_to_the_previous_clients_cache() {
+    fn bundle_offline_start_uses_own_cache_and_preserves_previous_clients_cache() {
         let root = tempfile::tempdir().unwrap();
         let old = include_bytes!("../../tests/fixtures/catalog429/catalog.json");
         fs::write(root.path().join("cloud-catalog.json"), old).unwrap();
@@ -1487,10 +1620,13 @@ mod tests {
             old
         );
         let mut next = bundled();
+        next.revision = "cached-bundle-revision".into();
         next.prefer_github = true;
         core::atomic_json(&root.path().join("cloud-catalog-v3.json"), &next).unwrap();
-        assert_eq!(cached_at(root.path()).schema, 3);
-        fs::write(root.path().join("cloud-catalog-v3.json"), b"broken").unwrap();
+        assert_eq!(cached_at(root.path()).revision, bundled().revision);
+        core::atomic_json(&root.path().join("cloud-catalog-bundles.json"), &next).unwrap();
+        assert_eq!(cached_at(root.path()).revision, "cached-bundle-revision");
+        fs::write(root.path().join("cloud-catalog-bundles.json"), b"broken").unwrap();
         assert_eq!(cached_at(root.path()).revision, bundled().revision);
     }
     #[test]

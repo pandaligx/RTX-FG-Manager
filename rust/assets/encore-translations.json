@@ -1570,5 +1570,41 @@
     "M",
     "M",
     "M"
+  ],
+  "禁用游戏内菜单": [
+    "Disable in-game menu",
+    "Отключить игровое меню",
+    "ゲーム内メニューを無効化",
+    "게임 내 메뉴 비활성화"
+  ],
+  "Encore 1.0.0：用于排查菜单冲突（如星球大战：亡命之徒）。插帧仍可工作；Insert 无法打开菜单，需在此关闭本项并重启游戏。": [
+    "Encore 1.0.0: for menu conflicts (e.g. Star Wars Outlaws). FG remains active. Insert cannot open the menu; turn this off here and restart to restore it.",
+    "Encore 1.0.0: при конфликте меню (например, Star Wars Outlaws). Генерация кадров работает. Insert не откроет меню; отключите этот параметр здесь и перезапустите игру.",
+    "Encore 1.0.0：メニューの競合対策（Star Wars Outlaws など）。フレーム生成は動作します。Insert で開けなくなるため、ここでオフにしてゲームを再起動してください。",
+    "Encore 1.0.0: 메뉴 충돌 해결용(예: Star Wars Outlaws). 프레임 생성은 유지됩니다. Insert로 열 수 없으므로 여기서 끈 후 게임을 다시 시작하세요."
+  ],
+  "DXGI 交换链调用日志": [
+    "DXGI swapchain call logging",
+    "Журнал вызовов цепочки DXGI",
+    "DXGI スワップチェーン呼び出しログ",
+    "DXGI 스왑 체인 호출 로그"
+  ],
+  "Encore 1.0.0：记录游戏对菜单交换链的调用，用于排查菜单加载后的崩溃。默认关闭；需重启，收集后关闭。": [
+    "Encore 1.0.0: logs game calls to the menu swapchain to diagnose crashes after menu attachment. Off by default; restart required. Disable after collecting logs.",
+    "Encore 1.0.0: журнал обращений игры к цепочке меню для диагностики сбоев после подключения меню. По умолчанию выключен; нужен перезапуск. Отключите после сбора.",
+    "Encore 1.0.0：メニュー接続後のクラッシュ調査用にスワップチェーンへの呼び出しを記録。既定はオフ、再起動が必要です。収集後はオフにしてください。",
+    "Encore 1.0.0: 메뉴 연결 후 충돌 진단을 위해 메뉴 스왑 체인 호출을 기록합니다. 기본값은 꺼짐이며 재시작이 필요합니다. 수집 후 끄세요."
+  ],
+  "详细崩溃转储": [
+    "Detailed crash dumps",
+    "Подробные дампы сбоев",
+    "詳細なクラッシュダンプ",
+    "상세 충돌 덤프"
+  ],
+  "Encore 1.0.0：异常日志包含寄存器和栈，崩溃时生成 .dmp（通常数十 MB）。仅诊断时开启，收集后关闭；需重启。转储可能包含进程内存，请谨慎分享。": [
+    "Encore 1.0.0: adds register/stack details and a .dmp on crashes (often tens of MB). Diagnostics only; disable afterwards and restart. Dumps may contain process memory; review before sharing.",
+    "Encore 1.0.0: регистры, стек и .dmp при сбое (обычно десятки МБ). Только для диагностики; затем отключите и перезапустите. Дамп может содержать память процесса; проверьте перед отправкой.",
+    "Encore 1.0.0：レジスターとスタックを記録し、クラッシュ時に .dmp（通常数十 MB）を生成。診断後はオフにして再起動してください。プロセスメモリを含むため共有に注意。",
+    "Encore 1.0.0: 레지스터·스택 정보와 충돌 시 .dmp(보통 수십 MB)를 생성합니다. 진단 후 끄고 재시작하세요. 프로세스 메모리가 포함될 수 있으니 공유 전 확인하세요."
   ]
 }

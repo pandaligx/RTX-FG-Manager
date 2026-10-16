@@ -99,8 +99,7 @@ fn rtx40_json_protocol_is_separate_and_preserves_menu_settings() -> Result<()> {
     );
     assert!(core::deployment_names("upstream_sm86", &["d3d11.dll".into()]).is_err());
     assert!(
-        core::deployment_names(rtxmfg::BACKEND, &["version.dll".into(), "dxgi.dll".into()])
-            .is_err()
+        core::deployment_names(rtxmfg::BACKEND, &["version.dll".into(), "dxgi.dll".into()]).is_ok()
     );
     Ok(())
 }

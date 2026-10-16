@@ -2,11 +2,12 @@
   "default_scheme": "upstream-0.3.5-310-9",
   "packages": [
     {
-      "archive": "dlssg-mfg-vulkan-sm86-7-20260922-version.zip",
+      "archive": "pipotoufik-mfg-vulkan-sm86-7-complete-7bf5630b9834.zip",
+      "archive_prefix": "pipotoufik-mfg-vulkan-sm86-7-version",
       "backends": [
         "upstream_sm86"
       ],
-      "bytes": 4509186,
+      "bytes": 4540182,
       "files": [
         {
           "bytes": 4267,
@@ -24,19 +25,21 @@
       "labels": {},
       "proxy": "version.dll",
       "scheme_id": "pipotoufik-mfg-vulkan-sm86-7",
-      "sha256": "b6e6769f37c1f3ca338da97d7634f42cedef0124f10e8026fa2ea29e0026af7a",
+      "sha256": "7bf5630b983471c476551b50c01022051c12e1ec60a57f2522e1cfdfa4fda9c7",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-mfg-vulkan-sm86-7-20260922-version.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-mfg-vulkan-sm86-7-20260922-version.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/pipotoufik-mfg-vulkan-sm86-7-complete-7bf5630b9834.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/pipotoufik-mfg-vulkan-sm86-7-complete-7bf5630b9834.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/pipotoufik-mfg-vulkan-sm86-7-complete-7bf5630b9834.zip"
       },
       "version": "1.0.0"
     },
     {
-      "archive": "rtxfg-0.3.5-mfg-v421-version-signed-backend-v425.zip",
+      "archive": "rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+      "archive_prefix": "rtxfg-0.3.5-mfg-v421-version-signed-backend-v425",
       "backends": [
         "upstream_sm86"
       ],
-      "bytes": 10838114,
+      "bytes": 65044232,
       "files": [
         {
           "bytes": 4179,
@@ -59,19 +62,21 @@
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
-      "sha256": "b24a3c67609aee6e6df6fa3314835590d0a16decfadadb14ebdd3f813c089c56",
+      "sha256": "e67e9e65c7d40870becb8efbf30f354b218e8682d6d50c63678b62fba7aacc4c",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-mfg-v421-version-signed-backend-v425.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-mfg-v421-version-signed-backend-v425.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip"
       },
       "version": "0.3.5"
     },
     {
-      "archive": "rtxfg-0.3.5-mfg-v421-winmm-signed-backend-v425.zip",
+      "archive": "rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+      "archive_prefix": "rtxfg-0.3.5-mfg-v421-winmm-signed-backend-v425",
       "backends": [
         "upstream_sm86"
       ],
-      "bytes": 10844105,
+      "bytes": 65044232,
       "files": [
         {
           "bytes": 4179,
@@ -94,19 +99,21 @@
       },
       "proxy": "winmm.dll",
       "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
-      "sha256": "829f8614feaf57c78f4ae66a53f7a7f9dbd12469b02d177374a9d958bdf46662",
+      "sha256": "e67e9e65c7d40870becb8efbf30f354b218e8682d6d50c63678b62fba7aacc4c",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-mfg-v421-winmm-signed-backend-v425.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-mfg-v421-winmm-signed-backend-v425.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip"
       },
       "version": "0.3.5"
     },
     {
-      "archive": "rtxfg-0.3.5-mfg-v421-dinput8-signed-backend-v425.zip",
+      "archive": "rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+      "archive_prefix": "rtxfg-0.3.5-mfg-v421-dinput8-signed-backend-v425",
       "backends": [
         "upstream_sm86"
       ],
-      "bytes": 10837843,
+      "bytes": 65044232,
       "files": [
         {
           "bytes": 34154368,
@@ -129,19 +136,21 @@
       },
       "proxy": "dinput8.dll",
       "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
-      "sha256": "db46d03ec85144cc82dc74b48c0b90f0b0796221995a8dd660506b7b8e8b4a93",
+      "sha256": "e67e9e65c7d40870becb8efbf30f354b218e8682d6d50c63678b62fba7aacc4c",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-mfg-v421-dinput8-signed-backend-v425.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-mfg-v421-dinput8-signed-backend-v425.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip"
       },
       "version": "0.3.5"
     },
     {
-      "archive": "rtxfg-0.3.5-mfg-v421-dbghelp-signed-backend-v425.zip",
+      "archive": "rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+      "archive_prefix": "rtxfg-0.3.5-mfg-v421-dbghelp-signed-backend-v425",
       "backends": [
         "upstream_sm86"
       ],
-      "bytes": 10845840,
+      "bytes": 65044232,
       "files": [
         {
           "bytes": 34173488,
@@ -164,19 +173,21 @@
       },
       "proxy": "dbghelp.dll",
       "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
-      "sha256": "c76cd58ec08da9d26ee3af56b389f4ae7854c823bff7bded8f1c9163af44bc83",
+      "sha256": "e67e9e65c7d40870becb8efbf30f354b218e8682d6d50c63678b62fba7aacc4c",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-mfg-v421-dbghelp-signed-backend-v425.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-mfg-v421-dbghelp-signed-backend-v425.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip"
       },
       "version": "0.3.5"
     },
     {
-      "archive": "rtxfg-0.3.5-mfg-v421-dxgi-signed-backend-v425.zip",
+      "archive": "rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+      "archive_prefix": "rtxfg-0.3.5-mfg-v421-dxgi-signed-backend-v425",
       "backends": [
         "upstream_sm86"
       ],
-      "bytes": 10838613,
+      "bytes": 65044232,
       "files": [
         {
           "bytes": 4179,
@@ -199,19 +210,21 @@
       },
       "proxy": "dxgi.dll",
       "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
-      "sha256": "bfb82b5d1e5c54de405f7e5988b2837a2f4dea0b7a7f4d9b979087d024b9d0ca",
+      "sha256": "e67e9e65c7d40870becb8efbf30f354b218e8682d6d50c63678b62fba7aacc4c",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-mfg-v421-dxgi-signed-backend-v425.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-mfg-v421-dxgi-signed-backend-v425.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip"
       },
       "version": "0.3.5"
     },
     {
-      "archive": "rtxfg-0.3.5-mfg-v421-d3d12-signed-backend-v425.zip",
+      "archive": "rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+      "archive_prefix": "rtxfg-0.3.5-mfg-v421-d3d12-signed-backend-v425",
       "backends": [
         "upstream_sm86"
       ],
-      "bytes": 10838679,
+      "bytes": 65044232,
       "files": [
         {
           "bytes": 34154840,
@@ -234,20 +247,22 @@
       },
       "proxy": "d3d12.dll",
       "scheme_id": "rtxfg-0.3.5-dx12-vulkan",
-      "sha256": "71066ab6d4baafba122fa1a305842a86391354ef2b6adb7bb11f54b6467bcfd8",
+      "sha256": "e67e9e65c7d40870becb8efbf30f354b218e8682d6d50c63678b62fba7aacc4c",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-mfg-v421-d3d12-signed-backend-v425.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-mfg-v421-d3d12-signed-backend-v425.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip"
       },
       "version": "0.3.5"
     },
     {
-      "archive": "native-0.2.6-stable-version.zip",
+      "archive": "native-0.2.6-stable-complete-1557490dc742.zip",
+      "archive_prefix": "native-0.2.6-stable-version",
       "backends": [
         "native20",
         "native30"
       ],
-      "bytes": 5217058,
+      "bytes": 26279200,
       "files": [
         {
           "bytes": 581,
@@ -265,20 +280,22 @@
       "labels": {},
       "proxy": "version.dll",
       "scheme_id": "native-0.2.6-stable",
-      "sha256": "1261f179aae5da7ea8f72c71d4fb7cabba9c4d741b57d49a6703080087b3d655",
+      "sha256": "1557490dc742b90f4489acfb971e55f2bb64d29f970d28bcd65ffbc24a1390c6",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-version.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-version.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip"
       },
       "version": "0.2.6"
     },
     {
-      "archive": "native-0.2.6-stable-winmm.zip",
+      "archive": "native-0.2.6-stable-complete-1557490dc742.zip",
+      "archive_prefix": "native-0.2.6-stable-winmm",
       "backends": [
         "native20",
         "native30"
       ],
-      "bytes": 5220293,
+      "bytes": 26279200,
       "files": [
         {
           "bytes": 581,
@@ -296,20 +313,22 @@
       "labels": {},
       "proxy": "winmm.dll",
       "scheme_id": "native-0.2.6-stable",
-      "sha256": "e59be6966cae49fe54bf9306882788bfd21dfb02dc218eb0530017b064356331",
+      "sha256": "1557490dc742b90f4489acfb971e55f2bb64d29f970d28bcd65ffbc24a1390c6",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-winmm.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-winmm.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip"
       },
       "version": "0.2.6"
     },
     {
-      "archive": "native-0.2.6-stable-dinput8.zip",
+      "archive": "native-0.2.6-stable-complete-1557490dc742.zip",
+      "archive_prefix": "native-0.2.6-stable-dinput8",
       "backends": [
         "native20",
         "native30"
       ],
-      "bytes": 5216999,
+      "bytes": 26279200,
       "files": [
         {
           "bytes": 16127000,
@@ -327,20 +346,22 @@
       "labels": {},
       "proxy": "dinput8.dll",
       "scheme_id": "native-0.2.6-stable",
-      "sha256": "d0107cb6711952884e863312ed92e31f3f1a84e33a27971114022a573164be05",
+      "sha256": "1557490dc742b90f4489acfb971e55f2bb64d29f970d28bcd65ffbc24a1390c6",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-dinput8.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-dinput8.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip"
       },
       "version": "0.2.6"
     },
     {
-      "archive": "native-0.2.6-stable-winhttp.zip",
+      "archive": "native-0.2.6-stable-complete-1557490dc742.zip",
+      "archive_prefix": "native-0.2.6-stable-winhttp",
       "backends": [
         "native20",
         "native30"
       ],
-      "bytes": 5218577,
+      "bytes": 26279200,
       "files": [
         {
           "bytes": 581,
@@ -358,20 +379,22 @@
       "labels": {},
       "proxy": "winhttp.dll",
       "scheme_id": "native-0.2.6-stable",
-      "sha256": "e163daf7f35a10c4b5c8df8b9528546a87b0e6b3310dd36966c505ebb7215574",
+      "sha256": "1557490dc742b90f4489acfb971e55f2bb64d29f970d28bcd65ffbc24a1390c6",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-winhttp.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-winhttp.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip"
       },
       "version": "0.2.6"
     },
     {
-      "archive": "native-0.2.6-stable-dxgi.zip",
+      "archive": "native-0.2.6-stable-complete-1557490dc742.zip",
+      "archive_prefix": "native-0.2.6-stable-dxgi",
       "backends": [
         "native20",
         "native30"
       ],
-      "bytes": 5217363,
+      "bytes": 26279200,
       "files": [
         {
           "bytes": 581,
@@ -389,89 +412,21 @@
       "labels": {},
       "proxy": "dxgi.dll",
       "scheme_id": "native-0.2.6-stable",
-      "sha256": "a1b4aefb2fd9b35d347733be1f957a857aeac07006bbe0a86224fdb740f64e66",
+      "sha256": "1557490dc742b90f4489acfb971e55f2bb64d29f970d28bcd65ffbc24a1390c6",
       "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-dxgi.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-dxgi.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/native-0.2.6-stable-complete-1557490dc742.zip"
       },
       "version": "0.2.6"
     },
     {
-      "archive": "initial-rtx20-version-signed-backend-v425.zip",
-      "backends": [
-        "rtx20"
-      ],
-      "bytes": 5615059,
-      "files": [
-        {
-          "bytes": 791,
-          "name": "dlssg_sm86.ini",
-          "sha256": "106b4877495b6329bf2a085b7c01268a812e45996a140a3bafa27b8a19e8fb45"
-        },
-        {
-          "bytes": 17340128,
-          "name": "version.dll",
-          "sha256": "50d844ed3b341b1cc7a06720c9a52abe678554e95baf381f375c846f89795637"
-        }
-      ],
-      "id": "initial-rtx20-version-signed-backend-v425",
-      "label": "初始方案 · Github 第一版",
-      "labels": {
-        "en": "Initial · GitHub first release",
-        "ja": "初期版 · GitHub 初回リリース",
-        "ko": "초기 버전 · GitHub 첫 릴리스",
-        "ru": "Исходный · Первый выпуск GitHub"
-      },
-      "proxy": "version.dll",
-      "scheme_id": "initial",
-      "sha256": "4c3f28840185adc960a73417b5d483b3b1bb8a6c02b46c9afdfde3c96b23fd45",
-      "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/initial-rtx20-version-signed-backend-v425.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/initial-rtx20-version-signed-backend-v425.zip"
-      },
-      "version": "0.1.0"
-    },
-    {
-      "archive": "initial-rtx30-version-signed-backend-v425.zip",
-      "backends": [
-        "rtx30"
-      ],
-      "bytes": 4763630,
-      "files": [
-        {
-          "bytes": 1459,
-          "name": "dlssg_sm86.ini",
-          "sha256": "77a698310818b90039b72c61331cb50e7fc6692eff220ca9eb14c494998c96b8"
-        },
-        {
-          "bytes": 13209112,
-          "name": "version.dll",
-          "sha256": "8d6d8e9aebe8a8deae84e3f9ed0f3d0ba474a13d18b457cc38d858bc558e3328"
-        }
-      ],
-      "id": "initial-rtx30-version-signed-backend-v425",
-      "label": "初始方案 · Github 第一版",
-      "labels": {
-        "en": "Initial · GitHub first release",
-        "ja": "初期版 · GitHub 初回リリース",
-        "ko": "초기 버전 · GitHub 첫 릴리스",
-        "ru": "Исходный · Первый выпуск GitHub"
-      },
-      "proxy": "version.dll",
-      "scheme_id": "initial",
-      "sha256": "852ca38d414271dd069b22cdf3e869d6b19b47a050d0cde0749bc4a19754ba5b",
-      "urls": {
-        "domestic": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/initial-rtx30-version-signed-backend-v425.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/initial-rtx30-version-signed-backend-v425.zip"
-      },
-      "version": "0.1.0"
-    },
-    {
-      "archive": "dlssg-0.4.0-entry-version-24d7e3e60799.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-entry-version-24d7e3e60799",
       "backends": [
         "upstream040"
       ],
-      "bytes": 405158,
+      "bytes": 81565970,
       "component": false,
       "files": [
         {
@@ -496,20 +451,22 @@
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "24d7e3e60799d83108896bc5483aafa9b965d4631ea105dbb75a969126f4e870",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-entry-version-24d7e3e60799.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-entry-version-24d7e3e60799.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-entry-winmm-d1038788f6e9.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-entry-winmm-d1038788f6e9",
       "backends": [
         "upstream040"
       ],
-      "bytes": 408949,
+      "bytes": 81565970,
       "component": false,
       "files": [
         {
@@ -534,20 +491,22 @@
       },
       "proxy": "winmm.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "d1038788f6e95b8851fd02bb16826782ee953e42d9fa7f74351447df6aad7db4",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-entry-winmm-d1038788f6e9.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-entry-winmm-d1038788f6e9.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-entry-dbghelp-2d826613c34d.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-entry-dbghelp-2d826613c34d",
       "backends": [
         "upstream040"
       ],
-      "bytes": 410986,
+      "bytes": 81565970,
       "component": false,
       "files": [
         {
@@ -572,20 +531,22 @@
       },
       "proxy": "dbghelp.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "2d826613c34d84ffa23633506d7b73150bacba39182c269ee1bbb824ff0cbab3",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-entry-dbghelp-2d826613c34d.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-entry-dbghelp-2d826613c34d.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-entry-dinput8-25ab136b0ac9.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-entry-dinput8-25ab136b0ac9",
       "backends": [
         "upstream040"
       ],
-      "bytes": 405118,
+      "bytes": 81565970,
       "component": false,
       "files": [
         {
@@ -610,20 +571,22 @@
       },
       "proxy": "dinput8.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "25ab136b0ac95d948af37f8a977580b30c05e28090a02c44af09daa467063c43",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-entry-dinput8-25ab136b0ac9.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-entry-dinput8-25ab136b0ac9.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-entry-dxgi-d06944a2d973.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-entry-dxgi-d06944a2d973",
       "backends": [
         "upstream040"
       ],
-      "bytes": 405438,
+      "bytes": 81565970,
       "component": false,
       "files": [
         {
@@ -648,20 +611,22 @@
       },
       "proxy": "dxgi.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "d06944a2d973b43a33af0fbe1d7baa80aaa28d130c7c84ed0dc5460ca296c15f",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-entry-dxgi-d06944a2d973.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-entry-dxgi-d06944a2d973.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-entry-d3d12-4c9d59fca5f2.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-entry-d3d12-4c9d59fca5f2",
       "backends": [
         "upstream040"
       ],
-      "bytes": 405461,
+      "bytes": 81565970,
       "component": false,
       "files": [
         {
@@ -686,20 +651,22 @@
       },
       "proxy": "d3d12.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "4c9d59fca5f2b3ad4524c433e6e3e80b8dc173a716e5217b4c9613ca61b4e2c8",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-entry-d3d12-4c9d59fca5f2.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-entry-d3d12-4c9d59fca5f2.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-component-backend-sm86_backend-f95abda0ad2f.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-component-backend-sm86_backend-f95abda0ad2f",
       "backends": [
         "upstream040"
       ],
-      "bytes": 953840,
+      "bytes": 81565970,
       "component": true,
       "files": [
         {
@@ -719,20 +686,22 @@
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "f95abda0ad2fb380807eb8c6e41faa348fb689076818c5321d9fc34c44d167bd",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-component-backend-sm86_backend-f95abda0ad2f.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-component-backend-sm86_backend-f95abda0ad2f.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-component-kernels-fg_kernels-109b29bbbfff.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-component-kernels-fg_kernels-109b29bbbfff",
       "backends": [
         "upstream040"
       ],
-      "bytes": 3798142,
+      "bytes": 81565970,
       "component": true,
       "files": [
         {
@@ -752,20 +721,22 @@
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "109b29bbbfff9f638d4b438f2f5291b944d6e4c72456d3299bb41bc58db38bd5",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-component-kernels-fg_kernels-109b29bbbfff.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-component-kernels-fg_kernels-109b29bbbfff.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-component-runtime-nvngx_dlssg-579f4496e3cd.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-component-runtime-nvngx_dlssg-579f4496e3cd",
       "backends": [
         "upstream040"
       ],
-      "bytes": 3722759,
+      "bytes": 81565970,
       "component": true,
       "files": [
         {
@@ -785,20 +756,22 @@
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "579f4496e3cd920cc593dc98f2c968369763bd07f316c3aacab6374f5369ce18",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-component-runtime-nvngx_dlssg-579f4496e3cd.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-component-runtime-nvngx_dlssg-579f4496e3cd.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-component-xefg-xefg_kernels-251e26453b9e.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-component-xefg-xefg_kernels-251e26453b9e",
       "backends": [
         "upstream040"
       ],
-      "bytes": 3379082,
+      "bytes": 81565970,
       "component": true,
       "files": [
         {
@@ -818,20 +791,22 @@
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "251e26453b9ebcba81187270a6a27952d44142ad8c7f7a50f0619dd3c945e556",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-component-xefg-xefg_kernels-251e26453b9e.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-component-xefg-xefg_kernels-251e26453b9e.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-component-sr-nvngx_dlss-c1e6c0ccac04.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-component-sr-nvngx_dlss-c1e6c0ccac04",
       "backends": [
         "upstream040"
       ],
-      "bytes": 45374781,
+      "bytes": 81565970,
       "component": true,
       "files": [
         {
@@ -851,20 +826,22 @@
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "c1e6c0ccac04005fdb1606f19ef77eec09d1b20613978e5eddb7c947751a7a48",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-component-sr-nvngx_dlss-c1e6c0ccac04.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-component-sr-nvngx_dlss-c1e6c0ccac04.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-component-sr-sr_kernels-1c0504c4c3f3.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-component-sr-sr_kernels-1c0504c4c3f3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 21890549,
+      "bytes": 81565970,
       "component": true,
       "files": [
         {
@@ -884,20 +861,22 @@
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "1c0504c4c3f333671256ee5618c0da875c0b182c4faa423216a0a108ad1e2390",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-component-sr-sr_kernels-1c0504c4c3f3.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-component-sr-sr_kernels-1c0504c4c3f3.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "dlssg-0.4.0-notices-ca05d6c86252.zip",
+      "archive": "dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+      "archive_prefix": "dlssg-0.4.0-notices-ca05d6c86252",
       "backends": [
         "upstream040"
       ],
-      "bytes": 4299,
+      "bytes": 81565970,
       "component": true,
       "files": [
         {
@@ -922,26 +901,28 @@
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "ca05d6c86252d08742ac59fa88150bd6205b0b3cacae1274d94835b5697719a3",
+      "sha256": "d71fbfcc9bb2f43bac87f43db3d0ee457b23bd45eee388dd21d02a5fa129f2a2",
       "upstream_version": "0.4.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/dlssg-0.4.0-notices-ca05d6c86252.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/dlssg-0.4.0-notices-ca05d6c86252.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
       },
       "version": "0.4.0"
     },
     {
-      "archive": "mfg-unlocker-1.5.0-universal-23f196cc1bc3.zip",
+      "archive": "mfg-unlocker-1.5.0-hotfix.1-complete-19fcfe48ae9d.zip",
+      "archive_prefix": "mfg-unlocker-1.5.0-hotfix.1-a7f4b489f5a1",
       "backends": [
         "rtx40mfg"
       ],
-      "bytes": 3184155,
+      "bytes": 3184500,
       "component": false,
       "files": [
         {
-          "bytes": 1999,
+          "bytes": 3987,
           "name": "MFG-Unlocker-NOTICES.txt",
-          "sha256": "4b2542b1ab25195265dbe8db94ff47626c75fe6e72cb031c5f7b62734cffe163"
+          "sha256": "5d318c6137decdd6117d477b9e0a6b252d1b092004574f5862d4fdb9852bff12"
         },
         {
           "bytes": 115,
@@ -949,36 +930,38 @@
           "sha256": "e9fdd691bc81bca1cf7972c69affaefef210cccef5e49fc81ebdba2c67c06a31"
         },
         {
-          "bytes": 9024352,
+          "bytes": 9023328,
           "name": "version.dll",
-          "sha256": "ab10a084864eebed49729530cbc517bdc8c396923b661f65725ddf1bd3af6fa1"
+          "sha256": "a7f4b489f5a1ef14eec5a93f16766f200e776e815367a1be54443b368775fd11"
         }
       ],
-      "id": "mfg-unlocker-1.5.0-universal-23f196cc1bc3",
-      "label": "MFG Unlocker · 1.5.0",
+      "id": "mfg-unlocker-1.5.0-hotfix.1-a7f4b489f5a1",
+      "label": "MFG Unlocker · 1.5.0 Hotfix 1",
       "labels": {
-        "en": "MFG Unlocker · 1.5.0",
-        "ja": "MFG Unlocker · 1.5.0",
-        "ko": "MFG Unlocker · 1.5.0",
-        "ru": "MFG Unlocker · 1.5.0",
-        "zh": "MFG Unlocker · 1.5.0"
+        "en": "MFG Unlocker · 1.5.0 Hotfix 1",
+        "ja": "MFG Unlocker · 1.5.0 Hotfix 1",
+        "ko": "MFG Unlocker · 1.5.0 Hotfix 1",
+        "ru": "MFG Unlocker · 1.5.0 Hotfix 1",
+        "zh": "MFG Unlocker · 1.5.0 Hotfix 1"
       },
       "proxy": "version.dll",
       "scheme_id": "rtx40mfg-1.3.3-hf2",
-      "sha256": "23f196cc1bc3e5c595288c57d9652b72031bdd9bb15b4b9cf14496ca3dce7e99",
-      "upstream_version": "1.5.0",
+      "sha256": "19fcfe48ae9d5bef722c0fa5430131f3b415bd4d01982bcac3167fd4839c88a3",
+      "upstream_version": "1.5.0-hotfix.1",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/mfg-unlocker-1.5.0-universal-23f196cc1bc3.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/mfg-unlocker-1.5.0-universal-23f196cc1bc3.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/mfg-unlocker-1.5.0-hotfix.1-complete-19fcfe48ae9d.zip",
+        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/mfg-unlocker-1.5.0-hotfix.1-complete-19fcfe48ae9d.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/mfg-unlocker-1.5.0-hotfix.1-complete-19fcfe48ae9d.zip"
       },
       "version": "1.5.0"
     },
     {
-      "archive": "rtx-encore-1.0.0-rc.3-winhttp-dll-c63c82031756.zip",
+      "archive": "rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+      "archive_prefix": "rtx-encore-1.0.0-winhttp-dll-b013326c8cb6",
       "backends": [
         "encore"
       ],
-      "bytes": 20985727,
+      "bytes": 125346267,
       "component": false,
       "files": [
         {
@@ -987,41 +970,42 @@
           "sha256": "9b1d0a846f18f047e748b9d375523ebd73893183b66fcd10ed1e94d7f13175b0"
         },
         {
-          "bytes": 16823,
+          "bytes": 17570,
           "name": "rtx-encore.jsonc",
-          "sha256": "5e5428e2de72fe04d2e0559af29d039b05b09ad5aea1a32c1e9973df68967a51"
+          "sha256": "1c2e4350ce814e4f76236166b5e5444e26de3762e1bb869ea08d4a738c59a1dd"
         },
         {
-          "bytes": 94160696,
+          "bytes": 94325976,
           "name": "winhttp.dll",
-          "sha256": "030cfd0d129a189076a9d4e2e94b208c52623194d60e6e90f7601417f5b88415"
+          "sha256": "b013326c8cb6cc131cb35388722b6c00008932f116977a19ba6bdfd53f24ba20"
         }
       ],
-      "id": "rtx-encore-1.0.0-rc.3-winhttp-dll-c63c82031756",
-      "label": "RTX Encore · 1.0.0-rc.3",
+      "id": "rtx-encore-1.0.0-winhttp-dll-b013326c8cb6",
+      "label": "RTX Encore · 1.0.0",
       "labels": {
-        "en": "RTX Encore · 1.0.0-rc.3",
-        "ja": "RTX Encore · 1.0.0-rc.3",
-        "ko": "RTX Encore · 1.0.0-rc.3",
-        "ru": "RTX Encore · 1.0.0-rc.3",
-        "zh": "RTX Encore · 1.0.0-rc.3"
+        "en": "RTX Encore · 1.0.0",
+        "ja": "RTX Encore · 1.0.0",
+        "ko": "RTX Encore · 1.0.0",
+        "ru": "RTX Encore · 1.0.0",
+        "zh": "RTX Encore · 1.0.0"
       },
       "proxy": "winhttp.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "c63c820317565ddcb421cdd779c7f8756ec321ab5fe5635c6d12b4ff95e6d14f",
-      "upstream_version": "1.0.0-rc.3",
+      "sha256": "ae13c7cbec32936ff56ca0e9cacf78604e0aedaeb738d4e7b1b52c3b4280c294",
+      "upstream_version": "1.0.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/rtx-encore-1.0.0-rc.3-winhttp-dll-c63c82031756.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/rtx-encore-1.0.0-rc.3-winhttp-dll-c63c82031756.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip"
       },
       "version": "1.0.0"
     },
     {
-      "archive": "rtx-encore-1.0.0-rc.3-version-dll-d07c40cbace9.zip",
+      "archive": "rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+      "archive_prefix": "rtx-encore-1.0.0-version-dll-c9032b9eba91",
       "backends": [
         "encore"
       ],
-      "bytes": 20949869,
+      "bytes": 125346267,
       "component": false,
       "files": [
         {
@@ -1030,41 +1014,42 @@
           "sha256": "9b1d0a846f18f047e748b9d375523ebd73893183b66fcd10ed1e94d7f13175b0"
         },
         {
-          "bytes": 16823,
+          "bytes": 17570,
           "name": "rtx-encore.jsonc",
-          "sha256": "5e5428e2de72fe04d2e0559af29d039b05b09ad5aea1a32c1e9973df68967a51"
+          "sha256": "1c2e4350ce814e4f76236166b5e5444e26de3762e1bb869ea08d4a738c59a1dd"
         },
         {
-          "bytes": 93913256,
+          "bytes": 94078056,
           "name": "version.dll",
-          "sha256": "c6393f7c5ff687eff9db5d5a37c93b4d236dd7cb5c1e849f6b7616bcb2635b23"
+          "sha256": "c9032b9eba911d49c8ad36816a8dce02d8ce87c569e9647782b3d81ae28a51e5"
         }
       ],
-      "id": "rtx-encore-1.0.0-rc.3-version-dll-d07c40cbace9",
-      "label": "RTX Encore · 1.0.0-rc.3",
+      "id": "rtx-encore-1.0.0-version-dll-c9032b9eba91",
+      "label": "RTX Encore · 1.0.0",
       "labels": {
-        "en": "RTX Encore · 1.0.0-rc.3",
-        "ja": "RTX Encore · 1.0.0-rc.3",
-        "ko": "RTX Encore · 1.0.0-rc.3",
-        "ru": "RTX Encore · 1.0.0-rc.3",
-        "zh": "RTX Encore · 1.0.0-rc.3"
+        "en": "RTX Encore · 1.0.0",
+        "ja": "RTX Encore · 1.0.0",
+        "ko": "RTX Encore · 1.0.0",
+        "ru": "RTX Encore · 1.0.0",
+        "zh": "RTX Encore · 1.0.0"
       },
       "proxy": "version.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "d07c40cbace911acf11931c050ab5d841a02806366d423d7016f2e4681c06dfa",
-      "upstream_version": "1.0.0-rc.3",
+      "sha256": "ae13c7cbec32936ff56ca0e9cacf78604e0aedaeb738d4e7b1b52c3b4280c294",
+      "upstream_version": "1.0.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/rtx-encore-1.0.0-rc.3-version-dll-d07c40cbace9.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/rtx-encore-1.0.0-rc.3-version-dll-d07c40cbace9.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip"
       },
       "version": "1.0.0"
     },
     {
-      "archive": "rtx-encore-1.0.0-rc.3-winmm-dll-9d8a7d29c4c5.zip",
+      "archive": "rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+      "archive_prefix": "rtx-encore-1.0.0-winmm-dll-679a1b17a736",
       "backends": [
         "encore"
       ],
-      "bytes": 20953061,
+      "bytes": 125346267,
       "component": false,
       "files": [
         {
@@ -1073,47 +1058,48 @@
           "sha256": "9b1d0a846f18f047e748b9d375523ebd73893183b66fcd10ed1e94d7f13175b0"
         },
         {
-          "bytes": 16823,
+          "bytes": 17570,
           "name": "rtx-encore.jsonc",
-          "sha256": "5e5428e2de72fe04d2e0559af29d039b05b09ad5aea1a32c1e9973df68967a51"
+          "sha256": "1c2e4350ce814e4f76236166b5e5444e26de3762e1bb869ea08d4a738c59a1dd"
         },
         {
-          "bytes": 93917384,
+          "bytes": 94082704,
           "name": "winmm.dll",
-          "sha256": "db2999572f3a65f1dc4962738bba68fa57c53d8f623a784b2c8e8b5df5f7d655"
+          "sha256": "679a1b17a736ae699760a397d669ed8eb3f101e583dae47faba39918dbd451c6"
         }
       ],
-      "id": "rtx-encore-1.0.0-rc.3-winmm-dll-9d8a7d29c4c5",
-      "label": "RTX Encore · 1.0.0-rc.3",
+      "id": "rtx-encore-1.0.0-winmm-dll-679a1b17a736",
+      "label": "RTX Encore · 1.0.0",
       "labels": {
-        "en": "RTX Encore · 1.0.0-rc.3",
-        "ja": "RTX Encore · 1.0.0-rc.3",
-        "ko": "RTX Encore · 1.0.0-rc.3",
-        "ru": "RTX Encore · 1.0.0-rc.3",
-        "zh": "RTX Encore · 1.0.0-rc.3"
+        "en": "RTX Encore · 1.0.0",
+        "ja": "RTX Encore · 1.0.0",
+        "ko": "RTX Encore · 1.0.0",
+        "ru": "RTX Encore · 1.0.0",
+        "zh": "RTX Encore · 1.0.0"
       },
       "proxy": "winmm.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "9d8a7d29c4c5e50a6edf902fa6755ceeb0fd3d06658b52b078f85092f0ffdbff",
-      "upstream_version": "1.0.0-rc.3",
+      "sha256": "ae13c7cbec32936ff56ca0e9cacf78604e0aedaeb738d4e7b1b52c3b4280c294",
+      "upstream_version": "1.0.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/rtx-encore-1.0.0-rc.3-winmm-dll-9d8a7d29c4c5.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/rtx-encore-1.0.0-rc.3-winmm-dll-9d8a7d29c4c5.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip"
       },
       "version": "1.0.0"
     },
     {
-      "archive": "rtx-encore-1.0.0-rc.3-dxgi-dll-7b450db9ac49.zip",
+      "archive": "rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+      "archive_prefix": "rtx-encore-1.0.0-dxgi-dll-cb3be4454904",
       "backends": [
         "encore"
       ],
-      "bytes": 20950091,
+      "bytes": 125346267,
       "component": false,
       "files": [
         {
-          "bytes": 93913256,
+          "bytes": 94078568,
           "name": "dxgi.dll",
-          "sha256": "6396a76ba03ae71f0b45a3a72ac3c89b23e88fa453388725164857591069a28b"
+          "sha256": "cb3be44549045547ff24fa4a95a256c1c2ee6b333410f50bc915c857910b8093"
         },
         {
           "bytes": 9355,
@@ -1121,42 +1107,43 @@
           "sha256": "9b1d0a846f18f047e748b9d375523ebd73893183b66fcd10ed1e94d7f13175b0"
         },
         {
-          "bytes": 16823,
+          "bytes": 17570,
           "name": "rtx-encore.jsonc",
-          "sha256": "5e5428e2de72fe04d2e0559af29d039b05b09ad5aea1a32c1e9973df68967a51"
+          "sha256": "1c2e4350ce814e4f76236166b5e5444e26de3762e1bb869ea08d4a738c59a1dd"
         }
       ],
-      "id": "rtx-encore-1.0.0-rc.3-dxgi-dll-7b450db9ac49",
-      "label": "RTX Encore · 1.0.0-rc.3",
+      "id": "rtx-encore-1.0.0-dxgi-dll-cb3be4454904",
+      "label": "RTX Encore · 1.0.0",
       "labels": {
-        "en": "RTX Encore · 1.0.0-rc.3",
-        "ja": "RTX Encore · 1.0.0-rc.3",
-        "ko": "RTX Encore · 1.0.0-rc.3",
-        "ru": "RTX Encore · 1.0.0-rc.3",
-        "zh": "RTX Encore · 1.0.0-rc.3"
+        "en": "RTX Encore · 1.0.0",
+        "ja": "RTX Encore · 1.0.0",
+        "ko": "RTX Encore · 1.0.0",
+        "ru": "RTX Encore · 1.0.0",
+        "zh": "RTX Encore · 1.0.0"
       },
       "proxy": "dxgi.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "7b450db9ac497e3b8979fc252b3fdc09b43b0c012a89be52dfd57eed8dbcb9c5",
-      "upstream_version": "1.0.0-rc.3",
+      "sha256": "ae13c7cbec32936ff56ca0e9cacf78604e0aedaeb738d4e7b1b52c3b4280c294",
+      "upstream_version": "1.0.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/rtx-encore-1.0.0-rc.3-dxgi-dll-7b450db9ac49.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/rtx-encore-1.0.0-rc.3-dxgi-dll-7b450db9ac49.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip"
       },
       "version": "1.0.0"
     },
     {
-      "archive": "rtx-encore-1.0.0-rc.3-dinput8-dll-7df7b3693908.zip",
+      "archive": "rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+      "archive_prefix": "rtx-encore-1.0.0-dinput8-dll-3abd023af280",
       "backends": [
         "encore"
       ],
-      "bytes": 20949719,
+      "bytes": 125346267,
       "component": false,
       "files": [
         {
-          "bytes": 93912744,
+          "bytes": 94078056,
           "name": "dinput8.dll",
-          "sha256": "8900fd5126fbe68edd1a25e733b347a6be0aefc3015489db32092172afd5551d"
+          "sha256": "3abd023af2801dd82a0a8c488e50e0b7e1a86613848e717a666874d04b494872"
         },
         {
           "bytes": 9355,
@@ -1164,36 +1151,37 @@
           "sha256": "9b1d0a846f18f047e748b9d375523ebd73893183b66fcd10ed1e94d7f13175b0"
         },
         {
-          "bytes": 16823,
+          "bytes": 17570,
           "name": "rtx-encore.jsonc",
-          "sha256": "5e5428e2de72fe04d2e0559af29d039b05b09ad5aea1a32c1e9973df68967a51"
+          "sha256": "1c2e4350ce814e4f76236166b5e5444e26de3762e1bb869ea08d4a738c59a1dd"
         }
       ],
-      "id": "rtx-encore-1.0.0-rc.3-dinput8-dll-7df7b3693908",
-      "label": "RTX Encore · 1.0.0-rc.3",
+      "id": "rtx-encore-1.0.0-dinput8-dll-3abd023af280",
+      "label": "RTX Encore · 1.0.0",
       "labels": {
-        "en": "RTX Encore · 1.0.0-rc.3",
-        "ja": "RTX Encore · 1.0.0-rc.3",
-        "ko": "RTX Encore · 1.0.0-rc.3",
-        "ru": "RTX Encore · 1.0.0-rc.3",
-        "zh": "RTX Encore · 1.0.0-rc.3"
+        "en": "RTX Encore · 1.0.0",
+        "ja": "RTX Encore · 1.0.0",
+        "ko": "RTX Encore · 1.0.0",
+        "ru": "RTX Encore · 1.0.0",
+        "zh": "RTX Encore · 1.0.0"
       },
       "proxy": "dinput8.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "7df7b3693908dfd7853a5e647d736ad7db6e0393df3695cea0351400e011d223",
-      "upstream_version": "1.0.0-rc.3",
+      "sha256": "ae13c7cbec32936ff56ca0e9cacf78604e0aedaeb738d4e7b1b52c3b4280c294",
+      "upstream_version": "1.0.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/rtx-encore-1.0.0-rc.3-dinput8-dll-7df7b3693908.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/rtx-encore-1.0.0-rc.3-dinput8-dll-7df7b3693908.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip"
       },
       "version": "1.0.0"
     },
     {
-      "archive": "rtx-encore-1.0.0-rc.3-rtx-encore-asi-2125e7df2e71.zip",
+      "archive": "rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+      "archive_prefix": "rtx-encore-1.0.0-rtx-encore-asi-63d2ee098c69",
       "backends": [
         "encore"
       ],
-      "bytes": 20128620,
+      "bytes": 125346267,
       "component": false,
       "files": [
         {
@@ -1202,37 +1190,37 @@
           "sha256": "9b1d0a846f18f047e748b9d375523ebd73893183b66fcd10ed1e94d7f13175b0"
         },
         {
-          "bytes": 93079552,
+          "bytes": 93242880,
           "name": "rtx-encore.asi",
-          "sha256": "b6a367fd4103f36290ccf464f50486ab7283264b8c0c1558a197615cf01b13b0"
+          "sha256": "63d2ee098c69e26e069e0ab6972433d48dd11b5f258b52608400f365c02f84b1"
         },
         {
-          "bytes": 16823,
+          "bytes": 17570,
           "name": "rtx-encore.jsonc",
-          "sha256": "5e5428e2de72fe04d2e0559af29d039b05b09ad5aea1a32c1e9973df68967a51"
+          "sha256": "1c2e4350ce814e4f76236166b5e5444e26de3762e1bb869ea08d4a738c59a1dd"
         }
       ],
-      "id": "rtx-encore-1.0.0-rc.3-rtx-encore-asi-2125e7df2e71",
-      "label": "RTX Encore · 1.0.0-rc.3",
+      "id": "rtx-encore-1.0.0-rtx-encore-asi-63d2ee098c69",
+      "label": "RTX Encore · 1.0.0",
       "labels": {
-        "en": "RTX Encore · 1.0.0-rc.3",
-        "ja": "RTX Encore · 1.0.0-rc.3",
-        "ko": "RTX Encore · 1.0.0-rc.3",
-        "ru": "RTX Encore · 1.0.0-rc.3",
-        "zh": "RTX Encore · 1.0.0-rc.3"
+        "en": "RTX Encore · 1.0.0",
+        "ja": "RTX Encore · 1.0.0",
+        "ko": "RTX Encore · 1.0.0",
+        "ru": "RTX Encore · 1.0.0",
+        "zh": "RTX Encore · 1.0.0"
       },
       "proxy": "rtx-encore.asi",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "2125e7df2e7168af9d2dc3538894cbb9a85a8abb6a096fd292a39de594c639b5",
-      "upstream_version": "1.0.0-rc.3",
+      "sha256": "ae13c7cbec32936ff56ca0e9cacf78604e0aedaeb738d4e7b1b52c3b4280c294",
+      "upstream_version": "1.0.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/rtx-encore-1.0.0-rc.3-rtx-encore-asi-2125e7df2e71.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/rtx-encore-1.0.0-rc.3-rtx-encore-asi-2125e7df2e71.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.0.0-complete-ae13c7cbec32.zip"
       },
       "version": "1.0.0"
     }
   ],
-  "revision": "r-560610cd0243833a028d",
+  "revision": "bundles-46cb817b395c159c3e27",
   "schema": 3,
   "scheme_policies": {
     "dlssg-transfusion-1.4.5.3": {
@@ -1248,21 +1236,6 @@
       "ini_policy": "encore_json",
       "max_selected_proxies": 1,
       "parameter_profile": "rtx_encore_json_v4"
-    },
-    "initial": {
-      "capabilities": [],
-      "defaults": {
-        "enabled": "1",
-        "logging_level": "1",
-        "max_generated_frames": "3"
-      },
-      "gpu_paths": [
-        "SM75",
-        "SM86"
-      ],
-      "ini_policy": "initial",
-      "max_selected_proxies": 1,
-      "parameter_profile": "initial"
     },
     "native-0.2.6-stable": {
       "capabilities": [],
@@ -1342,10 +1315,13 @@
   },
   "sources": {
     "domestic": {
-      "base_url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/v430/"
+      "base_url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/"
+    },
+    "gitee": {
+      "base_url": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/"
     },
     "github": {
-      "base_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads-v430/"
+      "base_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/"
     }
   }
 }

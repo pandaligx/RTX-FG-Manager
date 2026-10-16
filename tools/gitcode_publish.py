@@ -390,7 +390,9 @@ def main():
         if not a.folder or not a.tag:
             p.error('assets requires --folder and --tag')
         repo = PAYLOAD_REPO if a.payloads else GC_REPO
-        create_release(repo, a.tag, a.commit, a.tag, 'GitHub 同源发行资源；客户端更新清单在附件校验后发布。')
+        create_release(repo, a.tag, a.commit,
+            'Resources (not a manager update)' if a.payloads else a.tag,
+            'GitHub 同源发行资源；客户端更新清单在附件校验后发布。')
         mirror_assets(a.folder, repo, a.tag, a.allow_local_exe)
 
 

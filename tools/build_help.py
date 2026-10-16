@@ -31,8 +31,8 @@ def build(destination, version, minimum):
     name = f'rtxfg-help-{version}-{digest[:12]}.zip'
     manifest = dict(schema=1, version=version, min_client=minimum, max_client=None,
         languages=['zh','en','ru','ja','ko'], urls=[
-            f'https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/help-{version}/{name}',
-            f'https://github.com/pandaligx/RTX-FG-Manager/releases/download/help-{version}/{name}'],
+            f'https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/{name}',
+            f'https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/{name}'],
         bytes=len(archive), sha256=digest,
         files={n:hashlib.sha256(b).hexdigest() for n,b in sources.items()})
     outputs = {name:archive, 'help.json':(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n').encode(),
@@ -51,7 +51,7 @@ def build(destination, version, minimum):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--version',default='4.3.0.5')
-    parser.add_argument('--min-client',default='4.3.0')
+    parser.add_argument('--version',default='4.3.1.1')
+    parser.add_argument('--min-client',default='4.3.1')
     args=parser.parse_args()
     build(args.output,args.version,args.min_client)

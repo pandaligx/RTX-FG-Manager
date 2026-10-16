@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 49300,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-8ffa22ef38902ea7f95a.json",
-    "sha256": "9e0abf351b1923fe6a92711c57ee3b97f38c6f38cc6a60e30878d9c8d2201c02",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-8ffa22ef38902ea7f95a.json"
+    "bytes": 48940,
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-46cb817b395c159c3e27.json",
+    "sha256": "415a30ea01e0c952774958e884ff92c21e661392c5946a4fbbbff89630d3edb2",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-46cb817b395c159c3e27.json"
   },
-  "revision": "bundles-8ffa22ef38902ea7f95a",
+  "revision": "bundles-46cb817b395c159c3e27",
   "schema": 3,
   "schemes": [
     {
@@ -105,7 +105,7 @@
     },
     {
       "archives": [
-        "rtx-encore-1.0.0-rc.3-complete-15afdc169fd2.zip"
+        "rtx-encore-1.0.0-complete-ae13c7cbec32.zip"
       ],
       "capabilities": [
         "encore_dedicated_entries"
@@ -113,13 +113,13 @@
       "defaults": {},
       "id": "dlssg-transfusion-1.4.5.3",
       "min_manager_version": "4.3.1",
-      "name": "RTX Encore · 1.0.0-rc.3",
+      "name": "RTX Encore · 1.0.0",
       "names": {
-        "en": "RTX Encore · 1.0.0-rc.3",
-        "ja": "RTX Encore · 1.0.0-rc.3",
-        "ko": "RTX Encore · 1.0.0-rc.3",
-        "ru": "RTX Encore · 1.0.0-rc.3",
-        "zh": "RTX Encore · 1.0.0-rc.3"
+        "en": "RTX Encore · 1.0.0",
+        "ja": "RTX Encore · 1.0.0",
+        "ko": "RTX Encore · 1.0.0",
+        "ru": "RTX Encore · 1.0.0",
+        "zh": "RTX Encore · 1.0.0"
       },
       "profile": "rtx_encore_json_v4",
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"

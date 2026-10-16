@@ -2460,5 +2460,62 @@
     "help": "详细记录 Streamline 和 NGX；可能降低性能。收集后关闭并重启游戏。",
     "optional": false,
     "source_help": "Extra verbose Streamline and NGX messages. Basic messages and failure reasons are logged automatically. Restart required; disable and restart after collecting the log. May reduce performance."
+  },
+  {
+    "key": "disableInGameMenu",
+    "path": [
+      "compatibility",
+      "disableInGameMenu"
+    ],
+    "label": "禁用游戏内菜单",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "Encore 1.0.0：用于排查菜单冲突（如星球大战：亡命之徒）。插帧仍可工作；Insert 无法打开菜单，需在此关闭本项并重启游戏。",
+    "optional": true,
+    "source_help": "Encore 1.0.0: for menu conflicts (e.g. Star Wars Outlaws). FG remains active. Insert cannot open the menu; turn this off here and restart to restore it."
+  },
+  {
+    "key": "logDxgiWrappers",
+    "path": [
+      "diagnostics",
+      "logDxgiWrappers"
+    ],
+    "label": "DXGI 交换链调用日志",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "Encore 1.0.0：记录游戏对菜单交换链的调用，用于排查菜单加载后的崩溃。默认关闭；需重启，收集后关闭。",
+    "optional": true,
+    "source_help": "Encore 1.0.0: logs game calls to the menu swapchain to diagnose crashes after menu attachment. Off by default; restart required. Disable after collecting logs."
+  },
+  {
+    "key": "crashDetails",
+    "path": [
+      "diagnostics",
+      "crashDetails"
+    ],
+    "label": "详细崩溃转储",
+    "group": "system",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "Encore 1.0.0：异常日志包含寄存器和栈，崩溃时生成 .dmp（通常数十 MB）。仅诊断时开启，收集后关闭；需重启。转储可能包含进程内存，请谨慎分享。",
+    "optional": true,
+    "source_help": "Encore 1.0.0: adds register/stack details and a .dmp on crashes (often tens of MB). Diagnostics only; disable afterwards and restart. Dumps may contain process memory; review before sharing."
   }
 ]

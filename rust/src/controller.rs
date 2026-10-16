@@ -440,10 +440,32 @@ impl Controller {
         self.tr.t(s)
     }
     pub fn cloud_label(&self, p: &cloud::Package) -> String {
-        p.labels
-            .get(&self.tr.language)
-            .cloned()
-            .unwrap_or_else(|| self.text(&p.label))
+        let name = match p.scheme_id.as_str() {
+            "upstream-0.3.5-310-9" => Some("Dlssg_for_sm86 · 0.4.0"),
+            "rtxfg-0.3.5-dx12-vulkan" => {
+                Some("Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan")
+            }
+            "pipotoufik-mfg-vulkan-sm86-7" => Some("Dlssg_for_sm86-MFG-version · Vulkan"),
+            "rtx40mfg-1.3.3-hf2" => {
+                return format!(
+                    "MFG-Unlocker · {}",
+                    p.upstream_version.as_deref().unwrap_or(&p.version)
+                );
+            }
+            "dlssg-transfusion-1.4.5.3" => {
+                return format!(
+                    "RTX-Encore · {}",
+                    p.upstream_version.as_deref().unwrap_or(&p.version)
+                );
+            }
+            _ => None,
+        };
+        name.map(|n| self.text(n)).unwrap_or_else(|| {
+            p.labels
+                .get(&self.tr.language)
+                .cloned()
+                .unwrap_or_else(|| self.text(&p.label))
+        })
     }
     pub fn cloud_scheme(&self) -> String {
         self.scheme_for(self.focus.as_deref())
@@ -532,6 +554,7 @@ impl Controller {
             })
             .unwrap_or_else(|| self.catalog.default_scheme.clone())
     }
+    #[cfg(test)]
     pub fn select_series(&mut self, series: usize) {
         if self.busy || series > 2 {
             return;
@@ -1558,26 +1581,6 @@ impl Controller {
             })
             .unwrap_or_default()
     }
-    /// The detail dialog always targets its own game, independent of library
-    /// multi-selection. Freeze that scope before showing the confirmation.
-    pub fn request_focused_cleanup(&mut self) {
-        if self.closing || self.busy || self.pending_patch.is_some() {
-            return;
-        }
-        let games = self
-            .games
-            .iter()
-            .filter(|g| self.focus.as_ref() == Some(&g.exe))
-            .collect();
-        let targets = self.patch_targets_for(games, true);
-        if !targets.is_empty() {
-            self.pending_patch = Some(PatchRequest {
-                clean: true,
-                targets,
-            });
-            self.confirm = Some("clean_batch".into());
-        }
-    }
     pub fn confirm_patch(&mut self) {
         if let Some(p) = self.pending_patch.take() {
             self.perform(p.clean, p.targets);
@@ -1701,8 +1704,6 @@ impl Controller {
                         break;
                     }
                     let p = PathBuf::from(&exe);
-                    let journal_target = game.deployment_target(&p);
-                    let previous = core::record(&journal_target.directory).ok().flatten();
                     let result = if let Some(ref payload) = prepared {
                         (|| {
                             ensure_directory_outside_data(
@@ -1736,55 +1737,6 @@ impl Controller {
                     } else {
                         cleanup::clean_outcome_at(&game.deployment_target(&p))
                     };
-                    let action = if clean {
-                        "卸载"
-                    } else if previous.as_ref().is_some_and(|old| {
-                        prepared.as_ref().is_some_and(|new| {
-                            old.upstream_version != new.upstream_version
-                                || old.payload_version.as_deref() != Some(new.version.as_str())
-                        })
-                    }) {
-                        "升级"
-                    } else if previous.is_some() {
-                        "安装或应用"
-                    } else {
-                        "安装"
-                    };
-                    let entry = rtx_fg_manager::operation_history::Entry {
-                        created: chrono::Local::now().to_rfc3339(),
-                        action: action.into(),
-                        scheme: if clean {
-                            previous
-                                .as_ref()
-                                .and_then(|r| r.scheme_id.clone())
-                                .unwrap_or_default()
-                        } else {
-                            scheme.clone()
-                        },
-                        version: prepared
-                            .as_ref()
-                            .map(|p| {
-                                p.upstream_version
-                                    .clone()
-                                    .unwrap_or_else(|| p.version.clone())
-                            })
-                            .or_else(|| {
-                                previous.as_ref().and_then(|r| {
-                                    r.upstream_version.clone().or(r.payload_version.clone())
-                                })
-                            })
-                            .unwrap_or_default(),
-                        complete: result.as_ref().is_ok_and(|r| r.complete),
-                        detail: match &result {
-                            Ok(r) => r.message.clone(),
-                            Err(e) => e.to_string(),
-                        },
-                    };
-                    if let Err(e) =
-                        rtx_fg_manager::operation_history::append(&journal_target, &entry)
-                    {
-                        errors.push(format!("操作结果已返回，但本地历史未保存：{e}"));
-                    }
                     match result {
                         Ok(outcome) => {
                             let ok = outcome.complete;
@@ -1961,7 +1913,7 @@ impl Controller {
     pub fn proxies_for(&self, exe: Option<&str>) -> Vec<String> {
         let scheme = self.scheme_for(exe);
         let allowed = self.catalog.proxies(&scheme);
-        let limit = self.catalog.scheme_policies[&scheme].max_selected_proxies;
+        let limit = self.catalog.selection_limit(&scheme);
         let saved = exe
             .and_then(|e| self.games.iter().find(|g| g.exe == e))
             .and_then(|g| g.extra.get("proxy_choices"))
@@ -2466,7 +2418,7 @@ impl Controller {
                             }
                         }
                         Err(e) => {
-                            self.update_status = format!("{}：{e}", self.text("检查更新失败"));
+                            self.update_status = e.to_string();
                             self.log(&self.update_status.clone());
                             if !automatic {
                                 self.warning = Some(self.update_status.clone());
@@ -3081,7 +3033,7 @@ mod tests {
                 // Only the synthetic test fragment is removed; recovery is retried normally.
                 std::fs::remove_file(&stage).unwrap();
             } else {
-                assert!(c.warning.is_none());
+                assert!(c.warning.is_none(), "{:?}", c.warning);
                 assert!(
                     c.logs
                         .iter()
@@ -3598,28 +3550,6 @@ mod tests {
         c.tick_close();
     }
     #[test]
-    fn detail_cleanup_ignores_other_selected_games_and_freezes_scope() {
-        let (_dir, mut c) = controller();
-        c.games = ["A.exe", "B.exe"]
-            .into_iter()
-            .map(|exe| Game {
-                exe: exe.into(),
-                ..Default::default()
-            })
-            .collect();
-        c.focus = Some("A.exe".into());
-        c.selected = BTreeSet::from(["B.exe".into()]);
-        c.request_focused_cleanup();
-        assert_eq!(c.confirm.as_deref(), Some("clean_batch"));
-        assert_eq!(c.pending_patch_list(), "1. A.exe");
-        c.focus = Some("B.exe".into());
-        assert_eq!(c.pending_patch_list(), "1. A.exe");
-        assert_eq!(c.selected, BTreeSet::from(["B.exe".into()]));
-        c.cancel_patch();
-        c.close();
-        c.tick_close();
-    }
-    #[test]
     fn upstream_options_are_independent_per_game_and_validated() {
         let (_dir, mut c) = controller();
         c.games = ["A.exe", "B.exe"]
@@ -3696,9 +3626,9 @@ mod tests {
         c.set_game_option("A.exe", "optimized", "3");
         c.set_game_option("A.exe", "max_generated_frames", "5");
         c.state["cloud_scheme"] = json!("native-0.2.6-experimental");
-        assert_eq!(c.cloud_scheme(), "native-0.2.6-stable");
+        assert_eq!(c.cloud_scheme(), c.catalog.default_scheme);
+        c.state["cloud_scheme"] = json!("rtx40mfg-1.3.3-hf2");
         assert!(!c.preset_values("A.exe").contains_key("optimized"));
-        c.set_game_option("A.exe", "max_generated_frames", "2");
         c.state["cloud_scheme"] = json!("initial-rtx20");
         assert_eq!(c.cloud_scheme(), c.catalog.default_scheme);
         assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "5");

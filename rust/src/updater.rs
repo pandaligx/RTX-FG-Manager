@@ -125,6 +125,7 @@ fn release_with_fetch(
         ],
         _ => bail!("更新来源无效"),
     };
+    let mut errors = Vec::new();
     for url in urls {
         ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
         let result = (|| -> Result<Manifest> {
@@ -138,11 +139,12 @@ fn release_with_fetch(
             Ok(m)
         })();
         ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
-        if let Ok(m) = result {
-            return Ok(m);
+        match result {
+            Ok(m) => return Ok(m),
+            Err(error) => errors.push(error.to_string()),
         }
     }
-    bail!("更新信息暂时不可用")
+    bail!("{}", errors.join("；"))
 }
 pub fn check(choice: &str) -> Result<Option<Manifest>> {
     check_with_cancel(choice, &AtomicBool::new(false))
@@ -169,7 +171,7 @@ fn check_with_fetch(
         ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
         match release_with_fetch(source, cancel, fetch) {
             Ok(m) => return Ok((version(&m.version)? > version(crate::VERSION)?).then_some(m)),
-            Err(_) => errors.push(format!("{source}: 更新信息暂时不可用")),
+            Err(error) => errors.push(format!("{source}: {error}")),
         }
     }
     ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");

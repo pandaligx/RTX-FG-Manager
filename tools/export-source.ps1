@@ -98,7 +98,7 @@ if (-not $ExcludeCloudMetadata) {
     Add-File 'cloud/help.json' $false
 }
 foreach ($name in @('.github/workflows/mirror-gitee.yml', '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml')) { Add-File $name $false }
-foreach ($name in @('docs/screenshot-home.png', 'docs/screenshot-home-zh.png', 'docs/screenshot-home-themes.png')) { Add-File $name $false }
+foreach ($name in @('docs/brand-banner.svg', 'docs/download-en.svg', 'docs/download-zh.svg', 'docs/screenshot-home.png', 'docs/screenshot-home-zh.png', 'docs/screenshot-home-themes.png')) { Add-File $name $false }
 
 $binaryExtensions = @('.png', '.ico')
 $findings = [Collections.Generic.List[string]]::new()
