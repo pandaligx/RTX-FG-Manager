@@ -1,0 +1,139 @@
+{
+  "default_scheme": "upstream-0.3.5-310-9",
+  "index": {
+    "bytes": 49203,
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-30de07310a0f7571baec.json",
+    "sha256": "7734def649c9fabc8339fb7806315c595ba9d31cce5c967005e9f1d04aec2719",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-30de07310a0f7571baec.json"
+  },
+  "revision": "bundles-30de07310a0f7571baec",
+  "schema": 3,
+  "schemes": [
+    {
+      "archives": [
+        "dlssg-0.4.0-complete-d71fbfcc9bb2.zip"
+      ],
+      "capabilities": [],
+      "defaults": {
+        "enabled": "1",
+        "fg_engine": "DLSS",
+        "logging_level": "1",
+        "max_generated_frames": "3",
+        "optimized": "2",
+        "preset": "Auto",
+        "sr_mode": "Off"
+      },
+      "id": "upstream-0.3.5-310-9",
+      "min_manager_version": "4.3.1",
+      "name": "dlssg_for_sm86 · 0.4.0",
+      "names": {
+        "en": "dlssg_for_sm86 · 0.4.0",
+        "ja": "dlssg_for_sm86 · 0.4.0",
+        "ko": "dlssg_for_sm86 · 0.4.0",
+        "ru": "dlssg_for_sm86 · 0.4.0",
+        "zh": "dlssg_for_sm86 · 0.4.0"
+      },
+      "profile": "upstream040"
+    },
+    {
+      "archives": [
+        "pipotoufik-mfg-vulkan-sm86-7-complete-7bf5630b9834.zip"
+      ],
+      "defaults": {},
+      "id": "pipotoufik-mfg-vulkan-sm86-7",
+      "min_manager_version": "4.3.1",
+      "name": "Dlssg-MFG-Vulkan",
+      "profile": "mfg_vulkan_sm86_7"
+    },
+    {
+      "archives": [
+        "rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip"
+      ],
+      "capabilities": [
+        "delta_force_mfg_v1"
+      ],
+      "defaults": {
+        "enabled": "1",
+        "logging_level": "1",
+        "max_generated_frames": "3",
+        "optimized": "1",
+        "preset": "Auto"
+      },
+      "id": "rtxfg-0.3.5-dx12-vulkan",
+      "min_manager_version": "4.3.1",
+      "name": "0.3.5 · 三角洲专用",
+      "names": {
+        "en": "0.3.5 · Delta Force",
+        "ja": "0.3.5 · デルタフォース専用",
+        "ko": "0.3.5 · 델타 포스 전용",
+        "ru": "0.3.5 · Delta Force"
+      },
+      "profile": "upstream035"
+    },
+    {
+      "archives": [
+        "native-0.2.6-stable-complete-1557490dc742.zip"
+      ],
+      "defaults": {
+        "hardware_bilinear": "0",
+        "logging_level": "1",
+        "max_generated_frames": "3"
+      },
+      "id": "native-0.2.6-stable",
+      "min_manager_version": "4.3.1",
+      "name": "0.2.6 · DX12/Vulkan",
+      "profile": "native026"
+    },
+    {
+      "archives": [
+        "mfg-unlocker-1.5.0-complete-5ed2054ae7af.zip"
+      ],
+      "capabilities": [],
+      "defaults": {},
+      "id": "rtx40mfg-1.3.3-hf2",
+      "min_manager_version": "4.3.1",
+      "name": "MFG Unlocker · 1.5.0",
+      "names": {
+        "en": "MFG Unlocker · 1.5.0",
+        "ja": "MFG Unlocker · 1.5.0",
+        "ko": "MFG Unlocker · 1.5.0",
+        "ru": "MFG Unlocker · 1.5.0",
+        "zh": "MFG Unlocker · 1.5.0"
+      },
+      "profile": "rtxmfg_universal_133",
+      "source_url": "https://github.com/dashdogy/RTX40MFG-Unlock"
+    },
+    {
+      "archives": [
+        "rtx-encore-1.0.0-rc.3-complete-15afdc169fd2.zip"
+      ],
+      "capabilities": [
+        "encore_dedicated_entries"
+      ],
+      "defaults": {},
+      "id": "dlssg-transfusion-1.4.5.3",
+      "min_manager_version": "4.3.1",
+      "name": "RTX Encore · 1.0.0-rc.3",
+      "names": {
+        "en": "RTX Encore · 1.0.0-rc.3",
+        "ja": "RTX Encore · 1.0.0-rc.3",
+        "ko": "RTX Encore · 1.0.0-rc.3",
+        "ru": "RTX Encore · 1.0.0-rc.3",
+        "zh": "RTX Encore · 1.0.0-rc.3"
+      },
+      "profile": "rtx_encore_json_v4",
+      "source_url": "https://github.com/SilyNoMeta/rtx-encore"
+    }
+  ],
+  "sources": {
+    "domestic": {
+      "base_url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/"
+    },
+    "gitee": {
+      "base_url": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/"
+    },
+    "github": {
+      "base_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/"
+    }
+  }
+}

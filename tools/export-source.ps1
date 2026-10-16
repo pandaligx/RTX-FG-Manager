@@ -67,7 +67,7 @@ foreach ($name in @(
     'app/assets/cleanup-catalog.json', 'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',
     'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/GPUI-FAST-LICENSE', 'rust/assets/licenses/LUCIDE-LICENSE',
     'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json', 'app/tools/aria2.conf',
-    'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1',
+    'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1', 'tools/build_scheme_bundles.py',
     'tools/prepare-fixtures.ps1', 'tools/export-source.ps1', 'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', 'tests/test_encore_cloud.py', '.github/workflows/build.yml',
     'vendor/gpui_fast_windows/Cargo.toml', 'vendor/gpui_fast_windows/Cargo.toml.orig',
     'vendor/gpui_fast_windows/build.rs', 'vendor/gpui_fast_windows/LICENSE',
@@ -94,6 +94,7 @@ if (-not $ExcludeCloudMetadata) {
     Add-File 'cloud/catalog.json' $false
     Add-Tree 'cloud/indexes' @('.json')
     Add-Tree 'cloud/v3' @('.json')
+    Add-Tree 'cloud/bundles' @('.json')
     Add-File 'cloud/help.json' $false
 }
 foreach ($name in @('.github/workflows/mirror-gitee.yml', '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml')) { Add-File $name $false }

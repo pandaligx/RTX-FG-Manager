@@ -15,7 +15,7 @@ def main():
         if not re.fullmatch(r'[A-Za-z0-9._-]{1,100}', tag):
             raise RuntimeError('Invalid source tag')
         payload = os.environ.get('PAYLOADS') == 'true' or tag.startswith(('payloads', 'help'))
-        destination = os.environ.get('DESTINATION_TAG') or (tag.removeprefix('payloads-') if payload else tag)
+        destination = os.environ.get('DESTINATION_TAG') or ('payloads' if payload else tag)
         repo = publish.PAYLOAD_REPO if payload else publish.GC_REPO
         asset_name = os.environ.get('ASSET_NAME', '')
         if asset_name and (not payload or not re.fullmatch(r'[A-Za-z0-9._-]{1,160}',asset_name)):
@@ -27,7 +27,8 @@ def main():
         if not payload:
             publish.sync_source(Path.cwd())
             publish.sync_release_tag(Path.cwd(), tag)
-        publish.create_release(repo, destination, 'main' if payload else tag, release['name'], release['body'])
+        publish.create_release(repo, destination, 'main' if payload else tag,
+            'Resources (not a manager update)' if payload else release['name'], release['body'])
         with tempfile.TemporaryDirectory() as folder:
             started = time.monotonic()
             for asset in release['assets']:

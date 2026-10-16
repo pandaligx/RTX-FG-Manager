@@ -48,7 +48,7 @@ def verify_metadata_artifact(url, size, digest, metadata_digest):
                         'https://github.com/' + GH_REPO + '/releases/download/')
             name = url.rsplit('/', 1)[-1]
             immutable = (url.startswith(prefixes) and (
-                re.fullmatch(r'r-[0-9a-f]{20}\.json', name)
+                re.fullmatch(r'(?:r|bundles)-[0-9a-f]{20}\.json', name)
                 or (re.fullmatch(r'[A-Za-z0-9._-]+-[0-9a-f]{12}\.zip', name)
                     and name.endswith('-' + digest[:12] + '.zip'))))
             if valid and immutable and type(size) is int and 0 < size <= 256 * 1024 * 1024:
@@ -300,6 +300,40 @@ def verify_metadata_changes(root, review, before, after):
         if path not in after:
             raise RuntimeError('Missing referenced metadata: ' + path)
         return review.git(root, 'cat-file', 'blob', after[path][2], binary=True)
+    bundle_path = 'cloud/bundles/catalog.json'
+    if before.get(bundle_path) != after.get(bundle_path):
+        c = json.loads(blob(bundle_path))
+        if c.get('schema') != 3 or not re.fullmatch(r'bundles-[0-9a-f]{20}', c.get('revision', '')):
+            raise RuntimeError('Invalid complete-bundle catalog')
+        index_path = f'cloud/bundles/indexes/{c["revision"]}.json'
+        if index_path in before:
+            raise RuntimeError('A bundle catalog change requires a new immutable revision')
+        raw = blob(index_path)
+        index = c['index']
+        if len(raw) != index['bytes'] or hashlib.sha256(raw).hexdigest() != index['sha256']:
+            raise RuntimeError('Bundle index does not match catalog')
+        expected = asset_url(PAYLOAD_REPO, 'payloads', c['revision'] + '.json')
+        if index['url'] != expected:
+            raise RuntimeError('Bundle index must use Resources')
+        metadata_digest = hashlib.sha256(blob(bundle_path)).hexdigest()
+        verify_metadata_artifact(expected, len(raw), index['sha256'], metadata_digest)
+        seen = {}
+        for p in json.loads(raw)['packages']:
+            if not p.get('archive_prefix'):
+                raise RuntimeError('Complete bundle requires an explicit package prefix')
+            url = asset_url(PAYLOAD_REPO, 'payloads', p['archive'])
+            if p.get('urls', {}).get('domestic') != url:
+                raise RuntimeError('Bundle must use the GitCode Resources location')
+            identity = (p['bytes'], p['sha256'])
+            if url in seen and seen[url] != identity:
+                raise RuntimeError('Conflicting bundle identity')
+            if url not in seen:
+                verify_metadata_artifact(url, *identity, metadata_digest)
+                seen[url] = identity
+    for path, entry in after.items():
+        if path.startswith('cloud/bundles/indexes/') and before.get(path) != entry:
+            if path in before or path != f'cloud/bundles/indexes/{json.loads(blob(bundle_path))["revision"]}.json':
+                raise RuntimeError('Bundle indexes are immutable and must be referenced')
     catalog_path = 'cloud/v3/catalog.json'
     if before.get(catalog_path) != after.get(catalog_path):
         c = json.loads(blob(catalog_path))

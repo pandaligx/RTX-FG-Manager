@@ -10,7 +10,7 @@ on:
         description: 'Optional GitHub release to mirror (EXE must be uploaded locally)'
         type: string
       gitcode_tag:
-        description: 'Destination tag; payloads-v430 maps to v430'
+        description: 'Destination tag; resources default to payloads (Resources)'
         type: string
       payloads:
         description: 'Use the separate domestic payload repository'
