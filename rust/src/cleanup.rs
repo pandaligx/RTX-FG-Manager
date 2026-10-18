@@ -345,6 +345,7 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
         },
         delta_legacy_cache: delta_runtime,
         cache_pending: false,
+        cleanup_pending_reasons: Vec::new(),
     }))
 }
 fn is_log(name: &str) -> bool {
@@ -448,7 +449,8 @@ fn scan_encore_logs(
         kept.insert(root);
         return Ok(());
     }
-    const NAMES: [&str; 5] = [
+    const NAMES: [&str; 6] = [
+        "rtx-encore-status.json",
         "rtx-encore.log",
         "rtx-encore.crash.log",
         "rtx-encore_perf.csv",
@@ -504,6 +506,7 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
     core::assert_target_stopped(&target)?;
+    crate::neural_runtime::remove_locked(&target)?;
     crate::encore_upgrade::recover_locked(&target)?;
     crate::rtxmfg_upgrade::recover_locked(&target)?;
     crate::upstream040_upgrade::recover_locked(&target)?;
@@ -808,6 +811,17 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     pending.extend(stage_pending);
     if !pending.is_empty() {
         record.cache_pending = true;
+        record.cleanup_pending_reasons = pending
+            .iter()
+            .take(4)
+            .map(|s| s.chars().take(512).collect())
+            .collect();
+        // Preserve the existing bounded record format even for long OS errors.
+        while !record.cleanup_pending_reasons.is_empty()
+            && serde_json::to_vec(&record)?.len() > 19500
+        {
+            record.cleanup_pending_reasons.pop();
+        }
         core::atomic_json(&root.join(MARKER), &record)?;
         let message = if pending_stage {
             format!(

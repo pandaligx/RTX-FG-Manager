@@ -41,7 +41,7 @@ def main():
                     raise RuntimeError('Unsafe release asset name')
                 if not payload and name not in ('update.json', 'SHA256SUMS.txt', 'third-party-info.json'):
                     raise RuntimeError('Unexpected stable release asset')
-                if asset['size'] > (128 if payload else 2) * 1024 * 1024:
+                if asset['size'] > (512 if payload else 2) * 1024 * 1024:
                     raise RuntimeError('Unexpected asset size')
                 subprocess.run(['gh', 'release', 'download', tag, '--repo', publish.GH_REPO,
                     '--pattern', name, '--dir', folder], check=True)

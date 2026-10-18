@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.3.2
+
+- Drag game rows to reorder the library; save the order and retain positions on rescan. Removal confirmation shows game icons, display names and paths using the configured font size.
+- Hide terminal `.exe` suffixes consistently in game labels while preserving real paths.
+- Exclude D3D12 compiler helpers and prefer The Witcher 3's `bin/x64_dx12/witcher3.exe`; repair saved targets and retain cleanup access to previously managed folders.
+- Adapt signed RTX Encore 1.1.0: Fast SR, NR A/B models, NR hotkey and legacy preset migration, preserving comments, unknown fields and menu state.
+- Offer optional NR 310.8.0 / 310.9.16 downloads with GitCode/GitHub fallback, verified cache, original-file backup and uninstall recovery. NR remains off by default; game output/depth requirements still apply.
+- Clean owned Encore session status files while retaining unknown/manual files. Raise the complete-archive size limit and prevent stale catalogs from downgrading bundled resources.
+- Compact DLSS Neural Rendering sidebar with installed status and independent uninstall; broaden bounded DLSS component discovery for engine/plugin layouts.
+- Keep pending-edit feedback, reset controls and Apply in a fixed parameter footer. Warn before closing with unapplied changes; valid drafts remain available.
+- Explain pending game cleanup and offer scoped retry. List blocking background processes and allow confirmed, identity-checked termination followed by retry.
+
+See [Encore 1.1.0 and Neural Rendering](docs/encore-1.1.0.md). Manager checks do not establish game/GPU compatibility or performance.
+
 ## 4.3.1
 
 - Adapt signed RTX Encore 1.0.0 stable and MFG-Unlocker 1.5.0-hotfix.1, retaining the complete dlssg_for_sm86 0.4.0 and custom Delta Force/Vulkan routes.

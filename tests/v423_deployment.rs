@@ -75,6 +75,7 @@ impl Game {
             delta_cache_ids: Vec::new(),
             delta_legacy_cache: false,
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
         record.validate()?;
         core::atomic_json(&self.path(core::OWN).join(core::MARKER), &record)

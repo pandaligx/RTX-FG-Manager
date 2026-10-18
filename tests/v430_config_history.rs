@@ -61,7 +61,7 @@ fn three_protocols_named_export_selected_import_and_conflict_aware_undo() -> Res
         }
         let record=core::Record {schema:3,backend:backend.into(),game_exe:target.record_exe(),payload_version:Some("1.0.0".into()),upstream_version:None,
             proxy:"version.dll".into(),proxies:vec!["version.dll".into()],hashes,cleanup_dirs:BTreeMap::new(),scheme_id:Some(scheme.into()),
-            delta_cache_ids:vec![],delta_legacy_cache:false,cache_pending:false};
+            delta_cache_ids:vec![],delta_legacy_cache:false,cache_pending:false,cleanup_pending_reasons:vec![]};
         core::write_new(&target.directory.join(core::OWN).join(core::MARKER),&serde_json::to_vec(&record)?)?;
         let context=presets::Context {scheme:scheme.into(),profile:protocol.into(),delta:false,delta_capable:false};
         let snapshot=store::snapshot(&target,&context,"steam:1234","Quality: original")?;

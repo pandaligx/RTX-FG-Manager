@@ -12,10 +12,12 @@
     "smoothMotionForce": false               // Vulkan: run Smooth Motion even where the game's NVIDIA profile excludes it. Unexpected results are possible. Restart the game to apply.
   },
   "dlssSuperResolution": {
+    "fastSuperResolution": false, // RTX 30, DX12, SR 310.9.x preset M/L; restart. Not RR/DLAA.
     "dlssRenderScale": "game",               // Force the DLSS render resolution: game, dlaa, quality, balanced, performance, ultra-performance or custom. The game must use DLSS already.
     "dlssCustomScale": 67                    // Render scale in percent (50 to 100) when dlssRenderScale is custom.
   },
   "dlssPresets": {
+    "dlssNrPreset": "b", // NR 310.9.16: b smaller network, a larger network, auto DLL default; live. Open ignores.
     "dlssSrPreset": "game",                  // SR preset: game (no override), default, a-f (legacy), j, k, l or m. Applies to all quality modes; supported models depend on the DLSS DLL. Restart to apply.
     "dlssRrPreset": "game",                  // RR preset: game (no override), default, a-c (legacy), d or e. Does not enable RR. Driver/model selection may override SR/RR hints. Restart to apply.
     "dlssFgPreset": "game",                  // FG preset: game (no override), a, b or c. A/B use Normal; C automatically enables Lite (faster, with image-quality trade-offs) and needs 310.9.16.0. Fast frame generation remains independent for every preset. Qualified NVIDIA releases 310.6.0.0, 310.7.0.0, 310.7.128.0, 310.7.129.0, 310.8.0.0, 310.9.0.0, 310.9.1.0 and 310.9.16.0; unknown binaries are untouched and logged. B needs compatible HUD-less/UI inputs. Lite keeps NVIDIA's native image policy: frameProtection, protectionTuning and UI recomposition are unavailable. No driver-profile writes. Restart to apply.
@@ -28,7 +30,7 @@
   },
   "neuralRendering": {
     "core": {                                // Activation, engine and NR scaler: the main quality/performance controls.
-      "nrEnabled": false,                    // DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0. The first launch prepares it in the background.
+      "nrEnabled": false,                    // DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0 or 310.9.16. The first launch prepares it in the background.
       "nrEngine": "nvidia",                  // nvidia (default) or opendlss (experimental). Open runs dedicated in a Direct3D game (on its own device beside the game) and in-game in a Vulkan game (on the game's device). Restart to apply; no engine fallback.
       "nrPasses": 1,                         // Independent temporal NR passes, 1 to 4. Cost and VRAM grow. Only a complete chain is published; unsupported chain routes preserve SR.
       "nrLaterPassLocalTone": 0,             // Tone applied after pass one, 0 to 2. Default zero avoids repeated tone accumulation.
@@ -71,8 +73,7 @@
       "nrOpenSeed": 0                        // Open deterministic noise seed. Applied live with history reset.
     },
     "advanced": {                            // Model compatibility.
-      "nrUiCorrection": false,               // Model UI correction.
-      "nrPreset": 0                          // NVIDIA model profile: 0 Automatic (recommended), 1-3 numbered profiles. No documented quality/speed ranking; separate from image style.
+      "nrUiCorrection": false               // Model UI correction.
     }
   },
   "overlay": {
@@ -127,6 +128,7 @@
     "logFilesKept": 3                        // Logs kept in rtx-encore-logs: 1 to 100 sessions plus the same number of exception logs. Active files are preserved. Older closed files are deleted at startup.
   },
   "keyboardShortcuts": {
+    "hotkeyToggleNr": "Ctrl+Alt+N", // Toggle Neural Rendering while the game has focus.
     "hotkeyFixed2": "Ctrl+Alt+2, Ctrl+Alt+Num2", // Combinations such as Ctrl+Alt+4 or Ctrl+Shift+F5; several separated by commas; empty disables the action.
     "hotkeyFixed3": "Ctrl+Alt+3, Ctrl+Alt+Num3",
     "hotkeyFixed4": "Ctrl+Alt+4, Ctrl+Alt+Num4",

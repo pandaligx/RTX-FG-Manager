@@ -1150,3 +1150,136 @@ fn welcome_only_for_new_users_and_dismissal_persists() -> Result<()> {
     assert_eq!(old["language"], "ja");
     Ok(())
 }
+
+#[test]
+fn component_probe_covers_engine_layouts_without_crossing_games() -> Result<()> {
+    // Names are deliberately generic: these are engine layouts, not game rules.
+    for (exe_relative, dll_relative) in [
+        ("Game.exe", "nvngx_dlss.dll"),
+        (
+            "Project/Binaries/Win64/Game.exe",
+            "Engine/Plugins/Marketplace/nvidia/DLSS/Binaries/ThirdParty/Win64/nvngx_dlss.dll",
+        ),
+        (
+            "Project/Binaries/Win64/Game.exe",
+            "Engine/Plugins/Runtime/Nvidia/Streamline/Binaries/ThirdParty/Win64/NVNGX_DLSS.DLL",
+        ),
+        ("Game.exe", "Game_Data/Plugins/x86_64/nvngx_dlss.dll"),
+        ("bin/x64_dx12/Game.exe", "bin/x64_dx12/nvngx_dlss.dll"),
+        (
+            "bin64/Game.exe",
+            "vendor/render/plugins/dlss/nvngx_dlss.dll",
+        ),
+    ] {
+        let dir = tempfile::tempdir()?;
+        let root = dir.path().join("GameA");
+        let exe = root.join(exe_relative);
+        let dll = root.join(dll_relative);
+        fs::create_dir_all(exe.parent().unwrap())?;
+        fs::create_dir_all(dll.parent().unwrap())?;
+        fs::write(&exe, b"never executed")?;
+        fs::write(&dll, b"component discovery only")?;
+        let evidence = scanner::inspect(&exe);
+        assert!(evidence.super_resolution, "{dll_relative}");
+        assert!(evidence.component_paths.iter().any(|p| p == &dll));
+        fs::remove_file(dll)?;
+        let neighbor = dir.path().join("GameB");
+        fs::create_dir(&neighbor)?;
+        fs::write(neighbor.join("nvngx_dlss.dll"), b"another game")?;
+        assert!(!scanner::inspect(&exe).super_resolution);
+    }
+    Ok(())
+}
+
+#[test]
+fn component_probe_does_not_confuse_wrappers_fg_nr_or_backups_with_sr() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let exe = game(dir.path());
+    for name in [
+        "sl.dlss.dll",
+        "nvngx_dlssg.dll",
+        "nvngx_dlssnr.dll",
+        "nvngx_dlssd.dll",
+        "sl.interposer.dll",
+    ] {
+        fs::write(dir.path().join(name), b"fixture")?;
+    }
+    for folder in ["backups", ".rtx-fg-nr", core::OWN] {
+        fs::create_dir(dir.path().join(folder))?;
+        fs::write(dir.path().join(folder).join("nvngx_dlss.dll"), b"backup")?;
+    }
+    let evidence = scanner::inspect(&exe);
+    assert!(!evidence.super_resolution);
+    assert!(evidence.super_resolution_plugin && evidence.frame_generation);
+    Ok(())
+}
+
+#[test]
+fn component_probe_reports_truncated_search_as_incomplete() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let exe = game(dir.path());
+    let deep = (0..19).fold(dir.path().to_path_buf(), |p, _| p.join("nested"));
+    fs::create_dir_all(&deep)?;
+    fs::write(deep.join("nvngx_dlss.dll"), b"fixture")?;
+    let evidence = scanner::inspect(&exe);
+    assert!(evidence.limited && !evidence.super_resolution);
+    Ok(())
+}
+
+#[test]
+#[ignore = "Read-only local game probe; set RTXFG_COMPONENT_PROBE explicitly"]
+fn component_probe_local_game() -> Result<()> {
+    let path = std::env::var("RTXFG_COMPONENT_PROBE")?;
+    let exe = Path::new(&path);
+    let evidence = scanner::inspect(exe);
+    println!("{evidence:#?}");
+    assert!(
+        evidence.super_resolution,
+        "Expected a locally supplied DLSS SR game"
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "Only started as a disposable process by the termination regression"]
+fn process_wait_fixture() {
+    if std::env::var("RTXFG_PROCESS_FIXTURE").as_deref() == Ok("1") {
+        std::thread::sleep(std::time::Duration::from_secs(30));
+    }
+}
+
+#[test]
+fn confirmed_process_termination_checks_path_and_creation_time() -> Result<()> {
+    use rtx_fg_manager::win;
+    use std::process::{Command, Stdio};
+    let exe = std::env::current_exe()?;
+    let mut child = Command::new(&exe)
+        .args(["--exact", "process_wait_fixture", "--ignored"])
+        .env("RTXFG_PROCESS_FIXTURE", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    let result = (|| -> Result<()> {
+        let entry = win::processes_in_directory(exe.parent().unwrap(), None)?
+            .into_iter()
+            .find(|p| p.pid == child.id())
+            .unwrap();
+        assert!(entry.can_terminate());
+        let mut wrong = entry.clone();
+        wrong.created = entry.created.map(|n| n + 1);
+        assert!(win::terminate_confirmed(&wrong).is_err());
+        assert!(child.try_wait()?.is_none());
+        wrong = entry.clone();
+        wrong.path = Some(exe.with_file_name("different.exe"));
+        assert!(win::terminate_confirmed(&wrong).is_err());
+        assert!(child.try_wait()?.is_none());
+        win::terminate_confirmed(&entry)?;
+        child.wait()?;
+        Ok(())
+    })();
+    // Only this test's child can be terminated on failure; no name-based taskkill.
+    let _ = child.kill();
+    let _ = child.wait();
+    result
+}

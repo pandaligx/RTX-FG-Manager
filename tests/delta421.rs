@@ -372,7 +372,20 @@ fn managed_uninstall_retains_retry_record_and_ignores_edited_id() -> Result<()> 
         .share_mode(1)
         .open(cache.join("sl.common.dll"))?;
     assert!(cleanup::clean(&exe)?.starts_with("补丁已移除，缓存待清理"));
-    assert!(core::record(dir)?.unwrap().cache_pending);
+    let pending = core::record(dir)?.unwrap();
+    assert!(pending.cache_pending);
+    assert!(
+        pending
+            .cleanup_pending_reasons
+            .iter()
+            .any(|r| r.contains("占用") || r.contains("删除"))
+    );
+    let game = rtx_fg_manager::scanner::Game {
+        exe: exe.display().to_string(),
+        ..Default::default()
+    };
+    let display = rtx_fg_manager::deployment::inspect(&game, &rtx_fg_manager::cloud::bundled());
+    assert!(display.cleanup_pending && !display.cleanup_details.is_empty());
     assert!(!dir.join("version.dll").exists());
     assert!(!dir.join("自定义日志/native_123.jsonl").exists());
     assert_eq!(fs::read(dir.join("自定义日志/notes.txt"))?, b"user notes");

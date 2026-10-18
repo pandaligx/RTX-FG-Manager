@@ -169,7 +169,94 @@ pub fn running_in_directory(dir: &Path) -> Result<Vec<String>> {
 pub fn running_in_directory_or_missing(dir: &Path, expected_exe: &Path) -> Result<Vec<String>> {
     running_in_directory_impl(dir, Some(expected_exe))
 }
+#[derive(Clone, Debug)]
+pub struct BlockingProcess {
+    pub pid: u32,
+    pub name: String,
+    pub path: Option<PathBuf>,
+    pub created: Option<u64>,
+}
+impl BlockingProcess {
+    pub fn can_terminate(&self) -> bool {
+        self.path.is_some()
+            && self.created.is_some()
+            && ![0, 4, std::process::id()].contains(&self.pid)
+    }
+}
 fn running_in_directory_impl(dir: &Path, expected_exe: Option<&Path>) -> Result<Vec<String>> {
+    Ok(processes_in_directory(dir, expected_exe)?
+        .into_iter()
+        .map(|p| p.name)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect())
+}
+fn process_created(handle: HANDLE) -> Result<u64> {
+    let (mut created, mut exit, mut kernel, mut user) = (
+        FILETIME::default(),
+        FILETIME::default(),
+        FILETIME::default(),
+        FILETIME::default(),
+    );
+    // SAFETY: The caller owns a live process handle; all FILETIME outputs are valid.
+    unsafe {
+        GetProcessTimes(handle, &mut created, &mut exit, &mut kernel, &mut user)?;
+    }
+    Ok((u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
+}
+/// Only invoked after the UI confirms this exact process snapshot. Recheck path
+/// and creation time on the same handle used to terminate, preventing PID reuse.
+pub fn terminate_confirmed(process: &BlockingProcess) -> Result<()> {
+    ensure!(
+        process.can_terminate(),
+        "无法核实进程身份，请在任务管理器中处理"
+    );
+    // SAFETY: Every acquired handle is owned by RAII. Paths, time and wait result
+    // are checked before terminating only the user-confirmed process instance.
+    unsafe {
+        let handle = match OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE | PROCESS_SYNCHRONIZE,
+            false,
+            process.pid,
+        ) {
+            Ok(h) => Handle(h),
+            Err(e) if e.code() == windows::core::HRESULT::from_win32(ERROR_INVALID_PARAMETER.0) => {
+                return Ok(());
+            }
+            Err(e) => return Err(e.into()),
+        };
+        if WaitForSingleObject(handle.0, 0) == WAIT_OBJECT_0 {
+            return Ok(());
+        }
+        let mut buf = vec![0; 32768];
+        let mut size = buf.len() as u32;
+        QueryFullProcessImageNameW(
+            handle.0,
+            PROCESS_NAME_WIN32,
+            PWSTR(buf.as_mut_ptr()),
+            &mut size,
+        )?;
+        let current = PathBuf::from(from_wide(&buf[..size as usize]));
+        ensure!(
+            process
+                .path
+                .as_ref()
+                .is_some_and(|p| crate::core::key(p) == crate::core::key(&current))
+                && process.created == Some(process_created(handle.0)?),
+            "进程身份已变化，未结束任何新进程；请重新检测"
+        );
+        TerminateProcess(handle.0, 1)?;
+        ensure!(
+            WaitForSingleObject(handle.0, 5000) == WAIT_OBJECT_0,
+            "进程尚未完全退出，请稍后重新检测"
+        );
+    }
+    Ok(())
+}
+pub fn processes_in_directory(
+    dir: &Path,
+    expected_exe: Option<&Path>,
+) -> Result<Vec<BlockingProcess>> {
     let mut names: BTreeSet<_> = match std::fs::read_dir(dir) {
         Ok(entries) => entries
             .filter_map(|e| e.ok())
@@ -188,7 +275,7 @@ fn running_in_directory_impl(dir: &Path, expected_exe: Option<&Path>) -> Result<
     if let Some(name) = expected_exe.and_then(Path::file_name) {
         names.insert(name.to_string_lossy().to_lowercase());
     }
-    let mut result = BTreeSet::new();
+    let mut result = Vec::new();
     // SAFETY: All Win32 structures are initialized to their ABI sizes, buffers stay
     // live for each call, and every snapshot/process handle is released by RAII.
     unsafe {
@@ -223,18 +310,28 @@ fn running_in_directory_impl(dir: &Path, expected_exe: Option<&Path>) -> Result<
                         if p.parent()
                             .is_some_and(|p| crate::core::key(p) == crate::core::key(dir))
                         {
-                            result.insert(name.clone());
+                            result.push(BlockingProcess {
+                                pid: entry.th32ProcessID,
+                                name: name.clone(),
+                                path: Some(p),
+                                created: process_created(h.0).ok(),
+                            });
                         }
                     }
                 }
                 if !resolved && names.contains(&name.to_lowercase()) {
-                    result.insert(name);
+                    result.push(BlockingProcess {
+                        pid: entry.th32ProcessID,
+                        name,
+                        path: None,
+                        created: None,
+                    });
                 }
             }
             more = Process32NextW(snapshot.0, &mut entry).is_ok();
         }
     }
-    Ok(result.into_iter().collect())
+    Ok(result)
 }
 pub fn is_admin() -> bool {
     // SAFETY: IsUserAnAdmin takes no pointers and only queries the current token.

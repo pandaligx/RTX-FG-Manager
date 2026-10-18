@@ -43,6 +43,8 @@ pub enum Event {
     Warning(String),
     Notice(String),
     Done,
+    Blocked(BlockedOperation),
+    RetryReady(RetryRequest),
     Checked(Result<Option<updater::Manifest>>, bool, Arc<AtomicBool>),
     Download(PathBuf),
     DownloadProgress(updater::DownloadProgress),
@@ -94,6 +96,53 @@ impl Channel {
             }
         });
     }
+}
+#[derive(Clone)]
+pub enum RetryAction {
+    Patch(bool, BTreeSet<String>),
+    InstallNr(&'static str),
+    RemoveNr,
+    Apply,
+}
+#[derive(Clone)]
+pub struct RetryRequest {
+    action: RetryAction,
+    epoch: u64,
+    fingerprint: String,
+}
+#[derive(Clone)]
+pub struct BlockedOperation {
+    request: RetryRequest,
+    pub processes: Vec<win::BlockingProcess>,
+}
+impl BlockedOperation {
+    pub fn can_terminate(&self) -> bool {
+        !self.processes.is_empty()
+            && self
+                .processes
+                .iter()
+                .all(win::BlockingProcess::can_terminate)
+    }
+}
+fn defer_if_running(
+    c: &Channel,
+    targets: &[core::DeploymentTarget],
+    request: RetryRequest,
+) -> Result<bool> {
+    let mut processes = BTreeMap::new();
+    for target in targets {
+        for process in core::blocking_processes(target)? {
+            processes.insert(process.pid, process);
+        }
+    }
+    if processes.is_empty() {
+        return Ok(false);
+    }
+    c.send(Event::Blocked(BlockedOperation {
+        request,
+        processes: processes.into_values().collect(),
+    }));
+    Ok(true)
 }
 struct PatchRequest {
     clean: bool,
@@ -175,6 +224,8 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
     paths.extend(core::PROXIES.iter().map(|n| dir.join(n)));
     paths.extend(
         [
+            "nvngx_dlssnr.dll",
+            ".rtx-fg-nr/ownership.json",
             core::INI,
             rtx_fg_manager::rtxmfg::CONFIG,
             rtx_fg_manager::transfusion::CONFIG,
@@ -234,6 +285,7 @@ pub struct Controller {
     pub cancel: Arc<AtomicBool>,
     pub progress: String,
     pub payload_progress: Option<cloud::CloudProgress>,
+    pub neural_versions: BTreeMap<String, &'static str>,
     display_cache: DisplayCache,
     patch_summary: Option<PatchSummary>,
     save_revision: u64,
@@ -255,6 +307,7 @@ pub struct Controller {
     pub alias_index: usize,
     pub gpu: String,
     pub warning: Option<String>,
+    pub blocked: Option<BlockedOperation>,
     pub notice: Option<String>,
     pub confirm: Option<String>,
     pending_patch: Option<PatchRequest>,
@@ -283,7 +336,7 @@ impl Controller {
         let tr = i18n::Translator::new(state["language"].as_str().unwrap_or("system"));
         let (tx, rx) = mpsc::channel();
         let channel = Channel { tx };
-        let games = state["games"]
+        let mut games: Vec<Game> = state["games"]
             .as_array()
             .map(|v| {
                 v.iter()
@@ -291,6 +344,9 @@ impl Controller {
                     .collect()
             })
             .unwrap_or_default();
+        for game in &mut games {
+            game.repair_renderer();
+        }
         let read_only = error.is_some();
         let mut app = Self {
             catalog: cloud::bundled(),
@@ -323,6 +379,7 @@ impl Controller {
             cancel: Arc::new(AtomicBool::new(false)),
             progress: String::new(),
             payload_progress: None,
+            neural_versions: BTreeMap::new(),
             display_cache: Arc::new(Mutex::new(BTreeMap::new())),
             patch_summary: None,
             save_revision: 0,
@@ -344,6 +401,7 @@ impl Controller {
             alias_index: 0,
             gpu: String::new(),
             warning: error,
+            blocked: None,
             notice: None,
             confirm: None,
             pending_patch: None,
@@ -973,7 +1031,15 @@ impl Controller {
         self.critical = true;
         self.status_epoch += 1;
         self.progress = "正在应用参数…".into();
+        let retry = self.retry_request(RetryAction::Apply);
         self.channel.operation(move |c| {
+            let guards = paths
+                .iter()
+                .map(|p| game.deployment_target(std::path::Path::new(p)))
+                .collect::<Vec<_>>();
+            if defer_if_running(c, &guards, retry)? {
+                return Ok(());
+            }
             let mut unavailable = Vec::new();
             for path in &paths {
                 let target = std::path::Path::new(path);
@@ -1176,6 +1242,27 @@ impl Controller {
             Ok(())
         })
     }
+    /// Move one card relative to another without changing selection or game identity.
+    pub fn reorder_game(&mut self, source: &str, target: &str, after: bool) {
+        if self.busy || self.read_only || self.closing || source == target {
+            return;
+        }
+        let Some(from) = self.games.iter().position(|g| g.exe == source) else {
+            return;
+        };
+        let Some(to) = self.games.iter().position(|g| g.exe == target) else {
+            return;
+        };
+        let insertion = to + usize::from(after);
+        let insertion = insertion - usize::from(from < insertion);
+        if from == insertion {
+            return;
+        }
+        let game = self.games.remove(from);
+        self.games.insert(insertion, game);
+        self.library_revision += 1;
+        self.save();
+    }
     pub fn merge(&mut self, rows: Vec<Game>) {
         let before = self.games.len();
         for g in rows {
@@ -1216,7 +1303,7 @@ impl Controller {
     }
     /// Refresh scanned installations without discarding a previously deployed path.
     pub fn merge_scan(&mut self, rows: Vec<Game>) {
-        // A same-count rescan can reorder entries and replace their title/root.
+        // A same-count rescan can replace entries and their title/root.
         self.library_revision += 1;
         // In-flight reads and status checks refer to the old library identities.
         self.status_epoch += 1;
@@ -1377,6 +1464,12 @@ impl Controller {
                 .iter()
                 .map(|g| core::key(std::path::Path::new(&g.exe)))
                 .collect::<BTreeSet<_>>();
+            // A scan refresh replaces a card in its original user-ordered slot.
+            let insertion = self
+                .games
+                .iter()
+                .position(|g| old_paths.contains(&core::key(std::path::Path::new(&g.exe))))
+                .unwrap_or(self.games.len());
             self.games
                 .retain(|g| !old_paths.contains(&core::key(std::path::Path::new(&g.exe))));
             for old in &matched {
@@ -1395,7 +1488,7 @@ impl Controller {
                     self.disk_presets.retain(|(exe, _), _| exe != &old.exe);
                 }
             }
-            self.games.push(fresh);
+            self.games.insert(insertion.min(self.games.len()), fresh);
         }
         self.save();
         self.refresh();
@@ -1581,6 +1674,162 @@ impl Controller {
             })
             .unwrap_or_default()
     }
+    fn retry_fingerprint(&self) -> String {
+        core::hash(serde_json::to_string(&json!({"games": self.games, "focus": self.focus,
+            "scheme": self.cloud_scheme(), "series": self.cloud_series(), "proxies": self.proxies()})).unwrap_or_default().as_bytes())
+    }
+    fn retry_request(&self, action: RetryAction) -> RetryRequest {
+        RetryRequest {
+            action,
+            epoch: self.status_epoch,
+            fingerprint: self.retry_fingerprint(),
+        }
+    }
+    fn retry_operation(&mut self, request: RetryRequest) {
+        if self.busy || self.closing {
+            return;
+        }
+        if request.epoch != self.status_epoch || request.fingerprint != self.retry_fingerprint() {
+            self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
+            return;
+        }
+        self.blocked = None;
+        match request.action {
+            RetryAction::Patch(clean, paths) => self.perform(clean, paths),
+            RetryAction::InstallNr(version) => self.install_neural_runtime(version),
+            RetryAction::RemoveNr => self.remove_neural_runtime(),
+            RetryAction::Apply => self.apply_focused_parameters(),
+        }
+    }
+    pub fn recheck_blocked(&mut self) {
+        if let Some(blocked) = self.blocked.take() {
+            self.retry_operation(blocked.request);
+        }
+    }
+    pub fn end_blocked_and_retry(&mut self) {
+        if self.busy || self.closing {
+            return;
+        }
+        let Some(blocked) = self.blocked.clone() else {
+            return;
+        };
+        if !blocked.can_terminate() {
+            self.warning = Some("无法核实进程身份，请在任务管理器中处理".into());
+            return;
+        }
+        if blocked.request.epoch != self.status_epoch
+            || blocked.request.fingerprint != self.retry_fingerprint()
+        {
+            self.blocked = None;
+            self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
+            return;
+        }
+        self.busy = true;
+        self.critical = true;
+        self.channel.job(move |c| {
+            let result = (|| -> Result<()> {
+                for process in &blocked.processes {
+                    win::terminate_confirmed(process)?;
+                }
+                Ok(())
+            })();
+            c.send(Event::Done);
+            match result {
+                Ok(()) => c.send(Event::RetryReady(blocked.request)),
+                Err(error) => c.send(Event::Warning(format!(
+                    "结束进程未完成；请重新检测或在任务管理器中处理：{error:#}"
+                ))),
+            }
+            Ok(())
+        });
+    }
+    pub fn install_neural_runtime(&mut self, version: &'static str) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned()
+        else {
+            return;
+        };
+        let target = parameter_target(&game);
+        self.status_epoch += 1;
+        let data = self.data.clone();
+        self.busy = true;
+        self.critical = true;
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancel = self.cancel.clone();
+        let retry = self.retry_request(RetryAction::InstallNr(version));
+        self.channel.operation(move |c| {
+            if defer_if_running(c, std::slice::from_ref(&target), retry)? {
+                return Ok(());
+            }
+            ensure_directory_outside_data(&target.directory, &data)?;
+            rtx_fg_manager::neural_runtime::install(&target, version, &cancel, &mut |transfer| {
+                c.send(Event::PayloadProgress(cloud::CloudProgress {
+                    transfer,
+                    proxy: "nvngx_dlssnr.dll".into(),
+                    package_index: 1,
+                    package_count: 1,
+                }));
+            })?;
+            c.send(Event::Notice(
+                "NR 运行库已安装。请在游戏中开启 DLSS/DLAA，再按 Insert 开启神经渲染。".into(),
+            ));
+            Ok(())
+        });
+    }
+    pub fn remove_neural_runtime(&mut self) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+        else {
+            return;
+        };
+        let target = parameter_target(game);
+        let data = self.data.clone();
+        self.status_epoch += 1;
+        self.busy = true;
+        self.critical = true;
+        let retry = self.retry_request(RetryAction::RemoveNr);
+        self.channel.operation(move |c| {
+            if defer_if_running(c, std::slice::from_ref(&target), retry)? {
+                return Ok(());
+            }
+            ensure_directory_outside_data(&target.directory, &data)?;
+            rtx_fg_manager::neural_runtime::remove(&target)?;
+            c.send(Event::Notice(
+                "NR 安装已撤销；若原先已有运行库，已恢复原件。Encore 和其他补丁保持不变。".into(),
+            ));
+            Ok(())
+        });
+    }
+    pub fn retry_focused_cleanup(&mut self) {
+        if self.busy || self.closing {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+        else {
+            return;
+        };
+        // Scope retries to this card, never the unrelated checked batch.
+        let paths = game
+            .deployment_executables()
+            .into_iter()
+            .chain(game.cleanup_only.clone())
+            .collect();
+        self.perform(true, paths);
+    }
     pub fn confirm_patch(&mut self) {
         if let Some(p) = self.pending_patch.take() {
             self.perform(p.clean, p.targets);
@@ -1647,7 +1896,20 @@ impl Controller {
         let mut catalog = self.catalog.clone();
         let data = self.data.clone();
         catalog.prefer_github = self.choice("download_source", "domestic") == "github";
+        let retry = self.retry_request(RetryAction::Patch(clean, paths.clone()));
         self.channel.operation(move |c| {
+            let guards = jobs
+                .iter()
+                .flat_map(|(_, targets, game, _, _, _, _, _)| {
+                    targets
+                        .iter()
+                        .map(|p| game.deployment_target(std::path::Path::new(p)))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            if defer_if_running(c, &guards, retry)? {
+                return Ok(());
+            }
             let mut errors = Vec::new();
             for (primary, targets, game, scheme, series, proxies, options, overrides) in jobs {
                 if cancel.load(Ordering::Relaxed) {
@@ -1901,8 +2163,14 @@ impl Controller {
             return;
         }
         self.evidence.insert(exe.clone(), None);
+        let target = self
+            .games
+            .iter()
+            .find(|g| g.exe == exe)
+            .map(parameter_target)
+            .unwrap_or_else(|| core::DeploymentTarget::for_game(std::path::Path::new(&exe)));
         self.channel.job(move |c| {
-            let evidence = scanner::inspect(std::path::Path::new(&exe));
+            let evidence = scanner::inspect(&target.game_exe);
             c.send(Event::Evidence(exe, evidence));
             Ok(())
         });
@@ -2084,7 +2352,8 @@ impl Controller {
         if self.busy {
             return;
         }
-        if let Some(catalog) = self.pending_catalog.take() {
+        if let Some(mut catalog) = self.pending_catalog.take() {
+            catalog.retain_bundled_versions();
             for (scheme, reason) in &catalog.skipped_schemes {
                 self.log(&format!("{scheme}：{reason}"));
             }
@@ -2358,6 +2627,14 @@ impl Controller {
                         self.deployments.insert(exe, snapshot);
                     }
                 }
+                Event::Blocked(blocked) => {
+                    if blocked.request.epoch == self.status_epoch {
+                        self.blocked = Some(blocked);
+                        self.patch_summary = None;
+                        self.confirm = Some("end_processes".into());
+                    }
+                }
+                Event::RetryReady(request) => self.retry_operation(request),
                 Event::Done => {
                     self.busy = false;
                     self.critical = false;
@@ -2500,6 +2777,24 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn nr_changes_invalidate_display_cache_without_hashing_runtime() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let exe = dir.path().join("game.exe");
+        std::fs::write(&exe, b"fixture")?;
+        let target = core::DeploymentTarget::for_game(&exe);
+        let before = display_stamp(&target)?;
+        std::fs::write(dir.path().join("nvngx_dlssnr.dll"), b"runtime fixture")?;
+        let installed = display_stamp(&target)?;
+        assert_ne!(before, installed);
+        std::fs::create_dir(dir.path().join(".rtx-fg-nr"))?;
+        std::fs::write(dir.path().join(".rtx-fg-nr/ownership.json"), b"{}")?;
+        assert_ne!(installed, display_stamp(&target)?);
+        std::fs::remove_file(dir.path().join("nvngx_dlssnr.dll"))?;
+        assert_ne!(installed, display_stamp(&target)?);
+        Ok(())
+    }
+
     #[test]
     fn grouped_encore_settings_read_rendering_directory_and_failed_read_preserves_last_values() {
         use rtx_fg_manager::encore;
@@ -2911,6 +3206,77 @@ mod tests {
         (dir, c)
     }
     #[test]
+    fn reorder_preserves_selection_and_saved_game_data() {
+        let (_dir, mut c) = controller();
+        c.games = ["A", "B", "C"]
+            .map(|name| Game {
+                exe: format!("{name}.exe"),
+                title: name.into(),
+                extra: serde_json::from_value(json!({"custom": name})).unwrap(),
+                ..Default::default()
+            })
+            .to_vec();
+        c.focus = Some("B.exe".into());
+        c.selected.insert("A.exe".into());
+        c.reorder_game("A.exe", "C.exe", true);
+        assert_eq!(
+            c.games.iter().map(|g| g.title.as_str()).collect::<Vec<_>>(),
+            ["B", "C", "A"]
+        );
+        c.reorder_game("A.exe", "B.exe", false);
+        assert_eq!(
+            c.games.iter().map(|g| g.title.as_str()).collect::<Vec<_>>(),
+            ["A", "B", "C"]
+        );
+        assert_eq!(c.focus.as_deref(), Some("B.exe"));
+        assert_eq!(c.selected, BTreeSet::from(["A.exe".into()]));
+        assert_eq!(c.games[0].extra["custom"], "A");
+        assert_eq!(c.state["games"], serde_json::to_value(&c.games).unwrap());
+        let revision = c.library_revision;
+        c.reorder_game("A.exe", "B.exe", false);
+        c.reorder_game("missing.exe", "B.exe", true);
+        c.busy = true;
+        c.reorder_game("A.exe", "C.exe", true);
+        c.busy = false;
+        assert_eq!(c.library_revision, revision);
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn rescan_preserves_manual_order_and_appends_new_games() {
+        let (dir, mut c) = controller();
+        let rows = ["A", "B", "C"].map(|name| {
+            let root = dir.path().join("Steam/steamapps/common").join(name);
+            std::fs::create_dir_all(&root).unwrap();
+            let exe = root.join(format!("{name}.exe")).display().to_string();
+            Game {
+                exe: exe.clone(),
+                title: name.into(),
+                root: root.display().to_string(),
+                targets: vec![exe],
+                ..Default::default()
+            }
+        });
+        c.games = vec![rows[1].clone(), rows[0].clone()];
+        c.merge_scan(rows.to_vec());
+        assert_eq!(
+            c.games.iter().map(|g| g.title.as_str()).collect::<Vec<_>>(),
+            ["B", "A", "C"]
+        );
+        assert_eq!(c.state["games"], serde_json::to_value(&c.games).unwrap());
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn process_retry_rejects_changed_game_or_options() {
+        let (_dir, mut c) = controller();
+        let request = c.retry_request(RetryAction::RemoveNr);
+        c.focus = Some("different-game.exe".into());
+        c.retry_operation(request);
+        assert!(!c.busy);
+        assert!(c.warning.as_deref().unwrap().contains("已变化"));
+    }
+    #[test]
     fn busy_catalog_refresh_keeps_latest_success_until_operation_finishes() {
         for critical in [false, true] {
             let (_dir, mut c) = controller();
@@ -3029,7 +3395,8 @@ mod tests {
                         .any(|s| s.contains("成功 0，失败 1，未处理 0"))
                 );
                 assert_eq!(std::fs::read(&stage).unwrap(), pe[..100]);
-                assert!(core::record(game.path()).unwrap().unwrap().cache_pending);
+                let record = core::record(game.path()).unwrap().unwrap();
+                assert!(record.cache_pending && !record.cleanup_pending_reasons.is_empty());
                 // Only the synthetic test fragment is removed; recovery is retried normally.
                 std::fs::remove_file(&stage).unwrap();
             } else {

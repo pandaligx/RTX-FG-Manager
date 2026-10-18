@@ -301,7 +301,18 @@ pub fn upgrade_locked(
         .get(core::config_name(&old.backend))
         .context("旧配置文件缺失")?;
     let migrated = if old.backend == encore::BACKEND {
-        encore::configure(original, explicit_overrides.unwrap_or(&empty))?
+        let needs_nr_migration = new
+            .upstream_version
+            .as_deref()
+            .or(new.payload_version.as_deref())
+            .and_then(|v| semver::Version::parse(v).ok())
+            .is_some_and(|v| v >= semver::Version::new(1, 1, 0));
+        let migrated = if needs_nr_migration {
+            encore::migrate_nr(original)?
+        } else {
+            original.clone()
+        };
+        encore::configure(&migrated, explicit_overrides.unwrap_or(&empty))?
     } else {
         encore::migrate(original, explicit_overrides.unwrap_or(&empty))?
     };
@@ -527,6 +538,34 @@ mod tests {
         Ok(map)
     }
 
+    #[test]
+    fn encore_110_upgrade_moves_old_nr_model_without_resetting_configuration() -> Result<()> {
+        let (_temp, target) = fixture()?;
+        install(&target)?;
+        let original = b"{\n// keep this\n\"configVersion\":4,\"neuralRendering\":{\"core\":{\"nrEnabled\":false},\"advanced\":{\"nrPreset\":1}},\"vendor\":42}";
+        fs::write(target.directory.join(encore::CONFIG), original)?;
+        core::deploy_prepared_context_at_with_overrides(
+            &target,
+            encore::BACKEND,
+            &["dinput8.dll".into()],
+            None,
+            BTreeMap::from([
+                ("dinput8.dll".into(), pe(true, 3)),
+                (encore::CONFIG.into(), encore::DEFAULT_CONFIG.to_vec()),
+                (encore::NOTICES.into(), b"updated notices".to_vec()),
+            ]),
+            Some("1.1.0"),
+            Some(&context(encore::PROFILE)),
+            None,
+            Some("1.1.0"),
+        )?;
+        let current = fs::read(target.directory.join(encore::CONFIG))?;
+        assert_eq!(encore::read(&current)?["dlssNrPreset"], "a");
+        assert_eq!(encore::read(&current)?["nrEnabled"], "0");
+        assert!(String::from_utf8_lossy(&current).contains("// keep this"));
+        assert_eq!(crate::jsonc::Document::parse(&current)?.value["vendor"], 42);
+        Ok(())
+    }
     #[test]
     fn encore_prerelease_upgrade_preserves_exact_jsonc_and_rejects_downgrade() -> Result<()> {
         let (_temp, target) = fixture()?;

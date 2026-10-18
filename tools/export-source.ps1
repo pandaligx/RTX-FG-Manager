@@ -74,7 +74,7 @@ foreach ($name in @(
     'vendor/gpui_fast_windows/README.md', 'vendor/gpui_fast_windows/LOCAL_CHANGES.md',
     'rust/assets/themes/LICENSE-APACHE'
 )) { Add-File $name }
-foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md')) { Add-File $name $false }
+foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md', 'docs/encore-1.1.0.md', 'docs/encore-1.1.0.zh-CN.md')) { Add-File $name $false }
 Add-Tree 'rust/src' @('.rs')
 Add-Tree 'help' @('.html', '.css', '.js')
 foreach ($name in @('community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore', 'community/wrangler.example.jsonc', 'community/README.md', 'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json', '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md')) { Add-File $name }

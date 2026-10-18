@@ -5,6 +5,9 @@ use std::{collections::BTreeSet, path::Path};
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {
     pub status: String,
+    pub cleanup_pending: bool,
+    pub cleanup_details: Vec<String>,
+    pub neural: Vec<crate::neural_runtime::Status>,
     pub total: usize,
     pub installed: usize,
     pub schemes: BTreeSet<String>,
@@ -27,6 +30,35 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
         let status = core::status_at(&target);
         statuses.push(status.clone());
         let record = core::record(&target.directory).ok().flatten();
+        if let Some(r) = record.as_ref()
+            && r.cache_pending
+        {
+            snapshot.cleanup_pending = true;
+            snapshot.cleanup_details.push(format!(
+                "{}\n{}",
+                target.directory.display(),
+                if r.cleanup_pending_reasons.is_empty() {
+                    "旧记录未保存具体原因；点击重新清理可重新检测。".into()
+                } else {
+                    r.cleanup_pending_reasons.join("\n")
+                }
+            ));
+        }
+        let mut nr = crate::neural_runtime::inspect(&target);
+        if status.starts_with("已部署")
+            && let Some(r) = record.as_ref()
+            && r.backend == crate::encore::BACKEND
+            && target.validate_record(r).is_ok()
+        {
+            nr.encore_version = Some(
+                r.upstream_version
+                    .as_deref()
+                    .or(r.payload_version.as_deref())
+                    .unwrap_or("0.0.0")
+                    .into(),
+            );
+        }
+        snapshot.neural.push(nr);
         if status.starts_with("已部署")
             && let Some(r) = record
         {

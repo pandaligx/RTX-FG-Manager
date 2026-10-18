@@ -262,32 +262,40 @@ pub fn deployment_directory(directory: &Path) -> Result<PathBuf> {
     );
     Ok(p)
 }
-pub fn assert_target_stopped(target: &DeploymentTarget) -> Result<()> {
-    // Each group can deploy once to a shared plugin folder while still having
-    // multiple real game processes. Do not derive these guards from destinations.
+pub fn blocking_processes(target: &DeploymentTarget) -> Result<Vec<win::BlockingProcess>> {
+    let mut processes = BTreeMap::new();
     for exe in std::iter::once(&target.game_exe).chain(&target.guard_exes) {
-        let game_dir = exe.parent().context("无效游戏路径")?;
-        let names = if exe == &target.game_exe && !target.is_custom() {
-            win::running_in_directory(game_dir)?
+        let dir = exe.parent().context("无效游戏路径")?;
+        let expected = if exe == &target.game_exe && !target.is_custom() {
+            None
         } else {
-            win::running_in_directory_or_missing(game_dir, exe)?
+            Some(exe.as_path())
         };
-        ensure!(
-            names.is_empty(),
-            "请先完全退出游戏及同目录程序：{}",
-            names.join(", ")
-        );
+        for p in win::processes_in_directory(dir, expected)? {
+            processes.insert(p.pid, p);
+        }
     }
     if target.is_custom() {
-        let names = win::running_in_directory(&target.directory)?;
-        ensure!(
-            names.is_empty(),
-            "请先完全退出游戏及同目录程序：{}",
-            names.join(", ")
-        );
+        for p in win::processes_in_directory(&target.directory, None)? {
+            processes.insert(p.pid, p);
+        }
     }
+    Ok(processes.into_values().collect())
+}
+pub fn assert_target_stopped(target: &DeploymentTarget) -> Result<()> {
+    let processes = blocking_processes(target)?;
+    ensure!(
+        processes.is_empty(),
+        "请先完全退出游戏及同目录程序：{}",
+        processes
+            .iter()
+            .map(|p| format!("{} (PID {})", p.name, p.pid))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     Ok(())
 }
+
 pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
     ensure!(
         !proxies.is_empty() && proxies.len() <= PROXIES.len(),
@@ -553,6 +561,8 @@ pub struct Record {
     pub delta_legacy_cache: bool,
     #[serde(default)]
     pub cache_pending: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cleanup_pending_reasons: Vec<String>,
 }
 fn default_proxy() -> String {
     "version.dll".into()
@@ -1028,6 +1038,7 @@ pub fn deploy_prepared_context_at_with_overrides(
             delta_cache_ids: Vec::new(),
             delta_legacy_cache: false,
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
         return crate::encore_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides);
     }
@@ -1060,6 +1071,7 @@ pub fn deploy_prepared_context_at_with_overrides(
             delta_cache_ids: Vec::new(),
             delta_legacy_cache: false,
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
         return crate::rtxmfg_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides);
     }
@@ -1084,6 +1096,7 @@ pub fn deploy_prepared_context_at_with_overrides(
             delta_cache_ids: Vec::new(),
             delta_legacy_cache: false,
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
         return crate::upstream040_upgrade::upgrade_locked(
             &target,
@@ -1145,6 +1158,7 @@ pub fn deploy_prepared_context_at_with_overrides(
             delta_cache_ids: delta_cache_ids.clone(),
             delta_legacy_cache: context.is_some_and(|c| c.delta),
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
         fs::create_dir_all(&root)?;
         write_new(&root.join(MARKER), &serde_json::to_vec(&r)?)?;
@@ -1279,6 +1293,7 @@ pub fn deploy_prepared_context_at_with_overrides(
         delta_cache_ids,
         delta_legacy_cache: false,
         cache_pending: false,
+        cleanup_pending_reasons: Vec::new(),
     };
     r.validate()?;
     write_new(&root.join(MARKER), &serde_json::to_vec(&r)?)?;

@@ -1158,34 +1158,29 @@
     "source_help": "Model UI correction."
   },
   {
-    "key": "nrPreset",
+    "key": "dlssNrPreset",
     "path": [
-      "neuralRendering",
-      "advanced",
-      "nrPreset"
+      "dlssPresets",
+      "dlssNrPreset"
     ],
-    "label": "NVIDIA模型配置",
+    "label": "NR 模型预设",
     "group": "image",
     "kind": "choice",
-    "default": "0",
+    "default": "b",
     "min": null,
     "max": null,
     "choices": [
       {
-        "value": "0",
-        "label": "自动（推荐）"
+        "value": "b",
+        "label": "B · 较小网络"
       },
       {
-        "value": "1",
-        "label": "配置1"
+        "value": "a",
+        "label": "A · 较大网络"
       },
       {
-        "value": "2",
-        "label": "配置2"
-      },
-      {
-        "value": "3",
-        "label": "配置3"
+        "value": "auto",
+        "label": "DLL 默认"
       }
     ],
     "restart": false,
@@ -1193,8 +1188,8 @@
       "nrEnabled=1",
       "nrEngine=nvidia"
     ],
-    "help": "模型编号没有公开的质量或速度排序；推荐自动。",
-    "optional": false,
+    "help": "310.9.16：B 为较小网络，A 为较大网络；310.8.0 仅有一个网络。Open 引擎忽略此项。",
+    "optional": true,
     "source_help": "NVIDIA model profile: 0 Automatic (recommended), 1-3 numbered profiles. No documented quality/speed ranking; separate from image style."
   },
   {
@@ -2517,5 +2512,45 @@
     "help": "Encore 1.0.0：异常日志包含寄存器和栈，崩溃时生成 .dmp（通常数十 MB）。仅诊断时开启，收集后关闭；需重启。转储可能包含进程内存，请谨慎分享。",
     "optional": true,
     "source_help": "Encore 1.0.0: adds register/stack details and a .dmp on crashes (often tens of MB). Diagnostics only; disable afterwards and restart. Dumps may contain process memory; review before sharing."
+  },
+  {
+    "key": "fastSuperResolution",
+    "path": [
+      "dlssSuperResolution",
+      "fastSuperResolution"
+    ],
+    "label": "快速超分（RTX 30）",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "仅 RTX 30、DX12、DLSS 310.9.x 的 M/L 模型有效；不适用于 RR 或 DLAA。需要重启游戏。",
+    "optional": true,
+    "source_help": "DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0. The first launch prepares it in the background."
+  },
+  {
+    "key": "hotkeyToggleNr",
+    "path": [
+      "keyboardShortcuts",
+      "hotkeyToggleNr"
+    ],
+    "label": "切换神经渲染",
+    "group": "system",
+    "kind": "hotkey",
+    "default": "Ctrl+Alt+N",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "disableKeybinds=0"
+    ],
+    "help": "游戏窗口内开启或关闭 NR，用于对比画面与帧率。",
+    "optional": true,
+    "source_help": "Combinations such as Ctrl+Alt+4 or Ctrl+Shift+F5; several separated by commas; empty disables the action."
   }
 ]

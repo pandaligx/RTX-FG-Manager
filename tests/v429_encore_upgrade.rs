@@ -284,6 +284,7 @@ fn cleanup_retains_modified_notice_and_unrecognized_files_inside_logs() -> Resul
     let logs = target.directory.join("rtx-encore-logs");
     fs::create_dir(&logs)?;
     fs::write(logs.join("rtx-encore.log"), b"owned session")?;
+    fs::write(logs.join("rtx-encore-status.json"), b"{}")?;
     fs::write(logs.join("rtx-encore_perf.csv"), b"owned metrics")?;
     let rotated = "rtx-encore.log.previous-20261009-015707-625-12888.log";
     fs::write(logs.join(rotated), b"owned rotated session")?;
@@ -312,6 +313,7 @@ fn cleanup_retains_modified_notice_and_unrecognized_files_inside_logs() -> Resul
     assert!(outcome.complete);
     assert!(!target.directory.join("version.dll").exists());
     assert!(!logs.join("rtx-encore.log").exists());
+    assert!(!logs.join("rtx-encore-status.json").exists());
     assert!(!logs.join("rtx-encore_perf.csv").exists());
     assert!(!logs.join(rotated).exists());
     assert!(!logs.join(dump).exists());

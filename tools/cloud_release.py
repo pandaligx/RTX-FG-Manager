@@ -33,7 +33,7 @@ import zipfile
 REPO = "pandaligx/RTX-FG-Manager"
 GITEE_RESOURCE_REPO = "pandaligx/RTX-FG-Manager-payloads"
 RESOURCE_TAG = "payloads"
-MAX_ZIP = 128 * 1024 * 1024
+MAX_ZIP = 512 * 1024 * 1024
 MAX_JSON = 1024 * 1024
 PROXIES = {"version.dll", "winmm.dll", "dinput8.dll", "dbghelp.dll", "dxgi.dll", "d3d12.dll", "winhttp.dll"}
 ENCORE_PROFILE = "rtx_encore_json_v4"

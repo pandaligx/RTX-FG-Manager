@@ -11,7 +11,7 @@ fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults
     encore::validate_cloud_config(encore::DEFAULT_CONFIG).unwrap();
     let read = encore::read(encore::DEFAULT_CONFIG).unwrap();
     assert_eq!(read, encore::defaults());
-    assert_eq!(encore::fields().len(), 98);
+    assert_eq!(encore::fields().len(), 100);
     assert_eq!(read["menuKey"], "45");
     assert_eq!(read["nrOpenFastProjection"], "1");
     assert_eq!(read["nrFastProcessing"], "1");
@@ -86,7 +86,7 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
     let captured = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG).unwrap();
     let mut actual = std::collections::BTreeSet::new();
     leaves(&captured.value, &mut Vec::new(), &mut actual);
-    assert_eq!(actual.len(), 99);
+    assert_eq!(actual.len(), 101);
     let represented: std::collections::BTreeSet<_> =
         encore::fields().iter().map(|f| f.path.clone()).collect();
     let absent: Vec<_> = actual.difference(&represented).cloned().collect();

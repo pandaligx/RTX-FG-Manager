@@ -67,6 +67,33 @@ pub struct Game {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 impl Game {
+    /// Repair the known compiler false positive in saved libraries without a
+    /// disk-wide rescan. Old owned paths remain available only for cleanup.
+    pub fn repair_renderer(&mut self) {
+        if !self.deployment_dir.is_empty() {
+            return;
+        }
+        let root = installation_root(Path::new(&self.exe));
+        let dx12 = root.join("bin/x64_dx12/witcher3.exe");
+        if is_name(&root, &["The Witcher 3"]) && dx12.is_file() && core::pe64(&dx12, false).is_ok()
+        {
+            let old = std::iter::once(self.exe.clone())
+                .chain(self.targets.clone())
+                .collect::<Vec<_>>();
+            for p in old {
+                if let Some(dir) = Path::new(&p).parent()
+                    && core::key(dir) != core::key(dx12.parent().unwrap())
+                    && dir.join(core::OWN).is_dir()
+                    && !self.cleanup_only.contains(&p)
+                {
+                    self.cleanup_only.push(p);
+                }
+            }
+            self.exe = dx12.to_string_lossy().into();
+            self.targets = vec![self.exe.clone()];
+            self.root = root.to_string_lossy().into();
+        }
+    }
     pub fn deployment_target(&self, exe: &Path) -> core::DeploymentTarget {
         let mut target = if self.deployment_dir.is_empty() {
             core::DeploymentTarget::for_game(exe)
@@ -175,7 +202,13 @@ pub fn is_gpu_diagnostic_tool(exe: &Path) -> bool {
             executable_role(&name.to_string_lossy())
                 .to_ascii_lowercase()
                 .as_str(),
-            "vulkaninfo" | "vulkaninfo32" | "vulkaninfo64" | "nvidia-smi" | "nvidia-debugdump"
+            "vulkaninfo"
+                | "vulkaninfo32"
+                | "vulkaninfo64"
+                | "nvidia-smi"
+                | "nvidia-debugdump"
+                | "d3d12stateobjectcompiler"
+                | "d3d12warpcompiler"
         )
     })
 }
@@ -354,6 +387,7 @@ fn renderer_name(path: &Path, root: &Path) -> bool {
     let stem = compact(&stem);
     let folder = compact(&folder);
     stem == folder
+        || (stem == "witcher3" && folder == "thewitcher3")
         || (!folder.is_empty() && stem.starts_with(&folder))
         || (stem.len() >= 4 && folder.starts_with(&stem))
         || stem.contains("dx12")
@@ -365,24 +399,43 @@ fn renderer_name(path: &Path, root: &Path) -> bool {
 pub struct Evidence {
     pub frame_generation: bool,
     pub super_resolution: bool,
+    /// Streamline SR wrapper alone is a clue, not a complete SR runtime.
+    pub super_resolution_plugin: bool,
+    pub component_paths: Vec<PathBuf>,
     pub anti_cheat: bool,
     pub limited: bool,
 }
 /// Bounded, read-only component discovery, called only in a background worker.
 pub fn inspect(exe: &Path) -> Evidence {
-    use std::os::windows::fs::MetadataExt;
+    use std::{
+        cmp::Reverse,
+        collections::{BinaryHeap, HashSet},
+        os::windows::fs::MetadataExt,
+    };
     let mut result = Evidence::default();
-    let Ok(root) = core::no_links(&game_root(exe)) else {
+    let Ok(root) = core::no_links(&installation_root(exe)) else {
         result.limited = true;
         return result;
     };
+    // Component discovery differs from EXE discovery: ThirdParty contains the
+    // actual Unreal DLSS DLLs and must never inherit the launcher's exclusion.
+    // Prioritize executable/plugin paths, then search other folders within this
+    // installation. No title-specific paths and no traversal into other games.
+    let mut pending = BinaryHeap::from([Reverse((0u32, 0u32, root.clone()))]);
+    if let Some(dir) = exe.parent()
+        && let Ok(dir) = core::no_links(dir)
+        && dir.starts_with(&root)
+    {
+        pending.push(Reverse((0, 0, dir)));
+    }
     let started = Instant::now();
-    let mut pending = std::collections::VecDeque::from([(root, 0)]);
+    let mut visited = HashSet::new();
     let mut entries = 0;
-    let mut directories = 0;
-    while let Some((dir, depth)) = pending.pop_front() {
-        directories += 1;
-        if directories > 256 || started.elapsed().as_millis() > 250 {
+    while let Some(Reverse((cost, depth, dir))) = pending.pop() {
+        if !visited.insert(core::key(&dir)) {
+            continue;
+        }
+        if visited.len() > 1024 || started.elapsed().as_millis() > 1000 {
             result.limited = true;
             break;
         }
@@ -392,7 +445,7 @@ pub fn inspect(exe: &Path) -> Evidence {
         };
         for row in rows {
             entries += 1;
-            if entries > 16000 || started.elapsed().as_millis() > 250 {
+            if entries > 50000 || started.elapsed().as_millis() > 1000 {
                 result.limited = true;
                 return result;
             }
@@ -414,12 +467,51 @@ pub fn inspect(exe: &Path) -> Evidence {
                 || name == "acesafe.sys"
                 || name == "anticheatexpert";
             if meta.is_file() {
-                result.frame_generation |=
-                    ["nvngx_dlssg.dll", "sl.dlss_g.dll"].contains(&name.as_str());
-                result.super_resolution |= name == "nvngx_dlss.dll";
-            } else if meta.is_dir() && !SKIP.contains(&name.as_str()) {
-                if depth < 6 {
-                    pending.push_back((row.path(), depth + 1));
+                let fg = ["nvngx_dlssg.dll", "sl.dlss_g.dll"].contains(&name.as_str());
+                let sr = name == "nvngx_dlss.dll";
+                let plugin = name == "sl.dlss.dll";
+                result.frame_generation |= fg;
+                result.super_resolution |= sr;
+                result.super_resolution_plugin |= plugin;
+                if (fg || sr || plugin) && result.component_paths.len() < 32 {
+                    result.component_paths.push(row.path());
+                }
+            } else if meta.is_dir()
+                && (name == "thirdparty" || !SKIP.contains(&name.as_str()))
+                && ![".rtx-fg-nr", "backup", "backups"].contains(&name.as_str())
+            {
+                if depth < 16 {
+                    let priority = if [
+                        "engine",
+                        "plugins",
+                        "plugin",
+                        "binaries",
+                        "bin",
+                        "bin64",
+                        "x64",
+                        "x86_64",
+                        "win64",
+                        "x64_dx12",
+                        "thirdparty",
+                        "nvidia",
+                        "dlss",
+                        "streamline",
+                        "streamlinecore",
+                        "marketplace",
+                        "runtime",
+                    ]
+                    .contains(&name.as_str())
+                        || name.ends_with("_data")
+                    {
+                        0
+                    } else if ["content", "paks", "movies", "videos", "audio", "textures"]
+                        .contains(&name.as_str())
+                    {
+                        32
+                    } else {
+                        1
+                    };
+                    pending.push(Reverse((cost + priority, depth + 1, row.path())));
                 } else {
                     result.limited = true;
                 }
@@ -428,6 +520,7 @@ pub fn inspect(exe: &Path) -> Evidence {
     }
     result
 }
+
 fn is_name(p: &Path, names: &[&str]) -> bool {
     p.file_name()
         .is_some_and(|n| names.iter().any(|s| n.eq_ignore_ascii_case(s)))
@@ -455,7 +548,7 @@ pub fn game_root(exe: &Path) -> PathBuf {
             project.into()
         };
     }
-    if is_name(d, &["x64"]) && d.parent().is_some_and(|p| is_name(p, &["bin"])) {
+    if is_name(d, &["x64", "x64_dx12"]) && d.parent().is_some_and(|p| is_name(p, &["bin"])) {
         return d.parent().unwrap().parent().unwrap().into();
     }
     if is_name(d, &["bin", "bin64", "x64", "win64"]) {
@@ -720,7 +813,10 @@ pub fn scan(
         if renderer_name(exe, base) {
             row.rank += 15;
         }
-        if name.contains("dx12") || name.contains("d3d12") {
+        if name.contains("dx12")
+            || name.contains("d3d12")
+            || exe.parent().is_some_and(|dir| is_name(dir, &["x64_dx12"]))
+        {
             row.rank += 10;
         }
         row.anti = anti.contains(&core::key(base));
@@ -795,6 +891,7 @@ pub fn scan(
             .expect("first deployment target belongs to scan group");
         // The first surviving renderer is the display icon and parameter target.
         primary.targets = targets;
+        primary.repair_renderer();
         report.rows.push(primary);
     }
     report.rows.sort_by(|a, b| {

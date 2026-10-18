@@ -30,3 +30,4 @@ pub mod upstream040;
 pub mod upstream040_upgrade;
 pub mod win;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub mod neural_runtime;

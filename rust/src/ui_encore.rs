@@ -34,6 +34,7 @@ impl EncoreEditor {
         let subscription = cx.subscribe(&search, |this, input, event, cx| {
             if matches!(event, InputEvent::Change) {
                 this.query = input.read(cx).value().to_lowercase();
+                let _ = this.owner.update(cx, |_, cx| cx.notify());
                 cx.notify();
             }
         });
@@ -110,6 +111,7 @@ impl EncoreEditor {
                     } else {
                         this.errors.insert(key.clone());
                         this.invalid.set(true);
+                        let _ = this.owner.update(cx, |_, cx| cx.notify());
                         cx.notify();
                     }
                 }
@@ -317,8 +319,6 @@ impl Render for EncoreEditor {
             || c.running_games.contains(&self.exe)
             || c.preset_reads.contains(&self.exe);
         let gpu = c.cloud_series().min(2) as i32;
-        let can_apply = c.can_apply_parameters();
-        let dirty = c.preset_dirty(&self.exe);
         let upgrade = c
             .deployments
             .get(&self.exe)
@@ -340,6 +340,7 @@ impl Render for EncoreEditor {
                     .when(group == self.group, |button| button.primary())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.group = group;
+                        let _ = this.owner.update(cx, |_, cx| cx.notify());
                         cx.notify();
                     })),
             );
@@ -386,37 +387,6 @@ impl Render for EncoreEditor {
         for field in fields {
             panel = panel.child(self.field(field, &values, locked, gpu, window, cx));
         }
-        panel = panel.child(
-            div()
-                .h_flex()
-                .flex_wrap()
-                .gap_2()
-                .child(
-                    Button::new("encore-reset-group")
-                        .small()
-                        .ghost()
-                        .label(self.t("恢复本组默认"))
-                        .disabled(locked || !self.query.is_empty())
-                        .tooltip(self.t("清除搜索后，可恢复当前分组默认值。"))
-                        .on_click(cx.listener(|this, _, _, cx| this.reset(true, cx))),
-                )
-                .child(
-                    Button::new("encore-reset-all")
-                        .small()
-                        .ghost()
-                        .label(self.t("恢复全部默认"))
-                        .disabled(locked)
-                        .on_click(cx.listener(|this, _, _, cx| this.reset(false, cx))),
-                ),
-        );
-        if dirty {
-            panel = panel.child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().info)
-                    .child(self.t("有修改，待应用")),
-            );
-        }
         if !self.errors.is_empty() {
             panel = panel.child(
                 div()
@@ -425,20 +395,41 @@ impl Render for EncoreEditor {
                     .child(self.t("请先修正高级参数中的无效输入，或恢复该项默认值。")),
             );
         }
-        if can_apply {
-            panel = panel.child(
-                Button::new("encore-apply")
-                    .small()
-                    .primary()
-                    .label(self.t("应用参数到当前游戏"))
-                    .disabled(locked || !self.errors.is_empty())
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        let _ = this
-                            .owner
-                            .update(cx, |owner, cx| owner.act(Command::ApplyPreset, window, cx));
-                    })),
-            );
-        }
         panel.into_any_element()
+    }
+}
+
+impl EncoreEditor {
+    pub(super) fn reset_buttons(
+        editor: &Entity<Self>,
+        locked: bool,
+        tr: &i18n::Translator,
+        cx: &App,
+    ) -> AnyElement {
+        let this = editor.read(cx);
+        let group = editor.clone();
+        let all = editor.clone();
+        div()
+            .h_flex()
+            .flex_wrap()
+            .gap_2()
+            .child(
+                Button::new("encore-reset-group")
+                    .small()
+                    .ghost()
+                    .label(tr.t("恢复本组默认"))
+                    .disabled(locked || !this.query.is_empty())
+                    .tooltip(tr.t("清除搜索后，可恢复当前分组默认值。"))
+                    .on_click(move |_, _, cx| group.update(cx, |this, cx| this.reset(true, cx))),
+            )
+            .child(
+                Button::new("encore-reset-all")
+                    .small()
+                    .ghost()
+                    .label(tr.t("恢复全部默认"))
+                    .disabled(locked)
+                    .on_click(move |_, _, cx| all.update(cx, |this, cx| this.reset(false, cx))),
+            )
+            .into_any_element()
     }
 }

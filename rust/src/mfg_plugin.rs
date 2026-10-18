@@ -257,6 +257,7 @@ mod tests {
             delta_cache_ids: vec![],
             delta_legacy_cache: false,
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
         core::write_new(
             &target.directory.join(core::OWN).join(core::MARKER),

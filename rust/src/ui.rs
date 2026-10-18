@@ -50,10 +50,18 @@ enum Command {
     ReleaseNotes,
     Refresh,
     RefreshGpu,
+    NeuralVersion(&'static str),
+    InstallNeural(&'static str),
+    RemoveNeural,
+    RetryCleanup,
+    CleanupDetails,
+    RecheckBlocked,
     All(bool),
     Game(String, bool),
     GameOption(String, String),
     ApplyPreset,
+    KeepEditing,
+    ClosePresetWithoutApplying,
     RetrySave,
     Focus(String),
     Proxy(String, bool),
@@ -122,6 +130,7 @@ impl GameFilter {
     }
 }
 pub struct Manager {
+    drag_gap: Option<(String, bool)>,
     choices: RefCell<HashMap<&'static str, ChoiceBinding>>,
     encore_editor: RefCell<Option<(String, Entity<encore_editor::EncoreEditor>)>>,
     encore_invalid: Rc<Cell<bool>>,
@@ -146,6 +155,8 @@ pub struct Manager {
     smoke_step: u8,
     update_ready_sent: bool,
     dialog_active: bool,
+    editor_open: bool,
+    preset_close: Option<bool>, // true: app exit; false: editor dismissal
     theme_preview: Option<u64>,
     theme_generation: u64,
 }
@@ -153,6 +164,27 @@ pub struct Manager {
 /// live editor inside Root::render_dialog_layer would recursively borrow Manager.
 struct GameEditor {
     owner: WeakEntity<Manager>,
+}
+#[derive(Clone)]
+struct GameDrag {
+    exe: String,
+    title: String,
+}
+impl Render for GameDrag {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .px_3()
+            .py_2()
+            .rounded_md()
+            .border_1()
+            .border_color(cx.theme().border)
+            .bg(cx.theme().background)
+            .text_color(cx.theme().foreground)
+            .text_sm()
+            .max_w(rems(24.))
+            .truncate()
+            .child(self.title.clone())
+    }
 }
 impl Render for GameEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -238,6 +270,9 @@ impl Manager {
             smoke_step: 0,
             update_ready_sent: false,
             dialog_active: false,
+            drag_gap: None,
+            editor_open: false,
+            preset_close: None,
             theme_preview: None,
             theme_generation: 0,
         };
@@ -343,6 +378,16 @@ impl Manager {
             return;
         }
         match command {
+            Command::KeepEditing => self.preset_close = None,
+            Command::ClosePresetWithoutApplying => {
+                let exit = self.preset_close.take() == Some(true);
+                self.editor_open = false;
+                self.dialog_active = false;
+                window.close_dialog(cx);
+                if exit {
+                    self.c.close();
+                }
+            }
             Command::FontSize(size) => self.set_font_size(size, window, cx),
             Command::ToggleSidebar => {
                 self.c.state["sidebar_collapsed"] =
@@ -365,6 +410,29 @@ impl Manager {
                     self.c.inspect(exe);
                 }
                 self.c.refresh();
+            }
+            Command::NeuralVersion(version) => {
+                if let Some(exe) = self.c.focus.clone() {
+                    self.c.neural_versions.insert(exe, version);
+                }
+            }
+            Command::InstallNeural(version) => self.c.install_neural_runtime(version),
+            Command::RecheckBlocked => {
+                self.dialog_active = false;
+                window.close_dialog(cx);
+                self.c.recheck_blocked();
+            }
+            Command::RemoveNeural => self.c.confirm = Some("remove_nr".into()),
+            Command::RetryCleanup => self.c.retry_focused_cleanup(),
+            Command::CleanupDetails => {
+                if let Some(d) = self
+                    .c
+                    .focus
+                    .as_ref()
+                    .and_then(|e| self.c.deployments.get(e))
+                {
+                    self.c.warning = Some(d.cleanup_details.join("\n\n"));
+                }
             }
             Command::RefreshGpu => self.c.channel.job(|c| {
                 c.send(Event::Devices(gpu_alias::enumerate()?));
@@ -536,6 +604,8 @@ impl Manager {
     fn commit(&mut self, action: &str) {
         match action {
             "deploy_batch" | "clean_batch" => self.c.confirm_patch(),
+            "remove_nr" => self.c.remove_neural_runtime(),
+            "end_processes" => self.c.end_blocked_and_retry(),
             "hags" => self.c.channel.job(|_| hags::settings()),
             "remove" | "remove_checked" => {
                 let paths = if action == "remove_checked" {
@@ -1172,6 +1242,17 @@ impl Manager {
     }
     fn game_row(&self, index: usize, window: &Window, cx: &Context<Self>) -> AnyElement {
         let game = &self.c.games[index];
+        let drag = GameDrag {
+            exe: game.exe.clone(),
+            title: game_display_name(&game.title, &game.exe),
+        };
+        let drag_target = game.exe.clone();
+        let drop_target = game.exe.clone();
+        let drop_after = self
+            .drag_gap
+            .as_ref()
+            .is_some_and(|(exe, after)| exe == &game.exe && *after);
+        let drop_color = cx.theme().primary;
         // The status occupies the upper right; the compact action sits directly
         // below it. Limit long statuses so game names still have room to render.
         let layout = self.layout(window);
@@ -1190,7 +1271,6 @@ impl Manager {
         let badge_width = px((row_width * 0.36).clamp(90. * self.scale(), 280. * self.scale()));
         let exe = game.exe.clone();
         let focus = exe.clone();
-        let p = PathBuf::from(&exe);
         let selected = self.c.selected.contains(&exe);
         let menu_exe = exe.clone();
         let open_folder = game.deployment_directory().display().to_string();
@@ -1224,7 +1304,7 @@ impl Manager {
                     .into_any_element()
             });
         div()
-            .id(("game-row", index))
+            .id(SharedString::from(format!("game-row:{}", game.exe)))
             .h(rems(4.5))
             .h_flex()
             .w_full()
@@ -1233,6 +1313,43 @@ impl Manager {
             .border_b_1()
             .border_color(cx.theme().border)
             .hover(|d| d.bg(cx.theme().muted))
+            .when(
+                !self.c.busy && !self.c.read_only && !self.dialog_active,
+                |row| {
+                    row.on_drag(drag, |drag, _, _, cx| cx.new(|_| drag.clone()))
+                        .on_drag_move(cx.listener(
+                            move |this, event: &DragMoveEvent<GameDrag>, _, cx| {
+                                let gap = (
+                                    drag_target.clone(),
+                                    event.event.position.y > event.bounds.center().y,
+                                );
+                                if event.bounds.contains(&event.event.position)
+                                    && this.drag_gap.as_ref() != Some(&gap)
+                                {
+                                    this.drag_gap = Some(gap);
+                                    cx.notify();
+                                }
+                            },
+                        ))
+                        .drag_over::<GameDrag>(move |style, _, _, _| {
+                            let style = style.border_color(drop_color);
+                            if drop_after {
+                                style.border_b_2()
+                            } else {
+                                style.border_t_2()
+                            }
+                        })
+                        .on_drop(cx.listener(move |this, drag: &GameDrag, _, cx| {
+                            let after = this
+                                .drag_gap
+                                .take()
+                                .is_some_and(|(exe, after)| exe == drop_target && after);
+                            this.c.reorder_game(&drag.exe, &drop_target, after);
+                            this.filter();
+                            cx.notify();
+                        }))
+                },
+            )
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 this.act(Command::Focus(focus.clone()), window, cx);
                 if ev.click_count() == 2 {
@@ -1243,7 +1360,7 @@ impl Manager {
                 d.bg(cx.theme().secondary)
             })
             .child(
-                Checkbox::new(("game-check", index))
+                Checkbox::new(SharedString::from(format!("game-check:{}", game.exe)))
                     .checked(selected)
                     .on_click(cx.listener(move |this, yes, window, cx| {
                         cx.stop_propagation();
@@ -1253,7 +1370,7 @@ impl Manager {
             .child(game_icon)
             .child(
                 div()
-                    .id(("game-label", index))
+                    .id(SharedString::from(format!("game-label:{}", game.exe)))
                     .v_flex()
                     .min_w_0()
                     .flex_1()
@@ -1271,14 +1388,7 @@ impl Manager {
                                     .text_sm()
                                     .font_weight(FontWeight::MEDIUM)
                                     .truncate()
-                                    .child(if game.title.is_empty() {
-                                        p.file_name()
-                                            .unwrap_or_default()
-                                            .to_string_lossy()
-                                            .to_string()
-                                    } else {
-                                        game.title.clone()
-                                    }),
+                                    .child(game_display_name(&game.title, &game.exe)),
                             )
                             .child(self.deployment_tag(&game.exe, badge_width)),
                     )
@@ -1289,7 +1399,7 @@ impl Manager {
                             .min_w_0()
                             .child(
                                 div()
-                                    .id(("game-path", index))
+                                    .id(SharedString::from(format!("game-path:{}", game.exe)))
                                     .tooltip(move |window, cx| {
                                         Tooltip::new(detail_tip.clone()).build(window, cx)
                                     })
@@ -1308,6 +1418,7 @@ impl Manager {
                                         )
                                     }),
                             )
+                            .child(self.neural_badge(&game.exe, cx))
                             .child(
                                 self.button(
                                     SharedString::from(format!("game-presets:{}", game.exe)),
@@ -1459,22 +1570,6 @@ impl Manager {
                     fields = fields.child(field);
                 }
             }
-            fields = fields.child(
-                self.button(
-                    "preset-reset",
-                    "恢复默认参数",
-                    Command::GameOption("reset".into(), "".into()),
-                    cx,
-                )
-                .small()
-                .ghost()
-                .disabled(
-                    self.c.busy
-                        || self.c.focus.as_ref().is_some_and(|e| {
-                            self.c.running_games.contains(e) || self.c.preset_reads.contains(e)
-                        }),
-                ),
-            );
         } else {
             common = common.child(
                 div()
@@ -1515,20 +1610,6 @@ impl Manager {
             } else {
                 "仅保存当前游戏、当前方案的参数。完全退出游戏后点击安装补丁以应用；已部署相同 DLL 时只更新这些参数，保留其他 INI 内容。恢复默认只重置这里的选项。"
             })).small()))
-            .when(
-                self.c
-                    .focus
-                    .as_deref()
-                    .is_some_and(|exe| self.c.preset_dirty(exe)),
-                |d| {
-                    d.child(
-                        div()
-                            .text_xs()
-                            .text_color(cx.theme().info)
-                            .child(self.t("有修改，待应用")),
-                    )
-                },
-            )
             .child(common)
             .child(
                 Accordion::new("preset-accordion")
@@ -1544,27 +1625,6 @@ impl Manager {
                         cx.notify();
                     })),
             )
-            .when(self.c.can_apply_parameters(), |d| {
-                d.child(
-                    self.button(
-                        "apply-preset",
-                        "应用参数到当前游戏",
-                        Command::ApplyPreset,
-                        cx,
-                    )
-                    .small()
-                    .tooltip(
-                        self.t("只修改当前游戏的参数，不重新下载 DLL；批量安装仍使用底部按钮。"),
-                    )
-                    .disabled(
-                        self.c.busy
-                            || self.c.read_only
-                            || self.c.focus.as_ref().is_some_and(|e| {
-                                self.c.running_games.contains(e) || self.c.preset_reads.contains(e)
-                            }),
-                    ),
-                )
-            })
             .into_any_element()
     }
     fn proxy_panel(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -1642,11 +1702,30 @@ impl Manager {
             )
             .into_any_element()
     }
+    fn current_preset_pending(&self) -> bool {
+        self.c
+            .focus
+            .as_deref()
+            .is_some_and(|exe| self.c.preset_dirty(exe))
+            || (self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE
+                && self.encore_invalid.get())
+    }
+    fn any_preset_pending(&self) -> bool {
+        self.current_preset_pending()
+            || self.c.games.iter().any(|g| {
+                g.extra
+                    .get("preset_dirty")
+                    .and_then(Value::as_object)
+                    .is_some_and(|schemes| schemes.values().any(|v| v.as_bool() == Some(true)))
+            })
+    }
+
     fn game_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.dialog_active {
             return;
         }
         self.dialog_active = true;
+        self.editor_open = true;
         self.c.state["preset_help_open"] = json!(false);
         let owner = cx.entity();
         let editor = cx.new(|cx| {
@@ -1660,36 +1739,53 @@ impl Manager {
         let width = (window.viewport_size().width - px(64.)).min(px(720.));
         window.open_dialog(cx, move |dialog, _, _| {
             let close_view = view.clone();
+            let cancel_view = view.clone();
             dialog
                 .title(title.clone())
                 .width(width)
                 .child(editor.clone())
+                .on_cancel(move |_, _, cx| {
+                    cancel_view
+                        .update(cx, |this, cx| {
+                            if this.preset_close.take().is_some() {
+                                cx.notify();
+                                return false;
+                            }
+                            if this.current_preset_pending() {
+                                this.preset_close = Some(false);
+                                cx.notify();
+                                return false;
+                            }
+                            true
+                        })
+                        .unwrap_or(true)
+                })
                 .on_close(move |_, _, cx| {
                     let _ = close_view.update(cx, |this, cx| {
                         this.dialog_active = false;
+                        this.editor_open = false;
                         cx.notify();
                     });
                 })
         });
     }
     fn game_editor_body(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        if self.preset_close.is_some() {
+            return div().v_flex().gap_4()
+                .child(div().font_weight(FontWeight::SEMIBOLD).child(self.t("参数尚未应用")))
+                .child(self.t("有效修改已暂存，但尚未写入游戏。返回后点击应用，或暂不应用并关闭；无效输入不会保存。"))
+                .child(div().h_flex().flex_wrap().justify_end().gap_2()
+                    .child(self.button("preset-close-later", "暂不应用，关闭", Command::ClosePresetWithoutApplying, cx).small())
+                    .child(self.button("preset-keep-editing", "返回修改并应用", Command::KeepEditing, cx).small().primary()))
+                .into_any_element();
+        }
         let game = self
             .c
             .focus
             .as_ref()
             .and_then(|e| self.c.games.iter().find(|g| &g.exe == e));
         let name = game
-            .map(|g| {
-                if g.title.is_empty() {
-                    PathBuf::from(&g.exe)
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string()
-                } else {
-                    g.title.clone()
-                }
-            })
+            .map(|g| game_display_name(&g.title, &g.exe))
             .unwrap_or_default();
         let mut content = div()
             .v_flex()
@@ -1706,14 +1802,106 @@ impl Manager {
                     .child(self.t("修改会记住在此游戏；更换方案或入口后，先卸载再安装应用。")),
             );
         content = content.child(self.preset_panel(window, cx));
+        let disabled = self.c.busy
+            || self.c.read_only
+            || !self.c.can_apply_parameters()
+            || self
+                .c
+                .focus
+                .as_ref()
+                .is_some_and(|e| self.c.preset_reads.contains(e))
+            || (self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE
+                && self.encore_invalid.get());
+        let locked = self.c.busy
+            || self.c.read_only
+            || self.c.focus.as_ref().is_some_and(|e| {
+                self.c.running_games.contains(e) || self.c.preset_reads.contains(e)
+            });
+        let resets = if self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE {
+            self.encore_editor
+                .borrow()
+                .as_ref()
+                .map(|(_, editor)| {
+                    encore_editor::EncoreEditor::reset_buttons(editor, locked, &self.c.tr, cx)
+                })
+                .unwrap_or_else(|| div().into_any_element())
+        } else {
+            self.button(
+                "preset-reset-fixed",
+                "恢复默认参数",
+                Command::GameOption("reset".into(), "".into()),
+                cx,
+            )
+            .small()
+            .ghost()
+            .disabled(locked)
+            .into_any_element()
+        };
+        let pending = self.current_preset_pending();
         div()
-            .id("game-editor-scroll")
             .v_flex()
-            .max_h((window.viewport_size().height - px(210.)).max(px(180.)))
-            .overflow_y_scroll()
-            .child(content)
+            .w_full()
+            .min_h_0()
+            .max_h((window.viewport_size().height - px(180.)).max(px(180.)))
+            .child(
+                div()
+                    .id("game-editor-scroll")
+                    .v_flex()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .pb_3()
+                    .child(content),
+            )
+            .child(
+                div()
+                    .v_flex()
+                    .flex_shrink_0()
+                    .gap_2()
+                    .pt_3()
+                    .border_t_1()
+                    .border_color(cx.theme().border)
+                    .bg(cx.theme().background)
+                    .when(pending, |d| {
+                        d.child(
+                            div()
+                                .text_sm()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(if self.encore_invalid.get() {
+                                    cx.theme().danger
+                                } else {
+                                    cx.theme().warning
+                                })
+                                .child(self.t(if self.encore_invalid.get() {
+                                    "存在无效输入，请修正后应用"
+                                } else {
+                                    "已修改，待应用"
+                                })),
+                        )
+                    })
+                    .child(
+                        div()
+                            .h_flex()
+                            .flex_wrap()
+                            .justify_between()
+                            .gap_2()
+                            .child(resets)
+                            .child(
+                                self.button(
+                                    "apply-preset-fixed",
+                                    "应用参数到当前游戏",
+                                    Command::ApplyPreset,
+                                    cx,
+                                )
+                                .small()
+                                .primary()
+                                .disabled(disabled),
+                            ),
+                    ),
+            )
             .into_any_element()
     }
+
     fn scheme_menu(&self, selected: usize, series: usize, cx: &mut Context<Self>) -> AnyElement {
         let schemes = self.c.catalog.schemes();
         let label = self.c.cloud_label(schemes[selected]);
@@ -1880,6 +2068,226 @@ impl Manager {
             )
             .into_any_element()
     }
+    fn neural_badge(&self, exe: &str, cx: &Context<Self>) -> AnyElement {
+        let Some(snapshot) = self.c.deployments.get(exe) else {
+            return div().into_any_element();
+        };
+        let count = snapshot.neural.iter().filter(|n| n.present).count();
+        let missing = snapshot.neural.iter().any(|n| n.managed && !n.present);
+        if count == 0 && !missing {
+            return div().into_any_element();
+        }
+        let tip = snapshot
+            .neural
+            .iter()
+            .map(|n| format!("{}\n{}", self.c.text(&n.label()), n.path.display()))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let label = if missing {
+            self.t("NR 文件缺失")
+        } else if snapshot.neural.len() > 1 {
+            SharedString::from(format!("NR {count}/{}", snapshot.neural.len()))
+        } else {
+            self.t("NR 已安装")
+        };
+        Tag::new()
+            .small()
+            .outline()
+            .with_variant(if missing {
+                TagVariant::Warning
+            } else {
+                TagVariant::Secondary
+            })
+            .flex_shrink_0()
+            .child(
+                div()
+                    .id(SharedString::from(format!("nr-status-{exe}")))
+                    .text_color(cx.theme().foreground)
+                    .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                    .child(label),
+            )
+            .into_any_element()
+    }
+
+    fn neural_panel(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let Some(exe) = &self.c.focus else {
+            return div().into_any_element();
+        };
+        let snapshot = self.c.deployments.get(exe);
+        let nr = snapshot.and_then(|d| d.neural.first());
+        if self.c.parameter_profile() != rtx_fg_manager::encore::PROFILE
+            && !nr.is_some_and(|n| n.present || n.managed || n.encore_version.is_some())
+        {
+            return div().into_any_element();
+        }
+        let version = self.c.neural_versions.get(exe).copied().unwrap_or_else(|| {
+            if nr.and_then(|n| n.version.as_deref()) == Some("310.9.16") {
+                "310.9.16"
+            } else {
+                "310.8.0"
+            }
+        });
+        let evidence = self.c.evidence.get(exe).and_then(Option::as_ref);
+        let ready = nr.and_then(|n| n.encore_version.as_deref());
+        let modern = ready
+            .and_then(|v| semver::Version::parse(v).ok())
+            .is_some_and(|v| v >= semver::Version::new(1, 1, 0));
+        let reason = if snapshot.is_none() {
+            "正在检测…"
+        } else if ready.is_none() {
+            "请先安装 RTX Encore。"
+        } else if version == "310.9.16" && !modern {
+            "NR 310.9.16 需要 RTX Encore 1.1.0 或更新版本"
+        } else if evidence.is_none() {
+            "正在检测…"
+        } else if evidence.is_some_and(|e| !e.super_resolution && e.limited) {
+            "DLSS 检测未完成，请刷新后重试。"
+        } else if evidence.is_some_and(|e| !e.super_resolution && e.super_resolution_plugin) {
+            "仅发现 DLSS 插件，尚未找到超分运行库。"
+        } else if evidence.is_some_and(|e| !e.super_resolution) {
+            "当前游戏目录未发现 DLSS 超分组件。"
+        } else {
+            ""
+        };
+        let active = self.c.busy
+            && self
+                .c
+                .payload_progress
+                .as_ref()
+                .is_some_and(|p| p.proxy == "nvngx_dlssnr.dll");
+        let disabled = self.c.busy || self.c.read_only || !reason.is_empty();
+        let label = if active { "安装中…" } else { "安装" };
+        let status = nr
+            .map(|n| {
+                if n.warning.is_some() {
+                    self.c.text("需检查")
+                } else if n.present {
+                    format!(
+                        "{} · {}",
+                        self.c.text("已安装"),
+                        n.version.as_deref().unwrap_or("?")
+                    )
+                } else {
+                    self.c.text("未安装")
+                }
+            })
+            .unwrap_or_else(|| self.c.text("正在检测…"));
+        let tip = nr
+            .map(|n| {
+                format!(
+                    "{}\n{}\n{}",
+                    self.c.text(&n.label()),
+                    n.path.display(),
+                    self.c
+                        .text("仅安装运行库；游戏内开启 DLSS/DLAA 后，按 Insert 设置 NR。")
+                )
+            })
+            .unwrap_or_default();
+        let runtime_items = [
+            ("310.8.0", self.t("310.8.0 · 兼容版")),
+            ("310.9.16", self.t("310.9.16 · A/B 模型")),
+        ];
+        let runtime_label = runtime_items
+            .iter()
+            .find(|(v, _)| *v == version)
+            .map(|(_, label)| label.clone())
+            .unwrap_or_else(|| version.into());
+        let view = cx.entity().downgrade();
+        let runtime_picker = Button::new("nr-version")
+            .small()
+            .tooltip(runtime_label.clone())
+            .label(runtime_label)
+            .w_full()
+            .icon(IconName::ChevronDown)
+            .disabled(self.c.busy)
+            .dropdown_menu(move |mut menu, _, _| {
+                for (value, label) in &runtime_items {
+                    let value = *value;
+                    let view = view.clone();
+                    menu = menu.item(
+                        PopupMenuItem::new(label.clone())
+                            .checked(value == version)
+                            .on_click(move |_, window, cx| {
+                                let _ = view.update(cx, |this, cx| {
+                                    this.act(Command::NeuralVersion(value), window, cx)
+                                });
+                            }),
+                    );
+                }
+                menu
+            });
+        let mut panel = div()
+            .v_flex()
+            .min_w_0()
+            .gap_2()
+            .child(
+                div()
+                    .id("nr-summary")
+                    .h_flex()
+                    .flex_wrap()
+                    .gap_2()
+                    .justify_between()
+                    .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(self.t("DLSS神经渲染")),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(status),
+                    ),
+            )
+            .child(runtime_picker)
+            .child(
+                div()
+                    .h_flex()
+                    .flex_wrap()
+                    .gap_2()
+                    .justify_end()
+                    .child(
+                        self.button("nr-install", label, Command::InstallNeural(version), cx)
+                            .small()
+                            .flex_shrink_0()
+                            .disabled(disabled),
+                    )
+                    .child(
+                        self.button("nr-remove", "卸载", Command::RemoveNeural, cx)
+                            .small()
+                            .flex_shrink_0()
+                            .disabled(
+                                self.c.busy || self.c.read_only || !nr.is_some_and(|n| n.managed),
+                            ),
+                    ),
+            );
+        let hint = if !reason.is_empty() {
+            reason
+        } else if self.c.running_games.contains(exe) {
+            "游戏仍在后台运行；操作前将提示处理。"
+        } else if snapshot.is_some_and(|s| s.total > 1) {
+            "NR 操作仅针对首个部署目录。"
+        } else {
+            ""
+        };
+        if !hint.is_empty() {
+            let tip = self.t(hint);
+            panel = panel.child(
+                div()
+                    .id("nr-reason")
+                    .text_xs()
+                    .min_w_0()
+                    .truncate()
+                    .text_color(cx.theme().muted_foreground)
+                    .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                    .child(self.t(hint)),
+            );
+        }
+        panel.into_any_element()
+    }
+
     fn details(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let (scheme, series) = self.profile();
         let game = self
@@ -1938,7 +2346,22 @@ impl Manager {
                     .gap_2()
                     .child(div().text_sm().child(self.t("此游戏的适配方案")))
                     .child(self.scheme_menu(scheme, series, cx)),
-            )
+            );
+        if let Some(d) = self
+            .c
+            .focus
+            .as_ref()
+            .and_then(|e| self.c.deployments.get(e))
+            && d.cleanup_pending
+        {
+            panel = panel.child(div().v_flex().gap_2()
+                .child(Alert::warning("cleanup-pending", self.t("补丁文件已移除，还有本游戏的缓存或临时文件需要处理。退出游戏后点击重新清理；无需清理其他游戏或全部下载缓存。")).small())
+                .child(div().h_flex().gap_2()
+                    .child(self.button("retry-cleanup", "重新清理", Command::RetryCleanup, cx).disabled(self.c.busy))
+                    .child(self.button("cleanup-details", "查看原因", Command::CleanupDetails, cx).disabled(self.c.busy))));
+        }
+        panel = panel
+            .child(self.neural_panel(window, cx))
             .child(self.proxy_panel(window, cx));
         let cloud_source = self.c.choice("download_source", "domestic");
         panel = panel.child(
@@ -2896,42 +3319,100 @@ impl Manager {
         } else if let Some(a) = self.c.confirm.take() {
             let text = match a.as_str() {
                 "deploy_batch" => "确认向以下游戏安装补丁？请先完全退出这些游戏。",
+                "end_processes" => {
+                    "检测到以下游戏相关进程仍在运行。结束进程会丢失未保存的游戏进度；确认后仅结束列出的进程，再重新检测并重试本次操作。身份无法核实的进程不会结束。"
+                }
                 "clean_batch" => "确认卸载以下游戏的补丁？请先完全退出这些游戏。",
+                "remove_nr" => {
+                    "仅撤销管理器安装的 NR 运行库；如安装前已有文件则恢复原件，保留 Encore 和其他补丁。请先退出游戏。"
+                }
                 "remove" | "remove_checked" => "仅从游戏库移除；游戏文件和已部署补丁保持不变。",
                 "update" => "更新将关闭管理器并替换程序，成功启动后删除旧版。是否继续？",
                 _ => "仅修改 Windows 显示名称，不改变显卡性能或硬件能力。修改和还原后请重启电脑。",
             };
             let mut message = self.c.text(text);
+            if a == "end_processes"
+                && let Some(blocked) = &self.c.blocked
+            {
+                for p in &blocked.processes {
+                    message.push_str(&format!(
+                        "\n\n{} · PID {}\n{}",
+                        p.name,
+                        p.pid,
+                        p.path
+                            .as_ref()
+                            .map(|v| v.display().to_string())
+                            .unwrap_or_else(|| self.c.text("路径无法核实，请在任务管理器中处理"))
+                    ));
+                }
+            }
             if a == "deploy_batch" || a == "clean_batch" {
                 message.push_str("\n\n");
                 message.push_str(&self.c.pending_patch_list());
-            } else if a == "remove_checked" {
-                message.push_str("\n\n");
-                message.push_str(
-                    &self
-                        .c
-                        .selected
-                        .iter()
-                        .cloned()
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                );
-            } else if a == "remove"
-                && let Some(exe) = &self.c.focus
-            {
-                message.push_str(&format!("\n\n{exe}"));
             }
+
             (self.t("请确认"), message.into(), Some(a), IconName::Info)
         } else {
             return;
+        };
+        let removal_dialog = matches!(action.as_deref(), Some("remove" | "remove_checked"));
+        // Freeze the displayed identities so a background refresh cannot change
+        // which games the confirmation removes.
+        let removal_rows = self
+            .c
+            .games
+            .iter()
+            .filter(|game| {
+                if action.as_deref() == Some("remove_checked") {
+                    self.c.selected.contains(&game.exe)
+                } else {
+                    removal_dialog && self.c.focus.as_ref() == Some(&game.exe)
+                }
+            })
+            .map(|game| {
+                (
+                    game.exe.clone(),
+                    game_display_name(&game.title, &game.exe),
+                    if game.deployment_dir.is_empty() {
+                        game.exe.clone()
+                    } else {
+                        format!("{}\n{}", game.exe, game.deployment_dir)
+                    },
+                    self.c.icons.get(&game.exe).and_then(|i| i.clone()),
+                )
+            })
+            .collect::<Vec<_>>();
+        let removal_paths = removal_rows
+            .iter()
+            .map(|row| row.0.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        let title = if removal_dialog {
+            self.t("移除游戏")
+        } else {
+            title
         };
         self.dialog_active = true;
         let view = cx.entity().downgrade();
         // The pinned AlertDialog overwrites its base on_close callback during
         // conversion. Release our guard in both standard button handlers instead.
-        let ok_text = self.t(if action.is_some() { "继续" } else { "确定" });
+        let process_dialog = action.as_deref() == Some("end_processes");
+        let cannot_end =
+            process_dialog && !self.c.blocked.as_ref().is_some_and(|b| b.can_terminate());
+        let recheck_text = self.t("重新检测并重试");
+        let ok_text = self.t(if removal_dialog {
+            "移除游戏"
+        } else if process_dialog {
+            "结束并重试"
+        } else if action.is_some() {
+            "继续"
+        } else {
+            "确定"
+        });
         let cancel_text = self.t("取消");
-        let ok_variant = if action.as_deref() == Some("clean_batch") {
+        let ok_variant = if matches!(
+            action.as_deref(),
+            Some("clean_batch" | "remove_nr" | "end_processes")
+        ) {
             ButtonVariant::Danger
         } else {
             ButtonVariant::Primary
@@ -2943,10 +3424,64 @@ impl Manager {
             .ok_variant(ok_variant);
         let width = (window.viewport_size().width - px(90.)).min(px(600.));
         let height = (window.viewport_size().height - px(240.)).max(px(120.));
-        window.open_alert_dialog(cx, move |dialog, _, _| {
+        window.open_alert_dialog(cx, move |dialog, _, cx| {
             let ok_view = view.clone();
             let cancel_view = view.clone();
             let action = action.clone();
+            let recheck_view = view.clone();
+            let removal_paths = removal_paths.clone();
+            let mut body = div()
+                .v_flex()
+                .gap_3()
+                .when(removal_dialog, |d| d.text_sm())
+                .child(text.clone());
+            for (exe, name, path, icon) in &removal_rows {
+                let icon = icon
+                    .as_ref()
+                    .map(|i| img(i.clone()).size_8().into_any_element())
+                    .unwrap_or_else(|| {
+                        Self::icon(IconName::LayoutDashboard)
+                            .size_8()
+                            .text_color(cx.theme().muted_foreground)
+                            .into_any_element()
+                    });
+                let full_path = path.clone();
+                body = body.child(
+                    div()
+                        .h_flex()
+                        .items_center()
+                        .gap_3()
+                        .py_2()
+                        .border_b_1()
+                        .border_color(cx.theme().border)
+                        .child(div().flex_shrink_0().child(icon))
+                        .child(
+                            div()
+                                .v_flex()
+                                .gap_1()
+                                .flex_1()
+                                .min_w_0()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .child(name.clone()),
+                                )
+                                .child(
+                                    div()
+                                        .id(SharedString::from(format!("remove-path:{exe}")))
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .truncate()
+                                        .tooltip(move |window, cx| {
+                                            Tooltip::new(full_path.clone()).build(window, cx)
+                                        })
+                                        .child(path.clone()),
+                                ),
+                        ),
+                );
+            }
+
             dialog
                 .title(title.clone())
                 .icon(Self::icon(status_icon.clone()).size(px(28.)))
@@ -2954,6 +3489,18 @@ impl Manager {
                 .button_props(props.clone())
                 .footer(
                     DialogFooter::new()
+                        .when(process_dialog, |footer| {
+                            footer.child(
+                                Button::new("process-recheck")
+                                    .small()
+                                    .label(recheck_text.clone())
+                                    .on_click(move |_, window, cx| {
+                                        let _ = recheck_view.update(cx, |this, cx| {
+                                            this.act(Command::RecheckBlocked, window, cx)
+                                        });
+                                    }),
+                            )
+                        })
                         .when(action.is_some(), |footer| {
                             footer.child(
                                 Button::new("message-cancel")
@@ -2966,6 +3513,7 @@ impl Manager {
                         })
                         .child(
                             Button::new("message-ok")
+                                .disabled(cannot_end)
                                 .small()
                                 .label(ok_text.clone())
                                 .with_variant(ok_variant)
@@ -2982,12 +3530,15 @@ impl Manager {
                         .id("message-scroll")
                         .max_h(height)
                         .overflow_y_scroll()
-                        .child(text.clone()),
+                        .child(body),
                 )
                 .on_ok(move |_, window, cx| {
                     let _ = ok_view.update(cx, |this, cx| {
                         this.dialog_active = false;
-                        if let Some(action) = &action {
+                        if removal_dialog {
+                            this.c.forget(&removal_paths);
+                            this.filter();
+                        } else if let Some(action) = &action {
                             this.act(Command::Commit(action.clone()), window, cx)
                         }
                         cx.notify();
@@ -2998,6 +3549,7 @@ impl Manager {
                     let _ = cancel_view.update(cx, |this, cx| {
                         this.dialog_active = false;
                         this.c.cancel_patch();
+                        this.c.blocked = None;
                         cx.notify();
                     });
                     true
@@ -3043,6 +3595,12 @@ impl Manager {
             }
         }
         if !self.c.closing {
+            if self.dialog_active && self.c.confirm.as_deref() == Some("end_processes") {
+                window.close_dialog(cx);
+                self.dialog_active = false;
+                self.editor_open = false;
+                self.preset_close = None;
+            }
             self.dialogs(window, cx);
         }
         if let Some(out) = self.c.smoke.clone() {
@@ -3324,10 +3882,19 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
             match cx.open_window(options, move |window, cx| {
                 let view = cx.new(|cx| Manager::new(data, state, error, smoke, window, cx));
                 let close = view.downgrade();
-                window.on_window_should_close(cx, move |_, cx| {
+                window.on_window_should_close(cx, move |window, cx| {
                     close
                         .update(cx, |this, cx| {
-                            this.c.close();
+                            if this.any_preset_pending() {
+                                if !this.editor_open {
+                                    window.close_dialog(cx);
+                                    this.dialog_active = false;
+                                    this.game_editor(window, cx);
+                                }
+                                this.preset_close = Some(true);
+                            } else {
+                                this.c.close();
+                            }
                             cx.notify();
                             false
                         })
@@ -3408,12 +3975,16 @@ fn fitted_bounds(work: Bounds<Pixels>) -> Bounds<Pixels> {
 }
 
 fn game_display_name(title: &str, exe: &str) -> String {
-    if !title.trim().is_empty() {
-        title.to_owned()
+    let name = if !title.trim().is_empty() {
+        title.trim()
     } else {
         // Handles imported Windows paths even in non-Windows unit tests.
-        exe.rsplit(['\\', '/']).next().unwrap_or(exe).to_owned()
-    }
+        exe.rsplit(['\\', '/']).next().unwrap_or(exe)
+    };
+    name.get(..name.len().saturating_sub(4))
+        .filter(|_| name.to_ascii_lowercase().ends_with(".exe"))
+        .unwrap_or(name)
+        .to_owned()
 }
 
 #[cfg(test)]
@@ -3459,8 +4030,8 @@ mod layout_tests {
             game_display_name("Stormgate", "C:\\Games\\Game.exe"),
             "Stormgate"
         );
-        assert_eq!(game_display_name("", "C:\\Games\\Game.exe"), "Game.exe");
-        assert_eq!(game_display_name("  ", "/games/Other.exe"), "Other.exe");
+        assert_eq!(game_display_name("", "C:\\Games\\Game.exe"), "Game");
+        assert_eq!(game_display_name("  ", "/games/Other.exe"), "Other");
     }
     #[test]
     fn search_rebuilds_after_same_count_rescan_reorders_and_relabels_library() {

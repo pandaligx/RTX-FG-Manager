@@ -34,7 +34,7 @@ fn delta_sm89(id: &str, policy: &Policy) -> bool {
         && policy.parameter_profile == "upstream035"
         && policy.capabilities.contains(crate::delta::CAPABILITY)
 }
-const LIMIT: u64 = 128 * 1024 * 1024;
+const LIMIT: u64 = 512 * 1024 * 1024;
 fn valid_upstream_version(value: &str, version: &str) -> bool {
     static FORMAT: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     value.len() <= 100
@@ -280,6 +280,39 @@ fn safe_url(value: &str) -> Result<reqwest::Url> {
     crate::transfer::validate_url(value, crate::transfer::UrlPolicy::Cloud)
 }
 impl Catalog {
+    /// A stale mirror/cache must not replace the newer resources shipped with
+    /// this manager. Explicitly removed/unsupported schemes remain removed.
+    pub fn retain_bundled_versions(&mut self) {
+        let baseline = bundled();
+        for (scheme, policy) in &baseline.scheme_policies {
+            let current = self.packages.iter().find(|p| &p.scheme_id == scheme);
+            let fresh = baseline.packages.iter().find(|p| &p.scheme_id == scheme);
+            if let (Some(current), Some(fresh)) = (current, fresh)
+                && let (Ok(a), Ok(b)) = (
+                    semver::Version::parse(
+                        current
+                            .upstream_version
+                            .as_deref()
+                            .unwrap_or(&current.version),
+                    ),
+                    semver::Version::parse(
+                        fresh.upstream_version.as_deref().unwrap_or(&fresh.version),
+                    ),
+                )
+                && a < b
+            {
+                self.packages.retain(|p| &p.scheme_id != scheme);
+                self.packages.extend(
+                    baseline
+                        .packages
+                        .iter()
+                        .filter(|p| &p.scheme_id == scheme)
+                        .cloned(),
+                );
+                self.scheme_policies.insert(scheme.clone(), policy.clone());
+            }
+        }
+    }
     pub fn validate(&self) -> Result<()> {
         ensure!(
             matches!(self.schema, 2 | 3) && !self.packages.is_empty() && self.packages.len() <= 256,

@@ -91,6 +91,20 @@ pub fn clean_scoped(runtime: &Path, data: &Path) -> Result<Report> {
         }
         let _ = fs::remove_dir(&path);
     }
+    // NR caches are disposable; game-side .rtx-fg-nr original backups are not.
+    let nr = core::no_links(&runtime.join("neural-rendering"))?;
+    let nr_dll = regex::Regex::new(r"^310\.(8\.0|9\.16)-[a-f0-9]{64}\.dll$")?;
+    if let Ok(entries) = fs::read_dir(&nr) {
+        for entry in entries.flatten().take(100_000) {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if (archive.is_match(&name) || nr_dll.is_match(&name)) && entry.path().is_file() {
+                tree(&entry.path(), 0, &mut report);
+            } else {
+                report.skipped += 1;
+            }
+        }
+    }
+    let _ = fs::remove_dir(nr);
     Ok(report)
 }
 pub fn operation_lock() -> Result<win::GameLock> {

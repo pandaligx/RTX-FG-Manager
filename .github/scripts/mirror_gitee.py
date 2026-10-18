@@ -53,6 +53,7 @@ ALLOWED = {
     'docs/brand-banner.svg', 'docs/download-en.svg', 'docs/download-zh.svg',
     # Existing public history has this screenshot; retaining its history is safe.
     'docs/screenshot-home-zh.png',
+    'docs/encore-1.1.0.md', 'docs/encore-1.1.0.zh-CN.md',
 }
 TREES = (
     (r'help/[^/]+', {'.html', '.css', '.js'}),

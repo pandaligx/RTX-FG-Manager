@@ -1,5 +1,5 @@
-//! RTX Encore 1.0.0 JSONC v4. Base field metadata comes from an isolated upstream
-//! configuration extraction, extended with the documented 1.0.0 switches.
+//! RTX Encore 1.1.0 JSONC v4. Base field metadata comes from an isolated upstream
+//! configuration extraction, extended with documented 1.1.0 settings.
 //! Deployment never requires a fixed DLL hash.
 use crate::{jsonc::Document, presets::Values};
 use anyhow::{Context, Result, bail, ensure};
@@ -164,6 +164,9 @@ pub fn valid_hotkey(value: &str) -> bool {
     })
 }
 pub fn valid_value(key: &str, value: &str) -> bool {
+    if key == "nrPreset" {
+        return ["0", "1", "2", "3"].contains(&value);
+    }
     let Some(f) = field(key) else {
         return false;
     };
@@ -243,8 +246,19 @@ const RENAMES: &[(&str, &str)] = &[
     ("nrOpenNativeQkvPairs", "nrOpenSharedLoads"),
     ("gpuArchitecture", "gpuSeries"),
     ("patchFlipMetering", "flipMeteringBypass"),
+    ("nrPreset", "dlssNrPreset"),
 ];
 fn normalized(key: &str, value: &Value) -> Value {
+    if key == "dlssNrPreset"
+        && let Some(n) = value.as_u64()
+    {
+        return json!(match n {
+            0 | 3 => "auto",
+            1 => "a",
+            2 => "b",
+            _ => return value.clone(),
+        });
+    }
     let mapped = match (key, value.as_str()) {
         ("protectionTuning", Some("explained-warp")) => Some("refined"),
         ("protectionTuning", Some("transfusion")) => Some("classic"),
@@ -267,6 +281,7 @@ fn supported_container(path: &[String]) -> bool {
         "frameGeneration",
         "smoothMotion",
         "dlssSuperResolution",
+        "dlssPresets",
         "nativeMenuFeatures",
         "neuralRendering",
         "overlay",
@@ -419,6 +434,13 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
     read(bytes)?;
     let mut out = bytes.to_vec();
     for (key, value) in values {
+        if key == "nrPreset" {
+            if !values.contains_key("dlssNrPreset") {
+                let mapped = normalized("dlssNrPreset", &json!(value.parse::<u64>()?));
+                out = document(&out)?.set(&path(&["dlssPresets", "dlssNrPreset"]), mapped)?;
+            }
+            continue;
+        }
         let f = field(key).context("Unknown Encore field")?;
         if key == "tf_mode" {
             out = document(&out)?.set(
@@ -437,6 +459,25 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
         }
     }
     read(&out)?;
+    Ok(out)
+}
+/// 1.1.0 moves only the legacy NR model setting. Keep all unrelated bytes as-is.
+pub fn migrate_nr(bytes: &[u8]) -> Result<Vec<u8>> {
+    let doc = document(bytes)?;
+    let canonical = path(&["dlssPresets", "dlssNrPreset"]);
+    let (value, locations) = resolve(&doc, &canonical)?;
+    let old: Vec<_> = locations.into_iter().filter(|p| p != &canonical).collect();
+    if old.is_empty() {
+        return Ok(bytes.to_vec());
+    }
+    read(bytes)?;
+    let mut out = bytes.to_vec();
+    for p in old {
+        out = document(&out)?.remove(&p)?;
+    }
+    if let Some(value) = value {
+        out = document(&out)?.set(&canonical, value)?;
+    }
     Ok(out)
 }
 pub fn migrate(bytes: &[u8], explicit_overrides: &Values) -> Result<Vec<u8>> {

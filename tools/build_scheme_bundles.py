@@ -61,7 +61,7 @@ def build(output, baseline):
                 info.external_attr=0o100644<<16
                 z.writestr(info,data)
         data=buf.getvalue(); sha=digest(data)
-        if len(data)>128*1024*1024: raise ValueError('Bundle exceeds client bound')
+        if len(data)>512*1024*1024: raise ValueError('Bundle exceeds client bound')
         stem={'upstream-0.3.5-310-9':'dlssg-0.4.0', 'rtx40mfg-1.3.3-hf2':'mfg-unlocker-1.5.0',
               'dlssg-transfusion-1.4.5.3':'rtx-encore-1.0.0-rc.3'}.get(sid,sid)
         filename=f'{stem}-complete-{sha[:12]}.zip'
