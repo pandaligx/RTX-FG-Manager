@@ -2,7 +2,7 @@
 
 # RTX-FG-Manager
 
-<img src="docs/brand-banner.svg" alt="RTX-FG-Manager — Your games. Your settings." width="100%">
+<img src="docs/brand-banner.png" alt="RTX-FG-Manager — Your games. Your settings." width="100%">
 
 **简体中文** · [English](README.md)
 
@@ -64,6 +64,8 @@
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
+> 云端 Encore 已更新至 **1.1.1**，管理器 **4.3.2** 可直接获取；刷新资源后，按需升级对应游戏。
+
 ## 方案怎么选
 
 | 方案 | 主要说明 | 参数 / 菜单 |
@@ -72,7 +74,7 @@
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
 | **MFG-Unlocker · 1.5.0-hotfix.1** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
-| **RTX Encore · 1.1.0** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion 与兼容性设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
+| **RTX Encore · 1.1.1** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion 与兼容性设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。初始方案与 0.2.6 不再提供新安装入口，旧安装仍保留归属识别、恢复与卸载能力。
 
@@ -84,7 +86,7 @@
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 保留本项目自定义适配 | 保留本项目自定义适配 | 本项目已提供 SM89 适配；不保证所有游戏 |
 | Dlssg_for_sm86-MFG-version · Vulkan | 上游面向 20/30 系列；以所选 Vulkan 包为准 | 上游主要目标系列 | 上游未明确保证 |
 | MFG-Unlocker · 1.5.0-hotfix.1 | 不列为原生 DLSS MFG 支持；可另用 OptiScaler 的 XeMFG 路线 | 上游支持 DLSS MFG | 上游支持 DLSS MFG |
-| RTX Encore · 1.1.0 | FG / NR 实验性；无 Smooth Motion 解锁 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
+| RTX Encore · 1.1.1 | FG / NR 实验性；无 Smooth Motion 解锁 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
 
 依据：[Dlssg_for_sm86 运行要求与限制](https://github.com/sdli1995/dlssg_for_sm86#运行要求)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。三角洲方案属于本项目保留的自定义包，不能将其适配范围等同于上游原版。表格用于选型，不代表管理器完成了各显卡和游戏的实机验证。
 

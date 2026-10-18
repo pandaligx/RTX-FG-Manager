@@ -2,7 +2,7 @@
 
 # RTX-FG-Manager
 
-<img src="docs/brand-banner.svg" alt="RTX-FG-Manager — Your games. Your settings." width="100%">
+<img src="docs/brand-banner.png" alt="RTX-FG-Manager — Your games. Your settings." width="100%">
 
 **English** · [简体中文](README.zh-CN.md)
 
@@ -64,6 +64,8 @@ Updating the manager does not automatically replace game patches. NR is off by d
 
 [Full changelog →](CHANGELOG.md)
 
+> Encore **1.1.1** is available through the cloud catalog for manager **4.3.2**. Refresh resources and upgrade each game when needed.
+
 ## Choose a patch
 
 | Scheme | What to know | Settings / menu |
@@ -72,7 +74,7 @@ Updating the manager does not automatically replace game patches. NR is off by d
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | Retained custom route with additional Delta Force support. Choose according to the actual game's requirements. | Manager / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | Retained dedicated Vulkan route; not interchangeable with the DX12 routes. | Manager / INI |
 | **MFG-Unlocker · 1.5.0-hotfix.1** | Standalone DLL or an existing OptiScaler 10 plugin installation; these modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
-| **RTX Encore · 1.1.0** | SR/RR/FG presets, fixed/dynamic FG, NR, Smooth Motion and compatibility controls. | **Insert**, unless the menu is disabled or its key was changed |
+| **RTX Encore · 1.1.1** | SR/RR/FG presets, fixed/dynamic FG, NR, Smooth Motion and compatibility controls. | **Insert**, unless the menu is disabled or its key was changed |
 
 GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility. The initial scheme and 0.2.6 are retired from new installation choices; existing installations remain eligible for owned cleanup/recovery.
 
@@ -84,7 +86,7 @@ GPU detection provides information, not an installation gate. Each upstream patc
 | 0.3.5 · Extra Delta Force support · DX12/Vulkan | Retained custom adaptation | Retained custom adaptation | Custom SM89 support provided; not a guarantee for every game |
 | Dlssg_for_sm86-MFG-version · Vulkan | Upstream targets RTX 20/30; check the selected Vulkan package | Primary target family | No explicit upstream guarantee |
 | MFG-Unlocker · 1.5.0-hotfix.1 | Not listed for native DLSS MFG; separate OptiScaler XeMFG route available | Upstream DLSS MFG support | Upstream DLSS MFG support |
-| RTX Encore · 1.1.0 | Experimental FG / NR; no Smooth Motion unlock | FG / NR; Smooth Motion depends on driver and API | FG / NR; NVIDIA provides Smooth Motion |
+| RTX Encore · 1.1.1 | Experimental FG / NR; no Smooth Motion unlock | FG / NR; Smooth Motion depends on driver and API | FG / NR; NVIDIA provides Smooth Motion |
 
 Sources: [Dlssg_for_sm86 requirements and limitations](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). The retained Delta Force package is this project's custom adaptation, not an upstream compatibility promise. This selection guide does not claim manager-side testing of every GPU or game.
 
