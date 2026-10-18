@@ -24,9 +24,9 @@
 
 > **4.3.2 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
-![RTX-FG-Manager 4.3.1](docs/screenshot-home.png)
+![RTX-FG-Manager 4.3.2](docs/screenshot-home.png)
 
-<p align="center"><sub>Actual 4.3.1 application capture · demonstration library with inert placeholder executables · no game or performance result</sub></p>
+<p align="center"><sub>4.3.2 user-provided screenshot · interface illustration, not a game compatibility or performance result</sub></p>
 
 ## One library. Five patch choices.
 

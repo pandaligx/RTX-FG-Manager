@@ -14,6 +14,19 @@ spec.loader.exec_module(pub)
 
 
 class PublicationTests(unittest.TestCase):
+    def test_split_bundle_index_can_only_complete_an_unchanged_final_catalog(self):
+        catalog='cloud/bundles/catalog.json';index='cloud/bundles/indexes/bundles-'+'a'*20+'.json'
+        entry=('100644','blob','catalog');blob=('100644','blob','index')
+        review=Mock();review.git.return_value=json.dumps({'revision':'bundles-'+'a'*20}).encode()
+        current={catalog:entry};final={catalog:entry,index:blob}
+        self.assertEqual(pub.complete_pending_bundle_index(Path('.'),review,current,final),final)
+        self.assertNotIn(index,current)
+        different={catalog:('100644','blob','other'),index:blob}
+        self.assertEqual(pub.complete_pending_bundle_index(Path('.'),review,current,different),current)
+        existing={**current,index:('100644','blob','original')}
+        self.assertEqual(pub.complete_pending_bundle_index(Path('.'),review,existing,final),existing)
+        self.assertEqual(pub.complete_pending_bundle_index(Path('.'),review,current,current),current)
+
     def test_exact_approved_immutable_readback_is_reused_only_for_bound_metadata(self):
         digest = 'a'*64
         url = pub.asset_url(pub.PAYLOAD_REPO, 'v430', 'patch-' + digest[:12] + '.zip')

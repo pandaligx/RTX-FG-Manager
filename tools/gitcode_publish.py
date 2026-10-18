@@ -220,6 +220,25 @@ def mirror_assets(folder, repo, tag, allow_exe=False):
         upload(repo, tag, path, allow_exe)
 
 
+def complete_pending_bundle_index(root, review, entries, final):
+    """Validate a split metadata commit against its unchanged, completed tip.
+
+    Only supply a missing immutable index, never replace an existing blob.
+    The normal metadata verifier still checks bytes, digest and remote receipts.
+    """
+    catalog = 'cloud/bundles/catalog.json'
+    if catalog not in entries or entries[catalog] != final.get(catalog):
+        return entries
+    raw = review.git(root, 'cat-file', 'blob', entries[catalog][2], binary=True)
+    revision = json.loads(raw).get('revision', '')
+    if not re.fullmatch(r'bundles-[0-9a-f]{20}', revision):
+        return entries
+    index = f'cloud/bundles/indexes/{revision}.json'
+    if index in entries or index not in final:
+        return entries
+    return {**entries, index: final[index]}
+
+
 def sync_source(root):
     spec = importlib.util.spec_from_file_location('review', root / '.github/scripts/mirror_gitee.py')
     review = importlib.util.module_from_spec(spec)
@@ -240,6 +259,7 @@ def sync_source(root):
             raise RuntimeError('GitCode has diverged; fast-forward required')
         seen = set()
         before = review.tree_entries(root, previous)
+        final = review.tree_entries(root, source)
         for commit in review.git(root, 'rev-list', '--reverse', previous + '..' + source).splitlines():
             entries = review.tree_entries(root, commit)
             review.validate_tree(root, entries, seen)
@@ -258,8 +278,9 @@ def sync_source(root):
             legacy = lambda e: {p:v for p,v in e.items() if p == 'cloud/catalog.json' or p.startswith('cloud/indexes/')}
             if legacy(entries) != legacy(before):
                 raise RuntimeError('Legacy catalogs must remain unchanged during migration')
-            verify_metadata_changes(root, review, before, entries)
-            before = entries
+            completed = complete_pending_bundle_index(root, review, entries, final)
+            verify_metadata_changes(root, review, before, completed)
+            before = completed
         review.git(root, '-c', 'credential.helper=', 'push', remote, source + ':refs/heads/main', env=env)
         refs = review.git(root, '-c', 'credential.helper=', 'ls-remote', remote, 'refs/heads/main', env=env)
         if not refs or refs.split()[0] != source:

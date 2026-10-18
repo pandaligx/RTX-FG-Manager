@@ -24,9 +24,9 @@
 
 > **4.3.2 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
-![RTX-FG-Manager 4.3.1](docs/screenshot-home-zh.png)
+![RTX-FG-Manager 4.3.2](docs/screenshot-home-zh.png)
 
-<p align="center"><sub>4.3.1 实际界面截图 · 演示库使用不可执行的占位 EXE · 不代表游戏运行或性能结果</sub></p>
+<p align="center"><sub>4.3.2 用户提供截图 · 仅展示界面，不代表游戏兼容性或性能验证</sub></p>
 
 ## 一个游戏库，五种补丁方案
 
