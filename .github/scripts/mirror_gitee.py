@@ -24,6 +24,8 @@ API='https://gitee.com/api/v5/repos/'+REPO
 # Keep in step with tools/export-source.ps1. This is deliberately not a recursive
 # copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
 ALLOWED = {
+    'tools/update_download_stats.py', 'tests/test_download_stats.py',
+    '.github/workflows/update-download-stats.yml', 'docs/download-stats.json', 'docs/downloads-total.svg',
     'tools/game-name-overrides.json', 'tests/test_game_names.py', '.github/workflows/update-game-names.yml',
     'tools/build_game_names.py', 'docs/game-names.md', 'cloud/game-names.json',
     'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tools/build_scheme_bundles.py',

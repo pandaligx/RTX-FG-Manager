@@ -13,9 +13,7 @@
 <a href="LICENSE"><img alt="Manager license MIT" src="https://img.shields.io/badge/Manager-MIT-blue?style=flat-square"></a>
 <a href="https://github.com/pandaligx/RTX-FG-Manager/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/pandaligx/RTX-FG-Manager?style=flat-square"></a>
 
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases"><img alt="GitHub release asset downloads" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total?style=flat-square&color=38a7bc&amp;label=GitHub%20downloads"></a>
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases"><img alt="GitCode main downloads" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.gitcode.com%2Fapi%2Fv5%2Frepos%2Fgcw_qWIjmve7%2FRTX-FG-Manager%2Fdownload_statistics&amp;query=%24.download_statistics_history_total&amp;label=GitCode+main+downloads&amp;style=flat-square&amp;color=38a7bc&amp;cacheSeconds=3600"></a>
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases"><img alt="GitCode patches downloads" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.gitcode.com%2Fapi%2Fv5%2Frepos%2Fgcw_qWIjmve7%2FRTX-FG-Manager-payloads%2Fdownload_statistics&amp;query=%24.download_statistics_history_total&amp;label=GitCode+patches+downloads&amp;style=flat-square&amp;color=38a7bc&amp;cacheSeconds=3600"></a>
+<a href="docs/download-stats.json"><img alt="总下载量" src="docs/downloads-total.svg"></a>
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
@@ -53,7 +51,7 @@
 
 下载 **`RTXManager-v4.3.4-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-下载量自动更新：**GitHub** 统计发行附件；**GitCode** 分别显示主仓库与补丁仓库的官方历史下载次数（[接口说明](https://docs.gitcode.com/docs/apis/get-api-v-5-repos-owner-repo-download-statistics/)）。各平台口径不同，不代表独立用户或安装成功次数。**Gitee 暂未计入**，其公开发行版/附件接口目前不返回下载次数；平台与徽章缓存可能延迟更新。
+下载量合并统计 **GitHub 发行附件＋GitCode 主仓库与补丁仓库**，每 6 小时自动刷新（平台与缓存可能延迟）。各平台统计口径不同，不代表独立用户或安装成功次数；Gitee 公开接口未提供下载次数，暂未计入。刷新失败时保留上次完整统计。
 
 ## 4.3.4 更新亮点
 

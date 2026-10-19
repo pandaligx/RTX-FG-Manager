@@ -13,9 +13,7 @@
 <a href="LICENSE"><img alt="Manager license MIT" src="https://img.shields.io/badge/Manager-MIT-blue?style=flat-square"></a>
 <a href="https://github.com/pandaligx/RTX-FG-Manager/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/pandaligx/RTX-FG-Manager?style=flat-square"></a>
 
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases"><img alt="GitHub release asset downloads" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total?style=flat-square&color=38a7bc&amp;label=GitHub%20downloads"></a>
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases"><img alt="GitCode main downloads" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.gitcode.com%2Fapi%2Fv5%2Frepos%2Fgcw_qWIjmve7%2FRTX-FG-Manager%2Fdownload_statistics&amp;query=%24.download_statistics_history_total&amp;label=GitCode+main+downloads&amp;style=flat-square&amp;color=38a7bc&amp;cacheSeconds=3600"></a>
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases"><img alt="GitCode patches downloads" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.gitcode.com%2Fapi%2Fv5%2Frepos%2Fgcw_qWIjmve7%2FRTX-FG-Manager-payloads%2Fdownload_statistics&amp;query=%24.download_statistics_history_total&amp;label=GitCode+patches+downloads&amp;style=flat-square&amp;color=38a7bc&amp;cacheSeconds=3600"></a>
+<a href="docs/download-stats.json"><img alt="Total downloads" src="docs/downloads-total.svg"></a>
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
@@ -53,7 +51,7 @@
 
 Download **`RTXManager-v4.3.4-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-Download counters update automatically: **GitHub** counts release assets; **GitCode** shows the platform-reported historical download counts for the main and patch repositories separately ([API](https://docs.gitcode.com/docs/apis/get-api-v-5-repos-owner-repo-download-statistics/)). Their scopes differ and do not represent unique users or completed installations. **Gitee is not counted** because its public release/attachment API does not currently return download counts; platform and badge caches may delay updates.
+The download badge combines **GitHub release assets + GitCode main and patch repository totals**, refreshed every 6 hours (platform/cache delays may apply). Counts are platform-reported, not unique users or successful installations. Gitee is not included because its public API does not provide download counts; failed refreshes retain the last complete total.
 
 ## 4.3.4 highlights
 

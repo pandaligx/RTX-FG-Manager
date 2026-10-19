@@ -80,6 +80,11 @@ Add-File 'tools/game-name-overrides.json'
 Add-File 'tests/test_game_names.py'
 Add-File '.github/workflows/update-game-names.yml'
 Add-File 'docs/game-names.md'
+Add-File 'tools/update_download_stats.py'
+Add-File 'tests/test_download_stats.py'
+Add-File '.github/workflows/update-download-stats.yml'
+Add-File 'docs/download-stats.json'
+Add-File 'docs/downloads-total.svg'
 Add-Tree 'rust/src' @('.rs')
 Add-Tree 'help' @('.html', '.css', '.js')
 foreach ($name in @('community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore', 'community/wrangler.example.jsonc', 'community/README.md', 'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json', '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md')) { Add-File $name }
