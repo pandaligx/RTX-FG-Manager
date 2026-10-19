@@ -26,6 +26,7 @@ jobs:
           python -m unittest discover -s tests -p test_game_names.py -v
           python -m unittest discover -s tests -p test_gitcode_publish.py -v
       - name: Fetch public names and retain reviewed rules
+        timeout-minutes: 5
         run: python tools/build_game_names.py "$RUNNER_TEMP/wikidata.json" --fetch
       - name: Publish catalog and manifest together
         run: |

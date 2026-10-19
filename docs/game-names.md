@@ -30,9 +30,9 @@ Registry records must match the current installation or executable. Chinese shor
 
 The bundled CC0 catalog works offline. Clients check at most daily and retain the last valid cache on failure. GitHub's weekly workflow refreshes public names and explicitly mirrors to GitCode, since token-created commits do not trigger another push workflow. Curated rules remain reviewed source data. No-change runs create no new revision; incomplete feeds and suspicious bulk changes are rejected. Special launcher formats and new local identification rules can still require maintenance; there is no promise of a universal self-learning translation service.
 
-**4.3.3 候选阶段：**上述自动流程及新名称包已准备在源码中，尚未上线。正式发布并将流程同步到 GitHub 后才会定期运行；本候选版现在即可使用内置识别。
+**4.3.3 发布状态：**名称包和每周自动流程已上线。上游访问失败时保留现有名称库，后续任务会再次尝试；离线识别不受影响。
 
-**4.3.3 candidate status:** the workflow and cloud files are staged for publication, not yet running online. Offline identification is available in this candidate.
+**4.3.3 release status:** the name package and weekly workflow are published. Failed upstream requests retain the existing catalog for later retry; offline identification remains available.
 
 ## 维护与参考 / Maintenance and references
 
