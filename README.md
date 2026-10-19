@@ -16,13 +16,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.3"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.4"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.3 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.4 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.2](docs/screenshot-home.png)
 
@@ -40,28 +40,25 @@
 
 ## Download
 
-**Version 4.3.3** · Windows 10 / 11 x64
+**Version 4.3.4** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.3 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.3) | Default domestic source |
-| **GitHub** | [Open 4.3.3 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.3) | Primary project and fallback |
-| **Gitee** | [Open 4.3.3 release](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.3) | Transition entry for existing users |
+| **GitCode** | [Open 4.3.4 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.4) | Default domestic source |
+| **GitHub** | [Open 4.3.4 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.4) | Primary project and fallback |
+| **Gitee** | [Open 4.3.4 release](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.4) | Transition entry for existing users |
 
-Download **`RTXManager-v4.3.3-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
+Download **`RTXManager-v4.3.4-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 The download badge counts **all GitHub release assets**, including patch resources. It is not a count of unique users and does not include GitCode or Gitee.
 
-## 4.3.3 highlights
+## 4.3.4 highlights
 
-- Improve cross-platform identities and Chinese game names, with manual naming and independent catalog updates.
-- Show deployment paths directly, with compact status and parameter controls.
-- Fix repeated preset warnings; add cleanup details, retry and a hardware-accelerated GPU scheduling switch.
-- Support Encore 1.1.2 and recommend NR 310.9.16; remove mouse-triggered focus rings.
+- Fix installed patch labels incorrectly showing the latest cloud version; library rows now match per-folder details.
 
 [Full changelog →](CHANGELOG.md)
 
-> Encore **1.1.2** is available through the cloud catalog for manager **4.3.3**. Refresh resources and upgrade each game when needed.
+> Encore **1.1.2** is available through the cloud catalog for manager **4.3.4**. Refresh resources and upgrade each game when needed.
 
 ## Choose a patch
 

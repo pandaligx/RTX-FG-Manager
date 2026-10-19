@@ -16,13 +16,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.3"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.4"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.3 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.4 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.2](docs/screenshot-home-zh.png)
 
@@ -40,28 +40,25 @@
 
 ## 下载
 
-**版本 4.3.3** · Windows 10 / 11 x64
+**版本 4.3.4** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.3 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.3) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.3 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.3) | 主项目与备用源 |
-| **Gitee** | [打开 4.3.3 发行页](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.3) | 保留给现有用户的过渡入口 |
+| **GitCode** | [打开 4.3.4 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.4) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.4 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.4) | 主项目与备用源 |
+| **Gitee** | [打开 4.3.4 发行页](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.4) | 保留给现有用户的过渡入口 |
 
-下载 **`RTXManager-v4.3.3-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+下载 **`RTXManager-v4.3.4-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
 下载量徽章统计 **GitHub 全部发行附件**，包含补丁资源；不代表独立用户数，也不包含 GitCode 和 Gitee 的下载量。
 
-## 4.3.3 更新亮点
+## 4.3.4 更新亮点
 
-- 改进跨平台游戏识别与中文名称，支持手动改名、名称库独立更新。
-- 游戏目录直接分行展示，状态与参数设置入口更紧凑。
-- 修复预设反复提示；支持清理详情、重试及硬件加速 GPU 调度开关。
-- 适配 Encore 1.1.2，默认推荐 NR 310.9.16；鼠标操作不再显示焦点外圈。
+- 修复游戏库已安装补丁版本误显示为云端最新版的问题；列表与逐目录详情保持一致。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
-> 云端 Encore 已更新至 **1.1.2**，管理器 **4.3.3** 可直接获取；刷新资源后，按需升级对应游戏。
+> 云端 Encore 已更新至 **1.1.2**，管理器 **4.3.4** 可直接获取；刷新资源后，按需升级对应游戏。
 
 ## 方案怎么选
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.3.4 — Unreleased
+## 4.3.4
 
 - Fix [#11](https://github.com/pandaligx/RTX-FG-Manager/issues/11): installed patch versions in the game library now use deployment records, matching the per-folder tooltip. Updating the manager or cloud catalog no longer makes an older installed patch appear updated; different installed versions across folders remain visible.
 
