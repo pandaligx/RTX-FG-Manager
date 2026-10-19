@@ -1,5 +1,5 @@
-//! RTX Encore 1.1.0 JSONC v4. Base field metadata comes from an isolated upstream
-//! configuration extraction, extended with documented 1.1.0 settings.
+//! RTX Encore JSONC v4, including 1.1.0 NR and 1.1.2 frame-pacing settings.
+//! Legacy paths remain writable for games whose patch has not been upgraded.
 //! Deployment never requires a fixed DLL hash.
 use crate::{jsonc::Document, presets::Values};
 use anyhow::{Context, Result, bail, ensure};
@@ -338,8 +338,13 @@ fn locations(
 fn resolve(doc: &Document, path: &[String]) -> Result<(Option<Value>, Vec<Vec<String>>)> {
     // Checking canonical parents also rejects a malformed known section even
     // when an equivalent flat legacy key is available.
-    let canonical = doc.get(path)?.cloned();
+    let mut canonical = doc.get(path)?.cloned();
     let key = path.last().context("Empty field path")?;
+    if key == "flipMeteringBypass"
+        && let Some(value) = doc.get(&self::path(&["frameGeneration", "flipMeteringBypass"]))?
+    {
+        canonical = Some(value.clone());
+    }
     let mut candidates = Vec::new();
     locations(&doc.value, key, &mut Vec::new(), &mut candidates);
     let aliases = candidates.iter().map(|(p, _)| p.clone()).collect();
@@ -442,6 +447,21 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
             continue;
         }
         let f = field(key).context("Unknown Encore field")?;
+        if key == "flipMeteringBypass" {
+            let doc = document(&out)?;
+            let modern = path(&["frameGeneration", key]);
+            if doc.get(&modern)?.is_some() {
+                let (_, locations) = resolve(&doc, &f.path)?;
+                for old in locations.into_iter().filter(|p| p != &modern) {
+                    out = document(&out)?.remove(&old)?;
+                }
+                out = document(&out)?.set(&modern, encode(f, value)?)?;
+            } else {
+                // An old game still needs the legacy section until its mod is upgraded.
+                out = doc.set(&f.path, encode(f, value)?)?;
+            }
+            continue;
+        }
         if key == "tf_mode" {
             out = document(&out)?.set(
                 &f.path,
@@ -480,6 +500,19 @@ pub fn migrate_nr(bytes: &[u8]) -> Result<Vec<u8>> {
     }
     Ok(out)
 }
+/// Called only when deploying Encore 1.1.2 or newer; preserves comments and
+/// unknown fields, and prevents a stale legacy key from overriding the new one.
+pub fn migrate_frame_pacing(bytes: &[u8]) -> Result<Vec<u8>> {
+    read(bytes)?;
+    let doc = document(bytes)?;
+    let canonical = path(&["frameGeneration", "flipMeteringBypass"]);
+    let (value, locations) = resolve(&doc, &canonical)?;
+    let mut out = bytes.to_vec();
+    for old in locations.into_iter().filter(|p| p != &canonical) {
+        out = document(&out)?.remove(&old)?;
+    }
+    document(&out)?.set(&canonical, value.unwrap_or(json!(false)))
+}
 pub fn migrate(bytes: &[u8], explicit_overrides: &Values) -> Result<Vec<u8>> {
     validate_values(explicit_overrides)?;
     let doc = document(bytes)?;
@@ -513,7 +546,11 @@ pub fn validate_template(bytes: &[u8]) -> Result<()> {
     );
     for f in fields().iter().filter(|f| !f.optional) {
         ensure!(
-            doc.get(&f.path)?.is_some(),
+            if f.key == "flipMeteringBypass" {
+                resolve(&doc, &f.path)?.0.is_some()
+            } else {
+                doc.get(&f.path)?.is_some()
+            },
             "Encore package missing {}",
             f.path.join(".")
         );

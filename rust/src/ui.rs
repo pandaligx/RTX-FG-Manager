@@ -6,7 +6,7 @@ use gpui::{prelude::*, *};
 use gpui_component::{
     accordion::Accordion,
     alert::Alert,
-    button::{Button, ButtonVariant, ButtonVariants, DropdownButton},
+    button::{Button, ButtonCustomVariant, ButtonVariant, ButtonVariants},
     checkbox::Checkbox,
     command::{Command as ThemeCommand, CommandItem, CommandState},
     dialog::{Cancel, Confirm, DialogButtonProps, DialogFooter},
@@ -34,6 +34,8 @@ use std::{
 
 #[path = "ui_encore.rs"]
 mod encore_editor;
+#[path = "ui_game_name.rs"]
+mod game_name_editor;
 
 #[derive(Clone, PartialEq)]
 enum Command {
@@ -50,11 +52,17 @@ enum Command {
     ReleaseNotes,
     Refresh,
     RefreshGpu,
+    GpuEditor,
+    RenameGame(String),
+    UpdateGameNames,
     NeuralVersion(&'static str),
     InstallNeural(&'static str),
     RemoveNeural,
     RetryCleanup,
     CleanupDetails,
+    DeleteCleanup,
+    CleanupLocation(PathBuf),
+    CopyCleanup(String),
     RecheckBlocked,
     All(bool),
     Game(String, bool),
@@ -75,7 +83,8 @@ enum Command {
     Download,
     Cancel,
     CancelUpdate,
-    Graphics,
+    Hags(bool),
+    RefreshHags,
     Device(usize),
     Alias(usize),
     Confirm(String),
@@ -120,7 +129,7 @@ impl GameFilter {
             .enumerate()
             .filter(|(_, g)| {
                 g.exe.to_lowercase().contains(&query)
-                    || g.title.to_lowercase().contains(&query)
+                    || rtx_fg_manager::game_names::matches_query(g, &c.game_names, &query)
                     || g.root.to_lowercase().contains(&query)
             })
             .map(|(i, _)| i)
@@ -129,6 +138,32 @@ impl GameFilter {
         self.query = c.search.clone();
     }
 }
+/// Display only current deployment locations, never cleanup-only remnants.
+/// Keep scanner order and collapse alternate executables in the same folder.
+fn game_directories(game: &rtx_fg_manager::scanner::Game) -> Vec<(String, String)> {
+    let mut seen = std::collections::BTreeSet::new();
+    game.deployment_executables()
+        .iter()
+        .filter_map(|exe| {
+            let directory = if game.deployment_dir.is_empty() {
+                std::path::Path::new(exe).parent()?.to_path_buf()
+            } else {
+                PathBuf::from(&game.deployment_dir)
+            };
+            if !seen.insert(core::key(&directory)) {
+                return None;
+            }
+            let label = directory
+                .strip_prefix(&game.root)
+                .ok()
+                .filter(|relative| !relative.as_os_str().is_empty())
+                .unwrap_or(&directory)
+                .display()
+                .to_string();
+            Some((directory.display().to_string(), label))
+        })
+        .collect()
+}
 pub struct Manager {
     drag_gap: Option<(String, bool)>,
     choices: RefCell<HashMap<&'static str, ChoiceBinding>>,
@@ -136,12 +171,13 @@ pub struct Manager {
     encore_invalid: Rc<Cell<bool>>,
     c: Controller,
     search: Entity<InputState>,
+    hags_focus: FocusHandle,
     font_slider: Entity<SliderState>,
     _font_subscription: Subscription,
     _subscription: Subscription,
     split_state: Entity<ResizableState>,
     _split_subscription: Subscription,
-    scroll: UniformListScrollHandle,
+    scroll: ListState,
     filtered: GameFilter,
     theme_choice: String,
     language: String,
@@ -164,6 +200,29 @@ pub struct Manager {
 /// live editor inside Root::render_dialog_layer would recursively borrow Manager.
 struct GameEditor {
     owner: WeakEntity<Manager>,
+}
+struct GpuEditor {
+    owner: WeakEntity<Manager>,
+}
+impl Render for GpuEditor {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.owner
+            .update(cx, |owner, cx| owner.gpu_editor_body(window, cx))
+            .unwrap_or_else(|_| div().into_any_element())
+    }
+}
+struct CleanupDetailsView {
+    owner: WeakEntity<Manager>,
+    snapshot: rtx_fg_manager::deployment::Snapshot,
+}
+impl Render for CleanupDetailsView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.owner
+            .update(cx, |owner, cx| {
+                owner.cleanup_body(&self.snapshot, window, cx)
+            })
+            .unwrap_or_else(|_| div().into_any_element())
+    }
 }
 #[derive(Clone)]
 struct GameDrag {
@@ -202,6 +261,7 @@ impl Manager {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        crate::ui_focus::observe(cx);
         let mut c = Controller::new(data, state, error, smoke);
         if !c.boolean("sidebar_compact_default_v3", false) {
             c.state["sidebar_collapsed"] = json!(true);
@@ -209,7 +269,11 @@ impl Manager {
             c.save();
         }
         let font_size = preferred_font_size(&c.state);
-        Theme::update(cx, |theme| theme.font_size = px(font_size * 8. / 7.));
+        Theme::update(cx, |theme| {
+            theme.font_size = px(font_size * 8. / 7.);
+            // Keep a thin focus edge without the outward halo in every window.
+            theme.focus_ring = false;
+        });
         let font_slider = cx.new(|_| {
             SliderState::new()
                 .min(12.)
@@ -251,12 +315,13 @@ impl Manager {
             encore_invalid: Rc::new(Cell::new(false)),
             c,
             search,
+            hags_focus: cx.focus_handle(),
             font_slider,
             _font_subscription: font_subscription,
             _subscription: subscription,
             split_state,
             _split_subscription: split_subscription,
-            scroll: UniformListScrollHandle::new(),
+            scroll: ListState::new(0, ListAlignment::Top, px(200.)),
             filtered: GameFilter::default(),
             theme_choice,
             language,
@@ -311,6 +376,7 @@ impl Manager {
         self.font_slider
             .update(cx, |slider, cx| slider.set_value(size as f32, window, cx));
         Theme::update(cx, |theme| theme.font_size = px(size as f32 * 8. / 7.));
+        self.scroll.remeasure();
         self.c.save();
         cx.notify();
     }
@@ -318,7 +384,24 @@ impl Manager {
         self.c.text(s).into()
     }
     fn filter(&mut self) {
+        if self.filtered.revision == Some(self.c.library_revision)
+            && self.filtered.query == self.c.search
+        {
+            return;
+        }
+        let query_changed = self.filtered.query != self.c.search;
+        let previous = self.scroll.logical_scroll_top();
         self.filtered.refresh(&self.c);
+        let count = self.filtered.indices.len();
+        if query_changed {
+            self.scroll.reset(count);
+        } else if self.scroll.item_count() != count {
+            self.scroll.splice(0..self.scroll.item_count(), count);
+            self.scroll.scroll_to(previous);
+        } else {
+            // Rescans can add directories without changing the number of games.
+            self.scroll.remeasure();
+        }
     }
     fn theme(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         if self.theme_preview.is_some() {
@@ -381,6 +464,14 @@ impl Manager {
             Command::KeepEditing => self.preset_close = None,
             Command::ClosePresetWithoutApplying => {
                 let exit = self.preset_close.take() == Some(true);
+                let target = self.c.focus.clone().map(|exe| (exe, self.c.cloud_scheme()));
+                self.c.discard_presets(if exit {
+                    None
+                } else {
+                    target.as_ref().map(|(e, s)| (e.as_str(), s.as_str()))
+                });
+                self.encore_editor.borrow_mut().take();
+                self.encore_invalid.set(false);
                 self.editor_open = false;
                 self.dialog_active = false;
                 window.close_dialog(cx);
@@ -395,6 +486,9 @@ impl Manager {
                 self.c.save();
             }
             Command::Page(p) => self.c.page = p,
+            Command::GpuEditor => self.gpu_editor(window, cx),
+            Command::RenameGame(exe) => self.rename_game(exe, window, cx),
+            Command::UpdateGameNames => self.c.update_game_names(),
             Command::ConfigHelp => {
                 if self.dialog_active {
                     self.c.state["preset_help_open"] =
@@ -410,6 +504,7 @@ impl Manager {
                     self.c.inspect(exe);
                 }
                 self.c.refresh();
+                self.c.identify_game_names();
             }
             Command::NeuralVersion(version) => {
                 if let Some(exe) = self.c.focus.clone() {
@@ -423,16 +518,31 @@ impl Manager {
                 self.c.recheck_blocked();
             }
             Command::RemoveNeural => self.c.confirm = Some("remove_nr".into()),
-            Command::RetryCleanup => self.c.retry_focused_cleanup(),
-            Command::CleanupDetails => {
-                if let Some(d) = self
-                    .c
-                    .focus
-                    .as_ref()
-                    .and_then(|e| self.c.deployments.get(e))
-                {
-                    self.c.warning = Some(d.cleanup_details.join("\n\n"));
+            Command::RetryCleanup => {
+                if self.dialog_active {
+                    self.dialog_active = false;
+                    window.close_dialog(cx);
                 }
+                self.c.retry_focused_cleanup();
+            }
+            Command::CleanupDetails => self.cleanup_dialog(window, cx),
+            Command::DeleteCleanup => {
+                self.dialog_active = false;
+                window.close_dialog(cx);
+                self.c.preview_cleanup_deletion();
+            }
+            Command::CopyCleanup(text) => cx.write_to_clipboard(ClipboardItem::new_string(text)),
+            Command::CleanupLocation(path) => {
+                self.c.channel.job(move |_| {
+                    let path = core::no_links(&path)?;
+                    let folder = if path.is_dir() {
+                        path
+                    } else {
+                        path.parent().unwrap_or(&path).to_path_buf()
+                    };
+                    anyhow::ensure!(folder.is_dir(), "目录已不存在，请点击重新清理更新状态");
+                    win::open(&folder.to_string_lossy())
+                });
             }
             Command::RefreshGpu => self.c.channel.job(|c| {
                 c.send(Event::Devices(gpu_alias::enumerate()?));
@@ -535,16 +645,26 @@ impl Manager {
             }
             Command::Boolean(k, v) => {
                 self.c.state[&k] = json!(v);
+                if k == "chinese_game_names" {
+                    self.c.library_revision += 1;
+                }
                 self.c.save()
             }
             Command::CheckUpdate => self.c.check_update(false),
             Command::Download => self.c.download_update(),
             Command::Cancel => self.c.cancel.store(true, Ordering::Relaxed),
             Command::CancelUpdate => self.c.cancel_update(),
-            Command::Graphics => self.c.channel.job(|_| hags::settings()),
+            Command::Hags(enabled) => self.c.set_hags(enabled),
+            Command::RefreshHags => self.c.refresh_hags(),
             Command::Device(i) => self.c.device_index = i,
             Command::Alias(i) => self.c.alias_index = i,
             Command::Confirm(action) => {
+                if matches!(action.as_str(), "alias" | "restore") {
+                    // Move to the existing explicit confirmation; opening the
+                    // editor and choosing a model never writes the registry.
+                    window.close_dialog(cx);
+                    self.dialog_active = false;
+                }
                 if action == "remove" && self.c.can_forget_focused_without_confirmation() {
                     self.commit(&action);
                 } else {
@@ -605,8 +725,8 @@ impl Manager {
         match action {
             "deploy_batch" | "clean_batch" => self.c.confirm_patch(),
             "remove_nr" => self.c.remove_neural_runtime(),
+            "delete_cleanup" => self.c.confirm_cleanup_deletion(),
             "end_processes" => self.c.end_blocked_and_retry(),
-            "hags" => self.c.channel.job(|_| hags::settings()),
             "remove" | "remove_checked" => {
                 let paths = if action == "remove_checked" {
                     self.c.selected.clone()
@@ -651,6 +771,7 @@ impl Manager {
         cx: &Context<Self>,
     ) -> Button {
         Button::new(id)
+            .focus_ring(crate::ui_focus::visible(cx))
             .small()
             .label(self.t(label))
             .on_click(cx.listener(move |this, _, window, cx| {
@@ -732,6 +853,7 @@ impl Manager {
             })
             .child(
                 Select::new(&binding.state)
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .placeholder(label)
                     .disabled(disabled)
                     .w_full()
@@ -780,12 +902,12 @@ impl Manager {
         let mut navigation = div().v_flex().w_full();
         for (page, icon, label) in [
             (0, IconName::LayoutDashboard, "游戏"),
-            (1, IconName::Cpu, "显卡"),
             (2, IconName::Settings, "设置"),
         ] {
             let label = self.t(label);
             navigation = navigation.child(
                 Button::new(("navigation", page as usize))
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .small()
                     .ghost()
                     .h_8()
@@ -990,34 +1112,150 @@ impl Manager {
         let view = cx.entity().downgrade();
         let folder = self.t("选择目录扫描");
         let all = self.t("全盘扫描");
-        DropdownButton::new("scan-split")
-            .small()
-            .button(
-                self.button("scan", "扫描", Command::Scan, cx)
-                    .icon(IconName::FolderOpen)
-                    .min_w(rems(5.)),
+        crate::ui_focus::SplitButton::new(
+            "scan-split",
+            self.button("scan", "扫描", Command::Scan, cx)
+                .icon(IconName::FolderOpen)
+                .min_w(rems(5.)),
+        )
+        .disabled(self.c.busy)
+        .dropdown_menu(move |mut menu, _, _| {
+            for (label, action) in std::iter::once((folder.clone(), Command::Pick(true)))
+                .chain(
+                    win::drives()
+                        .into_iter()
+                        .map(|p| (p.display().to_string().into(), Command::ScanRoots(vec![p]))),
+                )
+                .chain(std::iter::once((
+                    all.clone(),
+                    Command::ScanRoots(win::drives()),
+                )))
+            {
+                let view = view.clone();
+                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
+                    let _ = view.update(cx, |this, cx| this.act(action.clone(), window, cx));
+                }));
+            }
+            menu
+        })
+        .into_any_element()
+    }
+    fn add_game_button(&self, cx: &Context<Self>) -> AnyElement {
+        let view = cx.entity().downgrade();
+        let label = self.t("添加游戏文件夹（Xbox 等）");
+        crate::ui_focus::SplitButton::new(
+            "add-game-split",
+            self.button("add", "添加游戏", Command::Pick(false), cx)
+                .icon(IconName::Plus)
+                .min_w(rems(5.)),
+        )
+        .disabled(self.c.busy)
+        .dropdown_menu(move |menu, _, _| {
+            let view = view.clone();
+            menu.item(
+                PopupMenuItem::new(label.clone()).on_click(move |_, window, cx| {
+                    let _ = view.update(cx, |this, cx| this.act(Command::Pick(true), window, cx));
+                }),
             )
-            .disabled(self.c.busy)
-            .dropdown_menu(move |mut menu, _, _| {
-                for (label, action) in std::iter::once((folder.clone(), Command::Pick(true)))
-                    .chain(
-                        win::drives()
-                            .into_iter()
-                            .map(|p| (p.display().to_string().into(), Command::ScanRoots(vec![p]))),
-                    )
-                    .chain(std::iter::once((
-                        all.clone(),
-                        Command::ScanRoots(win::drives()),
-                    )))
-                {
-                    let view = view.clone();
-                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
-                        let _ = view.update(cx, |this, cx| this.act(action.clone(), window, cx));
-                    }));
-                }
-                menu
-            })
-            .into_any_element()
+        })
+        .into_any_element()
+    }
+    fn cleanup_body(
+        &self,
+        snapshot: &rtx_fg_manager::deployment::Snapshot,
+        window: &Window,
+        cx: &Context<Self>,
+    ) -> AnyElement {
+        let mut body = div()
+            .id("cleanup-details-scroll")
+            .v_flex()
+            .gap_3()
+            .max_h(window.viewport_size().height * 0.55)
+            .overflow_y_scroll()
+            .child(self.t("补丁已移除。以下文件尚未清理，归属不明的文件会保留。"));
+        for (i, path) in snapshot.cleanup_paths.iter().enumerate() {
+            let text = path.display().to_string();
+            body = body.child(
+                div()
+                    .v_flex()
+                    .gap_2()
+                    .p_3()
+                    .border_1()
+                    .border_color(cx.theme().border)
+                    .rounded_md()
+                    .child(div().text_sm().child(text.clone()))
+                    .child(
+                        div()
+                            .h_flex()
+                            .flex_wrap()
+                            .gap_2()
+                            .child(
+                                self.button(
+                                    ("cleanup-open", i),
+                                    "打开位置",
+                                    Command::CleanupLocation(path.clone()),
+                                    cx,
+                                )
+                                .small(),
+                            )
+                            .child(
+                                self.button(
+                                    ("cleanup-copy", i),
+                                    "复制路径",
+                                    Command::CopyCleanup(text),
+                                    cx,
+                                )
+                                .small()
+                                .ghost(),
+                            ),
+                    ),
+            );
+        }
+        body = body.child(div().text_sm().text_color(cx.theme().muted_foreground).child(snapshot.cleanup_details.join("\n\n")))
+            .child(self.t("卸载时已自动清理可确认归属的文件。剩余的当前游戏缓存和安装临时文件，可在确认列表后直接删除；共享目录与其他游戏文件会保留。"))
+            .child(div().h_flex().flex_wrap().gap_2().justify_end()
+                .child(self.button("cleanup-retry-dialog", "重新清理", Command::RetryCleanup, cx).disabled(self.c.busy))
+                .child(self.button("cleanup-delete-dialog", "删除并重新清理", Command::DeleteCleanup, cx).with_variant(ButtonVariant::Danger).icon(Icon::default().path("app/trash.svg")).disabled(self.c.busy || self.c.read_only)));
+        body.into_any_element()
+    }
+    fn cleanup_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.dialog_active {
+            return;
+        }
+        let Some(snapshot) = self
+            .c
+            .focus
+            .as_ref()
+            .and_then(|e| self.c.deployments.get(e))
+            .cloned()
+        else {
+            return;
+        };
+        self.dialog_active = true;
+        let view = cx.entity().downgrade();
+        let content = cx.new(|cx| {
+            crate::ui_focus::observe(cx);
+            CleanupDetailsView {
+                owner: view.clone(),
+                snapshot,
+            }
+        });
+        let title = self.t("待清理文件");
+        let width = (window.viewport_size().width - px(64.)).min(window.rem_size() * 40.);
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let view = view.clone();
+            dialog
+                .title(crate::ui_focus::dialog_title(title.clone(), cx))
+                .close_button(false)
+                .width(width)
+                .child(content.clone())
+                .on_close(move |_, _, cx| {
+                    let _ = view.update(cx, |this, cx| {
+                        this.dialog_active = false;
+                        cx.notify();
+                    });
+                })
+        });
     }
     fn library(&self, cx: &mut Context<Self>) -> AnyElement {
         let mut card = div()
@@ -1040,14 +1278,9 @@ impl Manager {
                     .gap_2()
                     .flex_wrap()
                     .child(self.scan_button(cx))
+                    .child(self.add_game_button(cx))
                     .child(
-                        self.button("add", "添加游戏", Command::Pick(false), cx)
-                            .icon(IconName::Plus)
-                            .min_w(rems(5.))
-                            .disabled(self.c.busy),
-                    )
-                    .child(
-                        self.button("add-folder", "添加文件夹", Command::CustomFolder, cx)
+                        self.button("add-folder", "部署目录", Command::CustomFolder, cx)
                             .icon(IconName::FolderOpen)
                             .disabled(self.c.busy),
                     )
@@ -1080,6 +1313,7 @@ impl Manager {
                     .gap_3()
                     .child(
                         Checkbox::new("all")
+                            .focus_ring(crate::ui_focus::visible(cx))
                             .label(self.t("全选"))
                             .checked(
                                 !self.c.games.is_empty()
@@ -1089,7 +1323,29 @@ impl Manager {
                                 this.act(Command::All(*v), window, cx)
                             })),
                     )
-                    .child(Input::new(&self.search).cleanable(true).flex_1()),
+                    .child(
+                        div()
+                            .id("library-search-surface")
+                            .flex_1()
+                            .min_w_0()
+                            .on_mouse_down_out({
+                                let search = self.search.clone();
+                                move |_, window, cx| {
+                                    let focus = search.focus_handle(cx);
+                                    window.defer(cx, move |window, cx| {
+                                        if focus.is_focused(window) {
+                                            window.blur(cx);
+                                        }
+                                    });
+                                }
+                            })
+                            .child(
+                                Input::new(&self.search)
+                                    .focus_ring(crate::ui_focus::visible(cx))
+                                    .cleanable(true)
+                                    .w_full(),
+                            ),
+                    ),
             );
         if self.c.busy {
             let activity = if let Some(p) = &self.c.payload_progress {
@@ -1159,23 +1415,19 @@ impl Manager {
             );
         } else {
             card = card.child(
-                uniform_list(
-                    "game-list",
-                    self.filtered.indices.len(),
-                    cx.processor(|this, range: std::ops::Range<usize>, window, cx| {
-                        range
-                            .map(|i| this.game_row(this.filtered.indices[i], window, cx))
-                            .collect::<Vec<_>>()
+                list(
+                    self.scroll.clone(),
+                    cx.processor(|this, i, window, cx| {
+                        this.game_row(this.filtered.indices[i], window, cx)
                     }),
                 )
-                .track_scroll(&self.scroll)
                 .flex_1()
                 .min_h_0(),
             );
         }
         card.into_any_element()
     }
-    fn deployment_tag(&self, exe: &str, max_width: Pixels) -> AnyElement {
+    fn deployment_status(&self, exe: &str, cx: &App) -> AnyElement {
         let status = self
             .c
             .statuses
@@ -1223,28 +1475,49 @@ impl Manager {
                 TagVariant::Warning
             };
         }
-        Tag::new()
-            .with_variant(variant)
-            .outline()
-            .small()
-            .max_w(max_width)
-            .flex_shrink_0()
-            .child(
-                div()
-                    .id(SharedString::from(format!("deployment-tip-{exe}")))
-                    .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
-                    .min_w_0()
-                    .truncate()
-                    .line_height(rems(1.25))
-                    .child(self.t(&label)),
-            )
+        div()
+            .id(SharedString::from(format!("deployment-tip-{exe}")))
+            .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+            .flex_1()
+            .min_w_0()
+            .text_xs()
+            .text_color(match variant {
+                TagVariant::Success => cx.theme().success,
+                TagVariant::Warning => cx.theme().warning,
+                TagVariant::Info => cx.theme().info,
+                _ => cx.theme().muted_foreground,
+            })
+            .truncate()
+            .child(self.t(&label))
             .into_any_element()
     }
-    fn game_row(&self, index: usize, window: &Window, cx: &Context<Self>) -> AnyElement {
+    fn game_row(&self, index: usize, _window: &Window, cx: &Context<Self>) -> AnyElement {
         let game = &self.c.games[index];
+        let directories = game_directories(game);
+        let preset_exe = game.exe.clone();
+        let parameter_button =
+            Button::new(SharedString::from(format!("game-presets:{}", game.exe)))
+                .focus_ring(crate::ui_focus::visible(cx))
+                .small()
+                .custom(
+                    ButtonCustomVariant::new(cx)
+                        .hover(*cx.theme().tokens.secondary_hover)
+                        .active(*cx.theme().tokens.secondary_active),
+                )
+                .selected(self.editor_open && self.c.focus.as_ref() == Some(&game.exe))
+                .size(rems(1.5))
+                .icon(Icon::new(IconName::Settings).size(rems(1.)))
+                .accessibility_label(self.t("参数设置"))
+                .tooltip(self.t("参数设置"))
+                .flex_shrink_0()
+                .disabled(self.c.busy)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.act(Command::Editor(preset_exe.clone()), window, cx)
+                }));
         let drag = GameDrag {
             exe: game.exe.clone(),
-            title: game_display_name(&game.title, &game.exe),
+            title: self.c.game_name(game),
         };
         let drag_target = game.exe.clone();
         let drop_target = game.exe.clone();
@@ -1253,22 +1526,6 @@ impl Manager {
             .as_ref()
             .is_some_and(|(exe, after)| exe == &game.exe && *after);
         let drop_color = cx.theme().primary;
-        // The status occupies the upper right; the compact action sits directly
-        // below it. Limit long statuses so game names still have room to render.
-        let layout = self.layout(window);
-        let inspector = if layout.compact {
-            0.
-        } else {
-            self.split_state
-                .read(cx)
-                .sizes()
-                .get(1)
-                .copied()
-                .map(f32::from)
-                .unwrap_or(384. * self.scale())
-        };
-        let row_width = f32::from(window.viewport_size().width) - layout.nav - inspector;
-        let badge_width = px((row_width * 0.36).clamp(90. * self.scale(), 280. * self.scale()));
         let exe = game.exe.clone();
         let focus = exe.clone();
         let selected = self.c.selected.contains(&exe);
@@ -1290,6 +1547,7 @@ impl Manager {
         };
         let view = cx.entity().downgrade();
         let remove_label = self.t("从游戏库移除");
+        let rename_label = self.t("修改游戏名称");
         let menu_disabled = self.c.busy;
         let game_icon = self
             .c
@@ -1305,7 +1563,8 @@ impl Manager {
             });
         div()
             .id(SharedString::from(format!("game-row:{}", game.exe)))
-            .h(rems(4.5))
+            .min_h(rems(4.5))
+            .py_1p5()
             .h_flex()
             .w_full()
             .gap_4()
@@ -1361,6 +1620,7 @@ impl Manager {
             })
             .child(
                 Checkbox::new(SharedString::from(format!("game-check:{}", game.exe)))
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .checked(selected)
                     .on_click(cx.listener(move |this, yes, window, cx| {
                         cx.stop_propagation();
@@ -1374,7 +1634,7 @@ impl Manager {
                     .v_flex()
                     .min_w_0()
                     .flex_1()
-                    .gap_1()
+                    .gap_0p5()
                     .child(
                         div()
                             .h_flex()
@@ -1388,16 +1648,21 @@ impl Manager {
                                     .text_sm()
                                     .font_weight(FontWeight::MEDIUM)
                                     .truncate()
-                                    .child(game_display_name(&game.title, &game.exe)),
+                                    .child(self.c.game_name(game)),
                             )
-                            .child(self.deployment_tag(&game.exe, badge_width)),
+                            .child(parameter_button),
                     )
                     .child(
                         div()
                             .h_flex()
                             .gap_2()
                             .min_w_0()
-                            .child(
+                            .child(self.deployment_status(&game.exe, cx))
+                            .child(self.neural_badge(&game.exe, cx)),
+                    )
+                    .when(directories.len() <= 1, |column| {
+                        column.child(
+                            div().h_flex().gap_2().min_w_0().child(
                                 div()
                                     .id(SharedString::from(format!("game-path:{}", game.exe)))
                                     .tooltip(move |window, cx| {
@@ -1417,29 +1682,51 @@ impl Manager {
                                             game.deployment_dir
                                         )
                                     }),
-                            )
-                            .child(self.neural_badge(&game.exe, cx))
-                            .child(
-                                self.button(
-                                    SharedString::from(format!("game-presets:{}", game.exe)),
-                                    "预设参数",
-                                    Command::Editor(game.exe.clone()),
-                                    cx,
-                                )
-                                .small()
-                                .compact()
-                                .icon(Icon::new(IconName::Settings2).size(px(14.)))
-                                .flex_shrink_0()
-                                .disabled(self.c.busy),
                             ),
-                    ),
+                        )
+                    })
+                    .when(directories.len() > 1, |column| {
+                        column.child(div().v_flex().min_w_0().gap_0p5().children(
+                            directories.iter().map(|(path, label)| {
+                                let tooltip = path.clone();
+                                div()
+                                    .id(SharedString::from(format!(
+                                        "game-directory:{}:{path}",
+                                        game.exe
+                                    )))
+                                    .h_flex()
+                                    .gap_2()
+                                    .min_w_0()
+                                    .text_xs()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .tooltip(move |window, cx| {
+                                        Tooltip::new(tooltip.clone()).build(window, cx)
+                                    })
+                                    .child(
+                                        Self::icon(IconName::Folder)
+                                            .size(rems(0.875))
+                                            .flex_shrink_0(),
+                                    )
+                                    .child(div().min_w_0().truncate().child(label.clone()))
+                            }),
+                        ))
+                    }),
             )
             .context_menu(move |menu, _, _| {
                 let exe = menu_exe.clone();
                 let open_view = view.clone();
                 let folder = open_folder.clone();
                 let view = view.clone();
-                menu.item(
+                let rename_view = view.clone();
+                let rename_exe = exe.clone();
+                menu.item(PopupMenuItem::new(rename_label.clone()).on_click(
+                    move |_, window, cx| {
+                        let _ = rename_view.update(cx, |this, cx| {
+                            this.act(Command::RenameGame(rename_exe.clone()), window, cx)
+                        });
+                    },
+                ))
+                .item(
                     PopupMenuItem::new(open_label.clone()).on_click(move |_, window, cx| {
                         let _ = open_view.update(cx, |this, cx| {
                             this.act(Command::Open(folder.clone()), window, cx)
@@ -1584,6 +1871,7 @@ impl Manager {
             .child(self.t("预设参数"))
             .child(
                 Button::new("preset-help")
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .label("?")
                     .ghost()
                     .small()
@@ -1642,6 +1930,7 @@ impl Manager {
             }
             checks = checks.child(
                 Checkbox::new(n)
+                    .focus_ring(crate::ui_focus::visible(cx))
                     // The component's built-in label forces line-height: 1 inside
                     // an overflow-hidden wrapper, clipping descenders with our font.
                     // A child keeps the standard checkbox interaction but supplies
@@ -1711,13 +2000,7 @@ impl Manager {
                 && self.encore_invalid.get())
     }
     fn any_preset_pending(&self) -> bool {
-        self.current_preset_pending()
-            || self.c.games.iter().any(|g| {
-                g.extra
-                    .get("preset_dirty")
-                    .and_then(Value::as_object)
-                    .is_some_and(|schemes| schemes.values().any(|v| v.as_bool() == Some(true)))
-            })
+        self.current_preset_pending() || self.c.first_pending_preset().is_some()
     }
 
     fn game_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1737,11 +2020,12 @@ impl Manager {
         let view = cx.entity().downgrade();
         let title = self.t("预设参数");
         let width = (window.viewport_size().width - px(64.)).min(px(720.));
-        window.open_dialog(cx, move |dialog, _, _| {
+        window.open_dialog(cx, move |dialog, _, cx| {
             let close_view = view.clone();
             let cancel_view = view.clone();
             dialog
-                .title(title.clone())
+                .title(crate::ui_focus::dialog_title(title.clone(), cx))
+                .close_button(false)
                 .width(width)
                 .child(editor.clone())
                 .on_cancel(move |_, _, cx| {
@@ -1771,12 +2055,45 @@ impl Manager {
     }
     fn game_editor_body(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         if self.preset_close.is_some() {
-            return div().v_flex().gap_4()
-                .child(div().font_weight(FontWeight::SEMIBOLD).child(self.t("参数尚未应用")))
-                .child(self.t("有效修改已暂存，但尚未写入游戏。返回后点击应用，或暂不应用并关闭；无效输入不会保存。"))
-                .child(div().h_flex().flex_wrap().justify_end().gap_2()
-                    .child(self.button("preset-close-later", "暂不应用，关闭", Command::ClosePresetWithoutApplying, cx).small())
-                    .child(self.button("preset-keep-editing", "返回修改并应用", Command::KeepEditing, cx).small().primary()))
+            return div()
+                .v_flex()
+                .gap_4()
+                .child(
+                    div()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(self.t("参数尚未应用")),
+                )
+                .child(self.t(if self.preset_close == Some(true) {
+                    "关闭管理器将放弃所有尚未应用的参数修改，不会暂存。"
+                } else {
+                    "修改尚未写入游戏。选择“不修改”将放弃本次修改并关闭，不会暂存。"
+                }))
+                .child(
+                    div()
+                        .h_flex()
+                        .flex_wrap()
+                        .justify_end()
+                        .gap_2()
+                        .child(
+                            self.button(
+                                "preset-close-later",
+                                "不修改",
+                                Command::ClosePresetWithoutApplying,
+                                cx,
+                            )
+                            .small(),
+                        )
+                        .child(
+                            self.button(
+                                "preset-keep-editing",
+                                "返回修改",
+                                Command::KeepEditing,
+                                cx,
+                            )
+                            .small()
+                            .primary(),
+                        ),
+                )
                 .into_any_element();
         }
         let game = self
@@ -1784,9 +2101,7 @@ impl Manager {
             .focus
             .as_ref()
             .and_then(|e| self.c.games.iter().find(|g| &g.exe == e));
-        let name = game
-            .map(|g| game_display_name(&g.title, &g.exe))
-            .unwrap_or_default();
+        let name = game.map(|g| self.c.game_name(g)).unwrap_or_default();
         let mut content = div()
             .v_flex()
             .gap_3()
@@ -1799,7 +2114,7 @@ impl Manager {
                 div()
                     .text_xs()
                     .text_color(cx.theme().muted_foreground)
-                    .child(self.t("修改会记住在此游戏；更换方案或入口后，先卸载再安装应用。")),
+                    .child(self.t("修改仅在点击应用后写入游戏；选择“不修改”将放弃修改。")),
             );
         content = content.child(self.preset_panel(window, cx));
         let disabled = self.c.busy
@@ -1862,6 +2177,10 @@ impl Manager {
                     .border_t_1()
                     .border_color(cx.theme().border)
                     .bg(cx.theme().background)
+                    .when(!self.c.can_apply_parameters(), |d| d.child(
+                        div().text_sm().text_color(cx.theme().muted_foreground)
+                            .child(self.t("当前游戏未安装所选方案，或安装状态不完整；请先安装对应方案后再应用参数。"))
+                    ))
                     .when(pending, |d| {
                         d.child(
                             div()
@@ -1935,6 +2254,7 @@ impl Manager {
             - 32. * scale;
         let view = cx.entity().downgrade();
         Button::new("scheme-picker")
+            .focus_ring(crate::ui_focus::visible(cx))
             .small()
             .tooltip(label.clone())
             .label(label)
@@ -1982,6 +2302,7 @@ impl Manager {
                                 )
                                 .child(
                                     Button::new(("scheme-link", i))
+                                        .focus_ring(crate::ui_focus::visible(cx))
                                         .w_6()
                                         .flex_shrink_0()
                                         .small()
@@ -2048,6 +2369,10 @@ impl Manager {
                     ),
             )
             .child(
+                self.button("gpu-editor", "修改显卡型号", Command::GpuEditor, cx)
+                    .w_full(),
+            )
+            .child(
                 div()
                     .h_flex()
                     .gap_2()
@@ -2056,16 +2381,91 @@ impl Manager {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_xs()
+                            .text_sm()
                             .text_color(cx.theme().muted_foreground)
-                            .child(self.t("硬件加速 GPU 计划")),
+                            .child(self.t("硬件加速GPU调度")),
                     )
                     .child(
-                        self.button("graphics-inspector", "图形设置", Command::Graphics, cx)
-                            .ghost()
-                            .icon(IconName::ExternalLink),
+                        div()
+                            .id("hags-switch-surface")
+                            .track_focus(&self.hags_focus)
+                            .on_mouse_down_out({
+                                let focus = self.hags_focus.clone();
+                                move |_, window, cx| {
+                                    let focus = focus.clone();
+                                    window.defer(cx, move |window, cx| {
+                                        if focus.contains_focused(window, cx) {
+                                            window.blur(cx);
+                                        }
+                                    });
+                                }
+                            })
+                            .child(
+                                Switch::new("hardware-gpu-scheduling")
+                                    .focus_ring(crate::ui_focus::visible(cx))
+                                    .small()
+                                    .flex_shrink_0()
+                                    .accessibility_label(self.t("硬件加速GPU调度"))
+                                    .checked(
+                                        self.c
+                                            .hags
+                                            .as_ref()
+                                            .and_then(hags::State::selected)
+                                            .unwrap_or(false),
+                                    )
+                                    .disabled(!self.c.can_set_hags())
+                                    .on_click(cx.listener(|this, enabled, window, cx| {
+                                        this.act(Command::Hags(*enabled), window, cx)
+                                    })),
+                            ),
                     ),
             )
+            .child(self.hags_feedback(cx))
+            .into_any_element()
+    }
+    fn hags_feedback(&self, cx: &Context<Self>) -> AnyElement {
+        let state = self.c.hags.as_ref();
+        let message = if self.c.hags_busy && (self.c.hags_writing || state.is_none()) {
+            Some(if self.c.hags_writing {
+                "正在保存…"
+            } else {
+                "正在检测…"
+            })
+        } else if self.c.hags_error.is_some() {
+            Some("无法读取或保存 GPU 调度设置，请刷新后重试。")
+        } else if state.is_some_and(hags::State::needs_restart) {
+            Some("你需要重启电脑才能使此更改生效")
+        } else if state.is_some_and(|s| s.state == "unsupported") {
+            Some("当前系统或显卡驱动不支持此功能")
+        } else if state.and_then(hags::State::selected).is_none() {
+            Some("无法确认 GPU 调度状态，请刷新后重试。")
+        } else {
+            None
+        };
+        let Some(message) = message else {
+            return div().into_any_element();
+        };
+        let retry = !self.c.hags_busy
+            && (self.c.hags_error.is_some() || state.is_some_and(|s| s.state == "unknown"));
+        div()
+            .v_flex()
+            .gap_1()
+            .text_xs()
+            .text_color(cx.theme().muted_foreground)
+            .child(self.t(message))
+            .when(retry, |d| {
+                d.child(
+                    self.button("hags-retry", "刷新", Command::RefreshHags, cx)
+                        .ghost()
+                        .tooltip(
+                            self.c
+                                .hags_error
+                                .as_deref()
+                                .map(|s| self.c.text(s))
+                                .unwrap_or_default(),
+                        ),
+                )
+            })
             .into_any_element()
     }
     fn neural_badge(&self, exe: &str, cx: &Context<Self>) -> AnyElement {
@@ -2120,13 +2520,12 @@ impl Manager {
         {
             return div().into_any_element();
         }
-        let version = self.c.neural_versions.get(exe).copied().unwrap_or_else(|| {
-            if nr.and_then(|n| n.version.as_deref()) == Some("310.9.16") {
-                "310.9.16"
-            } else {
-                "310.8.0"
-            }
-        });
+        let version = self
+            .c
+            .neural_versions
+            .get(exe)
+            .copied()
+            .unwrap_or(rtx_fg_manager::neural_runtime::RECOMMENDED);
         let evidence = self.c.evidence.get(exe).and_then(Option::as_ref);
         let ready = nr.and_then(|n| n.encore_version.as_deref());
         let modern = ready
@@ -2184,8 +2583,8 @@ impl Manager {
             })
             .unwrap_or_default();
         let runtime_items = [
-            ("310.8.0", self.t("310.8.0 · 兼容版")),
-            ("310.9.16", self.t("310.9.16 · A/B 模型")),
+            ("310.9.16", self.t("310.9.16 · 推荐 · A/B 模型")),
+            ("310.8.0", self.t("310.8.0 · 旧版回退")),
         ];
         let runtime_label = runtime_items
             .iter()
@@ -2194,6 +2593,7 @@ impl Manager {
             .unwrap_or_else(|| version.into());
         let view = cx.entity().downgrade();
         let runtime_picker = Button::new("nr-version")
+            .focus_ring(crate::ui_focus::visible(cx))
             .small()
             .tooltip(runtime_label.clone())
             .label(runtime_label)
@@ -2296,7 +2696,7 @@ impl Manager {
             .as_ref()
             .and_then(|exe| self.c.games.iter().find(|g| &g.exe == exe));
         let name = game
-            .map(|g| game_display_name(&g.title, &g.exe))
+            .map(|g| self.c.game_name(g))
             .unwrap_or_else(|| self.c.text("请选择游戏"));
         let game_icon = game
             .and_then(|g| self.c.icons.get(&g.exe))
@@ -2329,15 +2729,34 @@ impl Manager {
                             .child(self.t("当前游戏")),
                     )
                     .child(
-                        div().h_flex().gap_3().min_w_0().child(game_icon).child(
-                            div()
-                                .id("inspector-game-name")
-                                .flex_1()
-                                .min_w_0()
-                                .text_sm()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(name),
-                        ),
+                        div()
+                            .h_flex()
+                            .gap_3()
+                            .min_w_0()
+                            .child(game_icon)
+                            .child(
+                                div()
+                                    .id("inspector-game-name")
+                                    .flex_1()
+                                    .min_w_0()
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(name),
+                            )
+                            .when_some(game, |row, g| {
+                                row.child(
+                                    self.button(
+                                        "rename-current-game",
+                                        "修改游戏名称",
+                                        Command::RenameGame(g.exe.clone()),
+                                        cx,
+                                    )
+                                    .label(self.t("改名"))
+                                    .ghost()
+                                    .small()
+                                    .disabled(self.c.read_only),
+                                )
+                            }),
                     ),
             )
             .child(
@@ -2358,7 +2777,7 @@ impl Manager {
                 .child(Alert::warning("cleanup-pending", self.t("补丁文件已移除，还有本游戏的缓存或临时文件需要处理。退出游戏后点击重新清理；无需清理其他游戏或全部下载缓存。")).small())
                 .child(div().h_flex().gap_2()
                     .child(self.button("retry-cleanup", "重新清理", Command::RetryCleanup, cx).disabled(self.c.busy))
-                    .child(self.button("cleanup-details", "查看原因", Command::CleanupDetails, cx).disabled(self.c.busy))));
+                    .child(self.button("cleanup-details", "查看文件", Command::CleanupDetails, cx).disabled(self.c.busy))));
         }
         panel = panel
             .child(self.neural_panel(window, cx))
@@ -2589,6 +3008,7 @@ impl Manager {
         ] {
             panel = panel.child(
                 Switch::new(key)
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .label(self.t(label))
                     .checked(self.c.boolean(key, default))
                     .on_click(cx.listener(move |this, yes, window, cx| {
@@ -2827,6 +3247,57 @@ impl Manager {
                 ),
         );
         let preferences=preferences.child(div().v_flex().gap_2().child(div().font_weight(FontWeight::SEMIBOLD).child(self.t("软件缓存"))).child(div().text_xs().text_color(cx.theme().muted_foreground).child(self.t("清理下载、更新暂存及未使用的已识别组件缓存；保留游戏列表、参数和归属记录。需要时重新下载或生成缓存。"))).child(self.button("clear-cache","清理缓存",Command::ClearCache,cx).disabled(self.c.busy||self.c.update_busy)));
+        let preferences = preferences.child(
+            div()
+                .v_flex()
+                .gap_2()
+                .child(
+                    div()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(self.t("游戏名称")),
+                )
+                .child(
+                    Checkbox::new("chinese-game-names")
+                        .focus_ring(crate::ui_focus::visible(cx))
+                        .label(self.t("中文界面优先显示中文游戏名"))
+                        .checked(self.c.boolean("chinese_game_names", true))
+                        .on_click(cx.listener(|this, yes, window, cx| {
+                            this.act(
+                                Command::Boolean("chinese_game_names".into(), *yes),
+                                window,
+                                cx,
+                            )
+                        })),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(self.c.text(&format!(
+                            "离线名称库：{0} 条 · {1}",
+                            self.c.game_names.len(),
+                            self.c.game_names.revision()
+                        ))),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(self.t("名称优先读取安装记录；无法确认时保留原名，可手动改名。")),
+                )
+                .when(!self.c.names_status.is_empty(), |d| {
+                    d.child(div().text_xs().child(self.t(&self.c.names_status)))
+                })
+                .child(
+                    self.button(
+                        "update-game-names",
+                        "更新名称库",
+                        Command::UpdateGameNames,
+                        cx,
+                    )
+                    .disabled(self.c.names_busy || self.c.read_only),
+                ),
+        );
         let mut links = div()
             .grid()
             .w_full()
@@ -2989,73 +3460,117 @@ impl Manager {
             )
             .into_any_element()
     }
-    fn gpu_page(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        div()
+    fn gpu_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.dialog_active {
+            return;
+        }
+        self.dialog_active = true;
+        let owner = cx.entity();
+        let editor = cx.new(|cx| {
+            cx.observe(&owner, |_, _, cx| cx.notify()).detach();
+            crate::ui_focus::observe(cx);
+            GpuEditor {
+                owner: owner.downgrade(),
+            }
+        });
+        let view = owner.downgrade();
+        let title = self.t("修改显卡型号");
+        let width =
+            (window.viewport_size().width - window.rem_size() * 4.).min(window.rem_size() * 38.);
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let view = view.clone();
+            dialog
+                .title(crate::ui_focus::dialog_title(title.clone(), cx))
+                .close_button(false)
+                .width(width)
+                .child(editor.clone())
+                .on_close(move |_, _, cx| {
+                    let _ = view.update(cx, |this, cx| {
+                        this.dialog_active = false;
+                        cx.notify();
+                    });
+                })
+        });
+    }
+    fn gpu_editor_body(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let disabled = self.c.busy || self.c.devices.is_empty();
+        let fields = div()
             .id("gpu-scroll")
             .v_flex()
-            .gap_5()
-            .flex_1()
+            .gap_4()
+            .min_w_0()
             .min_h_0()
+            .max_h(
+                (window.viewport_size().height - window.rem_size() * 15.)
+                    .max(window.rem_size() * 8.),
+            )
             .overflow_y_scroll()
-            .p_5()
-            .bg(cx.theme().background)
-            .rounded(cx.theme().radius)
-            .border_1()
-            .border_color(cx.theme().border)
             .child(
                 div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(self.t("显卡名称")),
-            )
-            .child(
-                self.t(
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(self.t(
                     "仅修改 Windows 显示名称，不改变显卡性能或硬件能力。修改和还原后请重启电脑。",
-                ),
+                )),
             )
             .child(
-                div().max_w(px(640.)).child(
-                    self.menu(
-                        "gpu-device",
-                        self.c
-                            .devices
-                            .get(self.c.device_index)
-                            .map(|d| d.name.clone().into())
-                            .unwrap_or_else(|| "NVIDIA".into()),
-                        self.c
-                            .devices
-                            .iter()
-                            .enumerate()
-                            .map(|(i, d)| {
-                                (
-                                    d.name.clone().into(),
-                                    Command::Device(i),
-                                    i == self.c.device_index,
-                                )
-                            })
-                            .collect(),
-                        self.c.busy,
-                        window,
-                        cx,
-                    ),
-                ),
-            )
-            .child(
-                div().h_flex().child(
-                    self.button("gpu-refresh", "刷新", Command::RefreshGpu, cx)
-                        .disabled(self.c.busy),
+                div().v_flex().gap_2().child(self.t("当前显卡")).child(
+                    div()
+                        .h_flex()
+                        .gap_2()
+                        .child(
+                            div().flex_1().min_w_0().child(
+                                self.menu(
+                                    "gpu-device",
+                                    self.c
+                                        .devices
+                                        .get(self.c.device_index)
+                                        .map(|d| d.name.clone().into())
+                                        .unwrap_or_else(|| "NVIDIA".into()),
+                                    self.c
+                                        .devices
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, d)| {
+                                            (
+                                                d.name.clone().into(),
+                                                Command::Device(i),
+                                                i == self.c.device_index,
+                                            )
+                                        })
+                                        .collect(),
+                                    disabled,
+                                    window,
+                                    cx,
+                                ),
+                            ),
+                        )
+                        .child(
+                            self.button("gpu-refresh", "刷新", Command::RefreshGpu, cx)
+                                .flex_shrink_0()
+                                .disabled(self.c.busy),
+                        ),
                 ),
             )
             .when_some(self.c.devices.get(self.c.device_index), |d, device| {
                 d.child(
                     div()
                         .text_xs()
+                        .whitespace_normal()
                         .text_color(cx.theme().muted_foreground)
                         .child(format!("{} · {}", device.version, device.instance)),
                 )
             })
+            .when(self.c.devices.is_empty(), |d| {
+                d.child(
+                    div()
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(self.t("未检测到可修改的 NVIDIA 显卡，请刷新。")),
+                )
+            })
             .child(
-                div().max_w(px(460.)).child(
+                div().v_flex().gap_2().child(self.t("修改为")).child(
                     self.menu(
                         "gpu-alias",
                         gpu_alias::NAMES[self.c.alias_index].into(),
@@ -3064,25 +3579,33 @@ impl Manager {
                             .enumerate()
                             .map(|(i, s)| ((*s).into(), Command::Alias(i), i == self.c.alias_index))
                             .collect(),
-                        self.c.busy,
+                        disabled,
                         window,
                         cx,
                     ),
                 ),
-            )
+            );
+        div()
+            .v_flex()
+            .gap_4()
+            .min_w_0()
+            .text_sm()
+            .child(fields)
             .child(
                 div()
                     .h_flex()
-                    .gap_3()
+                    .flex_wrap()
+                    .gap_2()
+                    .justify_end()
                     .child(
                         self.button(
                             "alias",
-                            "修改显卡名称",
+                            "修改显卡型号",
                             Command::Confirm("alias".into()),
                             cx,
                         )
                         .primary()
-                        .disabled(self.c.busy || self.c.devices.is_empty()),
+                        .disabled(disabled),
                     )
                     .child(
                         self.button(
@@ -3091,7 +3614,7 @@ impl Manager {
                             Command::Confirm("restore".into()),
                             cx,
                         )
-                        .disabled(self.c.busy || self.c.devices.is_empty()),
+                        .disabled(disabled),
                     ),
             )
             .into_any_element()
@@ -3151,15 +3674,17 @@ impl Manager {
         let view = cx.entity().downgrade();
         let width = (window.viewport_size().width - px(90.)).min(px(620.));
         let height = (window.viewport_size().height - px(270.)).max(px(160.));
-        window.open_dialog(cx, move |dialog, _, _| {
+        window.open_dialog(cx, move |dialog, _, cx| {
             let view = view.clone();
             dialog
-                .title(title.clone())
+                .title(crate::ui_focus::dialog_title(title.clone(), cx))
+                .close_button(false)
                 .width(width)
                 .button_props(DialogButtonProps::default().ok_text(ok.clone()))
                 .footer(
                     DialogFooter::new().child(
                         Button::new("config-help-ok")
+                            .focus_ring(crate::ui_focus::visible(cx))
                             .small()
                             .label(ok.clone())
                             .primary()
@@ -3229,17 +3754,19 @@ impl Manager {
         let width = (window.viewport_size().width - px(80.)).min(px(520.));
         let top = ((window.viewport_size().height - px(320.)) / 2.).max(px(40.));
         let view = cx.entity().downgrade();
-        window.open_dialog(cx, move |dialog, _, _| {
+        window.open_dialog(cx, move |dialog, _, cx| {
             let ok_view = view.clone();
             let close_view = view.clone();
             dialog
-                .title(title.clone())
+                .title(crate::ui_focus::dialog_title(title.clone(), cx))
+                .close_button(false)
                 .width(width)
                 .margin_top(top)
                 .footer(
                     DialogFooter::new()
                         .child(
                             Button::new("update-later")
+                                .focus_ring(crate::ui_focus::visible(cx))
                                 .small()
                                 .label(later.clone())
                                 .on_click(|_, window, cx| {
@@ -3248,6 +3775,7 @@ impl Manager {
                         )
                         .child(
                             Button::new("update-accept")
+                                .focus_ring(crate::ui_focus::visible(cx))
                                 .small()
                                 .label(accept.clone())
                                 .primary()
@@ -3326,11 +3854,28 @@ impl Manager {
                 "remove_nr" => {
                     "仅撤销管理器安装的 NR 运行库；如安装前已有文件则恢复原件，保留 Encore 和其他补丁。请先退出游戏。"
                 }
+                "delete_cleanup" => {
+                    "确认永久删除以下当前游戏缓存和安装临时文件？目录内列出的自定义文件也会删除，无法撤销。游戏存档、备份和其他游戏的目录不在此列表内。删除后将自动重新清理。"
+                }
                 "remove" | "remove_checked" => "仅从游戏库移除；游戏文件和已部署补丁保持不变。",
                 "update" => "更新将关闭管理器并替换程序，成功启动后删除旧版。是否继续？",
                 _ => "仅修改 Windows 显示名称，不改变显卡性能或硬件能力。修改和还原后请重启电脑。",
             };
             let mut message = self.c.text(text);
+            if matches!(a.as_str(), "alias" | "restore")
+                && let Some(device) = self.c.devices.get(self.c.device_index)
+            {
+                let target = if a == "alias" {
+                    gpu_alias::NAMES[self.c.alias_index].to_owned()
+                } else {
+                    self.c.text("还原原始名称")
+                };
+                message.push_str(&format!("\n\n{} → {}", device.name, target));
+            }
+            if a == "delete_cleanup" {
+                message.push_str("\n\n");
+                message.push_str(&self.c.cleanup_deletion_list());
+            }
             if a == "end_processes"
                 && let Some(blocked) = &self.c.blocked
             {
@@ -3372,7 +3917,7 @@ impl Manager {
             .map(|game| {
                 (
                     game.exe.clone(),
-                    game_display_name(&game.title, &game.exe),
+                    self.c.game_name(game),
                     if game.deployment_dir.is_empty() {
                         game.exe.clone()
                     } else {
@@ -3403,6 +3948,8 @@ impl Manager {
             "移除游戏"
         } else if process_dialog {
             "结束并重试"
+        } else if action.as_deref() == Some("delete_cleanup") {
+            "删除并重新清理"
         } else if action.is_some() {
             "继续"
         } else {
@@ -3411,7 +3958,7 @@ impl Manager {
         let cancel_text = self.t("取消");
         let ok_variant = if matches!(
             action.as_deref(),
-            Some("clean_batch" | "remove_nr" | "end_processes")
+            Some("clean_batch" | "remove_nr" | "end_processes" | "delete_cleanup")
         ) {
             ButtonVariant::Danger
         } else {
@@ -3483,7 +4030,8 @@ impl Manager {
             }
 
             dialog
-                .title(title.clone())
+                .title(crate::ui_focus::dialog_title(title.clone(), cx))
+                .close_button(false)
                 .icon(Self::icon(status_icon.clone()).size(px(28.)))
                 .width(width)
                 .button_props(props.clone())
@@ -3492,6 +4040,7 @@ impl Manager {
                         .when(process_dialog, |footer| {
                             footer.child(
                                 Button::new("process-recheck")
+                                    .focus_ring(crate::ui_focus::visible(cx))
                                     .small()
                                     .label(recheck_text.clone())
                                     .on_click(move |_, window, cx| {
@@ -3504,6 +4053,7 @@ impl Manager {
                         .when(action.is_some(), |footer| {
                             footer.child(
                                 Button::new("message-cancel")
+                                    .focus_ring(crate::ui_focus::visible(cx))
                                     .small()
                                     .label(cancel_text.clone())
                                     .on_click(|_, window, cx| {
@@ -3513,6 +4063,7 @@ impl Manager {
                         })
                         .child(
                             Button::new("message-ok")
+                                .focus_ring(crate::ui_focus::visible(cx))
                                 .disabled(cannot_end)
                                 .small()
                                 .label(ok_text.clone())
@@ -3580,6 +4131,7 @@ impl Manager {
         }
         if self.system_poll.elapsed() > Duration::from_secs(2) {
             self.system_poll = Instant::now();
+            self.c.poll_hags();
             let choice = self.c.choice("theme", "跟随系统");
             if choice != self.theme_choice || choice == "跟随系统" {
                 self.theme_choice = choice;
@@ -3638,9 +4190,14 @@ impl Manager {
                     }
                     2 => {
                         window.close_dialog(cx);
-                        self.c.page = 1;
+                        self.dialog_active = false;
+                        self.gpu_editor(window, cx);
                     }
-                    3 => self.c.page = 2,
+                    3 => {
+                        window.close_dialog(cx);
+                        self.dialog_active = false;
+                        self.c.page = 2;
+                    }
                     4 => self.c.page = if self.layout(window).compact { 3 } else { 0 },
                     5 => {
                         let report = json!({"single_config_editor":true,"community_enabled":false,"help_enabled":false,"log_panel_enabled":false,"hardware_in_inspector":true,"first_ui_ms":self.first_render_ms,"frames":self.frames,"heartbeats":self.ticks,"max_event_gap_ms":self.max_gap_ms,"language":self.c.tr.language,"dark":cx.theme().mode.is_dark(),"light_palette":cx.theme().light_theme.name,"dark_palette":cx.theme().dark_theme.name,"renderer":"GPUI Fast D3D11","python_runtime":false,"scan_exercised":self.c.boolean("smoke_scan",false),"scan_busy_at_close":self.c.busy,"width":f32::from(window.viewport_size().width),"height":f32::from(window.viewport_size().height)});
@@ -3668,7 +4225,6 @@ impl Render for Manager {
             self.first_render_ms = Some(self.started.elapsed().as_secs_f64() * 1000.)
         }
         let content = match self.c.page {
-            1 => self.gpu_page(window, cx),
             2 => self.settings(window, cx),
             3 if self.layout(window).compact => self.details(window, cx),
             _ => self.home(window, cx),
@@ -3697,6 +4253,7 @@ impl Render for Manager {
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(
                         Button::new("titlebar-sidebar-toggle")
+                            .focus_ring(crate::ui_focus::visible(cx))
                             .disabled(automatic_sidebar)
                             .ghost()
                             .small()
@@ -3710,6 +4267,7 @@ impl Render for Manager {
                     )
                     .child(
                         Button::new("titlebar-theme")
+                            .focus_ring(crate::ui_focus::visible(cx))
                             .ghost()
                             .small()
                             .size(px(28.))
@@ -3723,6 +4281,7 @@ impl Render for Manager {
                     .when(self.layout(window).compact, |d| {
                         d.child(
                             Button::new("titlebar-inspector")
+                                .focus_ring(crate::ui_focus::visible(cx))
                                 .ghost()
                                 .small()
                                 .size(px(28.))
@@ -3783,7 +4342,7 @@ impl Render for Manager {
                             .flex_1()
                             .min_h_0()
                             .min_w_0()
-                            .when(self.c.page == 1 || self.c.page == 2, |d| d.p_4())
+                            .when(self.c.page == 2, |d| d.p_4())
                             .child(content),
                     )
                     .when(
@@ -3813,6 +4372,7 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
         .with_assets(crate::ui_assets::Assets)
         .run(move |cx| {
             gpui::init(cx);
+            crate::ui_focus::init(cx);
             if let Err(error) = crate::ui_themes::register(cx) {
                 win::message(
                     "RTX Manager",
@@ -3887,6 +4447,18 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
                         .update(cx, |this, cx| {
                             if this.any_preset_pending() {
                                 if !this.editor_open {
+                                    if let Some((exe, scheme)) = this.c.first_pending_preset() {
+                                        this.c.focus = Some(exe);
+                                        if let Some(index) = this
+                                            .c
+                                            .catalog
+                                            .schemes()
+                                            .iter()
+                                            .position(|p| p.scheme_id == scheme)
+                                        {
+                                            this.profile_set(index, this.c.cloud_series());
+                                        }
+                                    }
                                     window.close_dialog(cx);
                                     this.dialog_active = false;
                                     this.game_editor(window, cx);
@@ -3974,17 +4546,13 @@ fn fitted_bounds(work: Bounds<Pixels>) -> Bounds<Pixels> {
     Bounds::centered_at(work.center(), size(width, height))
 }
 
+#[cfg(test)]
 fn game_display_name(title: &str, exe: &str) -> String {
-    let name = if !title.trim().is_empty() {
-        title.trim()
-    } else {
-        // Handles imported Windows paths even in non-Windows unit tests.
-        exe.rsplit(['\\', '/']).next().unwrap_or(exe)
-    };
-    name.get(..name.len().saturating_sub(4))
-        .filter(|_| name.to_ascii_lowercase().ends_with(".exe"))
-        .unwrap_or(name)
-        .to_owned()
+    rtx_fg_manager::game_names::original(&rtx_fg_manager::scanner::Game {
+        title: title.into(),
+        exe: exe.into(),
+        ..Default::default()
+    })
 }
 
 #[cfg(test)]
@@ -4034,12 +4602,87 @@ mod layout_tests {
         assert_eq!(game_display_name("  ", "/games/Other.exe"), "Other");
     }
     #[test]
-    fn search_rebuilds_after_same_count_rescan_reorders_and_relabels_library() {
+    fn library_directories_show_current_targets_without_duplicates_or_cleanup_remnants() {
+        let root = std::env::temp_dir().join("library-directory-display");
+        let first = root.join("Engine/Binaries/Win64");
+        let second = root.join("Engine/Binaries/Win64rh");
+        let mut game = rtx_fg_manager::scanner::Game {
+            exe: first.join("game.exe").display().to_string(),
+            root: root.display().to_string(),
+            targets: vec![
+                first.join("game.exe").display().to_string(),
+                second.join("game.exe").display().to_string(),
+                first.join("alternate.exe").display().to_string(),
+            ],
+            cleanup_only: vec![root.join("old/game.exe").display().to_string()],
+            ..Default::default()
+        };
+        let directories = super::game_directories(&game);
+        assert_eq!(directories.len(), 2);
+        assert_eq!(directories[0].0, first.display().to_string());
+        assert_eq!(directories[1].0, second.display().to_string());
+        assert_eq!(
+            std::path::Path::new(&directories[1].1),
+            std::path::Path::new("Engine/Binaries/Win64rh")
+        );
+        game.deployment_dir = root.join("plugins").display().to_string();
+        assert_eq!(
+            super::game_directories(&game),
+            [(game.deployment_dir.clone(), "plugins".into())]
+        );
+        game.deployment_dir.clear();
+        game.targets.clear();
+        assert_eq!(super::game_directories(&game).len(), 1);
+    }
+    #[test]
+    fn rescan_added_directory_updates_same_game_and_survives_save() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("Game");
+        let first = root
+            .join("Binaries/Win64/Game-Win64-Shipping.exe")
+            .display()
+            .to_string();
+        let second = root
+            .join("Binaries/Win64rh/Game-Win64-Shipping.exe")
+            .display()
+            .to_string();
+        let mut c = crate::controller::Controller::new(
+            dir.path().into(),
+            serde_json::json!({"language":"zh-CN", "games":[], "auto_update":false}),
+            None,
+            Some(dir.path().join("smoke.json")),
+        );
+        let mut game = rtx_fg_manager::scanner::Game {
+            exe: first.clone(),
+            root: root.display().to_string(),
+            targets: vec![first],
+            ..Default::default()
+        };
+        c.merge_scan(vec![game.clone()]);
+        c.focus = Some(game.exe.clone());
+        let revision = c.library_revision;
+        game.targets.push(second.clone());
+        c.merge_scan(vec![game]);
+        assert_eq!(c.games.len(), 1);
+        assert_ne!(c.library_revision, revision);
+        assert_eq!(super::game_directories(&c.games[0]).len(), 2);
+        assert!(c.patch_targets(false).contains(&second));
+        let saved: rtx_fg_manager::scanner::Game =
+            serde_json::from_value(c.state["games"][0].clone()).unwrap();
+        assert_eq!(
+            super::game_directories(&saved),
+            super::game_directories(&c.games[0])
+        );
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn search_rebuilds_after_drag_reorder_and_same_count_rescan_relabels_library() {
         let dir = tempfile::tempdir().unwrap();
         let mut c = crate::controller::Controller::new(
             dir.path().into(),
             serde_json::json!({"language":"zh-CN", "games":[], "auto_update":false}),
-            Some("read-only test controller".into()),
+            None,
             Some(dir.path().join("smoke.json")),
         );
         let rows = ["Alpha", "Beta"].map(|name| {
@@ -4065,6 +4708,9 @@ mod layout_tests {
         let revision = c.library_revision;
         c.merge_scan(vec![rows[0].clone()]);
         assert_eq!(c.games.len(), 2);
+        // Rescans preserve user order (since the drag-sort feature in 4.3.2).
+        assert_eq!(c.games[0].title, "Alpha");
+        c.reorder_game(&rows[0].exe, &rows[1].exe, true);
         assert_eq!(c.games[0].title, "Beta");
         assert_eq!(c.games[1].title, "Alpha");
         assert_ne!(c.library_revision, revision);

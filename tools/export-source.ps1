@@ -75,6 +75,11 @@ foreach ($name in @(
     'rust/assets/themes/LICENSE-APACHE'
 )) { Add-File $name }
 foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md', 'docs/encore-1.1.0.md', 'docs/encore-1.1.0.zh-CN.md')) { Add-File $name $false }
+Add-File 'tools/build_game_names.py'
+Add-File 'tools/game-name-overrides.json'
+Add-File 'tests/test_game_names.py'
+Add-File '.github/workflows/update-game-names.yml'
+Add-File 'docs/game-names.md'
 Add-Tree 'rust/src' @('.rs')
 Add-Tree 'help' @('.html', '.css', '.js')
 foreach ($name in @('community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore', 'community/wrangler.example.jsonc', 'community/README.md', 'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json', '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md')) { Add-File $name }
@@ -96,9 +101,11 @@ if (-not $ExcludeCloudMetadata) {
     Add-Tree 'cloud/v3' @('.json')
     Add-Tree 'cloud/bundles' @('.json')
     Add-File 'cloud/help.json' $false
+    Add-File 'cloud/game-names.json' $false
+    Add-Tree 'cloud/names' @('.json')
 }
 foreach ($name in @('.github/workflows/mirror-gitee.yml', '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml')) { Add-File $name $false }
-foreach ($name in @('docs/brand-banner.svg', 'docs/brand-banner.png', 'docs/download-en.svg', 'docs/download-zh.svg', 'docs/screenshot-home.png', 'docs/screenshot-home-zh.png', 'docs/screenshot-home-themes.png')) { Add-File $name $false }
+foreach ($name in @('docs/brand-banner.svg', 'docs/brand-banner.png', 'docs/download-en.svg', 'docs/download-zh.svg', 'docs/screenshot-home.png', 'docs/screenshot-home-zh.png')) { Add-File $name $false }
 
 $binaryExtensions = @('.png', '.ico')
 $findings = [Collections.Generic.List[string]]::new()

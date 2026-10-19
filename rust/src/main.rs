@@ -3,6 +3,7 @@ mod controller;
 mod game_icons;
 mod ui;
 mod ui_assets;
+mod ui_focus;
 mod ui_themes;
 fn main() {
     if let Err(e) = run() {

@@ -1690,8 +1690,8 @@
       "compatibility",
       "flipMeteringBypass"
     ],
-    "label": "OptiScaler翻转计量绕过",
-    "group": "system",
+    "label": "平滑 X3 / X4",
+    "group": "frames",
     "kind": "bool",
     "default": "0",
     "min": null,
@@ -1699,9 +1699,9 @@
     "choices": [],
     "restart": true,
     "dependencies": [],
-    "help": "仅用于需要该兼容项的OptiScaler组合。",
+    "help": "当 X3/X4 比 X2 更不流畅时可尝试；让 Streamline 安排生成帧的间隔。Encore 1.1.2 支持 DX12/Vulkan，修改后重启游戏。默认关闭。",
     "optional": false,
-    "source_help": "OptiScaler flip metering bypass, only for setups that need it. Restart the game to apply."
+    "source_help": "Smooth out X3 / X4: Streamline spaces generated frames instead of the NVIDIA driver. DX12 and Vulkan in Encore 1.1.2. Restart the game to apply."
   },
   {
     "key": "disableMvDilation",

@@ -26,7 +26,7 @@ def current_source_export_files():
         files.update(re.findall(r"'([^']+)'", group))
     files.update(re.findall(r"Add-File '([^']+)'", script))
     trees = re.findall(r"Add-Tree '([^']+)' @\(([^)]*)\)", script)
-    if len(trees) != 12:
+    if len(trees) != 13:
         raise AssertionError('Review the source exporter Add-Tree structure')
     for directory, group in trees:
         extensions = set(re.findall(r"'([^']+)'", group))
@@ -60,6 +60,10 @@ class SourceAllowlistTests(unittest.TestCase):
                          'rust/assets/licenses/GPUI-FAST-LICENSE',
                          'rust/assets/encore-defaults.jsonc',
                          'rust/assets/encore-fields.json',
+                         'rust/assets/game-names.json', 'cloud/game-names.json',
+                         'tools/build_game_names.py', 'docs/game-names.md',
+                         'tools/game-name-overrides.json', 'tests/test_game_names.py',
+                         '.github/workflows/update-game-names.yml',
                          'tests/test_encore_cloud.py',
                          'tests/v429_encore_cloud.rs'):
             self.assertIn(required, files)

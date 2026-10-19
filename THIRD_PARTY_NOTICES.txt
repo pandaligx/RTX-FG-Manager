@@ -1,5 +1,11 @@
 Helper libraries used by this project
 
+Game name catalog (rust/assets/game-names.json)
+Source: Wikidata contributors, https://www.wikidata.org/wiki/Wikidata:Data_access
+Structured data: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+Each entry retains its Wikidata entity ID. Names may vary by region; this is
+not an official platform translation database or a compatibility guarantee.
+
 Manager source and distribution notes (2026-10-15; 4.3.0 candidate, not released)
 The manager is a Rust native application using GPUI Kit with the GPUI Fast backend.
 It does not bundle a Python interpreter, Tcl/Tk or a PyInstaller bootloader.

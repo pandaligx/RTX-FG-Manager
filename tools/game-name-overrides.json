@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "titles": {
+    "Q112307228": "风暴之门",
+    "Q24514682": "黎明杀机",
+    "Q111983519": "绝区零",
+    "Q113586305": "燕云十六声",
+    "Q112049342": "明日方舟：终末地",
+    "Q104817349": "永劫无间",
+    "Q123138197": "三角洲行动",
+    "Q67650639": "云顶之弈"
+  },
+  "rules": [
+    {
+      "id": "zzz-unity",
+      "game": "Q111983519",
+      "executables": [
+        "ZenlessZoneZero.exe"
+      ],
+      "files": [
+        "ZenlessZoneZero_Data"
+      ]
+    },
+    {
+      "id": "zzz-folder",
+      "game": "Q111983519",
+      "executables": [
+        "ZenlessZoneZero.exe"
+      ],
+      "directories": [
+        "ZenlessZoneZero Game"
+      ]
+    },
+    {
+      "id": "where-winds-meet",
+      "game": "Q113586305",
+      "executables": [
+        "yysls.exe"
+      ],
+      "directories": [
+        "yysls",
+        "yysls_medium"
+      ]
+    },
+    {
+      "id": "endfield-unity",
+      "game": "Q112049342",
+      "executables": [
+        "Endfield.exe"
+      ],
+      "files": [
+        "Endfield_Data"
+      ]
+    },
+    {
+      "id": "endfield-folder",
+      "game": "Q112049342",
+      "executables": [
+        "Endfield.exe"
+      ],
+      "directories": [
+        "Arknights Endfield"
+      ]
+    },
+    {
+      "id": "naraka",
+      "game": "Q104817349",
+      "executables": [
+        "NarakaBladepoint.exe"
+      ],
+      "directories": [
+        "Naraka",
+        "Naraka Bladepoint",
+        "NarakaBladepoint"
+      ]
+    },
+    {
+      "id": "naraka-unity",
+      "game": "Q104817349",
+      "executables": [
+        "NarakaBladepoint.exe"
+      ],
+      "files": [
+        "NarakaBladepoint_Data"
+      ]
+    },
+    {
+      "id": "delta-rail",
+      "game": "Q123138197",
+      "executables": [
+        "DeltaForceClient-Win64-Shipping.exe"
+      ],
+      "keys": [
+        "wegame:2001918"
+      ]
+    },
+    {
+      "id": "delta-folder",
+      "game": "Q123138197",
+      "executables": [
+        "DeltaForceClient-Win64-Shipping.exe"
+      ],
+      "directories": [
+        "DeltaForce",
+        "DeltaForce(2001918)"
+      ]
+    },
+    {
+      "id": "tft-client",
+      "game": "Q67650639",
+      "executables": [
+        "TFTTencentClient-Win64-Shipping.exe"
+      ],
+      "directories": [
+        "TFT",
+        "TFTTencentClient",
+        "League of Legends",
+        "英雄联盟"
+      ]
+    },
+    {
+      "id": "genshin-cn",
+      "game": "Q65059474",
+      "executables": [
+        "YuanShen.exe"
+      ],
+      "files": [
+        "YuanShen_Data"
+      ]
+    },
+    {
+      "id": "genshin-global",
+      "game": "Q65059474",
+      "executables": [
+        "GenshinImpact.exe"
+      ],
+      "files": [
+        "GenshinImpact_Data"
+      ]
+    },
+    {
+      "id": "star-rail",
+      "game": "Q108896777",
+      "executables": [
+        "StarRail.exe"
+      ],
+      "files": [
+        "StarRail_Data"
+      ]
+    }
+  ],
+  "keys": {
+    "Q244030": [
+      "battlenet:diablo3"
+    ],
+    "Q73163646": [
+      "battlenet:prometheus"
+    ]
+  }
+}

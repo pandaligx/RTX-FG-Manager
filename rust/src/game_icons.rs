@@ -1,6 +1,9 @@
 //! Resource-only icon extraction on a background worker; never executes the EXE.
 use anyhow::{Result, ensure};
-use std::path::Path;
+use std::{
+    io::{Cursor, Read},
+    path::Path,
+};
 use windows::{
     Win32::{
         Graphics::Gdi::*,
@@ -16,6 +19,15 @@ const ICON_PIXELS: u32 = 128;
 pub fn extract(path: &Path) -> Result<image::RgbaImage> {
     let path = rtx_fg_manager::core::no_links(path)?;
     ensure!(path.is_file(), "Icon file missing");
+    // Protected Xbox executables may not expose PE resources even elevated.
+    // Use the declared per-executable/package visual, not a generic EXE icon.
+    if let Some(game) = rtx_fg_manager::xbox::declared(&path) {
+        for logo in game.logos {
+            if let Ok(icon) = package_icon(&logo) {
+                return Ok(icon);
+            }
+        }
+    }
     let wide = rtx_fg_manager::win::wide(path);
     // SAFETY: Shell extraction reads resources, without loading executable code.
     // Each icon/DC/bitmap is released, including failure paths. The DIB buffer
@@ -127,6 +139,41 @@ pub fn extract(path: &Path) -> Result<image::RgbaImage> {
     }
 }
 
+fn package_icon(path: &Path) -> Result<image::RgbaImage> {
+    let path = rtx_fg_manager::core::no_links(path)?;
+    let file = std::fs::File::open(path)?;
+    const MAX_BYTES: u64 = 4 * 1024 * 1024;
+    ensure!(
+        file.metadata()?.len() <= MAX_BYTES,
+        "Package icon too large"
+    );
+    let mut bytes = Vec::new();
+    file.take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
+    ensure!(bytes.len() as u64 <= MAX_BYTES, "Package icon too large");
+    let mut reader = image::ImageReader::with_format(Cursor::new(bytes), image::ImageFormat::Png);
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(2048);
+    limits.max_image_height = Some(2048);
+    limits.max_alloc = Some(32 * 1024 * 1024);
+    reader.limits(limits);
+    let icon = reader
+        .decode()?
+        .resize(
+            ICON_PIXELS,
+            ICON_PIXELS,
+            image::imageops::FilterType::Lanczos3,
+        )
+        .to_rgba8();
+    let mut canvas = image::RgbaImage::new(ICON_PIXELS, ICON_PIXELS);
+    image::imageops::overlay(
+        &mut canvas,
+        &icon,
+        ((ICON_PIXELS - icon.width()) / 2) as i64,
+        ((ICON_PIXELS - icon.height()) / 2) as i64,
+    );
+    Ok(canvas)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,6 +181,45 @@ mod tests {
         ExtendedColorType,
         codecs::ico::{IcoEncoder, IcoFrame},
     };
+    #[test]
+    fn xbox_package_visuals_use_overrides_and_fall_back_when_an_asset_is_missing() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let exe = dir.path().join("Protected.exe");
+        std::fs::write(&exe, b"no executable icon")?;
+        image::RgbaImage::from_pixel(150, 150, image::Rgba([21, 144, 39, 255]))
+            .save(dir.path().join("game.png"))?;
+        image::RgbaImage::from_pixel(64, 64, image::Rgba([208, 32, 11, 255]))
+            .save(dir.path().join("override.png"))?;
+        let config = dir.path().join("MicrosoftGame.config");
+        std::fs::write(
+            &config,
+            r#"<Game><ExecutableList><Executable Name="Protected.exe" TargetDeviceFamily="PC" OverrideLogo="override.png"/></ExecutableList><ShellVisuals Square150x150Logo="game.png"/></Game>"#,
+        )?;
+        assert_eq!(extract(&exe)?.get_pixel(64, 64).0, [208, 32, 11, 255]);
+        std::fs::write(dir.path().join("override.png"), b"invalid PNG")?;
+        assert_eq!(extract(&exe)?.get_pixel(64, 64).0, [21, 144, 39, 255]);
+        std::fs::write(
+            &config,
+            r#"<Game><ExecutableList><Executable Name="Protected.exe" TargetDeviceFamily="PC" OverrideLogo="../outside.png"/></ExecutableList><ShellVisuals Square150x150Logo="missing.png" Square44x44Logo="game.png"/></Game>"#,
+        )?;
+        assert_eq!(rtx_fg_manager::xbox::declared(&exe).unwrap().logos.len(), 2);
+        assert_eq!(extract(&exe)?.get_pixel(64, 64).0, [21, 144, 39, 255]);
+        Ok(())
+    }
+    #[test]
+    #[ignore = "read-only local Xbox icon probe; requires RTXFG_XBOX_GAME"]
+    fn xbox_local_icon_readonly_probe() -> Result<()> {
+        let exe = std::path::PathBuf::from(
+            std::env::var_os("RTXFG_XBOX_GAME").expect("explicit Xbox installation"),
+        );
+        let icon = extract(&exe)?;
+        ensure!(
+            icon.dimensions() == (128, 128) && icon.pixels().any(|p| p.0[3] != 0),
+            "Missing visible package icon"
+        );
+        println!("Read-only Xbox icon probe: {} / 128x128", exe.display());
+        Ok(())
+    }
     #[test]
     fn native_high_resolution_detail_and_alpha_survive_extraction() -> Result<()> {
         let dir = tempfile::tempdir()?;

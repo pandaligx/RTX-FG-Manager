@@ -27,6 +27,13 @@ fn stale_catalog_cannot_downgrade_bundled_encore() -> Result<()> {
     use rtx_fg_manager::cloud;
     let scheme = "dlssg-transfusion-1.4.5.3";
     let mut catalog = cloud::bundled();
+    let expected = catalog
+        .packages
+        .iter()
+        .find(|p| p.scheme_id == scheme)
+        .unwrap()
+        .version
+        .clone();
     for p in catalog
         .packages
         .iter_mut()
@@ -48,7 +55,7 @@ fn stale_catalog_cannot_downgrade_bundled_encore() -> Result<()> {
             .packages
             .iter()
             .filter(|p| p.scheme_id == scheme)
-            .all(|p| p.version == "1.1.0")
+            .all(|p| p.version == expected)
     );
     assert_eq!(
         catalog.scheme_policies[scheme].defaults["dlssNrPreset"],

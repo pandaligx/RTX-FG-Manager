@@ -316,6 +316,17 @@ pub fn upgrade_locked(
     } else {
         encore::migrate(original, explicit_overrides.unwrap_or(&empty))?
     };
+    let migrated = if new
+        .upstream_version
+        .as_deref()
+        .or(new.payload_version.as_deref())
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(1, 1, 2))
+    {
+        encore::migrate_frame_pacing(&migrated)?
+    } else {
+        migrated
+    };
     ensure!(migrated.len() <= 1024 * 1024, "迁移后配置超过大小限制");
     files.insert(encore::CONFIG.into(), migrated);
     ensure!(

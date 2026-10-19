@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rtx_fg_manager::{
-    cleanup, cloud, core, gpu_alias, i18n, preferences,
+    cleanup, cloud, core, game_names, gpu_alias, hags, i18n, preferences,
     scanner::{self, Game},
     updater, win,
 };
@@ -16,8 +16,12 @@ use std::{
     time::{Duration, Instant},
 };
 pub enum Event {
+    GameNamesCached(game_names::Catalog),
+    GameIdentities(u64, Vec<(String, String, Value)>),
+    GameNames(Result<game_names::Catalog>, bool),
     Catalog(cloud::Catalog),
     Deployments(u64, String, rtx_fg_manager::deployment::Snapshot),
+    CleanupPreview(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>),
     Scan(scanner::Report),
     Progress(String),
     PayloadProgress(cloud::CloudProgress),
@@ -38,6 +42,7 @@ pub enum Event {
     PresetReadFailed(String, String, bool, u64),
     Devices(Vec<gpu_alias::Device>),
     Gpu(Vec<(String, i32)>),
+    Hags(Result<hags::State>),
     Icons(Vec<(String, Option<image::RgbaImage>)>),
     Log(String),
     Warning(String),
@@ -103,6 +108,7 @@ pub enum RetryAction {
     InstallNr(&'static str),
     RemoveNr,
     Apply,
+    DeleteCleanup(Vec<rtx_fg_manager::cleanup_pending::Plan>),
 }
 #[derive(Clone)]
 pub struct RetryRequest {
@@ -254,6 +260,11 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
         .collect()
 }
 pub struct Controller {
+    pub game_names: Arc<game_names::Catalog>,
+    pub names_busy: bool,
+    pub names_status: String,
+    names_generation: u64,
+    names_cancel: Arc<AtomicBool>,
     pub catalog: cloud::Catalog,
     pending_catalog: Option<cloud::Catalog>,
     pub data: PathBuf,
@@ -272,6 +283,7 @@ pub struct Controller {
     pub deployments: BTreeMap<String, rtx_fg_manager::deployment::Snapshot>,
     pub evidence: BTreeMap<String, Option<scanner::Evidence>>,
     pub disk_presets: BTreeMap<(String, String), rtx_fg_manager::presets::Values>,
+    preset_baselines: BTreeMap<(String, String), rtx_fg_manager::presets::Values>,
     pub running_games: BTreeSet<String>,
     pub preset_reads: BTreeSet<String>,
     pub logs: VecDeque<String>,
@@ -306,10 +318,17 @@ pub struct Controller {
     pub device_index: usize,
     pub alias_index: usize,
     pub gpu: String,
+    pub hags: Option<hags::State>,
+    pub hags_busy: bool,
+    pub hags_writing: bool,
+    pub hags_error: Option<String>,
+    hags_checked: Instant,
+    hags_cancel: Arc<AtomicBool>,
     pub warning: Option<String>,
     pub blocked: Option<BlockedOperation>,
     pub notice: Option<String>,
     pub confirm: Option<String>,
+    pending_cleanup: Option<(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>)>,
     pending_patch: Option<PatchRequest>,
     pub search: String,
     pub smoke: Option<PathBuf>,
@@ -349,6 +368,11 @@ impl Controller {
         }
         let read_only = error.is_some();
         let mut app = Self {
+            game_names: Arc::new(game_names::bundled()),
+            names_busy: false,
+            names_status: String::new(),
+            names_generation: 0,
+            names_cancel: Arc::new(AtomicBool::new(false)),
             catalog: cloud::bundled(),
             pending_catalog: None,
             data: data.clone(),
@@ -366,6 +390,7 @@ impl Controller {
             deployments: BTreeMap::new(),
             evidence: BTreeMap::new(),
             disk_presets: BTreeMap::new(),
+            preset_baselines: BTreeMap::new(),
             running_games: BTreeSet::new(),
             preset_reads: BTreeSet::new(),
             logs: VecDeque::new(),
@@ -400,10 +425,17 @@ impl Controller {
             device_index: 0,
             alias_index: 0,
             gpu: String::new(),
+            hags: None,
+            hags_busy: false,
+            hags_writing: false,
+            hags_error: None,
+            hags_checked: Instant::now(),
+            hags_cancel: Arc::new(AtomicBool::new(false)),
             warning: error,
             blocked: None,
             notice: None,
             confirm: None,
+            pending_cleanup: None,
             pending_patch: None,
             search: String::new(),
             smoke,
@@ -424,6 +456,9 @@ impl Controller {
             }
         }
         app.migrate_presets();
+        // Older builds persisted uncommitted drafts indefinitely. They were
+        // never applied to the game; discard them on migration, then read disk.
+        app.discard_presets(None);
         app.log("游戏库已载入。扫描仅查找游戏，安装前请退出游戏。");
         if let Some(message) = app
             .state
@@ -438,6 +473,29 @@ impl Controller {
             app.focus = app.games.first().map(|g| g.exe.clone());
         }
         app.refresh();
+        #[cfg(not(test))]
+        {
+            app.identify_game_names();
+            if app.smoke.is_none() && !app.read_only {
+                app.names_busy = true;
+                let data = app.data.clone();
+                let github = app.choice("download_source", "domestic") == "github";
+                let cancel = app.names_cancel.clone();
+                app.channel.job(move |c| {
+                    let cached = game_names::cached(&data);
+                    c.send(Event::GameNamesCached(cached.clone()));
+                    let result = if game_names::refresh_due(&data) {
+                        game_names::refresh(&data, &cached, github, &cancel)
+                    } else {
+                        Ok(cached)
+                    };
+                    c.send(Event::GameNames(result, false));
+                    Ok(())
+                });
+            }
+        }
+        #[cfg(not(test))]
+        app.refresh_hags();
         if app.smoke.is_none() {
             let prefer_github = app.choice("download_source", "domestic") == "github";
             let cancel = app.cancel.clone();
@@ -878,6 +936,10 @@ impl Controller {
             .parameter_profile
             .clone();
         let mut values = self.preset_values(exe);
+        let identity = (exe.to_owned(), scheme.clone());
+        self.preset_baselines
+            .entry(identity.clone())
+            .or_insert_with(|| values.clone());
         if key == "reset" {
             values = rtx_fg_manager::presets::defaults(
                 &profile,
@@ -890,7 +952,19 @@ impl Controller {
         if rtx_fg_manager::presets::validate(&profile, &values).is_err() {
             return;
         }
-        let changed = self.disk_presets.get(&(exe.to_owned(), scheme.clone())) != Some(&values);
+        let mut baseline = rtx_fg_manager::presets::defaults(
+            &profile,
+            &self.catalog.scheme_policies[&scheme].defaults,
+        );
+        baseline.extend(
+            self.disk_presets
+                .get(&identity)
+                .or_else(|| self.preset_baselines.get(&identity))
+                .cloned()
+                .unwrap_or_default(),
+        );
+        self.preset_context(exe).normalize(&mut baseline);
+        let changed = baseline != values;
         let mut dirty_keys: BTreeSet<String> = self
             .explicit_preset_values(exe, &scheme)
             .into_keys()
@@ -901,9 +975,7 @@ impl Controller {
             } else {
                 dirty_keys.insert(key.into());
             }
-            if let Some(disk) = self.disk_presets.get(&(exe.to_owned(), scheme.clone())) {
-                dirty_keys.retain(|key| disk.get(key) != values.get(key));
-            }
+            dirty_keys.retain(|key| baseline.get(key) != values.get(key));
         }
         if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
             let entry = game
@@ -941,13 +1013,150 @@ impl Controller {
             return;
         }
         self.state["schema"] = json!(3);
-        self.state["games"] = serde_json::to_value(&self.games).unwrap_or(json!([]));
+        // Drafts are session-only. Saving unrelated settings must not turn a
+        // pending edit into a draft that nags again after restarting the app.
+        let mut saved_games = self.games.clone();
+        for game in &mut saved_games {
+            self.restore_unapplied(game, None);
+        }
+        self.state["games"] = serde_json::to_value(saved_games).unwrap_or(json!([]));
         if let Some(s) = &self.store {
             match s.save_tracked(self.state.clone()) {
                 Ok(revision) => self.save_revision = revision,
                 Err(e) => self.save_error = Some(e.to_string()),
             }
         }
+    }
+    pub fn game_name(&self, game: &Game) -> String {
+        game_names::display(
+            game,
+            &self.game_names,
+            self.tr.language == "zh-CN" && self.boolean("chinese_game_names", true),
+        )
+    }
+    pub fn set_game_name(&mut self, exe: &str, name: Option<&str>) -> Result<()> {
+        anyhow::ensure!(!self.read_only && !self.closing, "游戏库当前无法保存");
+        if let Some(name) = name {
+            anyhow::ensure!(
+                game_names::valid_title(name),
+                "名称需要 1–160 个字符，不能包含控制字符"
+            );
+        }
+        let game = self
+            .games
+            .iter_mut()
+            .find(|g| g.exe == exe)
+            .ok_or_else(|| anyhow::anyhow!("游戏已从库中移除"))?;
+        match name {
+            Some(name) => {
+                game.extra
+                    .insert("title_override".into(), json!(name.trim()));
+            }
+            None => {
+                game.extra.remove("title_override");
+            }
+        }
+        self.library_revision += 1;
+        self.save();
+        Ok(())
+    }
+    pub fn identify_game_names(&mut self) {
+        if self.closing {
+            return;
+        }
+        self.names_generation += 1;
+        let generation = self.names_generation;
+        let catalog = self.game_names.clone();
+        let games = self.games.clone();
+        let cancel = self.names_cancel.clone();
+        self.channel.job(move |c| {
+            c.send(Event::GameIdentities(
+                generation,
+                rtx_fg_manager::game_identity::identify(&games, &catalog, &cancel),
+            ));
+            Ok(())
+        });
+    }
+    pub fn update_game_names(&mut self) {
+        if self.names_busy || self.closing || self.read_only {
+            return;
+        }
+        self.names_busy = true;
+        self.names_status = "正在更新名称库…".into();
+        let data = self.data.clone();
+        let current = self.game_names.clone();
+        let github = self.choice("download_source", "domestic") == "github";
+        let cancel = self.names_cancel.clone();
+        self.channel.job(move |c| {
+            c.send(Event::GameNames(
+                game_names::refresh(&data, &current, github, &cancel),
+                true,
+            ));
+            Ok(())
+        });
+    }
+    fn restore_unapplied(&self, game: &mut Game, only_scheme: Option<&str>) {
+        let schemes: Vec<String> = game
+            .extra
+            .get("preset_dirty")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter(|(s, v)| {
+                v.as_bool() == Some(true) && only_scheme.is_none_or(|only| only == s.as_str())
+            })
+            .map(|(s, _)| s.clone())
+            .collect();
+        for scheme in schemes {
+            let identity = (game.exe.clone(), scheme.clone());
+            if let Some(saved) = game
+                .extra
+                .get_mut("preset_options_v2")
+                .and_then(Value::as_object_mut)
+            {
+                if let Some(base) = self
+                    .disk_presets
+                    .get(&identity)
+                    .or_else(|| self.preset_baselines.get(&identity))
+                {
+                    saved.insert(scheme.clone(), json!(base));
+                } else {
+                    saved.remove(&scheme);
+                }
+            }
+            game.extra["preset_dirty"][&scheme] = json!(false);
+            if let Some(keys) = game
+                .extra
+                .get_mut("preset_dirty_keys")
+                .and_then(Value::as_object_mut)
+            {
+                keys.remove(&scheme);
+            }
+        }
+    }
+    pub fn discard_presets(&mut self, target: Option<(&str, &str)>) {
+        let mut games = self.games.clone();
+        for game in &mut games {
+            if target.is_none_or(|(exe, _)| exe == game.exe) {
+                self.restore_unapplied(game, target.map(|(_, scheme)| scheme));
+            }
+        }
+        self.games = games;
+        self.preset_baselines
+            .retain(|(exe, scheme), _| target.is_some_and(|(e, s)| e != exe || s != scheme));
+        self.save();
+    }
+    pub fn first_pending_preset(&self) -> Option<(String, String)> {
+        self.games.iter().find_map(|game| {
+            game.extra
+                .get("preset_dirty")
+                .and_then(Value::as_object)?
+                .iter()
+                .find(|(scheme, v)| {
+                    v.as_bool() == Some(true) && self.catalog.scheme_policies.contains_key(*scheme)
+                })
+                .map(|(scheme, _)| (game.exe.clone(), scheme.clone()))
+        })
     }
     pub fn preset_dirty(&self, exe: &str) -> bool {
         self.games
@@ -1297,6 +1506,7 @@ impl Controller {
         }
         if self.games.len() != before {
             self.library_revision += 1;
+            self.identify_game_names();
         }
         self.save();
         self.refresh();
@@ -1490,6 +1700,7 @@ impl Controller {
             }
             self.games.insert(insertion.min(self.games.len()), fresh);
         }
+        self.identify_game_names();
         self.save();
         self.refresh();
     }
@@ -1543,10 +1754,27 @@ impl Controller {
                 {
                     let mut rows = Vec::new();
                     for p in files {
-                        let p = core::library_location(&p)?;
+                        let p = core::library_location(&p).map_err(|e| {
+                            if e.chain().any(|cause| {
+                                cause.downcast_ref::<std::io::Error>().is_some_and(|io| {
+                                    io.kind() == std::io::ErrorKind::PermissionDenied
+                                })
+                            }) {
+                                anyhow::anyhow!("{}", rtx_fg_manager::xbox::access_hint(&p))
+                            } else {
+                                e
+                            }
+                        })?;
+                        let xbox = rtx_fg_manager::xbox::declared(&p);
                         rows.push(Game {
                             exe: p.display().to_string(),
-                            root: scanner::game_root(&p).display().to_string(),
+                            root: xbox
+                                .as_ref()
+                                .map(|g| g.root.clone())
+                                .unwrap_or_else(|| scanner::game_root(&p))
+                                .display()
+                                .to_string(),
+                            title: xbox.map(|g| g.title).unwrap_or_default(),
                             ..Default::default()
                         });
                     }
@@ -1699,6 +1927,7 @@ impl Controller {
             RetryAction::InstallNr(version) => self.install_neural_runtime(version),
             RetryAction::RemoveNr => self.remove_neural_runtime(),
             RetryAction::Apply => self.apply_focused_parameters(),
+            RetryAction::DeleteCleanup(plans) => self.delete_cleanup_plans(plans),
         }
     }
     pub fn recheck_blocked(&mut self) {
@@ -1811,6 +2040,102 @@ impl Controller {
             Ok(())
         });
     }
+    pub fn preview_cleanup_deletion(&mut self) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned()
+        else {
+            return;
+        };
+        let epoch = self.status_epoch;
+        let fingerprint = self.retry_fingerprint();
+        self.pending_cleanup = None;
+        self.busy = true;
+        self.channel.operation(move |c| {
+            let mut plans = Vec::new();
+            let mut directories = BTreeSet::new();
+            for exe in game
+                .deployment_executables()
+                .into_iter()
+                .chain(game.cleanup_only.clone())
+            {
+                let target = game.deployment_target(std::path::Path::new(&exe));
+                if !directories.insert(core::key(&target.directory)) {
+                    continue;
+                }
+                if core::record(&target.directory)?.is_some_and(|r| r.cache_pending) {
+                    let plan = rtx_fg_manager::cleanup_pending::prepare(&target)?;
+                    if plan.paths().next().is_some() {
+                        plans.push(plan);
+                    }
+                }
+            }
+            anyhow::ensure!(
+                !plans.is_empty(),
+                "没有可直接删除的当前游戏文件。请点击重新清理；共享缓存和其他游戏的目录会保留。"
+            );
+            c.send(Event::CleanupPreview(epoch, fingerprint, plans));
+            Ok(())
+        });
+    }
+    pub fn cleanup_deletion_list(&self) -> String {
+        self.pending_cleanup
+            .as_ref()
+            .map(|(_, _, plans)| {
+                plans
+                    .iter()
+                    .flat_map(|p| p.paths())
+                    .map(|p| p.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .unwrap_or_default()
+    }
+    pub fn confirm_cleanup_deletion(&mut self) {
+        let Some((epoch, fingerprint, plans)) = self.pending_cleanup.take() else {
+            return;
+        };
+        if epoch != self.status_epoch || fingerprint != self.retry_fingerprint() {
+            self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
+            return;
+        }
+        self.delete_cleanup_plans(plans);
+    }
+    fn delete_cleanup_plans(&mut self, plans: Vec<rtx_fg_manager::cleanup_pending::Plan>) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        self.status_epoch += 1;
+        let retry = self.retry_request(RetryAction::DeleteCleanup(plans.clone()));
+        self.busy = true;
+        self.critical = true;
+        self.channel.operation(move |c| {
+            let targets = plans.iter().map(|p| p.target().clone()).collect::<Vec<_>>();
+            if defer_if_running(c, &targets, retry)? {
+                return Ok(());
+            }
+            let mut pending = Vec::new();
+            for plan in &plans {
+                rtx_fg_manager::cleanup_pending::delete_confirmed(plan)?;
+                let outcome = cleanup::clean_outcome_at(plan.target())?;
+                c.send(Event::Log(outcome.message.clone()));
+                if !outcome.complete {
+                    pending.push(outcome.message);
+                }
+            }
+            if pending.is_empty() {
+                c.send(Event::Notice("已删除所列文件并完成清理。".into()));
+            } else {
+                c.send(Event::Warning(pending.join("\n\n")));
+            }
+            Ok(())
+        });
+    }
     pub fn retry_focused_cleanup(&mut self) {
         if self.busy || self.closing {
             return;
@@ -1837,6 +2162,7 @@ impl Controller {
     }
     pub fn cancel_patch(&mut self) {
         self.pending_patch = None;
+        self.pending_cleanup = None;
         if matches!(
             self.confirm.as_deref(),
             Some("deploy_batch" | "clean_batch")
@@ -2387,6 +2713,57 @@ impl Controller {
             let Ok(e) = self.rx.try_recv() else { break };
             changed = true;
             match e {
+                Event::GameNamesCached(catalog) => {
+                    if !self.closing && catalog.revision() > self.game_names.revision() {
+                        self.game_names = Arc::new(catalog);
+                        self.library_revision += 1;
+                        self.identify_game_names();
+                    }
+                }
+                Event::GameIdentities(generation, rows) => {
+                    if self.closing || generation != self.names_generation {
+                        continue;
+                    }
+                    let mut changed = false;
+                    for (exe, root, identity) in rows {
+                        if let Some(g) = self
+                            .games
+                            .iter_mut()
+                            .find(|g| g.exe == exe && g.root == root)
+                            && g.extra.get("name_identity") != Some(&identity)
+                        {
+                            // Never copy a worker's old manual name or presets.
+                            g.extra.insert("name_identity".into(), identity);
+                            changed = true;
+                        }
+                    }
+                    if changed {
+                        self.library_revision += 1;
+                        self.save();
+                    }
+                }
+                Event::GameNames(result, requested) => {
+                    self.names_busy = false;
+                    if self.closing {
+                        continue;
+                    }
+                    match result {
+                        Ok(catalog) => {
+                            if catalog.revision() > self.game_names.revision() {
+                                self.game_names = Arc::new(catalog);
+                                self.library_revision += 1;
+                                self.identify_game_names();
+                            }
+                            if requested {
+                                self.names_status = "名称库已是最新版本".into();
+                            }
+                        }
+                        Err(e) => {
+                            self.names_status = "名称库更新暂不可用，继续使用离线名称库。".into();
+                            self.log(&format!("Game names retained: {e}"));
+                        }
+                    }
+                }
                 Event::Scan(r) => {
                     self.log(&format!(
                         "扫描结束：{} 个目录，{} 个候选。",
@@ -2518,7 +2895,26 @@ impl Controller {
                                 }
                             }
                         }
-                        self.disk_presets.insert((exe, scheme), values);
+                        self.disk_presets
+                            .insert((exe.clone(), scheme.clone()), values.clone());
+                        if let Some(policy) = self.catalog.scheme_policies.get(&scheme) {
+                            let mut baseline = rtx_fg_manager::presets::defaults(
+                                &policy.parameter_profile,
+                                &policy.defaults,
+                            );
+                            baseline.extend(values);
+                            rtx_fg_manager::presets::Context::new(
+                                &scheme,
+                                policy,
+                                std::path::Path::new(&exe),
+                            )
+                            .normalize(&mut baseline);
+                            // A game menu or an earlier successful apply may
+                            // already match the draft. No difference, no prompt.
+                            if self.preset_values_for(&exe, &scheme) == baseline {
+                                self.discard_presets(Some((&exe, &scheme)));
+                            }
+                        }
                     }
                 }
                 Event::PresetReadFailed(exe, error, running, epoch) => {
@@ -2534,6 +2930,7 @@ impl Controller {
                     }
                 }
                 Event::PresetApplied(exe, scheme, values) => {
+                    self.preset_baselines.remove(&(exe.clone(), scheme.clone()));
                     self.disk_presets
                         .insert((exe.clone(), scheme.clone()), values.clone());
                     if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
@@ -2603,6 +3000,20 @@ impl Controller {
                         self.save();
                     }
                 }
+                Event::Hags(result) => {
+                    self.hags_busy = false;
+                    self.hags_writing = false;
+                    self.hags_checked = Instant::now();
+                    match result {
+                        Ok(state) => {
+                            self.hags = Some(state);
+                            self.hags_error = None;
+                        }
+                        Err(error) => {
+                            self.hags_error = Some(format!("{error:#}"));
+                        }
+                    }
+                }
                 Event::Devices(d) => {
                     self.devices = d;
                     self.device_index = self.device_index.min(self.devices.len().saturating_sub(1));
@@ -2625,6 +3036,14 @@ impl Controller {
                 Event::Deployments(epoch, exe, snapshot) => {
                     if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
                         self.deployments.insert(exe, snapshot);
+                    }
+                }
+                Event::CleanupPreview(epoch, fingerprint, plans) => {
+                    if epoch == self.status_epoch && fingerprint == self.retry_fingerprint() {
+                        self.pending_cleanup = Some((epoch, fingerprint, plans));
+                        self.confirm = Some("delete_cleanup".into());
+                    } else {
+                        self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
                     }
                 }
                 Event::Blocked(blocked) => {
@@ -2748,9 +3167,47 @@ impl Controller {
         changed
     }
 
+    pub fn can_set_hags(&self) -> bool {
+        !self.hags_busy
+            && !self.read_only
+            && !self.closing
+            && self.hags_error.is_none()
+            && self.hags.as_ref().and_then(hags::State::selected).is_some()
+    }
+    pub fn refresh_hags(&mut self) {
+        if self.hags_busy || self.closing {
+            return;
+        }
+        self.hags_busy = true;
+        let cancel = self.hags_cancel.clone();
+        self.channel.job(move |c| {
+            c.send(Event::Hags(hags::detect(&cancel)));
+            Ok(())
+        });
+    }
+    pub fn poll_hags(&mut self) {
+        if self.smoke.is_none() && self.hags_checked.elapsed() >= Duration::from_secs(30) {
+            self.refresh_hags();
+        }
+    }
+    pub fn set_hags(&mut self, enabled: bool) {
+        if !self.can_set_hags()
+            || self.hags.as_ref().and_then(hags::State::selected) == Some(enabled)
+        {
+            return;
+        }
+        self.hags_busy = true;
+        self.hags_writing = true;
+        let cancel = self.hags_cancel.clone();
+        self.channel.job(move |c| {
+            c.send(Event::Hags(hags::configure(enabled, &cancel)));
+            Ok(())
+        });
+    }
     pub fn language(&mut self, code: &str) {
         self.state["language"] = json!(code);
         self.tr = i18n::Translator::new(code);
+        self.library_revision += 1;
         self.save();
     }
     pub fn close(&mut self) {
@@ -2759,9 +3216,16 @@ impl Controller {
         self.install_pending = false;
         self.cancel.store(true, Ordering::Relaxed);
         self.update_cancel.store(true, Ordering::Relaxed);
+        self.hags_cancel.store(true, Ordering::Relaxed);
+        self.names_cancel.store(true, Ordering::Relaxed);
     }
     pub fn tick_close(&mut self) {
-        if self.closing && !self.saved && !self.critical && (!self.update_busy || self.checking) {
+        if self.closing
+            && !self.saved
+            && !self.critical
+            && !self.hags_writing
+            && (!self.update_busy || self.checking)
+        {
             if let Some(store) = self.store.take() {
                 self.channel.job(move |c| {
                     c.send(Event::Saved(store.finish()));
@@ -2777,6 +3241,49 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn hags_results_are_independent_of_game_preferences_and_failures_are_visible() {
+        let (_dir, mut c) = controller();
+        let state = c.state.clone();
+        let running = hags::Adapter {
+            supported: Some(true),
+            enabled: Some(false),
+            ..Default::default()
+        };
+        c.channel.send(Event::Hags(Ok(hags::classify(
+            vec![running.clone()],
+            Some(2),
+            26100,
+        ))));
+        c.events();
+        assert!(c.can_set_hags());
+        assert_eq!(c.hags.as_ref().unwrap().selected(), Some(true));
+        assert!(c.hags.as_ref().unwrap().needs_restart());
+        c.hags_busy = true;
+        c.hags_writing = true;
+        c.set_hags(false); // Duplicate requests while busy must not spawn a real writer.
+        c.channel
+            .send(Event::Hags(Err(anyhow::anyhow!("access denied"))));
+        c.events();
+        assert!(!c.hags_busy && !c.hags_writing);
+        assert!(!c.can_set_hags());
+        assert!(c.hags_error.is_some());
+        assert_eq!(c.hags.as_ref().unwrap().selected(), Some(true));
+        c.channel.send(Event::Hags(Ok(hags::classify(
+            vec![running],
+            Some(1),
+            26100,
+        ))));
+        c.events();
+        assert!(!c.hags.as_ref().unwrap().needs_restart());
+        assert!(c.hags_error.is_none());
+        assert_eq!(c.state, state);
+        c.read_only = true;
+        assert!(!c.can_set_hags());
+        c.close();
+        assert!(c.hags_cancel.load(Ordering::Relaxed));
+        assert!(!c.can_set_hags());
+    }
     #[test]
     fn nr_changes_invalidate_display_cache_without_hashing_runtime() -> Result<()> {
         let dir = tempfile::tempdir()?;
@@ -3195,6 +3702,75 @@ mod tests {
         c.close();
         c.tick_close();
     }
+    #[test]
+    fn preset_roundtrip_without_install_is_clean_and_discard_never_persists_a_draft() {
+        let (_dir, mut c) = controller();
+        let exe = "Draft.exe";
+        let scheme = rtx_fg_manager::encore::SCHEME;
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        let original = c.preset_values(exe);
+        let old = original["nrEnabled"].clone();
+        let changed = if old == "1" { "0" } else { "1" };
+        c.set_game_option(exe, "nrEnabled", changed);
+        assert!(c.preset_dirty(exe));
+        assert_eq!(c.state["games"][0]["preset_dirty"][scheme], false);
+        assert_eq!(
+            c.state["games"][0]["preset_options_v2"][scheme]["nrEnabled"],
+            old
+        );
+        c.set_game_option(exe, "nrEnabled", &old);
+        assert!(!c.preset_dirty(exe));
+        c.set_game_option(exe, "nrEnabled", changed);
+        c.discard_presets(Some((exe, scheme)));
+        assert_eq!(c.preset_values(exe), original);
+        assert!(!c.preset_dirty(exe));
+        assert!(c.first_pending_preset().is_none());
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn preset_roundtrip_partial_disk_and_stale_other_scheme_drafts() {
+        let (_dir, mut c) = controller();
+        let exe = "Draft.exe";
+        let scheme = rtx_fg_manager::encore::SCHEME;
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        c.disk_presets.insert(
+            (exe.into(), scheme.into()),
+            BTreeMap::from([("tf_mode".into(), "3".into())]),
+        );
+        let old = c.preset_values(exe)["nrEnabled"].clone();
+        c.set_game_option(exe, "nrEnabled", if old == "1" { "0" } else { "1" });
+        c.set_game_option(exe, "nrEnabled", &old);
+        assert!(!c.preset_dirty(exe));
+        c.games[0].extra.insert(
+            "preset_dirty".into(),
+            json!({scheme:true,"obsolete-scheme":true}),
+        );
+        c.games[0].extra.insert(
+            "preset_options_v2".into(),
+            json!({scheme:{"tf_mode":"5"},"obsolete-scheme":{}}),
+        );
+        c.discard_presets(None);
+        assert_eq!(c.preset_values(exe)["tf_mode"], "3");
+        assert!(c.first_pending_preset().is_none());
+        assert_eq!(
+            c.state["games"][0]["preset_dirty"]["obsolete-scheme"],
+            false
+        );
+        c.close();
+        c.tick_close();
+    }
+
     fn controller() -> (tempfile::TempDir, Controller) {
         let dir = tempfile::tempdir().unwrap();
         let c = Controller::new(
@@ -3204,6 +3780,81 @@ mod tests {
             Some(dir.path().join("test.json")),
         );
         (dir, c)
+    }
+    #[test]
+    fn game_names_preserve_manual_overrides_across_scan_cache_and_restart() {
+        let (dir, mut c) = controller();
+        let root = dir.path().join("Game");
+        std::fs::create_dir_all(&root).unwrap();
+        let exe = root.join("game.exe").display().to_string();
+        let game = Game {
+            exe: exe.clone(),
+            root: root.display().to_string(),
+            title: "The Witcher 3".into(),
+            ..Default::default()
+        };
+        c.games = vec![game.clone()];
+        c.set_game_name(&exe, Some("我的猎魔人")).unwrap();
+        c.channel
+            .send(Event::GameNamesCached(game_names::bundled()));
+        c.events();
+        c.merge_scan(vec![game]);
+        assert_eq!(c.game_name(&c.games[0]), "我的猎魔人");
+        let generation = c.names_generation;
+        c.channel.send(Event::GameIdentities(
+            generation,
+            vec![(
+                exe.clone(),
+                root.display().to_string(),
+                json!({"keys":["steam:292030"],"title":"The Witcher 3"}),
+            )],
+        ));
+        c.events();
+        assert_eq!(c.game_name(&c.games[0]), "我的猎魔人");
+        let state = c.state.clone();
+        let mut reopened = Controller::new(
+            dir.path().join("reopened"),
+            state,
+            None,
+            Some(dir.path().join("smoke.json")),
+        );
+        assert_eq!(reopened.game_name(&reopened.games[0]), "我的猎魔人");
+        reopened.set_game_name(&exe, None).unwrap();
+        assert_eq!(reopened.game_name(&reopened.games[0]), "巫师3：狂猎");
+        reopened.language("en");
+        assert_eq!(reopened.game_name(&reopened.games[0]), "The Witcher 3");
+        c.close();
+        c.tick_close();
+        reopened.close();
+        reopened.tick_close();
+    }
+    #[test]
+    fn stale_name_reads_and_removed_games_cannot_be_renamed() {
+        let (_dir, mut c) = controller();
+        c.games = vec![Game {
+            exe: "A.exe".into(),
+            root: "A".into(),
+            ..Default::default()
+        }];
+        c.names_generation = 2;
+        c.channel.send(Event::GameIdentities(
+            1,
+            vec![("A.exe".into(), "A".into(), json!({"keys":["steam:292030"]}))],
+        ));
+        c.channel.send(Event::GameIdentities(
+            2,
+            vec![(
+                "A.exe".into(),
+                "different root".into(),
+                json!({"keys":["steam:292030"]}),
+            )],
+        ));
+        c.events();
+        assert!(game_names::keys(&c.games[0]).is_empty());
+        assert!(c.set_game_name("removed.exe", Some("Name")).is_err());
+        assert!(c.set_game_name("A.exe", Some("bad\nname")).is_err());
+        c.close();
+        c.tick_close();
     }
     #[test]
     fn reorder_preserves_selection_and_saved_game_data() {
@@ -3397,8 +4048,42 @@ mod tests {
                 assert_eq!(std::fs::read(&stage).unwrap(), pe[..100]);
                 let record = core::record(game.path()).unwrap().unwrap();
                 assert!(record.cache_pending && !record.cleanup_pending_reasons.is_empty());
-                // Only the synthetic test fragment is removed; recovery is retried normally.
-                std::fs::remove_file(&stage).unwrap();
+                c.focus = Some(exe.clone());
+                // Preview and cancel are read-only. A changed selection must
+                // invalidate confirmation, even while the old dialog exists.
+                for action in ["cancel", "changed-focus", "confirm"] {
+                    c.preview_cleanup_deletion();
+                    let deadline = Instant::now() + Duration::from_secs(5);
+                    while c.busy {
+                        c.events();
+                        assert!(Instant::now() < deadline);
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    assert_eq!(c.confirm.take().as_deref(), Some("delete_cleanup"));
+                    assert!(c.cleanup_deletion_list().contains("version.dll.stage"));
+                    if action == "cancel" {
+                        c.cancel_patch();
+                        assert!(stage.exists());
+                    } else if action == "changed-focus" {
+                        c.focus = None;
+                        c.confirm_cleanup_deletion();
+                        assert!(c.warning.as_deref().unwrap().contains("已变化"));
+                        assert!(stage.exists());
+                        c.focus = Some(exe.clone());
+                    } else {
+                        c.warning = None;
+                        c.confirm_cleanup_deletion();
+                        let deadline = Instant::now() + Duration::from_secs(5);
+                        while c.busy {
+                            c.events();
+                            assert!(Instant::now() < deadline);
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                        assert!(c.warning.is_none(), "{:?}", c.warning);
+                        assert!(!stage.exists());
+                        assert!(core::record(game.path()).unwrap().is_none());
+                    }
+                }
             } else {
                 assert!(c.warning.is_none(), "{:?}", c.warning);
                 assert!(

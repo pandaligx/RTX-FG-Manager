@@ -16,13 +16,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.2"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.3"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.2 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.3 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.2](docs/screenshot-home.png)
 
@@ -40,31 +40,28 @@
 
 ## Download
 
-**Version 4.3.2** · Windows 10 / 11 x64
+**Version 4.3.3** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.2 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.2) | Default domestic source |
-| **GitHub** | [Open 4.3.2 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.2) | Primary project and fallback |
-| **Gitee** | [Open 4.3.2 release](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.2) | Transition entry for existing users |
+| **GitCode** | [Open 4.3.3 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.3) | Default domestic source |
+| **GitHub** | [Open 4.3.3 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.3) | Primary project and fallback |
+| **Gitee** | [Open 4.3.3 release](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.3) | Transition entry for existing users |
 
-Download **`RTXManager-v4.3.2-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
+Download **`RTXManager-v4.3.3-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 The download badge counts **all GitHub release assets**, including patch resources. It is not a count of unique users and does not include GitCode or Gitee.
 
-## What's new in 4.3.2
+## 4.3.3 highlights
 
-- Adapt Encore 1.1.0; optional DLSS Neural Rendering downloads, installed status, independent removal and original-file recovery.
-- Improve bounded DLSS discovery across engine layouts; fix game labels/icons and The Witcher 3 DX12 target.
-- Drag library games to reorder and save; removal confirmation shows icons, display names and paths at the configured font size.
-- Keep Apply, Reset and pending-edit feedback visible; warn before closing with unapplied edits.
-- Explain pending cleanup and offer retry; confirm termination of verified blocking game processes before retrying.
-
-Updating the manager does not automatically replace game patches. NR is off by default and requires compatible DLSS output/depth inputs. Refer to upstream compatibility notes.
+- Improve cross-platform identities and Chinese game names, with manual naming and independent catalog updates.
+- Show deployment paths directly, with compact status and parameter controls.
+- Fix repeated preset warnings; add cleanup details, retry and a hardware-accelerated GPU scheduling switch.
+- Support Encore 1.1.2 and recommend NR 310.9.16; remove mouse-triggered focus rings.
 
 [Full changelog →](CHANGELOG.md)
 
-> Encore **1.1.1** is available through the cloud catalog for manager **4.3.2**. Refresh resources and upgrade each game when needed.
+> Encore **1.1.2** is available through the cloud catalog for manager **4.3.3**. Refresh resources and upgrade each game when needed.
 
 ## Choose a patch
 
@@ -74,7 +71,7 @@ Updating the manager does not automatically replace game patches. NR is off by d
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | Retained custom route with additional Delta Force support. Choose according to the actual game's requirements. | Manager / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | Retained dedicated Vulkan route; not interchangeable with the DX12 routes. | Manager / INI |
 | **MFG-Unlocker · 1.5.0-hotfix.1** | Standalone DLL or an existing OptiScaler 10 plugin installation; these modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
-| **RTX Encore · 1.1.1** | SR/RR/FG presets, fixed/dynamic FG, NR, Smooth Motion and compatibility controls. | **Insert**, unless the menu is disabled or its key was changed |
+| **RTX Encore · 1.1.2** | SR/RR/FG presets, fixed/dynamic FG, NR, Smooth Motion and compatibility controls. | **Insert**, unless the menu is disabled or its key was changed |
 
 GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility. The initial scheme and 0.2.6 are retired from new installation choices; existing installations remain eligible for owned cleanup/recovery.
 
@@ -86,7 +83,7 @@ GPU detection provides information, not an installation gate. Each upstream patc
 | 0.3.5 · Extra Delta Force support · DX12/Vulkan | Retained custom adaptation | Retained custom adaptation | Custom SM89 support provided; not a guarantee for every game |
 | Dlssg_for_sm86-MFG-version · Vulkan | Upstream targets RTX 20/30; check the selected Vulkan package | Primary target family | No explicit upstream guarantee |
 | MFG-Unlocker · 1.5.0-hotfix.1 | Not listed for native DLSS MFG; separate OptiScaler XeMFG route available | Upstream DLSS MFG support | Upstream DLSS MFG support |
-| RTX Encore · 1.1.1 | Experimental FG / NR; no Smooth Motion unlock | FG / NR; Smooth Motion depends on driver and API | FG / NR; NVIDIA provides Smooth Motion |
+| RTX Encore · 1.1.2 | Experimental FG / NR; no Smooth Motion unlock | FG / NR; Smooth Motion depends on driver and API | FG / NR; NVIDIA provides Smooth Motion |
 
 Sources: [Dlssg_for_sm86 requirements and limitations](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). The retained Delta Force package is this project's custom adaptation, not an upstream compatibility promise. This selection guide does not claim manager-side testing of every GPU or game.
 

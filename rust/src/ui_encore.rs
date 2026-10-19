@@ -30,6 +30,7 @@ impl EncoreEditor {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        crate::ui_focus::observe(cx);
         let search = cx.new(|cx| InputState::new(window, cx));
         let subscription = cx.subscribe(&search, |this, input, event, cx| {
             if matches!(event, InputEvent::Change) {
@@ -131,6 +132,7 @@ impl EncoreEditor {
             });
         }
         Input::new(&binding.state)
+            .focus_ring(crate::ui_focus::visible(cx))
             .disabled(disabled)
             .w_full()
             .into_any_element()
@@ -164,6 +166,7 @@ impl EncoreEditor {
             )
             .child(
                 Button::new(SharedString::from(format!("reset-{}", field.key)))
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .xsmall()
                     .ghost()
                     .label(self.t("还原"))
@@ -184,6 +187,7 @@ impl EncoreEditor {
         let control = if matches!(field.kind, encore::FieldKind::Bool) {
             let key = field.key.clone();
             Switch::new(SharedString::from(format!("encore-{}", field.key)))
+                .focus_ring(crate::ui_focus::visible(cx))
                 .checked(value == "1")
                 .disabled(disabled)
                 .label(self.t(if value == "1" { "开启" } else { "关闭" }))
@@ -206,6 +210,7 @@ impl EncoreEditor {
             let owner = cx.weak_entity();
             let key = field.key.clone();
             Button::new(SharedString::from(format!("encore-{}", field.key)))
+                .focus_ring(crate::ui_focus::visible(cx))
                 .small()
                 .w_full()
                 .label(selected)
@@ -250,6 +255,7 @@ impl EncoreEditor {
                 let value = choice.value.clone();
                 quick = quick.child(
                     Button::new((SharedString::from(format!("quick-{}", key)), index))
+                        .focus_ring(crate::ui_focus::visible(cx))
                         .xsmall()
                         .ghost()
                         .label(self.t(&choice.label))
@@ -335,6 +341,7 @@ impl Render for EncoreEditor {
         ] {
             groups = groups.child(
                 Button::new(group)
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .small()
                     .label(self.t(title))
                     .when(group == self.group, |button| button.primary())
@@ -351,7 +358,7 @@ impl Render for EncoreEditor {
             .child(div().text_xs().child(self.t("搜索参数名称或说明")))
             .child(div().text_xs().text_color(cx.theme().muted_foreground)
                 .child(self.t("多目录游戏显示首个实际部署目录的参数；仅将明确修改项应用到每个目录。")))
-            .child(Input::new(&self.search).w_full())
+            .child(Input::new(&self.search).focus_ring(crate::ui_focus::visible(cx)).w_full())
             .child(groups);
         if upgrade {
             panel = panel.child(
@@ -415,6 +422,7 @@ impl EncoreEditor {
             .gap_2()
             .child(
                 Button::new("encore-reset-group")
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .small()
                     .ghost()
                     .label(tr.t("恢复本组默认"))
@@ -424,6 +432,7 @@ impl EncoreEditor {
             )
             .child(
                 Button::new("encore-reset-all")
+                    .focus_ring(crate::ui_focus::visible(cx))
                     .small()
                     .ghost()
                     .label(tr.t("恢复全部默认"))

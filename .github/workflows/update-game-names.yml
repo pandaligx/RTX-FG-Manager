@@ -1,0 +1,47 @@
+name: Refresh game names
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: rtxfg-gitcode-publish
+  cancel-in-progress: false
+jobs:
+  names:
+    if: github.repository == 'pandaligx/RTX-FG-Manager'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test data validation and publisher guards
+        run: |
+          python -m unittest discover -s tests -p test_game_names.py -v
+          python -m unittest discover -s tests -p test_gitcode_publish.py -v
+      - name: Fetch public names and retain reviewed rules
+        run: python tools/build_game_names.py "$RUNNER_TEMP/wikidata.json" --fetch
+      - name: Publish catalog and manifest together
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- rust/assets/game-names.json cloud/game-names.json cloud/names
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update public game name catalog'
+            git push origin HEAD:main
+          fi
+      # GITHUB_TOKEN commits do not trigger another push workflow. Mirror here,
+      # even on a no-op refresh so a previously interrupted mirror can recover.
+      - name: Synchronize to GitCode without executable uploads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          RTXFG_RESOURCE_RECEIPTS: ${{ vars.RTXFG_RESOURCE_RECEIPTS }}
+          RELEASE_TAG: ''
+        run: python tools/gitcode_ci.py

@@ -1,6 +1,6 @@
 [package]
 name = "rtx-fg-manager"
-version = "4.3.2"
+version = "4.3.3"
 edition = "2024"
 publish = false
 build = "rust/build.rs"
@@ -64,7 +64,7 @@ sha2 = "0.10"
 tempfile = "3.27"
 uuid = { version = "1", features = ["v4"] }
 winreg = "0.55"
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Dxgi", "Win32_Graphics_Gdi", "Win32_Graphics_Dxgi_Common", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Security_Cryptography_Catalog", "Win32_Security_Cryptography_Sip", "Win32_Security_WinTrust", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_Debug", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Registry", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_LibraryLoader", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_Globalization"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Dxgi", "Win32_Graphics_Gdi", "Win32_Graphics_Dxgi_Common", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Security_Cryptography_Catalog", "Win32_Security_Cryptography_Sip", "Win32_Security_WinTrust", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_Debug", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Registry", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_LibraryLoader", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_Globalization"] }
 
 [build-dependencies]
 cc = "1"

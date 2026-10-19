@@ -108,7 +108,24 @@ pub fn no_links(path: &Path) -> Result<PathBuf> {
     Ok(p)
 }
 fn pe_machine(path: &Path, dll: bool) -> Result<u16> {
-    let mut file = File::open(path)?;
+    let mut file = match File::open(path) {
+        Ok(file) => file,
+        Err(error) if !dll && error.kind() == std::io::ErrorKind::PermissionDenied => {
+            // GDK flat installs can expose writable game folders while the
+            // declared EXE remains encrypted. Only this specific access failure
+            // can use manifest architecture; readable invalid PEs still fail.
+            no_links(path)?;
+            if fs::metadata(path)?.is_file()
+                && let Some(game) = crate::xbox::declared(path)
+            {
+                return Ok(game.machine);
+            }
+            return Err(error).context(crate::xbox::access_hint(path));
+        }
+        Err(error) => {
+            return Err(error).with_context(|| format!("无法读取文件：{}", path.display()));
+        }
+    };
     let size = file.metadata()?.len();
     let mut h = [0; 64];
     file.read_exact(&mut h).context("EXE 文件头不完整")?;

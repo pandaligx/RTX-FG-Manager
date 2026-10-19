@@ -1,5 +1,17 @@
 # Changelog
 
+
+## 4.3.3
+
+- Show one path line per deployment folder in compact game rows, with rescan updates saved. Deployment status sits between the game name and paths at the same text size. A compact gear beside the name opens parameter settings with hover, pressed and open feedback.
+- Expand game naming through launcher records, local localized metadata and reviewed multi-signal rules. Add offline Chinese names, manual overrides and bilingual search; preserve uncertain originals. The GitHub/GitCode name catalog can update independently.
+- Move GPU model editing into a centered dialog opened from the inspector. Mouse interaction has no focus ring; Tab navigation retains a thin border.
+- Clear pending edits when values return to their original state. Discard unapplied drafts without repeated restart warnings; provide owned-cleanup details and retry.
+- Improve Xbox/GDK identity, protected-executable guidance and Minecraft Launcher icons. Add the hardware-accelerated GPU scheduling switch with reboot feedback that clears when reverted to the current boot state.
+- Support RTX Encore 1.1.2's smooth X3/X4 field migration. Recommend Neural Rendering 310.9.16 while retaining explicit older-version selection and recovery.
+
+See [game naming coverage and limits](docs/game-names.md). Updating the manager does not automatically replace installed game patches.
+
 ## 4.3.2
 
 - Drag game rows to reorder the library; save the order and retain positions on rescan. Removal confirmation shows game icons, display names and paths using the configured font size.

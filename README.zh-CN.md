@@ -16,13 +16,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.2"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.3"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.2 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.3 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.2](docs/screenshot-home-zh.png)
 
@@ -40,31 +40,28 @@
 
 ## 下载
 
-**版本 4.3.2** · Windows 10 / 11 x64
+**版本 4.3.3** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.2 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.2) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.2 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.2) | 主项目与备用源 |
-| **Gitee** | [打开 4.3.2 发行页](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.2) | 保留给现有用户的过渡入口 |
+| **GitCode** | [打开 4.3.3 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.3) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.3 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.3) | 主项目与备用源 |
+| **Gitee** | [打开 4.3.3 发行页](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.3) | 保留给现有用户的过渡入口 |
 
-下载 **`RTXManager-v4.3.2-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+下载 **`RTXManager-v4.3.3-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
 下载量徽章统计 **GitHub 全部发行附件**，包含补丁资源；不代表独立用户数，也不包含 GitCode 和 Gitee 的下载量。
 
-## 4.3.2 更新亮点
+## 4.3.3 更新亮点
 
-- 适配 Encore 1.1.0，提供可选 DLSS神经渲染运行库下载、状态显示、独立卸载及原件恢复。
-- 改进多种引擎目录的 DLSS 识别；修复游戏名称、图标和《巫师 3》DX12 渲染目标。
-- 游戏库支持拖动排序并保存；移除确认显示图标、游戏名称和路径，字号跟随设置。
-- 参数应用、恢复默认及待应用提示始终可见；关闭有未应用修改的窗口时提醒。
-- 显示清理未完成的原因并提供重试；后台游戏占用时，可确认结束对应进程后重试。
-
-更新管理器不会自动替换游戏补丁。NR 默认关闭，需要兼容的游戏 DLSS 输出与深度输入；具体支持以补丁上游说明为准。
+- 改进跨平台游戏识别与中文名称，支持手动改名、名称库独立更新。
+- 游戏目录直接分行展示，状态与参数设置入口更紧凑。
+- 修复预设反复提示；支持清理详情、重试及硬件加速 GPU 调度开关。
+- 适配 Encore 1.1.2，默认推荐 NR 310.9.16；鼠标操作不再显示焦点外圈。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
-> 云端 Encore 已更新至 **1.1.1**，管理器 **4.3.2** 可直接获取；刷新资源后，按需升级对应游戏。
+> 云端 Encore 已更新至 **1.1.2**，管理器 **4.3.3** 可直接获取；刷新资源后，按需升级对应游戏。
 
 ## 方案怎么选
 
@@ -74,7 +71,7 @@
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
 | **MFG-Unlocker · 1.5.0-hotfix.1** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
-| **RTX Encore · 1.1.1** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion 与兼容性设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
+| **RTX Encore · 1.1.2** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion 与兼容性设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。初始方案与 0.2.6 不再提供新安装入口，旧安装仍保留归属识别、恢复与卸载能力。
 
@@ -86,7 +83,7 @@
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 保留本项目自定义适配 | 保留本项目自定义适配 | 本项目已提供 SM89 适配；不保证所有游戏 |
 | Dlssg_for_sm86-MFG-version · Vulkan | 上游面向 20/30 系列；以所选 Vulkan 包为准 | 上游主要目标系列 | 上游未明确保证 |
 | MFG-Unlocker · 1.5.0-hotfix.1 | 不列为原生 DLSS MFG 支持；可另用 OptiScaler 的 XeMFG 路线 | 上游支持 DLSS MFG | 上游支持 DLSS MFG |
-| RTX Encore · 1.1.1 | FG / NR 实验性；无 Smooth Motion 解锁 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
+| RTX Encore · 1.1.2 | FG / NR 实验性；无 Smooth Motion 解锁 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
 
 依据：[Dlssg_for_sm86 运行要求与限制](https://github.com/sdli1995/dlssg_for_sm86#运行要求)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。三角洲方案属于本项目保留的自定义包，不能将其适配范围等同于上游原版。表格用于选型，不代表管理器完成了各显卡和游戏的实机验证。
 

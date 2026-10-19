@@ -13,6 +13,8 @@ use std::{
 const FILE: &str = "nvngx_dlssnr.dll";
 const OWN: &str = ".rtx-fg-nr";
 const LIMIT: u64 = 512 * 1024 * 1024;
+/// The newest qualified runtime. Choosing it does not replace an installed file.
+pub const RECOMMENDED: &str = "310.9.16";
 
 #[derive(Deserialize)]
 struct Runtime {

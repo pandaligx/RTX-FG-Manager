@@ -534,6 +534,7 @@ fn unreal_binary_dir(dir: &Path) -> bool {
             "win64h",
             "win64rh",
             "win64hr",
+            "wingdk",
             "win64_shipping",
         ],
     ) && dir.parent().is_some_and(|p| is_name(p, &["binaries"]))
@@ -722,15 +723,34 @@ pub fn scan(
                 if !name.to_lowercase().ends_with(".exe")
                     || auxiliary_exe(&name)
                     || is_steam_client_binary(&path)
-                    || core::pe64(&path, false).is_err()
                 {
                     continue;
                 }
+                if let Err(error) = core::pe64(&path, false) {
+                    if error.chain().any(|e| {
+                        e.downcast_ref::<std::io::Error>()
+                            .is_some_and(|io| io.kind() == std::io::ErrorKind::PermissionDenied)
+                    }) {
+                        report.skip(&path, &crate::xbox::access_hint(&path));
+                    }
+                    continue;
+                }
+                let xbox = crate::xbox::declared(&path);
                 let mut row = Game {
                     exe: path.to_string_lossy().into(),
-                    root: installation_root(&path).to_string_lossy().into(),
+                    root: xbox
+                        .as_ref()
+                        .map(|g| g.root.clone())
+                        .unwrap_or_else(|| installation_root(&path))
+                        .to_string_lossy()
+                        .into(),
+                    title: xbox.as_ref().map(|g| g.title.clone()).unwrap_or_default(),
                     ..Default::default()
                 };
+                if xbox.is_some() {
+                    row.rank += 40;
+                    row.reasons.push("Xbox PC 游戏清单已确认入口".into());
+                }
                 if names.contains("nvngx_dlssg.dll") || names.contains("sl.dlss_g.dll") {
                     row.rank += 80;
                     row.reasons.push("同目录有 DLSS 帧生成组件".into());
@@ -866,14 +886,19 @@ pub fn scan(
             let unity = row.reasons.iter().any(|r| r.contains("Unity 游戏本体"));
             let local_fg = row.reasons.iter().any(|r| r == "同目录有 DLSS 帧生成组件");
             let owned = path.parent().unwrap().join(core::OWN).is_dir();
+            let xbox = row
+                .reasons
+                .iter()
+                .any(|r| r == "Xbox PC 游戏清单已确认入口");
             // A Steam manifest identifies the installation, not every EXE in
             // it. Root-wide DLSS evidence likewise cannot identify a sidecar
             // utility in another directory as a rendering process.
-            if (has_unreal && !unreal)
+            if (has_unreal && !unreal && !xbox)
                 || (!unreal
                     && !unity
                     && !renderer_name(path, Path::new(&row.root))
                     && !local_fg
+                    && !xbox
                     && !owned)
             {
                 continue;

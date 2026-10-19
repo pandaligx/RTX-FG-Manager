@@ -24,6 +24,8 @@ API='https://gitee.com/api/v5/repos/'+REPO
 # Keep in step with tools/export-source.ps1. This is deliberately not a recursive
 # copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
 ALLOWED = {
+    'tools/game-name-overrides.json', 'tests/test_game_names.py', '.github/workflows/update-game-names.yml',
+    'tools/build_game_names.py', 'docs/game-names.md', 'cloud/game-names.json',
     'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tools/build_scheme_bundles.py',
     'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json',
     '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md',
@@ -56,6 +58,7 @@ ALLOWED = {
     'docs/encore-1.1.0.md', 'docs/encore-1.1.0.zh-CN.md',
 }
 TREES = (
+    (r'cloud/names/names-[0-9a-f]{20}\.json', {'.json'}),
     (r'help/[^/]+', {'.html', '.css', '.js'}),
     (r'community/src/[^/]+', {'.mjs', '.json'}),
     (r'community/public/[^/]+', {'.html', '.css', '.js'}),

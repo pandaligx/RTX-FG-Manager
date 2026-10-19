@@ -1,4 +1,11 @@
 {
+  "平滑 X3 / X4": ["Smooth out X3 / X4", "Плавность X3 / X4", "X3 / X4 を滑らかにする", "X3 / X4 부드럽게"],
+  "当 X3/X4 比 X2 更不流畅时可尝试；让 Streamline 安排生成帧的间隔。Encore 1.1.2 支持 DX12/Vulkan，修改后重启游戏。默认关闭。": [
+    "Try this if X3/X4 looks choppier than X2. Streamline spaces generated frames. Encore 1.1.2 supports DX12/Vulkan. Restart the game after changing it. Off by default.",
+    "Попробуйте, если X3/X4 менее плавные, чем X2. Streamline распределяет сгенерированные кадры. В Encore 1.1.2 поддерживаются DX12/Vulkan. После изменения перезапустите игру. По умолчанию выключено.",
+    "X3/X4 が X2 よりカクつく場合にお試しください。Streamline が生成フレームの間隔を調整します。Encore 1.1.2 は DX12/Vulkan に対応。変更後はゲームを再起動してください。既定はオフです。",
+    "X3/X4가 X2보다 끊길 때 사용하세요. Streamline이 생성 프레임 간격을 조절합니다. Encore 1.1.2에서 DX12/Vulkan을 지원합니다. 변경 후 게임을 다시 시작하세요. 기본값은 꺼짐입니다."
+  ],
   "0关闭新露出区域的邻近填充。": [
     "0 disables nearby filling of newly exposed regions.",
     "0 отключает заполнение новых видимых областей соседними данными.",

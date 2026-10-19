@@ -7,6 +7,7 @@ pub struct Snapshot {
     pub status: String,
     pub cleanup_pending: bool,
     pub cleanup_details: Vec<String>,
+    pub cleanup_paths: Vec<std::path::PathBuf>,
     pub neural: Vec<crate::neural_runtime::Status>,
     pub total: usize,
     pub installed: usize,
@@ -34,6 +35,30 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
             && r.cache_pending
         {
             snapshot.cleanup_pending = true;
+            if let Ok(root) = crate::delta::root() {
+                snapshot.cleanup_paths.extend(
+                    r.delta_cache_ids
+                        .iter()
+                        .filter(|id| crate::delta::valid_id(id))
+                        .map(|id| root.join("games").join(id)),
+                );
+                if r.delta_legacy_cache {
+                    snapshot
+                        .cleanup_paths
+                        .push(root.join(crate::delta::REVISION));
+                }
+            }
+            snapshot.cleanup_paths.extend(
+                r.hashes
+                    .keys()
+                    .map(|name| {
+                        target
+                            .directory
+                            .join(core::OWN)
+                            .join(core::stage_name(name))
+                    })
+                    .filter(|p| p.exists()),
+            );
             snapshot.cleanup_details.push(format!(
                 "{}\n{}",
                 target.directory.display(),
