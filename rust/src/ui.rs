@@ -1444,17 +1444,9 @@ impl Manager {
             && d.installed > 0
         {
             let names = d
-                .schemes
+                .installed_labels
                 .iter()
-                .map(|id| {
-                    self.c
-                        .catalog
-                        .packages
-                        .iter()
-                        .find(|p| &p.scheme_id == id)
-                        .map(|p| self.c.cloud_label(p))
-                        .unwrap_or_else(|| self.c.text("未知方案"))
-                })
+                .map(|label| self.c.text(label))
                 .collect::<Vec<_>>();
             label = format!(
                 "{} · {} · {}",

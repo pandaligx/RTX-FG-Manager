@@ -12,6 +12,9 @@ pub struct Snapshot {
     pub total: usize,
     pub installed: usize,
     pub schemes: BTreeSet<String>,
+    /// Installed release identities, shared by the row and per-directory details.
+    /// A stable scheme ID is not an installed version: the catalog may be newer.
+    pub installed_labels: BTreeSet<String>,
     pub proxies: BTreeSet<String>,
     pub details: Vec<String>,
     pub common: Option<(String, Vec<String>, Option<usize>)>,
@@ -99,13 +102,22 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
             let catalog_label = catalog
                 .packages
                 .iter()
-                .find(|p| p.scheme_id == scheme)
+                .find(|p| {
+                    p.scheme_id == scheme
+                        && Some(p.upstream_version.as_deref().unwrap_or(&p.version))
+                            == r.upstream_version
+                                .as_deref()
+                                .or(r.payload_version.as_deref())
+                })
                 .map(|p| p.label.clone())
                 .unwrap_or_else(|| {
                     format!(
                         "{} {}",
                         r.backend,
-                        r.payload_version.as_deref().unwrap_or("")
+                        r.upstream_version
+                            .as_deref()
+                            .or(r.payload_version.as_deref())
+                            .unwrap_or("?")
                     )
                 });
             let label = if r.backend == crate::transfusion::BACKEND {
@@ -144,6 +156,7 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
                     !core::backend_matches_profile(&r.backend, &policy.parameter_profile)
                 });
             snapshot.schemes.insert(scheme.clone());
+            snapshot.installed_labels.insert(label.clone());
             let proxies = r.selected();
             snapshot.proxies.extend(proxies.clone());
             snapshot.details.push(format!(
