@@ -52,26 +52,3 @@ jobs:
           RTXFG_RESOURCE_RECEIPTS: ${{ vars.RTXFG_RESOURCE_RECEIPTS }}
           RELEASE_TAG: ''
         run: python -B tools/gitcode_ci.py
-  gitee:
-    needs: stats
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    concurrency:
-      group: rtxfg-cloud-publish
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Mirror updated documentation to Gitee
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_USERNAME: pandaligx
-          TAG_NAME: ''
-        run: python -B .github/scripts/mirror_gitee.py

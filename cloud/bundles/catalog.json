@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 48946,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-ad3b0f7cff3a27b3b327.json",
-    "sha256": "af5ff36809393dbc5194615c13bed63e9881abb17e72f554437da6e55c650309",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-ad3b0f7cff3a27b3b327.json"
+    "bytes": 48685,
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-05bb2937b8771223b2a6.json",
+    "sha256": "cf6ab420ce49f76cb003fd65db1f2b6902c16700968ac816396bc18c2bc27a8e",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-05bb2937b8771223b2a6.json"
   },
-  "revision": "bundles-ad3b0f7cff3a27b3b327",
+  "revision": "bundles-05bb2937b8771223b2a6",
   "schema": 3,
   "schemes": [
     {
@@ -86,26 +86,26 @@
     },
     {
       "archives": [
-        "mfg-unlocker-1.5.0-hotfix.1-complete-19fcfe48ae9d.zip"
+        "mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip"
       ],
       "capabilities": [],
       "defaults": {},
       "id": "rtx40mfg-1.3.3-hf2",
-      "min_manager_version": "4.3.1",
-      "name": "MFG Unlocker · 1.5.0 Hotfix 1",
+      "min_manager_version": "4.3.5",
+      "name": "MFG Unlocker · 1.6.1",
       "names": {
-        "en": "MFG Unlocker · 1.5.0 Hotfix 1",
-        "ja": "MFG Unlocker · 1.5.0 Hotfix 1",
-        "ko": "MFG Unlocker · 1.5.0 Hotfix 1",
-        "ru": "MFG Unlocker · 1.5.0 Hotfix 1",
-        "zh": "MFG Unlocker · 1.5.0 Hotfix 1"
+        "en": "MFG Unlocker · 1.6.1",
+        "ja": "MFG Unlocker · 1.6.1",
+        "ko": "MFG Unlocker · 1.6.1",
+        "ru": "MFG Unlocker · 1.6.1",
+        "zh": "MFG Unlocker · 1.6.1"
       },
       "profile": "rtxmfg_universal_133",
       "source_url": "https://github.com/dashdogy/RTX40MFG-Unlock"
     },
     {
       "archives": [
-        "rtx-encore-1.1.2-complete-7e66b8588926.zip"
+        "rtx-encore-1.1.4-complete-9c21167a3601.zip"
       ],
       "capabilities": [
         "encore_dedicated_entries"
@@ -213,14 +213,14 @@
         "vsyncOff": "0"
       },
       "id": "dlssg-transfusion-1.4.5.3",
-      "min_manager_version": "4.3.3",
-      "name": "RTX Encore · 1.1.2",
+      "min_manager_version": "4.3.5",
+      "name": "RTX Encore · 1.1.4",
       "names": {
-        "en": "RTX Encore · 1.1.2",
-        "ja": "RTX Encore · 1.1.2",
-        "ko": "RTX Encore · 1.1.2",
-        "ru": "RTX Encore · 1.1.2",
-        "zh": "RTX Encore · 1.1.2"
+        "en": "RTX Encore · 1.1.4",
+        "ja": "RTX Encore · 1.1.4",
+        "ko": "RTX Encore · 1.1.4",
+        "ru": "RTX Encore · 1.1.4",
+        "zh": "RTX Encore · 1.1.4"
       },
       "profile": "rtx_encore_json_v4",
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"

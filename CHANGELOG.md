@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.5
+
+- Support MFG Unlocker 1.6.1: DLSS SR/RR presets, RTX 30 pacing and an experimental per-game FG option. Preserve unknown JSON/INI fields and recover interrupted edits. New settings require MFG 1.6+.
+- Remove this game’s MFG current/previous logs and interval traces from both its executable directory and the legacy TEMP location; preserve other games and unknown files.
+- Update RTX Encore resources to 1.1.4, including the Witcher 3 DX12 startup fix from 1.1.3 and the neural-rendering flicker/menu-cursor fixes from 1.1.4. Keep the existing configuration protocol and NR 310.9.16. Game upgrades remain user initiated.
+
 ## 4.3.4
 
 - Fix [#11](https://github.com/pandaligx/RTX-FG-Manager/issues/11): installed patch versions in the game library now use deployment records, matching the per-folder tooltip. Updating the manager or cloud catalog no longer makes an older installed patch appear updated; different installed versions across folders remain visible.

@@ -1,9 +1,6 @@
 name: Mirror reviewed sources and releases to Gitee
 on:
-  push:
-    branches: [main]
-  release:
-    types: [published]
+  # Historical mirror retained for manual recovery only (new releases use GitCode).
   workflow_dispatch:
     inputs:
       tag:

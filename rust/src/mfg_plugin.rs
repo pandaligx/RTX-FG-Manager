@@ -58,7 +58,7 @@ pub fn validate_host(target: &core::DeploymentTarget) -> Result<()> {
                     .next()
                     .and_then(|n| n.parse::<u32>().ok())
                     == Some(10),
-                "检测到 OptiScaler {version}；MFG 1.5 插件需要 OptiScaler 10"
+                "检测到 OptiScaler {version}；MFG 插件需要 OptiScaler 10"
             );
             core::pe64(&path, true)?;
             found = true;

@@ -640,6 +640,9 @@ pub fn inspect_at(
     } else {
         read_values(&bytes, &policy.parameter_profile)?
     };
+    if policy.parameter_profile == crate::rtxmfg::PROFILE {
+        values.extend(crate::rtxmfg_settings::read_ui_at(&target)?);
+    }
     if Context::new(&scheme, policy, exe).delta {
         let (text, _) = crate::diagnostics::decode_ini(&bytes)?;
         if let Some(n) =

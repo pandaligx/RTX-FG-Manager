@@ -218,7 +218,9 @@ fn read_json_preset_values(
     if profile == rtx_fg_manager::encore::PROFILE {
         rtx_fg_manager::encore::read(&bytes)
     } else {
-        rtx_fg_manager::rtxmfg::read(&bytes)
+        let mut values = rtx_fg_manager::rtxmfg::read(&bytes)?;
+        values.extend(rtx_fg_manager::rtxmfg_settings::read_ui_at(target)?);
+        Ok(values)
     }
 }
 

@@ -763,6 +763,7 @@ pub fn apply_parameters_at(
     assert_target_stopped(&target)?;
     crate::encore_upgrade::recover_locked(&target)?;
     crate::rtxmfg_upgrade::recover_locked(&target)?;
+    crate::rtxmfg_settings::recover_locked(&target)?;
     crate::upstream040_upgrade::recover_locked(&target)?;
     let record = record(dir)?.context("请先安装当前方案再应用参数")?;
     target.validate_record(&record)?;
@@ -782,6 +783,17 @@ pub fn apply_parameters_at(
     ensure!(ini.metadata()?.len() <= 1024 * 1024, "INI 文件过大");
     let before = fs::read(&ini)?;
     let after = context.configure(&before, values)?;
+    if record.backend == crate::rtxmfg::BACKEND {
+        crate::rtxmfg_settings::preflight(
+            &target,
+            record
+                .upstream_version
+                .as_deref()
+                .or(record.payload_version.as_deref()),
+            values,
+        )?;
+        return crate::rtxmfg_settings::apply_locked(&target, Some((&before, &after)), values);
+    }
     if before == after {
         return Ok(());
     }
@@ -835,7 +847,10 @@ pub fn status_at(target: &DeploymentTarget) -> String {
                     .map(|v| format!(" @{v}"))
                     .unwrap_or_default(),
                 r.selected().join(", "),
-                if edited {
+                if r.backend == crate::rtxmfg::BACKEND && crate::rtxmfg_settings::has_pending(dir)?
+                {
+                    " / 参数待恢复，请重新应用或卸载"
+                } else if edited {
                     " / 配置已修改，可正常卸载"
                 } else {
                     ""
@@ -973,7 +988,17 @@ pub fn deploy_prepared_context_at_with_overrides(
     assert_target_stopped(&target)?;
     crate::encore_upgrade::recover_locked(&target)?;
     crate::rtxmfg_upgrade::recover_locked(&target)?;
+    crate::rtxmfg_settings::recover_locked(&target)?;
     crate::upstream040_upgrade::recover_locked(&target)?;
+    let no_overrides = crate::presets::Values::new();
+    let mfg_overrides = explicit_overrides.unwrap_or(&no_overrides);
+    if backend == crate::rtxmfg::BACKEND {
+        crate::rtxmfg_settings::preflight(
+            &target,
+            upstream_version.or(payload_version),
+            mfg_overrides,
+        )?;
+    }
     let mut existing = record(dir)?;
     if let Some(record) = &existing {
         target.validate_record(record)?;
@@ -1090,7 +1115,10 @@ pub fn deploy_prepared_context_at_with_overrides(
             cache_pending: false,
             cleanup_pending_reasons: Vec::new(),
         };
-        return crate::rtxmfg_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides);
+        let message =
+            crate::rtxmfg_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides)?;
+        crate::rtxmfg_settings::apply_locked(&target, None, mfg_overrides)?;
+        return Ok(message);
     }
     if let Some(old) = existing.as_ref()
         && backend == crate::upstream040::BACKEND
@@ -1221,6 +1249,14 @@ pub fn deploy_prepared_context_at_with_overrides(
                     // cannot orphan runtime files released by the new settings.
                     atomic_json(&root.join(MARKER), &r)?;
                 }
+                if backend == crate::rtxmfg::BACKEND {
+                    crate::rtxmfg_settings::apply_locked(
+                        &target,
+                        Some((&current, &updated)),
+                        mfg_overrides,
+                    )?;
+                    return Ok("参数已应用；下次启动游戏生效。".into());
+                }
                 if current != updated {
                     let stage = no_links(&root.join(format!("{config}.config-stage")))?;
                     ensure!(!stage.exists(), "存在未完成的配置更新，请先卸载补丁");
@@ -1336,6 +1372,9 @@ pub fn deploy_prepared_context_at_with_overrides(
             }
             win::rename_no_replace(&stage, &dst)?;
             published.push(n.clone());
+        }
+        if backend == crate::rtxmfg::BACKEND {
+            crate::rtxmfg_settings::apply_locked(&target, None, mfg_overrides)?;
         }
         Ok(())
     })();

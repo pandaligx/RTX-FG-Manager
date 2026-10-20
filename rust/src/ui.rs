@@ -1835,7 +1835,17 @@ impl Manager {
                     .v_flex()
                     .gap_1()
                     .child(div().text_xs().child(self.t(param.label)))
-                    .child(self.menu(param.key, self.t(selected), choices, disabled, window, cx));
+                    .child(self.menu(param.key, self.t(selected), choices, disabled, window, cx))
+                    .when(context.profile == rtx_fg_manager::rtxmfg::PROFILE, |d| {
+                        d.when_some(rtx_fg_manager::rtxmfg::help(param.key), |d, help| {
+                            d.child(
+                                div()
+                                    .text_xs()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(self.t(help)),
+                            )
+                        })
+                    });
                 if matches!(
                     param.key,
                     "max_generated_frames"
@@ -1880,7 +1890,7 @@ impl Manager {
             .flex_shrink_0()
             .child(title)
             .when(self.c.boolean("preset_help_open", false), |d| d.child(Alert::info("preset-inline-help", self.t(if context.profile == rtx_fg_manager::rtxmfg::PROFILE {
-                "RTX40 专用 JSON；Backspace 打开游戏内菜单。游戏须已有 DLSS 帧生成；Vulkan 为实验支持且不支持动态倍率，倍率还受驱动与游戏限制。"
+                "MFG 1.6+：Backspace 打开独立菜单，插件模式使用 OptiScaler 菜单。支持 RTX 20（实验）/30/40/50；功能由游戏、驱动与运行库决定。退出游戏后应用参数，Vulkan 不支持动态倍率。"
             } else if context.profile == rtx_fg_manager::transfusion::PROFILE {
                 "默认跟随游戏；固定倍率可选2X—6X，5X/6X可能增加显存与延迟。Ctrl+Alt+2/3/4切换倍率，Ctrl+Alt+G跟随游戏，Ctrl+Alt+D切换动态。RTX20及旧显卡Vulkan仍需实机验证。"
             } else if context.delta {
@@ -3636,7 +3646,7 @@ impl Manager {
         } else if profile == rtx_fg_manager::rtxmfg::PROFILE {
             sections = vec![
                 (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
-                (self.t("使用说明"), self.t("Backspace 菜单仍为上游英文；可在管理器的预设参数中调整倍率、动态目标、UI预设、垂直同步及固定模式Reflex限帧。动态模式使用动态目标，固定限帧值会保留但不启用。")),
+                (self.t("使用说明"), self.t("MFG 1.6.1 新增 SR/RR 预设；独立菜单支持中文。DX12 的部分预设可在游戏内实时切换；管理器参数仍需退出游戏后应用。Vulkan 预设需重启游戏，不支持动态倍率。")),
                 (self.t("兼容性"), self.t("MFG Unlocker 使用独立 JSON。独立代理按 Backspace；OptiScaler 10 插件使用 OptiScaler 菜单。两种入口只能选择一种，管理器不会安装 OptiScaler。实际可用功能由显卡、驱动和游戏决定。")),
             ];
         } else if profile == rtx_fg_manager::presets::MFG_VULKAN {

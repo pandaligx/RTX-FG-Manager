@@ -1,4 +1,4 @@
-//! RTXMFG Universal v1.3.3 HF2 through v1.4.2 use their own JSON protocol,
+//! RTXMFG Universal / MFG Unlocker use their own JSON protocol,
 //! not dlssg_sm86.ini. Keep the profile ID stable for existing game settings.
 use crate::presets::{Parameter, Values};
 use anyhow::{Result, ensure};
@@ -8,6 +8,7 @@ pub const PROFILE: &str = "rtxmfg_universal_133";
 pub const BACKEND: &str = "rtx40mfg";
 pub const CONFIG: &str = "RTXMFG-Universal.json";
 pub const NOTICES: &str = "MFG-Unlocker-NOTICES.txt";
+pub const UI_CONFIG: &str = "RTX40MFG-UI.ini";
 /// Fixed upstream sidecars only; never derive deletion targets from JSON values.
 pub const SIDECARS: [&str; 3] = [
     "RTXMFG-Universal.status.json",
@@ -103,6 +104,49 @@ pub fn parameters() -> Vec<Parameter> {
             choices: vec![("0", "跟随游戏"), ("1", "关闭")],
         },
         Parameter {
+            key: "rtx_sr_preset",
+            section: "",
+            ini_key: "dlssSrPreset",
+            label: "DLSS 超分辨率预设",
+            default: "0",
+            choices: vec![
+                ("0", "跟随游戏 / 驱动"),
+                ("10", "J"),
+                ("11", "K"),
+                ("12", "L"),
+                ("13", "M"),
+            ],
+        },
+        Parameter {
+            key: "rtx_rr_preset",
+            section: "",
+            ini_key: "dlssRrPreset",
+            label: "DLSS 光线重建预设",
+            default: "0",
+            choices: vec![
+                ("0", "跟随游戏 / 驱动"),
+                ("4", "D"),
+                ("5", "E"),
+                ("6", "F（驱动 580+）"),
+            ],
+        },
+        Parameter {
+            key: "rtx_flip_metering",
+            section: "Compatibility",
+            ini_key: "Rtx30FlipMetering",
+            label: "RTX 30 帧调度",
+            default: "1",
+            choices: vec![("1", "驱动调度（默认）"), ("0", "旧版 CPU 调度")],
+        },
+        Parameter {
+            key: "rtx_gpu_override",
+            section: "Compatibility",
+            ini_key: "GpuNameOverride",
+            label: "解锁游戏帧生成选项（实验）",
+            default: "0",
+            choices: vec![("0", "关闭"), ("1", "开启（仅当前游戏）")],
+        },
+        Parameter {
             key: "rtx_reflex_limit",
             section: "",
             ini_key: "reflexFrameLimitFps",
@@ -127,7 +171,7 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
         serde_json::from_slice(bytes.strip_prefix(&[239, 187, 191]).unwrap_or(bytes))?;
     ensure!(data.is_object(), "RTXMFG JSON 必须是对象");
     crate::presets::validate(PROFILE, values)?;
-    if values.is_empty() {
+    if values.keys().all(|key| is_sidecar_key(key)) {
         return Ok(bytes.to_vec());
     }
     if let Some(mode) = values.get("rtx_mode") {
@@ -141,7 +185,11 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
         });
         data["multiplier"] = json!(mode.parse::<u32>().unwrap_or(2));
     }
-    for p in parameters().into_iter().skip(1) {
+    for p in parameters()
+        .into_iter()
+        .skip(1)
+        .filter(|p| p.section.is_empty())
+    {
         if let Some(value) = values.get(p.key) {
             data[p.ini_key] = json!(value.parse::<u32>()?);
         }
@@ -160,7 +208,11 @@ pub fn read(bytes: &[u8]) -> Result<Values> {
         data["multiplier"].as_u64().unwrap_or(2).to_string()
     };
     let mut values = Values::from([("rtx_mode".into(), mode)]);
-    for p in parameters().into_iter().skip(1) {
+    for p in parameters()
+        .into_iter()
+        .skip(1)
+        .filter(|p| p.section.is_empty())
+    {
         if let Some(n) = data[p.ini_key].as_u64() {
             let n = n.to_string();
             if valid_value(p.key, &n) {
@@ -180,6 +232,67 @@ pub fn valid_value(key: &str, value: &str) -> bool {
         || parameters()
             .iter()
             .any(|p| p.key == key && p.choices.iter().any(|(v, _)| *v == value))
+}
+
+pub fn is_sidecar_key(key: &str) -> bool {
+    matches!(key, "rtx_flip_metering" | "rtx_gpu_override")
+}
+
+pub fn help(key: &str) -> Option<&'static str> {
+    match key {
+        "rtx_sr_preset" | "rtx_rr_preset" => {
+            Some("需要 MFG 1.6+ 及游戏支持的 DLSS 功能；预设不会安装 SR/RR 运行库。")
+        }
+        "rtx_flip_metering" => Some("默认使用驱动调度；遇到兼容问题可恢复旧版。重启游戏生效。"),
+        "rtx_gpu_override" => Some(
+            "仅向当前游戏报告 RTX 4090 身份，尝试显示帧生成选项；不修改系统显卡名称。默认关闭，重启游戏生效。",
+        ),
+        _ => None,
+    }
+}
+
+pub fn validate_version(version: Option<&str>, values: &Values) -> Result<()> {
+    let supported = version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| (v.major, v.minor, v.patch) >= (1, 6, 0));
+    ensure!(
+        supported
+            || !values
+                .keys()
+                .any(|k| is_sidecar_key(k)
+                    || matches!(k.as_str(), "rtx_sr_preset" | "rtx_rr_preset")),
+        "这些参数需要 MFG Unlocker 1.6.0 或更新版本，请先升级补丁"
+    );
+    Ok(())
+}
+
+pub fn configure_ui(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
+    crate::presets::validate(PROFILE, values)?;
+    let mut out = bytes.to_vec();
+    for p in parameters().into_iter().filter(|p| is_sidecar_key(p.key)) {
+        if let Some(v) = values.get(p.key) {
+            out = crate::diagnostics::edit_ini(&out, p.section, p.ini_key, v)?;
+        }
+    }
+    Ok(out)
+}
+
+pub fn read_ui(bytes: &[u8]) -> Result<Values> {
+    let (text, _) = crate::diagnostics::decode_ini(bytes)?;
+    let mut values = Values::new();
+    for p in parameters().into_iter().filter(|p| is_sidecar_key(p.key)) {
+        if let Some(v) = crate::diagnostics::ini_value(&text, p.section, p.ini_key)? {
+            let normalized = match v.to_ascii_lowercase().as_str() {
+                "1" | "true" | "on" => Some("1"),
+                "0" | "false" | "off" => Some("0"),
+                _ => None,
+            };
+            if let Some(v) = normalized {
+                values.insert(p.key.into(), v.into());
+            }
+        }
+    }
+    Ok(values)
 }
 
 /// Match upstream diagnostic_paths.h; never accept a deletion path from JSON.
@@ -222,7 +335,19 @@ pub fn log_paths(exe: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut interval = current.file_stem().unwrap_or_default().to_os_string();
     interval.push("-intervals.csv");
     let interval = current.with_file_name(interval);
-    vec![current, previous, interval]
+    let mut paths = vec![current, previous, interval];
+    if let Some(dir) = exe.parent() {
+        for path in paths.clone() {
+            let local = dir.join(path.file_name().unwrap());
+            if !paths
+                .iter()
+                .any(|p| crate::core::key(p) == crate::core::key(&local))
+            {
+                paths.push(local);
+            }
+        }
+    }
+    paths
 }
 
 #[cfg(test)]
@@ -260,13 +385,22 @@ mod tests {
         let a = log_paths(std::path::Path::new("D:/游戏 A/Game.exe"));
         let a_case = log_paths(std::path::Path::new("d:/游戏 a/game.EXE"));
         let b = log_paths(std::path::Path::new("D:/游戏 B/Game.exe"));
-        assert_eq!(a, a_case);
+        assert_eq!(
+            a.iter().map(|p| crate::core::key(p)).collect::<Vec<_>>(),
+            a_case
+                .iter()
+                .map(|p| crate::core::key(p))
+                .collect::<Vec<_>>()
+        );
         assert_ne!(a, b);
         assert!(
-            a.iter()
+            a[..3]
+                .iter()
                 .all(|p| p.parent() == Some(std::env::temp_dir().as_path()))
         );
         assert!(a[1].to_string_lossy().ends_with(".previous.log"));
         assert!(a[2].to_string_lossy().ends_with("-intervals.csv"));
+        assert_eq!(a.len(), 6);
+        assert_eq!(a[3].parent(), Some(std::path::Path::new("D:/游戏 A")));
     }
 }

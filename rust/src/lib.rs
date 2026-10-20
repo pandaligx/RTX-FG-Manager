@@ -26,6 +26,7 @@ pub mod preferences;
 pub mod presets;
 pub mod release_notes;
 pub mod rtxmfg;
+pub mod rtxmfg_settings;
 pub mod rtxmfg_upgrade;
 pub mod scanner;
 pub mod selftest;

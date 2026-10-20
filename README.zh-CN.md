@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.4"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.5"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.4 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.5 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.2](docs/screenshot-home-zh.png)
 
@@ -41,25 +41,25 @@
 
 ## 下载
 
-**版本 4.3.4** · Windows 10 / 11 x64
+**版本 4.3.5** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.4 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.4) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.4 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.4) | 主项目与备用源 |
-| **Gitee** | [打开 4.3.4 发行页](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.4) | 保留给现有用户的过渡入口 |
+| **GitCode** | [打开 4.3.5 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.5) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.5 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.5) | 主项目与备用源 |
+| **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
-下载 **`RTXManager-v4.3.4-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+下载 **`RTXManager-v4.3.5-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
 下载量合并统计 **GitHub 发行附件＋GitCode 主仓库与补丁仓库**，每 6 小时自动刷新（平台与缓存可能延迟）。各平台统计口径不同，不代表独立用户或安装成功次数；Gitee 公开接口未提供下载次数，暂未计入。刷新失败时保留上次完整统计。
 
-## 4.3.4 更新亮点
+## 4.3.5 更新亮点
 
-- 修复游戏库已安装补丁版本误显示为云端最新版的问题；列表与逐目录详情保持一致。
+- 新增 MFG 1.6.1 的 SR/RR 预设与兼容选项，完善配置恢复和专属日志清理；更新 RTX Encore 1.1.4。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
-> 云端 Encore 已更新至 **1.1.2**，管理器 **4.3.4** 可直接获取；刷新资源后，按需升级对应游戏。
+> 云端 Encore 已更新至 **1.1.4**，管理器 **4.3.5** 可直接获取；刷新资源后，按需升级对应游戏。
 
 ## 方案怎么选
 
@@ -68,8 +68,8 @@
 | **Dlssg_for_sm86 · 0.4.0** | FG/SR 完整组件包；支持受管理的 0.3.5 配置迁移。`Optimized=2` 是上游默认值。 | 管理器 / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
-| **MFG-Unlocker · 1.5.0-hotfix.1** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
-| **RTX Encore · 1.1.2** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion 与兼容性设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
+| **MFG-Unlocker · 1.6.1** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
+| **RTX Encore · 1.1.4** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion 与兼容性设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。初始方案与 0.2.6 不再提供新安装入口，旧安装仍保留归属识别、恢复与卸载能力。
 
@@ -80,12 +80,12 @@
 | Dlssg_for_sm86 · 0.4.0 | 上游支持；0.4.0 新 FG 内核尚缺真实 Turing 验证 | 上游主要支持与测试系列 | 上游提供 PTX 路径，但未实机验证 |
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 保留本项目自定义适配 | 保留本项目自定义适配 | 本项目已提供 SM89 适配；不保证所有游戏 |
 | Dlssg_for_sm86-MFG-version · Vulkan | 上游面向 20/30 系列；以所选 Vulkan 包为准 | 上游主要目标系列 | 上游未明确保证 |
-| MFG-Unlocker · 1.5.0-hotfix.1 | 不列为原生 DLSS MFG 支持；可另用 OptiScaler 的 XeMFG 路线 | 上游支持 DLSS MFG | 上游支持 DLSS MFG |
-| RTX Encore · 1.1.2 | FG / NR 实验性；无 Smooth Motion 解锁 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
+| MFG-Unlocker · 1.6.1 | 实验性 DLSS MFG；限受支持的 310.9 运行库 | 上游支持 DLSS MFG | 上游支持 DLSS MFG |
+| RTX Encore · 1.1.4 | FG / NR 实验性；无 Smooth Motion 解锁 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
 
 依据：[Dlssg_for_sm86 运行要求与限制](https://github.com/sdli1995/dlssg_for_sm86#运行要求)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。三角洲方案属于本项目保留的自定义包，不能将其适配范围等同于上游原版。表格用于选型，不代表管理器完成了各显卡和游戏的实机验证。
 
-MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 310.9.16 运行库。XeMFG 是另一条需已有 OptiScaler 的路线，不等于 RTX 20 获得原生 DLSS MFG。0.4.0 官方路线为 DX12；改名为不同 DLL 不会自动增加 Vulkan 支持。
+MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 310.9.16 运行库。RTX 20 的 DLSS MFG 为实验性，仅支持 310.9.0 / 310.9.1 / 310.9.16；XeMFG 是另需已有 OptiScaler 的路线。0.4.0 官方路线为 DX12；改名为不同 DLL 不会自动增加 Vulkan 支持。
 
 ### Encore 功能支持速览
 

@@ -509,6 +509,7 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     crate::neural_runtime::remove_locked(&target)?;
     crate::encore_upgrade::recover_locked(&target)?;
     crate::rtxmfg_upgrade::recover_locked(&target)?;
+    crate::rtxmfg_settings::recover_locked(&target)?;
     crate::upstream040_upgrade::recover_locked(&target)?;
     let root = core::no_links(&dir.join(OWN))?;
     let journal = core::no_links(&dir.join(".rtx-fg-v3-legacy.json"))?;
@@ -652,6 +653,16 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
             let path = core::no_links(&path)?;
             if path.is_file() && path.metadata()?.len() <= 128 * 1024 * 1024 {
                 targets.insert(path.clone(), core::digest(&path)?);
+            }
+        }
+        // The 1.6+ menu settings always live beside the game EXE, including
+        // plugin/custom-directory installs. These fixed sidecars belong to it.
+        if let Some(exe_dir) = p.parent().filter(|d| core::key(d) != core::key(dir)) {
+            for name in [crate::rtxmfg::UI_CONFIG, "RTX40MFG-UI-layout.ini"] {
+                let path = core::no_links(&exe_dir.join(name))?;
+                if path.is_file() && path.metadata()?.len() <= 1024 * 1024 {
+                    targets.insert(path.clone(), core::digest(&path)?);
+                }
             }
         }
     }
