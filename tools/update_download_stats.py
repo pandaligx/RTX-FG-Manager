@@ -92,10 +92,17 @@ def collect(fetch=get_json):
 
 
 def badge(total):
-    value = f'{count(total):,}'
+    total = count(total)
+    exact = f'{total:,}'
+    if total < 1000:
+        value = str(total)
+    else:
+        # One decimal in thousands; retain exact counts in accessible text/JSON.
+        whole, decimal = divmod((total + 50) // 100, 10)
+        value = f'{whole}' + (f'.{decimal}' if decimal else '') + 'k'
     left, right = 70, len(value) * 7 + 12
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{left + right}" height="20" role="img" aria-label="downloads: {value}">
-  <title>Total reported downloads: {value}</title>
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{left + right}" height="20" role="img" aria-label="downloads: {exact}">
+  <title>Total reported downloads: {exact}</title>
   <path fill="#555" d="M0 0h{left}v20H0z"/>
   <path fill="#38a7bc" d="M{left} 0h{right}v20H{left}z"/>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">

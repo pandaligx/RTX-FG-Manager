@@ -41,6 +41,15 @@ class DownloadStats(unittest.TestCase):
         self.assertEqual(len(list(stats['pages'](fetch, GH + '/releases'))), 101)
         self.assertEqual(len(calls), 2)
 
+    def test_badge_uses_k_suffix_but_retains_exact_accessible_total(self):
+        for total, visible in ((0, '0'), (999, '999'), (1000, '1k'), (1050, '1.1k'),
+                               (1500, '1.5k'), (60466, '60.5k'), (682256, '682.3k')):
+            with self.subTest(total=total):
+                svg = ET.fromstring(stats['badge'](total))
+                texts = svg.findall('.//{http://www.w3.org/2000/svg}text')
+                self.assertEqual(texts[-1].text, visible)
+                self.assertEqual(svg.attrib['aria-label'], f'downloads: {total:,}')
+
     def test_partial_response_never_overwrites_last_complete_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
