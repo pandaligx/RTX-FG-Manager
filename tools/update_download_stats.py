@@ -3,7 +3,8 @@
 GitHub counts published release assets (including Resources prereleases).
 GitCode supplies historical repository totals, whose scope is platform-defined.
 Gitee has no public attachment download counter and is explicitly excluded.
-Any failed/incomplete response aborts before writing; the last snapshot survives.
+Failed, incomplete or decreasing counters abort before writing; the last snapshot
+survives. A genuine platform counter reset requires maintainer review.
 """
 import argparse
 from datetime import datetime, timezone
@@ -22,10 +23,19 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class CounterRegression(ValueError):
+    """A source no longer reports all previously observed downloads."""
+
+
 def get_json(url):
     headers = {'User-Agent': 'RTXFG-download-stats', 'Accept': 'application/json'}
     if url.startswith(GH + '/') and os.environ.get('GH_TOKEN'):
         headers['Authorization'] = 'Bearer ' + os.environ['GH_TOKEN']
+    elif (url in {GC + repo + '/download_statistics' for repo in REPOS}
+          and os.environ.get('GITCODE_TOKEN')):
+        # Anonymous responses can succeed with incomplete/zero statistics.
+        # Keep the existing repository credential in a header, never in the URL.
+        headers['Authorization'] = 'Bearer ' + os.environ['GITCODE_TOKEN']
     request = urllib.request.Request(url, headers=headers)
     with urllib.request.build_opener(NoRedirect).open(request, timeout=30) as response:
         data = response.read(16 * 1024 * 1024 + 1)
@@ -96,8 +106,35 @@ def badge(total):
 '''
 
 
+def source_counts(snapshot):
+    if snapshot['schema_version'] != 1:
+        raise ValueError('Unsupported statistics snapshot')
+    result = {}
+    for row in snapshot['sources']:
+        key = (row['platform'], row['repository'], row['scope'])
+        if key in result:
+            raise ValueError('Duplicate statistics source')
+        result[key] = count(row['downloads'])
+    if not result or count(snapshot['total']) != sum(result.values()):
+        raise ValueError('Incomplete statistics snapshot')
+    return result
+
+
+def validate_refresh(snapshot, previous):
+    current, before = source_counts(snapshot), source_counts(previous)
+    if current.keys() != before.keys():
+        raise ValueError('Statistics sources changed; maintainer review required')
+    # Check each source: growth elsewhere must never hide a missing platform.
+    if any(downloads < before[key] for key, downloads in current.items()):
+        raise CounterRegression('A platform counter decreased; previous complete snapshot retained. '
+                                'Retry later or review a platform counter reset.')
+
+
 def refresh(root, fetch=get_json):
     snapshot = collect(fetch)
+    previous = root / 'docs' / 'download-stats.json'
+    if previous.exists():
+        validate_refresh(snapshot, json.loads(previous.read_text(encoding='utf-8')))
     outputs = {'download-stats.json': json.dumps(snapshot, ensure_ascii=False, indent=2) + '\n',
                'downloads-total.svg': badge(snapshot['total'])}
     # Both files enter a single Git commit only after a complete refresh succeeds.
@@ -118,5 +155,8 @@ if __name__ == '__main__':
         print(f"Combined reported downloads: {result['total']:,}")
     except Exception as exc:
         # Do not print authenticated request details or remote response bodies.
-        print(f'{type(exc).__name__}: refresh failed; previous public snapshot retained')
+        if isinstance(exc, CounterRegression):
+            print(str(exc))
+        else:
+            print(f'{type(exc).__name__}: refresh failed; previous public snapshot retained')
         raise SystemExit(1)

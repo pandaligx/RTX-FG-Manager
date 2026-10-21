@@ -1,8 +1,11 @@
 """Aggregation guards: pagination, resource releases and failure retention."""
 from pathlib import Path
+import copy
+import json
 import runpy
 import tempfile
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 stats = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'tools/update_download_stats.py'))
@@ -52,6 +55,84 @@ class DownloadStats(unittest.TestCase):
                 with self.assertRaises((KeyError, ValueError)):
                     stats['refresh'](root, incomplete)
                 self.assertEqual(before, {p.name: p.read_bytes() for p in (root / 'docs').iterdir()})
+
+    def test_each_counter_regression_retains_both_files_and_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            stats['refresh'](root, fixture)
+            before = {p.name: p.read_bytes() for p in (root / 'docs').iterdir()}
+            for target in ('github', *stats['REPOS']):
+                for value in (0, 1):
+                    def regression(url):
+                        data = fixture(url)
+                        if target == 'github' and '/assets?' in url:
+                            for row in data:
+                                row['download_count'] = value
+                        elif url == GC + target + '/download_statistics':
+                            data['download_statistics_history_total'] = value
+                        elif '/assets?' in url:
+                            # The grand total grows, but one GitCode count is lost.
+                            for row in data:
+                                row['download_count'] += 1000
+                        return data
+                    with self.subTest(source=target, value=value):
+                        with self.assertRaises(stats['CounterRegression']):
+                            stats['refresh'](root, regression)
+                        self.assertEqual(before, {p.name: p.read_bytes() for p in (root / 'docs').iterdir()})
+
+    def test_unchanged_or_growing_counters_publish_one_correct_total(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            stats['refresh'](root, fixture)
+            def increasing(url):
+                data = fixture(url)
+                if url == GC + stats['REPOS'][0] + '/download_statistics':
+                    data['download_statistics_history_total'] += 5
+                return data
+            data = stats['refresh'](root, increasing)
+            self.assertEqual(data['total'], 272)
+            self.assertEqual(json.loads((root / 'docs/download-stats.json').read_bytes()), data)
+            self.assertEqual(ET.parse(root / 'docs/downloads-total.svg').getroot().attrib['aria-label'],
+                             'downloads: 272')
+            self.assertEqual(stats['refresh'](root, increasing)['total'], 272)
+
+    def test_changed_or_corrupt_baseline_requires_review(self):
+        data = stats['collect'](fixture)
+        invalid = []
+        for field, value in (('total', 0), ('schema_version', 2)):
+            before = copy.deepcopy(data)
+            before[field] = value
+            invalid.append(before)
+        for change in ('missing', 'duplicate', 'scope'):
+            before = copy.deepcopy(data)
+            if change == 'missing':
+                before['sources'].pop()
+                before['total'] -= 30
+            elif change == 'duplicate':
+                before['sources'].append(before['sources'][0])
+                before['total'] += 207
+            else:
+                before['sources'][0]['scope'] = 'different_counter'
+            invalid.append(before)
+        for before in invalid:
+            with self.assertRaises(ValueError):
+                stats['validate_refresh'](data, before)
+
+    def test_credentials_are_headers_on_exact_platform_endpoints_only(self):
+        with patch.dict(stats['os'].environ, {'GH_TOKEN': 'fake-gh', 'GITCODE_TOKEN': 'fake-gc'}):
+            with patch.object(stats['urllib'].request, 'build_opener') as opener:
+                opener.return_value.open.return_value.__enter__.return_value.read.return_value = b'{}'
+                for url, token in ((GH + '/releases', 'fake-gh'),
+                                   (GC + stats['REPOS'][0] + '/download_statistics', 'fake-gc'),
+                                   (GC + stats['REPOS'][1] + '/download_statistics', 'fake-gc'),
+                                   ('https://example.org/download_statistics', None),
+                                   (GC + 'other/download_statistics', None)):
+                    stats['get_json'](url)
+                    request = opener.return_value.open.call_args.args[0]
+                    self.assertEqual(request.full_url, url)
+                    self.assertEqual(request.get_header('Authorization'), 'Bearer ' + token if token else None)
 
 
 if __name__ == '__main__':

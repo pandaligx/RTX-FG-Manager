@@ -34,6 +34,7 @@ jobs:
         timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
         run: python -B tools/update_download_stats.py
       - name: Commit badge and source counts together
         run: |
