@@ -51,8 +51,6 @@
 
 Download **`RTXManager-v4.3.5-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-The download badge combines **GitHub release assets + GitCode main and patch repository totals**, refreshed every 6 hours (platform/cache delays may apply). Counts are platform-reported, not unique users or successful installations. Gitee is not included because its public API does not provide download counts; failed refreshes or unexpected decreases in any platform counter retain the last complete total.
-
 ## 4.3.5 highlights
 
 - Add MFG 1.6.1 SR/RR presets and compatibility options, improve settings recovery and owned-log cleanup, and update RTX Encore to 1.1.4.
