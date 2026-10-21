@@ -87,8 +87,100 @@ class DownloadStats(unittest.TestCase):
                         return data
                     with self.subTest(source=target, value=value):
                         with self.assertRaises(stats['CounterRegression']):
-                            stats['refresh'](root, regression)
+                            stats['refresh'](root, regression, retry_delays=())
                         self.assertEqual(before, {p.name: p.read_bytes() for p in (root / 'docs').iterdir()})
+
+    def test_transient_regression_retries_whole_snapshot_without_mixing_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            stats['refresh'](root, fixture)
+            before = {p.name: p.read_bytes() for p in (root / 'docs').iterdir()}
+            attempts, waits = [], []
+            def fluctuating(url):
+                if url == GH + '/releases?per_page=100&page=1':
+                    attempts.append(url)
+                data = fixture(url)
+                if len(attempts) < 3:
+                    if url == GC + stats['REPOS'][1] + '/download_statistics':
+                        data['download_statistics_history_total'] = 0
+                    elif '/assets?' in url:
+                        for row in data:
+                            row['download_count'] += 1000
+                else:
+                    if url == GC + stats['REPOS'][0] + '/download_statistics':
+                        data['download_statistics_history_total'] += 5
+                return data
+            def wait(delay):
+                waits.append(delay)
+                self.assertEqual(before, {p.name: p.read_bytes() for p in (root / 'docs').iterdir()})
+            result = stats['refresh'](root, fluctuating, sleep=wait)
+            self.assertEqual(len(attempts), 3)
+            self.assertEqual(waits, [5, 15])
+            self.assertEqual(result['total'], 272)
+            self.assertEqual([s['downloads'] for s in result['sources']], [207, 35, 30])
+
+    def test_persistent_regression_remains_failure_and_keeps_complete_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            stats['refresh'](root, fixture)
+            before = {p.name: p.read_bytes() for p in (root / 'docs').iterdir()}
+            attempts, waits = [], []
+            def regression(url):
+                if url == GH + '/releases?per_page=100&page=1':
+                    attempts.append(url)
+                data = fixture(url)
+                if url == GC + stats['REPOS'][0] + '/download_statistics':
+                    data['download_statistics_history_total'] = 1
+                return data
+            with self.assertRaisesRegex(stats['CounterRegression'], r'GitCode gcw_qWIjmve7/RTX-FG-Manager: 30 -> 1'):
+                stats['refresh'](root, regression, sleep=waits.append)
+            self.assertEqual(len(attempts), 3)
+            self.assertEqual(waits, [5, 15])
+            self.assertEqual(before, {p.name: p.read_bytes() for p in (root / 'docs').iterdir()})
+
+    def test_temporary_transport_failures_retry_without_exposing_response_details(self):
+        errors = (TimeoutError('private request detail'),
+                  stats['urllib'].error.URLError('private request detail'),
+                  stats['urllib'].error.HTTPError(GC, 429, 'private response', {}, None),
+                  stats['urllib'].error.HTTPError(GH, 503, 'private response', {}, None),
+                  stats['http'].client.IncompleteRead(b'private response'))
+        for error in errors:
+            with self.subTest(error=type(error).__name__), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / 'docs').mkdir()
+                waits, attempts = [], []
+                def fetch(url):
+                    attempts.append(url)
+                    if len(attempts) == 1:
+                        raise error
+                    return fixture(url)
+                with patch('builtins.print') as output:
+                    result = stats['refresh'](root, fetch, sleep=waits.append)
+                self.assertEqual(result['total'], 267)
+                self.assertEqual(waits, [5])
+                self.assertNotIn('private', str(output.call_args_list))
+
+    def test_authentication_and_malformed_responses_are_not_retried(self):
+        errors = (stats['urllib'].error.HTTPError(GC, 401, 'Unauthorized', {}, None),
+                  stats['urllib'].error.HTTPError(GC, 403, 'Forbidden', {}, None),
+                  ValueError('Malformed response'))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            stats['refresh'](root, fixture)
+            before = {p.name: p.read_bytes() for p in (root / 'docs').iterdir()}
+            for error in errors:
+                waits, calls = [], []
+                def fetch(url):
+                    calls.append(url)
+                    raise error
+                with self.assertRaises(type(error)):
+                    stats['refresh'](root, fetch, sleep=waits.append)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(waits, [])
+                self.assertEqual(before, {p.name: p.read_bytes() for p in (root / 'docs').iterdir()})
 
     def test_unchanged_or_growing_counters_publish_one_correct_total(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -142,6 +234,7 @@ class DownloadStats(unittest.TestCase):
                     request = opener.return_value.open.call_args.args[0]
                     self.assertEqual(request.full_url, url)
                     self.assertEqual(request.get_header('Authorization'), 'Bearer ' + token if token else None)
+                    self.assertEqual(request.get_header('Cache-control'), 'no-cache')
 
 
 if __name__ == '__main__':

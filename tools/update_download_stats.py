@@ -8,9 +8,12 @@ survives. A genuine platform counter reset requires maintainer review.
 """
 import argparse
 from datetime import datetime, timezone
+import http.client
 import json
 import os
 from pathlib import Path
+import time
+import urllib.error
 import urllib.request
 
 GH = 'https://api.github.com/repos/pandaligx/RTX-FG-Manager'
@@ -28,7 +31,8 @@ class CounterRegression(ValueError):
 
 
 def get_json(url):
-    headers = {'User-Agent': 'RTXFG-download-stats', 'Accept': 'application/json'}
+    headers = {'User-Agent': 'RTXFG-download-stats', 'Accept': 'application/json',
+               'Cache-Control': 'no-cache'}
     if url.startswith(GH + '/') and os.environ.get('GH_TOKEN'):
         headers['Authorization'] = 'Bearer ' + os.environ['GH_TOKEN']
     elif (url in {GC + repo + '/download_statistics' for repo in REPOS}
@@ -132,16 +136,39 @@ def validate_refresh(snapshot, previous):
     if current.keys() != before.keys():
         raise ValueError('Statistics sources changed; maintainer review required')
     # Check each source: growth elsewhere must never hide a missing platform.
-    if any(downloads < before[key] for key, downloads in current.items()):
-        raise CounterRegression('A platform counter decreased; previous complete snapshot retained. '
-                                'Retry later or review a platform counter reset.')
+    decreased = [f'{key[0]} {key[1]}: {before[key]:,} -> {downloads:,}'
+                 for key, downloads in current.items() if downloads < before[key]]
+    if decreased:
+        raise CounterRegression('Platform counters decreased (' + '; '.join(decreased)
+                                + '); previous complete snapshot retained.')
 
 
-def refresh(root, fetch=get_json):
-    snapshot = collect(fetch)
+def retryable(exc):
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code in (408, 429, 500, 502, 503, 504)
+    return isinstance(exc, (CounterRegression, urllib.error.URLError,
+                            TimeoutError, http.client.IncompleteRead))
+
+
+def refresh(root, fetch=get_json, *, retry_delays=(5, 15), sleep=time.sleep):
     previous = root / 'docs' / 'download-stats.json'
-    if previous.exists():
-        validate_refresh(snapshot, json.loads(previous.read_text(encoding='utf-8')))
+    baseline = json.loads(previous.read_text(encoding='utf-8')) if previous.exists() else None
+    for attempt in range(len(retry_delays) + 1):
+        try:
+            # Restart the entire collection: never mix counts from failed attempts.
+            snapshot = collect(fetch)
+            if baseline is not None:
+                validate_refresh(snapshot, baseline)
+            break
+        except Exception as exc:
+            if not retryable(exc) or attempt == len(retry_delays):
+                raise
+            # Counts are safe to report; request details and response bodies are not.
+            reason = str(exc) if isinstance(exc, CounterRegression) else type(exc).__name__
+            delay = retry_delays[attempt]
+            print(f'{reason} Retrying complete statistics in {delay}s '
+                  f'({attempt + 2}/{len(retry_delays) + 1}).', flush=True)
+            sleep(delay)
     outputs = {'download-stats.json': json.dumps(snapshot, ensure_ascii=False, indent=2) + '\n',
                'downloads-total.svg': badge(snapshot['total'])}
     # Both files enter a single Git commit only after a complete refresh succeeds.
