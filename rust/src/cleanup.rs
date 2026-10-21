@@ -501,16 +501,56 @@ pub struct CleanOutcome {
     pub complete: bool,
 }
 pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome> {
+    clean_outcome(target, false)
+}
+/// A residual retry must never turn into a fresh uninstall after a reinstall.
+/// Check under the same per-game lock as the mutation.
+pub fn retry_pending_at(target: &core::DeploymentTarget) -> Result<CleanOutcome> {
+    clean_outcome(target, true)
+}
+fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<CleanOutcome> {
     let target = target.validate(false)?;
     let p = target.game_exe.clone();
     let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
     core::assert_target_stopped(&target)?;
-    crate::neural_runtime::remove_locked(&target)?;
-    crate::encore_upgrade::recover_locked(&target)?;
-    crate::rtxmfg_upgrade::recover_locked(&target)?;
-    crate::rtxmfg_settings::recover_locked(&target)?;
-    crate::upstream040_upgrade::recover_locked(&target)?;
+    if pending_only {
+        let Some(record) = core::record(dir)? else {
+            return Ok(CleanOutcome {
+                message: "没有待清理的卸载记录，状态已刷新。".into(),
+                complete: true,
+            });
+        };
+        target.validate_record(&record)?;
+        ensure!(
+            record.cache_pending,
+            "补丁状态已变化，请刷新后重新查看处理选项。"
+        );
+        // A restored Bink original (or another user's replacement DLL) may
+        // occupy the old entry name. It is not a reinstalled manager patch.
+        for name in record.selected() {
+            let entry = core::no_links(&dir.join(&name))?;
+            if entry.is_file() {
+                ensure!(
+                    record.hashes.get(&name) != Some(&core::digest(&entry)?),
+                    "发现补丁文件或恢复记录，已停止残留清理。请刷新后查看详情。"
+                );
+            }
+        }
+        ensure!(
+            !crate::encore_upgrade::has_pending(dir)?
+                && !crate::rtxmfg_upgrade::has_pending(dir)?
+                && !crate::upstream040_upgrade::has_pending(dir)?,
+            "发现补丁文件或恢复记录，已停止残留清理。请刷新后查看详情。"
+        );
+        // NR is independent and may have been installed after the FG uninstall.
+    } else {
+        crate::neural_runtime::remove_locked(&target)?;
+        crate::encore_upgrade::recover_locked(&target)?;
+        crate::rtxmfg_upgrade::recover_locked(&target)?;
+        crate::rtxmfg_settings::recover_locked(&target)?;
+        crate::upstream040_upgrade::recover_locked(&target)?;
+    }
     let root = core::no_links(&dir.join(OWN))?;
     let journal = core::no_links(&dir.join(".rtx-fg-v3-legacy.json"))?;
     let legacy = legacy_identity(&journal)?;
@@ -564,6 +604,9 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         merge(&mut roots, p, kind);
     }
     for name in PROXIES {
+        if pending_only {
+            break;
+        }
         let q = core::no_links(&dir.join(name))?;
         if !q.exists() {
             continue;
@@ -577,7 +620,7 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         }
         kept.insert(q);
     }
-    if record.backend == crate::upstream040::BACKEND {
+    if !pending_only && record.backend == crate::upstream040::BACKEND {
         for name in crate::upstream040::COMPONENTS {
             let path = core::no_links(&dir.join(name))?;
             if path.is_file()
@@ -595,73 +638,75 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
             }
         }
     }
-    let helper = core::no_links(&dir.join(HELPER))?;
-    if helper.exists() {
-        if helper.is_file() && known_helper(&helper)? {
-            targets.insert(helper.clone(), core::digest(&helper)?);
+    if !pending_only {
+        let helper = core::no_links(&dir.join(HELPER))?;
+        if helper.exists() {
+            if helper.is_file() && known_helper(&helper)? {
+                targets.insert(helper.clone(), core::digest(&helper)?);
+            } else {
+                kept.insert(helper);
+            }
+        }
+        let logs: Vec<&str> = if record.backend == crate::encore::BACKEND {
+            Vec::new()
+        } else if record.backend == crate::rtxmfg::BACKEND {
+            crate::rtxmfg::SIDECARS.to_vec()
+        } else if record.backend == crate::transfusion::BACKEND {
+            vec!["DLSSG-Transfusion.log", "DLSSG-Transfusion_perf.csv"]
         } else {
-            kept.insert(helper);
-        }
-    }
-    let logs: Vec<&str> = if record.backend == crate::encore::BACKEND {
-        Vec::new()
-    } else if record.backend == crate::rtxmfg::BACKEND {
-        crate::rtxmfg::SIDECARS.to_vec()
-    } else if record.backend == crate::transfusion::BACKEND {
-        vec!["DLSSG-Transfusion.log", "DLSSG-Transfusion_perf.csv"]
-    } else {
-        VK_LOGS.to_vec()
-    };
-    for name in logs.into_iter().chain([config]) {
-        let q = core::no_links(&dir.join(name))?;
-        if q.exists() {
-            if q.is_file() {
-                targets.insert(q.clone(), core::digest(&q)?);
-            } else {
-                kept.insert(q);
+            VK_LOGS.to_vec()
+        };
+        for name in logs.into_iter().chain([config]) {
+            let q = core::no_links(&dir.join(name))?;
+            if q.exists() {
+                if q.is_file() {
+                    targets.insert(q.clone(), core::digest(&q)?);
+                } else {
+                    kept.insert(q);
+                }
             }
         }
-    }
-    if record.backend == crate::encore::BACKEND {
-        let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
-        if notice.exists() {
-            if notice.is_file()
-                && record
-                    .hashes
-                    .get(crate::encore::NOTICES)
-                    .is_some_and(|expected| {
-                        core::digest(&notice).is_ok_and(|actual| &actual == expected)
-                    })
-            {
-                targets.insert(notice.clone(), core::digest(&notice)?);
-            } else {
-                kept.insert(notice);
+        if record.backend == crate::encore::BACKEND {
+            let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
+            if notice.exists() {
+                if notice.is_file()
+                    && record
+                        .hashes
+                        .get(crate::encore::NOTICES)
+                        .is_some_and(|expected| {
+                            core::digest(&notice).is_ok_and(|actual| &actual == expected)
+                        })
+                {
+                    targets.insert(notice.clone(), core::digest(&notice)?);
+                } else {
+                    kept.insert(notice);
+                }
             }
+            scan_encore_logs(dir, &mut kept, &mut targets, &mut dirs)?;
         }
-        scan_encore_logs(dir, &mut kept, &mut targets, &mut dirs)?;
-    }
-    if record.backend == crate::rtxmfg::BACKEND {
-        if let Some(expected) = record.hashes.get(crate::rtxmfg::NOTICES) {
-            let notice = core::no_links(&dir.join(crate::rtxmfg::NOTICES))?;
-            if notice.is_file() && core::digest(&notice)? == *expected {
-                targets.insert(notice, expected.clone());
-            } else if notice.exists() {
-                kept.insert(notice);
+        if record.backend == crate::rtxmfg::BACKEND {
+            if let Some(expected) = record.hashes.get(crate::rtxmfg::NOTICES) {
+                let notice = core::no_links(&dir.join(crate::rtxmfg::NOTICES))?;
+                if notice.is_file() && core::digest(&notice)? == *expected {
+                    targets.insert(notice, expected.clone());
+                } else if notice.exists() {
+                    kept.insert(notice);
+                }
             }
-        }
-        for path in crate::rtxmfg::log_paths(&p) {
-            let path = core::no_links(&path)?;
-            if path.is_file() && path.metadata()?.len() <= 128 * 1024 * 1024 {
-                targets.insert(path.clone(), core::digest(&path)?);
-            }
-        }
-        // The 1.6+ menu settings always live beside the game EXE, including
-        // plugin/custom-directory installs. These fixed sidecars belong to it.
-        if let Some(exe_dir) = p.parent().filter(|d| core::key(d) != core::key(dir)) {
-            for name in [crate::rtxmfg::UI_CONFIG, "RTX40MFG-UI-layout.ini"] {
-                let path = core::no_links(&exe_dir.join(name))?;
-                if path.is_file() && path.metadata()?.len() <= 1024 * 1024 {
+            for path in crate::rtxmfg::log_paths(&p) {
+                let path = core::no_links(&path)?;
+                if path.is_file() && path.metadata()?.len() <= 128 * 1024 * 1024 {
                     targets.insert(path.clone(), core::digest(&path)?);
+                }
+            }
+            // The 1.6+ menu settings always live beside the game EXE, including
+            // plugin/custom-directory installs. These fixed sidecars belong to it.
+            if let Some(exe_dir) = p.parent().filter(|d| core::key(d) != core::key(dir)) {
+                for name in [crate::rtxmfg::UI_CONFIG, "RTX40MFG-UI-layout.ini"] {
+                    let path = core::no_links(&exe_dir.join(name))?;
+                    if path.is_file() && path.metadata()?.len() <= 1024 * 1024 {
+                        targets.insert(path.clone(), core::digest(&path)?);
+                    }
                 }
             }
         }

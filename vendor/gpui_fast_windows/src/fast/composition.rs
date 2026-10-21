@@ -32,7 +32,6 @@ use gpui::{
 use gpui_util::ResultExt;
 use windows::{
     Win32::{
-        Foundation::HWND,
         Graphics::{
             Direct3D11::{ID3D11RenderTargetView, ID3D11Texture2D},
             DirectComposition::{
@@ -41,7 +40,6 @@ use windows::{
             },
             Dxgi::{DXGI_PRESENT, DXGI_SWAP_CHAIN_FLAG, IDXGISwapChain1},
         },
-        UI::WindowsAndMessaging::GetClassNameW,
     },
     core::{IUnknown, Interface},
 };
@@ -134,18 +132,6 @@ pub(crate) fn set_composition_order(
     surfaces: &[PlatformCompositionSurface],
 ) -> Result<()> {
     set_order(&mut window.state.renderer.borrow_mut(), surfaces)
-}
-
-/// Forwarded to by `translate_accelerator`: whether `hwnd` is one of GPUI's
-/// windows, whose key downs GPUI handles before they are translated. Key
-/// downs of other windows, such as a WebView2 controller's child windows,
-/// are left to their own window procedures.
-pub(crate) fn is_gpui_window(hwnd: HWND) -> Option<()> {
-    let class_name = unsafe { crate::window::WINDOW_CLASS_NAME.as_wide() };
-    let mut buffer = [0u16; 64];
-    let length = unsafe { GetClassNameW(hwnd, &mut buffer) };
-    let length = usize::try_from(length).ok()?;
-    (buffer.get(..length)? == class_name).then_some(())
 }
 
 /// Forwarded to by `DirectXRenderer::handle_device_lost_impl` before it

@@ -21,7 +21,7 @@ pub fn extract(path: &Path) -> Result<image::RgbaImage> {
     ensure!(path.is_file(), "Icon file missing");
     // Protected Xbox executables may not expose PE resources even elevated.
     // Use the declared per-executable/package visual, not a generic EXE icon.
-    if let Some(game) = rtx_fg_manager::xbox::declared(&path) {
+    if let Some(game) = rtx_fg_manager::xbox::identified(&path) {
         for logo in game.logos {
             if let Ok(icon) = package_icon(&logo) {
                 return Ok(icon);

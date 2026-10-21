@@ -20,13 +20,13 @@ def current_source_export_files():
     lists = re.findall(
         r'foreach \(\$name in @\((.*?)\)\) \{ Add-File \$name(?: \$false)? \}',
         script, re.S)
-    if len(lists) != 6:
+    if len(lists) != 7:
         raise AssertionError('Review the source exporter Add-File list structure')
     for group in lists:
         files.update(re.findall(r"'([^']+)'", group))
     files.update(re.findall(r"Add-File '([^']+)'", script))
     trees = re.findall(r"Add-Tree '([^']+)' @\(([^)]*)\)", script)
-    if len(trees) != 13:
+    if len(trees) != 16:
         raise AssertionError('Review the source exporter Add-Tree structure')
     for directory, group in trees:
         extensions = set(re.findall(r"'([^']+)'", group))
@@ -65,7 +65,9 @@ class SourceAllowlistTests(unittest.TestCase):
                          'tools/game-name-overrides.json', 'tests/test_game_names.py',
                          '.github/workflows/update-game-names.yml',
                          'tests/test_encore_cloud.py',
-                         'tests/v429_encore_cloud.rs'):
+                         'tests/v429_encore_cloud.rs',
+                         'recommendations/src/api.mjs', 'recommendations/Dockerfile',
+                         'recommendations/config.example', 'recommendations/NODEMAILER-LICENSE'):
             self.assertIn(required, files)
         self.assertEqual(sum(path.startswith('rust/assets/themes/') and path.endswith('.json')
                              for path in files), 21)
@@ -101,7 +103,10 @@ class SourceAllowlistTests(unittest.TestCase):
                      'development/gpui-fast-upgrade/license-review.md',
                      'payloads/version.dll', 'log/game.txt', 'rust/native/probe.cpp',
                      'AGENTS.md', 'agent.md', 'RELEASE_WORKFLOW.md',
-                     'tests/fixtures/catalog999/private.json'):
+                     'tests/fixtures/catalog999/private.json',
+                     'recommendations/.env', 'recommendations/data/recommendations.sqlite',
+                     'recommendations/node_modules/nodemailer/package.json',
+                     'recommendations/backups/backup.json'):
             self.assertFalse(mirror['allowed_source'](path), path)
 
 

@@ -8,6 +8,19 @@ use std::rc::Rc;
 
 const FONT_FAMILY: &str = "Microsoft YaHei UI";
 
+/// Product accent for discovering player recommendations, separate from status colors.
+pub fn recommendation_accent() -> gpui::Hsla {
+    gpui::rgb(0x2868b8).into()
+}
+
+pub fn recommendation_button(cx: &App) -> gpui::component::button::ButtonCustomVariant {
+    gpui::component::button::ButtonCustomVariant::new(cx)
+        .color(recommendation_accent())
+        .foreground(gpui::rgb(0xffffff).into())
+        .hover(gpui::rgb(0x205ca7).into())
+        .active(gpui::rgb(0x194b8c).into())
+}
+
 /// A preview is an ephemeral choice; only an explicit confirmation persists it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Choice {

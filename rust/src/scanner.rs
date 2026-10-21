@@ -2,7 +2,7 @@ use crate::core;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     io::Read,
     path::{Path, PathBuf},
@@ -122,6 +122,16 @@ impl Game {
             self.targets.clone()
         }
     }
+    /// One current target per directory, in library order. Cleanup-only paths
+    /// remain process guards, never installation destinations.
+    pub fn deployment_targets(&self) -> Vec<core::DeploymentTarget> {
+        let mut seen = BTreeSet::new();
+        self.deployment_executables()
+            .iter()
+            .map(|exe| self.deployment_target(Path::new(exe)))
+            .filter(|target| seen.insert(core::key(&target.directory)))
+            .collect()
+    }
 }
 #[derive(Debug, Serialize, Default)]
 pub struct Report {
@@ -226,6 +236,15 @@ fn auxiliary_exe(name: &str) -> bool {
         "shadercompiler",
         "workshoptool",
         "workshoputility",
+        "updater",
+        "downloader",
+        "webhelper",
+        "subprocess",
+        "helper",
+        "patcher",
+        "crashreporter",
+        "uninstaller",
+        "installer",
     ]
     .iter()
     .any(|suffix| role_suffix(role, suffix))
@@ -240,7 +259,10 @@ fn auxiliary_exe(name: &str) -> bool {
             "crashpad_handler|crashsender[0-9]*|unitycrashhandler(?:32|64)?|",
             "unins[0-9]*|uninstall|uninstaller|",
             "setup(?:32|64)?|install|installer|launcher|updater|",
-            "benchmarkreport|reporter|helper|cefsubprocess|epicwebhelper|",
+            "benchmarkreport|reporter|helper|cefsubprocess|epicwebhelper|qtwebengineprocess|",
+            "steamcmd|hlmv|hammer|vpk|vvis|vrad|vbsp|srcds(?:_win64)?|",
+            "sandbox|shadercachegen|rc|crysbsrenderapp|gameserver|",
+            "iipshostapp|fixdownload|",
             "easyanticheat(?:_eos)?(?:_setup)?|beservice(?:_x64)?|",
             "start_protected_game|startprotectedgame|eaanticheat(?:_game_service_launcher)?|",
             "steamservice|steamerrorreporter|steamwebhelper|",
@@ -255,6 +277,86 @@ fn auxiliary_exe(name: &str) -> bool {
     // Protected launchers also appear with Unreal's Shipping suffix. Match
     // both their original filename and the normalized role above.
     tool.is_match(name) || tool.is_match(&format!("{role}.exe"))
+}
+
+#[cfg(test)]
+mod engine_scan_tests {
+    use super::*;
+    use crate::game_installations::{self as installs, Install};
+    use serde_json::json;
+    fn exe(path: &Path) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let mut bytes = vec![0u8; 512];
+        bytes[..2].copy_from_slice(b"MZ");
+        bytes[60..64].copy_from_slice(&128u32.to_le_bytes());
+        bytes[128..132].copy_from_slice(b"PE\0\0");
+        bytes[132..134].copy_from_slice(&0x8664u16.to_le_bytes());
+        fs::write(path, bytes).unwrap();
+    }
+    #[test]
+    fn epic_declared_entry_does_not_require_engine_or_dlss_and_rejects_helper() {
+        let t = tempfile::tempdir().unwrap();
+        let game = t.path().join("Unusual client/bin/Render.exe");
+        exe(&game);
+        let manifest = t
+            .path()
+            .join("ProgramData/Epic/EpicGamesLauncher/Data/Manifests/game.item");
+        let root = game.parent().unwrap().parent().unwrap();
+        let mut value = json!({"InstallLocation":root,"DisplayName":"Epic Test",
+            "AppName":"title","MainGameAppName":"title","CatalogNamespace":"test","CatalogItemId":"42",
+            "LaunchExecutable":"bin/Render.exe"});
+        core::atomic_json(&manifest, &value).unwrap();
+        let cancel = AtomicBool::new(false);
+        let records = installs::epic(&t.path().join("ProgramData"), &cancel);
+        let report = scan_with_records(&[root.into()], &cancel, |_, _, _| {}, records).unwrap();
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(core::key(Path::new(&report.rows[0].exe)), core::key(&game));
+        assert_eq!(report.rows[0].title, "Epic Test");
+        let helper = root.join("RenderHelper.exe");
+        exe(&helper);
+        value["LaunchExecutable"] = json!("RenderHelper.exe");
+        core::atomic_json(&manifest, &value).unwrap();
+        let records = installs::epic(&t.path().join("ProgramData"), &cancel);
+        assert!(
+            scan_with_records(&[root.into()], &cancel, |_, _, _| {}, records)
+                .unwrap()
+                .rows
+                .is_empty()
+        );
+    }
+    #[test]
+    fn declared_root_bootstrap_does_not_replace_nested_unreal_renderer() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("Epic Game");
+        let launcher = root.join("Start.exe");
+        let game = root.join("Project/Binaries/Win64/Real-Win64-Shipping.exe");
+        exe(&launcher);
+        exe(&game);
+        fs::create_dir(root.join("Engine")).unwrap();
+        let mut record = Install::new(root.clone(), "Epic", "Epic Game");
+        record.executable = Some(launcher);
+        let report =
+            scan_with_records(&[root], &AtomicBool::new(false), |_, _, _| {}, vec![record])
+                .unwrap();
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(report.rows[0].targets.len(), 1);
+        assert_eq!(core::key(Path::new(&report.rows[0].exe)), core::key(&game));
+    }
+    #[test]
+    fn platform_directory_only_admits_matching_game_not_unrelated_programs() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("EA Title");
+        let game = root.join("EATitle.exe");
+        exe(&game);
+        exe(&root.join("Other.exe"));
+        exe(&root.join("EATitleUpdater.exe"));
+        let records = vec![Install::new(root.clone(), "EA", "EA Title")];
+        let report =
+            scan_with_records(&[root], &AtomicBool::new(false), |_, _, _| {}, records).unwrap();
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(report.rows[0].targets.len(), 1);
+        assert_eq!(core::key(Path::new(&report.rows[0].exe)), core::key(&game));
+    }
 }
 
 fn non_rendering_role(exe: &Path) -> bool {
@@ -540,6 +642,9 @@ fn unreal_binary_dir(dir: &Path) -> bool {
     ) && dir.parent().is_some_and(|p| is_name(p, &["binaries"]))
 }
 pub fn game_root(exe: &Path) -> PathBuf {
+    if let Some(install) = crate::game_installations::wegame_renderer(exe) {
+        return install.root;
+    }
     let d = exe.parent().unwrap();
     if unreal_binary_dir(d) {
         let project = d.parent().unwrap().parent().unwrap();
@@ -549,8 +654,20 @@ pub fn game_root(exe: &Path) -> PathBuf {
             project.into()
         };
     }
-    if is_name(d, &["x64", "x64_dx12"]) && d.parent().is_some_and(|p| is_name(p, &["bin"])) {
-        return d.parent().unwrap().parent().unwrap().into();
+    if is_name(
+        d,
+        &["x64", "x64_dx12", "win64", "win_x64", "win_x64_release"],
+    ) && d.parent().is_some_and(|p| is_name(p, &["bin"]))
+    {
+        let root = d.parent().unwrap().parent().unwrap();
+        return if is_name(root, &["game"])
+            && d.join("engine2.dll").is_file()
+            && d.join("tier0.dll").is_file()
+        {
+            root.parent().unwrap_or(root).into()
+        } else {
+            root.into()
+        };
     }
     if is_name(d, &["bin", "bin64", "x64", "win64"]) {
         return d.parent().unwrap_or(d).into();
@@ -622,7 +739,20 @@ fn ancestors_into(p: &Path, set: &mut HashSet<String>) {
 pub fn scan(
     roots: &[PathBuf],
     cancel: &AtomicBool,
+    progress: impl FnMut(u64, u64, &Path),
+) -> Result<Report> {
+    let records = if cancel.load(Ordering::Relaxed) {
+        vec![]
+    } else {
+        crate::game_installations::scan_records(cancel)
+    };
+    scan_with_records(roots, cancel, progress, records)
+}
+fn scan_with_records(
+    roots: &[PathBuf],
+    cancel: &AtomicBool,
     mut progress: impl FnMut(u64, u64, &Path),
+    mut records: Vec<crate::game_installations::Install>,
 ) -> Result<Report> {
     let start = Instant::now();
     let mut report = Report::default();
@@ -632,6 +762,8 @@ pub fn scan(
     let mut anti = HashSet::new();
     let mut candidates = Vec::new();
     let mut steam_dirs = HashSet::new();
+    let mut engine_entries = HashSet::new();
+    let mut platform_entries = HashSet::new();
     for root in roots {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -692,8 +824,8 @@ pub fn scan(
                     continue;
                 }
                 if meta.is_dir() {
+                    subnames.push(lower.clone());
                     if !SKIP.contains(&lower.as_str()) {
-                        subnames.push(lower);
                         stack.push(entry.path());
                     } else {
                         report.skip(&entry.path(), "已跳过系统或缓存目录");
@@ -719,9 +851,32 @@ pub fn scan(
             if report.directories % 100 == 0 {
                 progress(report.directories, report.skipped, &dir);
             }
+            if subnames.iter().any(|n| n == "__installer")
+                && let Some(record) = crate::game_installations::ea(&dir)
+            {
+                records.push(record);
+            }
+            if names.contains(".build.info")
+                && let Some(record) = crate::game_installations::build_info(&dir)
+            {
+                records.push(record);
+            }
+            for (_, path) in files.iter().filter(|(name, _)| {
+                let name = name.to_ascii_lowercase();
+                (name.starts_with("goggame-") || name.starts_with("goggame_"))
+                    && name.ends_with(".info")
+            }) {
+                records.extend(crate::game_installations::gog_entries(path));
+            }
             for (name, path) in files {
+                // Crytek's canonical GameLauncher is the renderer itself, but
+                // only when its project/asset/engine layout is verified.
+                let cry = name
+                    .eq_ignore_ascii_case("GameLauncher.exe")
+                    .then(|| crate::game_engines::cryengine(&path))
+                    .flatten();
                 if !name.to_lowercase().ends_with(".exe")
-                    || auxiliary_exe(&name)
+                    || auxiliary_exe(&name) && cry.is_none()
                     || is_steam_client_binary(&path)
                 {
                     continue;
@@ -735,7 +890,9 @@ pub fn scan(
                     }
                     continue;
                 }
-                let xbox = crate::xbox::declared(&path);
+                let xbox = crate::xbox::identified(&path);
+                let wegame = crate::game_installations::wegame_renderer(&path);
+                let engine = cry.or_else(|| crate::game_engines::probe(&path, &names));
                 let mut row = Game {
                     exe: path.to_string_lossy().into(),
                     root: xbox
@@ -749,7 +906,23 @@ pub fn scan(
                 };
                 if xbox.is_some() {
                     row.rank += 40;
-                    row.reasons.push("Xbox PC 游戏清单已确认入口".into());
+                    row.reasons.push("Xbox PC 安装信息已确认入口".into());
+                }
+                if let Some(install) = wegame {
+                    row.root = install.root.display().to_string();
+                    row.title = install.title;
+                    row.rank += 40;
+                    row.reasons.push("WeGame 安装信息已确认游戏本体".into());
+                }
+                if let Some(entry) = engine {
+                    row.root = entry.root.display().to_string();
+                    if !entry.title.is_empty() {
+                        row.title = entry.title;
+                    }
+                    row.rank += 30;
+                    row.reasons
+                        .push(format!("{} 游戏结构已确认（兼容性待确认）", entry.engine));
+                    engine_entries.insert(core::key(&path));
                 }
                 if names.contains("nvngx_dlssg.dll") || names.contains("sl.dlss_g.dll") {
                     row.rank += 80;
@@ -785,6 +958,16 @@ pub fn scan(
     let manifests = steam_manifests(&steam_dirs);
     let mut groups: BTreeMap<String, Vec<Game>> = BTreeMap::new();
     for mut row in candidates {
+        if let Some((record, _)) = crate::game_installations::scan_match(&row, &records) {
+            row.root = record.root.display().to_string();
+            if !record.title.is_empty() {
+                row.title = record.title.clone();
+            }
+            row.rank += 40;
+            row.reasons
+                .push(format!("{} 安装记录已确认游戏入口", record.source));
+            platform_entries.insert(core::key(Path::new(&row.exe)));
+        }
         let base = Path::new(&row.root);
         let exe = Path::new(&row.exe);
         if let Some((steam, title)) = steam_root(exe).and_then(|steam| {
@@ -803,6 +986,18 @@ pub fn scan(
             };
             row.rank += 35;
             row.reasons.push("Steam 已安装游戏".into());
+            if !renderer_name(exe, base)
+                && crate::game_engines::graphics_import(exe)
+                && crate::game_name_windows::products(exe)
+                    .iter()
+                    .any(|product| {
+                        crate::game_engines::normalized(product)
+                            == crate::game_engines::normalized(title)
+                    })
+            {
+                platform_entries.insert(core::key(exe));
+                row.reasons.push("游戏产品信息与图形入口已确认".into());
+            }
         }
         if base.parent().is_some()
             && evidence.contains(&core::key(base))
@@ -863,12 +1058,24 @@ pub fn scan(
         let has_unity = rows
             .iter()
             .any(|g| g.reasons.iter().any(|r| r.contains("Unity 游戏本体")));
+        let has_engine = rows
+            .iter()
+            .any(|g| engine_entries.contains(&core::key(Path::new(&g.exe))));
         let owned = rows.iter().any(|g| {
             Path::new(&g.exe)
                 .parent()
                 .is_some_and(|p| p.join(core::OWN).is_dir())
         });
-        if rows[0].title.is_empty() && !has_unreal && !has_unity && !has_named && !owned {
+        if rows[0].title.is_empty()
+            && !has_unreal
+            && !has_unity
+            && !has_engine
+            && !has_named
+            && !owned
+            && !rows
+                .iter()
+                .any(|g| platform_entries.contains(&core::key(Path::new(&g.exe))))
+        {
             report.skip(
                 Path::new(&rows[0].root),
                 "缺少可确认的游戏身份线索，仍可手动添加",
@@ -889,16 +1096,26 @@ pub fn scan(
             let xbox = row
                 .reasons
                 .iter()
-                .any(|r| r == "Xbox PC 游戏清单已确认入口");
+                .any(|r| r == "Xbox PC 安装信息已确认入口");
+            let wegame = row
+                .reasons
+                .iter()
+                .any(|r| r == "WeGame 安装信息已确认游戏本体");
+            let engine = engine_entries.contains(&core::key(path));
+            let platform = platform_entries.contains(&core::key(path));
             // A Steam manifest identifies the installation, not every EXE in
             // it. Root-wide DLSS evidence likewise cannot identify a sidecar
             // utility in another directory as a rendering process.
-            if (has_unreal && !unreal && !xbox)
+            if (has_unreal && !unreal && !xbox && !wegame)
+                || ((has_engine || has_unity) && !engine && !unity && !unreal && !owned)
                 || (!unreal
                     && !unity
+                    && !engine
+                    && !platform
                     && !renderer_name(path, Path::new(&row.root))
                     && !local_fg
                     && !xbox
+                    && !wegame
                     && !owned)
             {
                 continue;

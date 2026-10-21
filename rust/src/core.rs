@@ -110,21 +110,7 @@ pub fn no_links(path: &Path) -> Result<PathBuf> {
 fn pe_machine(path: &Path, dll: bool) -> Result<u16> {
     let mut file = match File::open(path) {
         Ok(file) => file,
-        Err(error) if !dll && error.kind() == std::io::ErrorKind::PermissionDenied => {
-            // GDK flat installs can expose writable game folders while the
-            // declared EXE remains encrypted. Only this specific access failure
-            // can use manifest architecture; readable invalid PEs still fail.
-            no_links(path)?;
-            if fs::metadata(path)?.is_file()
-                && let Some(game) = crate::xbox::declared(path)
-            {
-                return Ok(game.machine);
-            }
-            return Err(error).context(crate::xbox::access_hint(path));
-        }
-        Err(error) => {
-            return Err(error).with_context(|| format!("无法读取文件：{}", path.display()));
-        }
+        Err(error) => return unreadable_pe_machine(path, dll, error),
     };
     let size = file.metadata()?.len();
     let mut h = [0; 64];
@@ -144,6 +130,103 @@ fn pe_machine(path: &Path, dll: bool) -> Result<u16> {
         "EXE / DLL 类型不匹配"
     );
     Ok(u16::from_le_bytes([h[4], h[5]]))
+}
+fn unreadable_pe_machine(path: &Path, dll: bool, error: std::io::Error) -> Result<u16> {
+    if !dll && error.kind() == std::io::ErrorKind::PermissionDenied {
+        // GDK flat installs can expose writable game folders while a declared
+        // EXE remains encrypted. Require an exact declaration or a bounded,
+        // package-specific renderer rule; never substitute a launcher path.
+        no_links(path)?;
+        if fs::metadata(path)?.is_file()
+            && let Some(game) = crate::xbox::identified(path)
+        {
+            return Ok(game.machine);
+        }
+        return Err(error).context(crate::xbox::access_hint(path));
+    }
+    Err(error).with_context(|| format!("无法读取文件：{}", path.display()))
+}
+
+#[cfg(test)]
+mod protected_exe_tests {
+    use super::*;
+
+    #[test]
+    fn xbox_protected_nested_exe_requires_its_own_declaration() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("Xbox/Call of Duty/Content");
+        fs::create_dir_all(root.join("sp26")).unwrap();
+        let main = root.join("cod.exe");
+        let game = root.join("sp26/sp26-cod.exe");
+        for exe in [&main, &game] {
+            fs::write(exe, b"synthetic protected bytes").unwrap();
+        }
+        let config = root.join("MicrosoftGame.config");
+        fs::write(&config, r#"<Game><ExecutableList><Executable Name="cod.exe" TargetDeviceFamily="PC"/></ExecutableList></Game>"#).unwrap();
+        let denied = || std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            unreadable_pe_machine(&main, false, denied()).unwrap(),
+            0x8664
+        );
+        assert!(unreadable_pe_machine(&game, false, denied()).is_err());
+        fs::write(&config, r#"<Game><ExecutableList><Executable Name="cod.exe" TargetDeviceFamily="PC"/><Executable Name="sp26\sp26-cod.exe" TargetDeviceFamily="PC"/></ExecutableList></Game>"#).unwrap();
+        assert_eq!(
+            unreadable_pe_machine(&game, false, denied()).unwrap(),
+            0x8664
+        );
+        assert_eq!(crate::xbox::declared(&game).unwrap().exe, game);
+        // The declaration never overrides invalid readable bytes or a DLL check.
+        assert!(pe_machine(&game, false).is_err());
+        assert!(unreadable_pe_machine(&game, true, denied()).is_err());
+        assert!(
+            unreadable_pe_machine(&game, false, std::io::Error::from_raw_os_error(32)).is_err()
+        );
+        fs::remove_file(&game).unwrap();
+        assert!(unreadable_pe_machine(&game, false, denied()).is_err());
+    }
+
+    #[test]
+    fn xbox_protected_exe_keeps_manifest_architecture_and_package_boundary() {
+        let temp = tempfile::tempdir().unwrap();
+        let exe = temp.path().join("Content/sub/game.exe");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        fs::write(&exe, b"synthetic protected bytes").unwrap();
+        let config = temp.path().join("Content/MicrosoftGame.config");
+        let denied = || std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        fs::write(&config, r#"<Game><ExecutableList><Executable Name="sub\game.exe" TargetDeviceFamily="PC" Architecture="ARM64"/></ExecutableList></Game>"#).unwrap();
+        assert_eq!(
+            unreadable_pe_machine(&exe, false, denied()).unwrap(),
+            0xaa64
+        );
+        fs::write(
+            exe.parent().unwrap().join("MicrosoftGame.config"),
+            "<Game/>",
+        )
+        .unwrap();
+        assert!(unreadable_pe_machine(&exe, false, denied()).is_err());
+        assert!(unreadable_pe_machine(&config, false, denied()).is_err());
+    }
+
+    #[test]
+    fn xbox_cod_renderer_rule_handles_denied_read_without_accepting_corrupt_pe() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("Content");
+        let exe = root.join("sp26/sp26-cod.exe");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        fs::write(&exe, b"synthetic protected bytes").unwrap();
+        fs::write(root.join("bootstrapper.exe"), b"fixture only").unwrap();
+        fs::write(root.join("MicrosoftGame.config"), r#"<Game><Identity Name="38985CA0.COREBase" Publisher="CN=07A9AC0F-5502-4D92-BA69-01D5D39D1E92"/><ExecutableList><Executable Name="bootstrapper.exe" TargetDeviceFamily="PC"/></ExecutableList><StoreId>9N201KQXS5BM</StoreId></Game>"#).unwrap();
+        let denied = || std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            unreadable_pe_machine(&exe, false, denied()).unwrap(),
+            0x8664
+        );
+        assert!(unreadable_pe_machine(&exe, true, denied()).is_err());
+        assert!(library_location(&exe).is_err());
+        assert!(pe64(&exe, false).is_err());
+        fs::remove_file(root.join("bootstrapper.exe")).unwrap();
+        assert!(unreadable_pe_machine(&exe, false, denied()).is_err());
+    }
 }
 pub fn pe64(path: &Path, dll: bool) -> Result<()> {
     ensure!(
@@ -565,7 +648,7 @@ pub struct Record {
     pub upstream_version: Option<String>,
     #[serde(default = "default_proxy")]
     pub proxy: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub proxies: Vec<String>,
     pub hashes: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -670,7 +753,13 @@ pub fn record(directory: &Path) -> Result<Option<Record>> {
     let data = read_json(&p, 20000)?;
     if let Some(proxies) = data.get("proxies") {
         ensure!(
-            proxies.as_array().is_some_and(|a| !a.is_empty()),
+            proxies.as_array().is_some_and(|a| {
+                !a.is_empty()
+                    // Older cleanup serialized a legacy single-entry record
+                    // with an empty list. The explicit entry and exact owned
+                    // file set still pass Record::validate below.
+                    || data.get("proxy").and_then(serde_json::Value::as_str).is_some()
+            }),
             "部署记录的 DLL 入口无效"
         );
     }

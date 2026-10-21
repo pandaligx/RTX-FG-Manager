@@ -8,7 +8,8 @@
     "Q112049342": "明日方舟：终末地",
     "Q104817349": "永劫无间",
     "Q123138197": "三角洲行动",
-    "Q67650639": "云顶之弈"
+    "Q67650639": "云顶之弈",
+    "Q117750031": "鸣潮"
   },
   "rules": [
     {
@@ -146,6 +147,19 @@
       ],
       "files": [
         "StarRail_Data"
+      ]
+    },
+    {
+      "id": "wuthering-waves-client",
+      "game": "Q117750031",
+      "executables": [
+        "Client-Win64-Shipping.exe"
+      ],
+      "directories": [
+        "Wuthering Waves Game",
+        "Wuthering Waves",
+        "WutheringWaves",
+        "鸣潮"
       ]
     }
   ],

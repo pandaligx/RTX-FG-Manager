@@ -109,6 +109,7 @@ pub enum RetryAction {
     RemoveNr,
     Apply,
     DeleteCleanup(Vec<rtx_fg_manager::cleanup_pending::Plan>),
+    CleanupResiduals(Vec<core::DeploymentTarget>),
 }
 #[derive(Clone)]
 pub struct RetryRequest {
@@ -1741,6 +1742,7 @@ impl Controller {
         self.busy = true;
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
+        let title = self.text("添加游戏");
         self.channel.operation(move |c| {
             (|| {
                 if folder {
@@ -1750,10 +1752,7 @@ impl Controller {
                         })?;
                         c.send(Event::Scan(r));
                     }
-                } else if let Some(files) = rfd::FileDialog::new()
-                    .add_filter("Windows EXE", &["exe"])
-                    .pick_files()
-                {
+                } else if let Some(files) = rtx_fg_manager::game_picker::pick(&title, true)? {
                     let mut rows = Vec::new();
                     for p in files {
                         let p = core::library_location(&p).map_err(|e| {
@@ -1767,7 +1766,7 @@ impl Controller {
                                 e
                             }
                         })?;
-                        let xbox = rtx_fg_manager::xbox::declared(&p);
+                        let xbox = rtx_fg_manager::xbox::identified(&p);
                         rows.push(Game {
                             exe: p.display().to_string(),
                             root: xbox
@@ -1817,10 +1816,8 @@ impl Controller {
             let game = if let Some(g) = existing {
                 g
             } else {
-                let Some(exe) = rfd::FileDialog::new()
-                    .set_title(exe_title)
-                    .add_filter("Windows EXE", &["exe"])
-                    .pick_file()
+                let Some(exe) = rtx_fg_manager::game_picker::pick(&exe_title, false)?
+                    .and_then(|files| files.into_iter().next())
                 else {
                     return Ok(());
                 };
@@ -1930,6 +1927,7 @@ impl Controller {
             RetryAction::RemoveNr => self.remove_neural_runtime(),
             RetryAction::Apply => self.apply_focused_parameters(),
             RetryAction::DeleteCleanup(plans) => self.delete_cleanup_plans(plans),
+            RetryAction::CleanupResiduals(targets) => self.cleanup_residual_targets(targets),
         }
     }
     pub fn recheck_blocked(&mut self) {
@@ -1986,7 +1984,7 @@ impl Controller {
         else {
             return;
         };
-        let target = parameter_target(&game);
+        let targets = game.deployment_targets();
         self.status_epoch += 1;
         let data = self.data.clone();
         self.busy = true;
@@ -1995,18 +1993,25 @@ impl Controller {
         let cancel = self.cancel.clone();
         let retry = self.retry_request(RetryAction::InstallNr(version));
         self.channel.operation(move |c| {
-            if defer_if_running(c, std::slice::from_ref(&target), retry)? {
+            if defer_if_running(c, &targets, retry)? {
                 return Ok(());
             }
-            ensure_directory_outside_data(&target.directory, &data)?;
-            rtx_fg_manager::neural_runtime::install(&target, version, &cancel, &mut |transfer| {
-                c.send(Event::PayloadProgress(cloud::CloudProgress {
-                    transfer,
-                    proxy: "nvngx_dlssnr.dll".into(),
-                    package_index: 1,
-                    package_count: 1,
-                }));
-            })?;
+            for target in &targets {
+                ensure_directory_outside_data(&target.directory, &data)?;
+            }
+            rtx_fg_manager::neural_runtime::install_many(
+                &targets,
+                version,
+                &cancel,
+                &mut |transfer| {
+                    c.send(Event::PayloadProgress(cloud::CloudProgress {
+                        transfer,
+                        proxy: "nvngx_dlssnr.dll".into(),
+                        package_index: 1,
+                        package_count: 1,
+                    }));
+                },
+            )?;
             c.send(Event::Notice(
                 "NR 运行库已安装。请在游戏中开启 DLSS/DLAA，再按 Insert 开启神经渲染。".into(),
             ));
@@ -2024,18 +2029,20 @@ impl Controller {
         else {
             return;
         };
-        let target = parameter_target(game);
+        let targets = game.deployment_targets();
         let data = self.data.clone();
         self.status_epoch += 1;
         self.busy = true;
         self.critical = true;
         let retry = self.retry_request(RetryAction::RemoveNr);
         self.channel.operation(move |c| {
-            if defer_if_running(c, std::slice::from_ref(&target), retry)? {
+            if defer_if_running(c, &targets, retry)? {
                 return Ok(());
             }
-            ensure_directory_outside_data(&target.directory, &data)?;
-            rtx_fg_manager::neural_runtime::remove(&target)?;
+            for target in &targets {
+                ensure_directory_outside_data(&target.directory, &data)?;
+            }
+            rtx_fg_manager::neural_runtime::remove_many(&targets)?;
             c.send(Event::Notice(
                 "NR 安装已撤销；若原先已有运行库，已恢复原件。Encore 和其他补丁保持不变。".into(),
             ));
@@ -2124,7 +2131,7 @@ impl Controller {
             let mut pending = Vec::new();
             for plan in &plans {
                 rtx_fg_manager::cleanup_pending::delete_confirmed(plan)?;
-                let outcome = cleanup::clean_outcome_at(plan.target())?;
+                let outcome = cleanup::retry_pending_at(plan.target())?;
                 c.send(Event::Log(outcome.message.clone()));
                 if !outcome.complete {
                     pending.push(outcome.message);
@@ -2142,20 +2149,96 @@ impl Controller {
         if self.busy || self.closing {
             return;
         }
-        let Some(game) = self
+        let targets = self
             .focus
             .as_ref()
-            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
-        else {
+            .and_then(|e| self.deployments.get(e))
+            .map(|s| {
+                s.issues()
+                    .iter()
+                    .filter(|i| i.kind() == rtx_fg_manager::deployment::IssueKind::Residuals)
+                    .map(|i| i.target().clone())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        self.cleanup_residual_targets(targets);
+    }
+    fn cleanup_residual_targets(&mut self, targets: Vec<core::DeploymentTarget>) {
+        if self.busy || self.closing {
             return;
-        };
-        // Scope retries to this card, never the unrelated checked batch.
-        let paths = game
-            .deployment_executables()
-            .into_iter()
-            .chain(game.cleanup_only.clone())
-            .collect();
-        self.perform(true, paths);
+        }
+        if targets.is_empty() {
+            self.refresh();
+            return;
+        }
+        self.status_epoch += 1;
+        self.busy = true;
+        self.critical = true;
+        let retry = self.retry_request(RetryAction::CleanupResiduals(targets.clone()));
+        let data = self.data.clone();
+        self.channel.operation(move |c| {
+            if defer_if_running(c, &targets, retry)? {
+                return Ok(());
+            }
+            let mut pending = Vec::new();
+            for target in &targets {
+                ensure_directory_outside_data(&target.directory, &data)?;
+                match cleanup::retry_pending_at(target) {
+                    Ok(outcome) if outcome.complete => c.send(Event::Log(outcome.message)),
+                    Ok(outcome) => pending.push(format!(
+                        "{}\n{}",
+                        target.directory.display(),
+                        outcome.message
+                    )),
+                    Err(error) => {
+                        pending.push(format!("{}\n{error:#}", target.directory.display()))
+                    }
+                }
+            }
+            if pending.is_empty() {
+                c.send(Event::Notice(
+                    "当前游戏的残留清理已完成，状态已刷新。".into(),
+                ));
+            } else {
+                c.send(Event::Warning(format!(
+                    "仍有文件未清理；已保留恢复记录，可查看详情后重试。\n\n{}",
+                    pending.join("\n\n")
+                )));
+            }
+            Ok(())
+        });
+    }
+    pub fn request_focused_recovery(&mut self) {
+        if self.busy || self.closing {
+            return;
+        }
+        let targets = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.deployments.get(e))
+            .map(|s| {
+                s.issues()
+                    .iter()
+                    .filter(|i| {
+                        matches!(
+                            i.kind(),
+                            rtx_fg_manager::deployment::IssueKind::Interrupted
+                                | rtx_fg_manager::deployment::IssueKind::Modified
+                        )
+                    })
+                    .map(|i| i.target().game_exe.display().to_string())
+                    .collect::<BTreeSet<_>>()
+            })
+            .unwrap_or_default();
+        if targets.is_empty() {
+            self.refresh();
+            return;
+        }
+        self.pending_patch = Some(PatchRequest {
+            clean: true,
+            targets,
+        });
+        self.confirm = Some("recover_patch".into());
     }
     pub fn confirm_patch(&mut self) {
         if let Some(p) = self.pending_patch.take() {
@@ -2167,7 +2250,7 @@ impl Controller {
         self.pending_cleanup = None;
         if matches!(
             self.confirm.as_deref(),
-            Some("deploy_batch" | "clean_batch")
+            Some("deploy_batch" | "clean_batch" | "recover_patch")
         ) {
             self.confirm = None;
         }
@@ -3662,15 +3745,13 @@ mod tests {
             ("A.exe", "upstream-0.3.5-310-9", "d3d12.dll"),
             ("B.exe", "rtxfg-0.3.5-dx12-vulkan", "version.dll"),
         ] {
-            c.deployments.insert(
-                exe.into(),
-                rtx_fg_manager::deployment::Snapshot {
-                    total: 1,
-                    installed: 1,
-                    common: Some((scheme.into(), vec![proxy.into()], None)),
-                    ..Default::default()
-                },
-            );
+            c.deployments.insert(exe.into(), {
+                let mut snapshot = rtx_fg_manager::deployment::Snapshot::default();
+                snapshot.total = 1;
+                snapshot.installed = 1;
+                snapshot.common = Some((scheme.into(), vec![proxy.into()], None));
+                snapshot
+            });
         }
         c.focus = Some("A.exe".into());
         assert_eq!(c.cloud_scheme(), "upstream-0.3.5-310-9");
@@ -4446,15 +4527,13 @@ mod tests {
             .insert(first.clone(), "已部署 1/2 个目录，请检查未完成项".into());
         assert!(!c.can_apply_parameters());
         let scheme = c.cloud_scheme();
-        c.deployments.insert(
-            first.clone(),
-            rtx_fg_manager::deployment::Snapshot {
-                total: 2,
-                installed: 1,
-                common: Some((scheme.clone(), vec!["version.dll".into()], None)),
-                ..Default::default()
-            },
-        );
+        c.deployments.insert(first.clone(), {
+            let mut snapshot = rtx_fg_manager::deployment::Snapshot::default();
+            snapshot.total = 2;
+            snapshot.installed = 1;
+            snapshot.common = Some((scheme.clone(), vec!["version.dll".into()], None));
+            snapshot
+        });
         assert!(!c.can_apply_parameters());
         c.statuses.insert(first.clone(), "已部署 2/2 个目录".into());
         c.deployments.get_mut(&first).unwrap().installed = 2;

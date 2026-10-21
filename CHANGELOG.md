@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.3.6
+
+- Fix the Windows file picker rejecting some protected Xbox / Game Pass executables before validation. Recognize the sp26 renderer under the known COD package identity, retaining manifest, architecture and directory checks without substituting launchers or changing game permissions.
+- Reuse verified game identities for recommendations, including recognized non-Steam games. Choose once when uncertain and correct the association later. Shares can specify platform and edition; administrators can associate game aliases and undo the latest association without losing setups or feedback.
+
+- Add reversible reports with reasons and temporary hiding after reports from three distinct verified emails, pending admin review. Monitor the verification-email service. Recognize the standalone Wuthering Waves client by its installation directory without renaming unrelated Client executables.
+- Add per-game recommendation cards, collapsed by default, with patch schemes, DLL entries, GPU-name guidance and NR. Preview before choosing a setup; verify an email to share notes or leave reversible useful/not-useful feedback. Authors can edit or delete their own shares, retaining feedback across edits. Select common email suffixes. Administrators can search, filter suspected duplicates, hide or delete setups. Retain a local browsing cache for outages.
+- Upgrade GPUI Kit to 0.8.0 and GPUI Fast to 0.1.10, incorporating upstream text layout, dropdown, tooltip and retained-rendering fixes.
+- Retain the current layout, font sizing, resizable sidebar and mouse/Tab focus behavior. Rebase the manager's Windows startup, DPI and font compatibility patches onto the new renderer.
+- Show full deployment paths in the library, wrapping long paths. Slightly enlarge game icons and scale them with the font size. Open each folder with its folder icon; double-clicking a game row no longer opens a folder.
+- Add folder hover/open feedback, place NR status alongside deployment status and remove its tooltip. Recognize the WeGame QQ Speed installation and its 64-bit game executable without requiring DLSS components.
+- Extend discovery to Godot, Source/Source 2 and verified CRYENGINE layouts, and use platform-declared game entries independently of DLSS. Exclude additional launchers, tools and servers; match folder-button hover/press feedback to the parameter-settings button.
+- Fix NR installation reaching only the first folder of a multi-folder game. Reuse one download across all deployment folders and remove owned NR from all of them, preserving per-folder ownership and original-file restoration. The inspector distinguishes partial from complete installation.
+- Existing patch resources and per-game configurations remain unchanged.
+- Replace generic review warnings with specific causes and per-game actions. Residual cleanup explains its scope before execution, preserves working folders and independent NR, and stops if a patch has been reinstalled. Technical file details remain available in a collapsed section.
+- Recover legacy single-DLL records saved during failed cleanup, retaining file-scope validation so cleanup can be retried after files are unlocked.
+
 ## 4.3.5
 
 - Support MFG Unlocker 1.6.1: DLSS SR/RR presets, RTX 30 pacing and an experimental per-game FG option. Preserve unknown JSON/INI fields and recover interrupted edits. New settings require MFG 1.6+.

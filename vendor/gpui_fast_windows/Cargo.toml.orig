@@ -1,14 +1,14 @@
 # Modified by Longbridge for gpui-fast publication.
 [package]
 name = "gpui-fast-windows"
-version = "0.1.2"
+version = "0.1.10"
 edition = "2024"
 publish = ["crates-io"]
 license = "Apache-2.0"
 repository = "https://github.com/longbridge/gpui-fast"
 homepage = "https://github.com/longbridge/gpui-fast"
 readme = "README.md"
-documentation = "https://docs.rs/gpui-fast-windows/0.1.2/gpui_windows/"
+documentation = "https://docs.rs/gpui-fast-windows/0.1.10/gpui_windows/"
 description = "gpui_windows: GPUI with gpui-fast rendering and layout optimizations"
 autoexamples = false
 autobenches = false
@@ -29,7 +29,7 @@ screen-capture = ["gpui/screen-capture", "scap"]
 [dependencies.gpui]
 default-features = false
 package = "gpui-fast"
-version = "=0.1.2"
+version = "^0.1.10"
 path = "../gpui"
 
 [target."cfg(target_os = \"windows\")".dependencies]
@@ -46,7 +46,7 @@ version = "0.34"
 version = "1.0.86"
 
 [target."cfg(target_os = \"windows\")".dependencies.collections]
-version = "=0.3.8"
+version = "=0.3.9"
 package = "gpui-pre-collections"
 
 [target."cfg(target_os = \"windows\")".dependencies.dunce]
@@ -60,7 +60,7 @@ version = "0.3.34"
 
 [target."cfg(target_os = \"windows\")".dependencies.gpui_util]
 package = "gpui-pre-util"
-version = "=0.3.8"
+version = "=0.3.9"
 
 [target."cfg(target_os = \"windows\")".dependencies.image]
 version = "0.25.1"
@@ -88,7 +88,7 @@ version = "0.6"
 
 [target."cfg(target_os = \"windows\")".dependencies.scheduler]
 package = "gpui-pre-scheduler"
-version = "=0.3.8"
+version = "=0.3.9"
 
 [target."cfg(target_os = \"windows\")".dependencies.smallvec]
 version = "1.6"
@@ -116,3 +116,6 @@ optional = true
 
 [target."cfg(target_os = \"windows\")".build-dependencies.windows-registry]
 version = "0.6.0"
+
+[lints.rust.unexpected_cfgs]
+level = "allow"

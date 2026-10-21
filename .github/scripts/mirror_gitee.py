@@ -24,6 +24,11 @@ API='https://gitee.com/api/v5/repos/'+REPO
 # Keep in step with tools/export-source.ps1. This is deliberately not a recursive
 # copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
 ALLOWED = {
+    'recommendations/package.json', 'recommendations/pnpm-lock.yaml', 'recommendations/.gitignore',
+    'recommendations/.dockerignore', 'recommendations/Dockerfile', 'recommendations/compose.yaml',
+    'recommendations/config.example', 'recommendations/nginx-location.conf', 'recommendations/README.md',
+    'recommendations/NODEMAILER-LICENSE',
+    'recommendations/src/game-directory.json',
     'tools/update_download_stats.py', 'tests/test_download_stats.py',
     '.github/workflows/update-download-stats.yml', 'docs/download-stats.json', 'docs/downloads-total.svg',
     'tools/game-name-overrides.json', 'tests/test_game_names.py', '.github/workflows/update-game-names.yml',
@@ -60,6 +65,9 @@ ALLOWED = {
     'docs/encore-1.1.0.md', 'docs/encore-1.1.0.zh-CN.md',
 }
 TREES = (
+    (r'recommendations/src/[^/]+', {'.mjs'}),
+    (r'recommendations/public/[^/]+', {'.html', '.css', '.js'}),
+    (r'recommendations/tests/[^/]+', {'.mjs'}),
     (r'cloud/names/names-[0-9a-f]{20}\.json', {'.json'}),
     (r'help/[^/]+', {'.html', '.css', '.js'}),
     (r'community/src/[^/]+', {'.mjs', '.json'}),

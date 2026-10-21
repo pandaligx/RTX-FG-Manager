@@ -1890,11 +1890,23 @@
     "ゲームが実行中です。操作前に確認します。",
     "게임이 실행 중입니다. 작업 전에 처리 방법을 확인합니다."
   ],
-  "NR 操作仅针对首个部署目录。": [
-    "NR applies to the first deployment folder only.",
-    "NR применяется только к первой папке.",
-    "NR の操作は最初の配置先のみに適用します。",
-    "NR 작업은 첫 배포 폴더에만 적용됩니다."
+  "NR 安装和卸载会处理此游戏的所有部署目录。": [
+    "NR installation and removal apply to all deployment folders for this game.",
+    "Установка и удаление NR применяются ко всем папкам развёртывания этой игры.",
+    "NR のインストールと削除は、このゲームのすべての配置先に適用されます。",
+    "NR 설치 및 제거는 이 게임의 모든 배포 폴더에 적용됩니다."
+  ],
+  "请先在所有部署目录安装 RTX Encore。": [
+    "Install RTX Encore in every deployment folder first.",
+    "Сначала установите RTX Encore во все папки развёртывания.",
+    "先にすべての配置先に RTX Encore をインストールしてください。",
+    "먼저 모든 배포 폴더에 RTX Encore를 설치하세요."
+  ],
+  "部分安装": [
+    "Partially installed",
+    "Частично установлено",
+    "一部インストール済み",
+    "일부 설치됨"
   ],
   "重新清理": [
     "Retry cleanup",

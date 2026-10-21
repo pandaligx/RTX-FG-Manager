@@ -1,0 +1,6 @@
+.env
+node_modules/
+data/
+backups/
+*.db*
+*.log

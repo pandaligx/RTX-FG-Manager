@@ -269,3 +269,82 @@ fn xbox_manifest_rejects_escaping_console_and_developer_entries() {
     fs::write(&path, "<Game><ExecutableList>").unwrap();
     assert!(xbox::manifest(&path).is_err());
 }
+
+#[test]
+fn xbox_cod_child_renderer_keeps_its_path_and_separate_deployment_directory() {
+    let temp = tempfile::tempdir().unwrap();
+    let content = temp.path().join("Xbox/Call of Duty/Content");
+    let main = content.join("cod.exe");
+    let child = content.join("sp26/sp26-cod.exe");
+    for relative in [
+        "bootstrapper.exe",
+        "cod.exe",
+        "sp26/sp26-cod.exe",
+        "CODBrokerService.exe",
+        "gamelaunchhelper.exe",
+    ] {
+        pe(&content.join(relative));
+    }
+    let config = content.join("MicrosoftGame.config");
+    let xml = r#"<Game><Identity Name="38985CA0.COREBase" Publisher="CN=07A9AC0F-5502-4D92-BA69-01D5D39D1E92"/><ShellVisuals DefaultDisplayName="Call of Duty®"/><ExecutableList><Executable Name="bootstrapper.exe" Id="codShip" TargetDeviceFamily="PC"/></ExecutableList><StoreId>9N201KQXS5BM</StoreId></Game>"#;
+    fs::write(&config, xml).unwrap();
+    assert!(xbox::declared(&child).is_none());
+    let identified = xbox::identified(&child).unwrap();
+    assert_eq!(core::key(&identified.exe), core::key(&child));
+    assert_eq!(
+        core::key(&identified.root),
+        core::key(child.parent().unwrap())
+    );
+    assert!(
+        identified.store_id.is_empty(),
+        "HQ does not identify a specific campaign for sharing"
+    );
+    core::library_location(&child).unwrap();
+    let report = scanner::scan(
+        std::slice::from_ref(&content),
+        &AtomicBool::new(false),
+        |_, _, _| {},
+    )
+    .unwrap();
+    assert_eq!(report.rows.len(), 2);
+    for exe in [&main, &child] {
+        let row = report
+            .rows
+            .iter()
+            .find(|g| core::key(Path::new(&g.exe)) == core::key(exe))
+            .unwrap();
+        assert_eq!(row.targets.len(), 1);
+        assert_eq!(core::key(Path::new(&row.targets[0])), core::key(exe));
+    }
+    assert!(xbox::identified(&content.join("CODBrokerService.exe")).is_none());
+    assert!(xbox::identified(&content.join("gamelaunchhelper.exe")).is_none());
+    let other = content.join("sp26/other.exe");
+    pe(&other);
+    assert!(xbox::identified(&other).is_none());
+    for (from, to) in [
+        ("38985CA0.COREBase", "Other.Game"),
+        ("CN=07A9AC0F-5502-4D92-BA69-01D5D39D1E92", "CN=Other"),
+        ("9N201KQXS5BM", "9OTHER000001"),
+        (
+            "TargetDeviceFamily=\"PC\"",
+            "TargetDeviceFamily=\"Scarlett\"",
+        ),
+        ("Id=\"codShip\"", "Architecture=\"ARM64\""),
+    ] {
+        fs::write(&config, xml.replace(from, to)).unwrap();
+        assert!(
+            xbox::identified(&child).is_none(),
+            "invalid package field: {from}"
+        );
+    }
+    fs::write(&config, xml).unwrap();
+    fs::write(
+        child.parent().unwrap().join("MicrosoftGame.config"),
+        "<Game/>",
+    )
+    .unwrap();
+    assert!(
+        xbox::identified(&child).is_none(),
+        "do not escape a nested package boundary"
+    );
+}

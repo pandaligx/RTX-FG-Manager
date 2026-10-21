@@ -234,6 +234,9 @@ fn identify_records(
             identity.source = "Xbox".into();
         }
         let mut local = Vec::new();
+        if let Some(install) = installs::wegame_renderer(exe).filter(|i| i.matches(game)) {
+            local.push(install);
+        }
         for folder in exe
             .parent()
             .into_iter()

@@ -169,6 +169,32 @@ pub(crate) fn rail_key(exe: &Path) -> Option<String> {
     }
     None
 }
+
+/// Legacy WeGame installs may identify the product in rail_files rather than
+/// rail_apps or the registry. The ID alone is not a rendering-entry declaration:
+/// pair the observed QQ Speed ID with its exact client layout and launcher.
+pub(crate) fn wegame_renderer(exe: &Path) -> Option<Install> {
+    if !exe.file_name()?.eq_ignore_ascii_case("GameApp.exe") {
+        return None;
+    }
+    let bin = exe.parent()?;
+    if !bin.file_name()?.eq_ignore_ascii_case("Releasephysx27_64") {
+        return None;
+    }
+    let root = bin.parent()?;
+    let data = read(&root.join("rail_files/rail_game_identify.json"), 4096)?;
+    let value: Value = serde_json::from_slice(&data).ok()?;
+    if value.get("game_id")?.as_u64()? != 17
+        || !root.join("QQSpeedLauncher.exe").is_file()
+        || core::no_links(&root.join("QQSpeedLauncher.exe")).is_err()
+    {
+        return None;
+    }
+    let mut record = Install::new(root.to_path_buf(), "WeGame", "QQ飞车").with_priority(1);
+    record.executable = Some(exe.to_path_buf());
+    record.add_key("wegame:17".into());
+    Some(record)
+}
 fn absolute(value: &str) -> Option<PathBuf> {
     let p = PathBuf::from(value.replace('/', "\\"));
     (p.is_absolute() && !p.to_string_lossy().starts_with("\\\\") && core::no_links(&p).is_ok())
@@ -419,6 +445,136 @@ pub(crate) fn unity_products(exe: &Path) -> Vec<String> {
         .filter_map(|s| s.lines().nth(1).map(str::to_owned))
         .filter(|s| game_names::valid_title(s))
         .collect()
+}
+
+/// Load game-platform records once per scan. Generic Windows uninstall entries
+/// include ordinary applications, so only entries with a platform ID qualify.
+pub(crate) fn scan_records(cancel: &AtomicBool) -> Vec<Install> {
+    let mut records = crate::game_name_windows::registry(cancel);
+    records.retain(|r| r.source != "Windows" || !r.keys.is_empty());
+    if let Some(data) = std::env::var_os("ProgramData").map(PathBuf::from) {
+        records.extend(epic(&data, cancel));
+        if let Some(bytes) = read(&data.join("Battle.net/Agent/product.db"), 8 * 1024 * 1024) {
+            records.extend(battlenet(&bytes));
+        }
+    }
+    records
+}
+
+/// Only a GOG game task is an entry point. Launcher/support tasks and DLC records
+/// may describe the installation, but must not become a patch target.
+pub(crate) fn gog_entries(path: &Path) -> Vec<Install> {
+    let name = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_ascii_lowercase();
+    let Some(id) = name
+        .strip_prefix("goggame-")
+        .or_else(|| name.strip_prefix("goggame_"))
+        .and_then(|n| n.strip_suffix(".info"))
+    else {
+        return vec![];
+    };
+    let Some(root) = path.parent() else {
+        return vec![];
+    };
+    let Some(data) = read(path, 1024 * 1024) else {
+        return vec![];
+    };
+    let Ok(v) = serde_json::from_slice::<Value>(&data) else {
+        return vec![];
+    };
+    if id.is_empty()
+        || !id.bytes().all(|b| b.is_ascii_digit())
+        || v["gameId"].as_str() != Some(id)
+        || v["rootGameId"].as_str().is_some_and(|s| s != id)
+    {
+        return vec![];
+    }
+    v["playTasks"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .take(64)
+        .filter_map(|task| {
+            if task["category"].as_str().is_some_and(|s| s != "game")
+                || task["type"].as_str().is_some_and(|s| s != "FileTask")
+            {
+                return None;
+            }
+            let exe = task["path"].as_str()?.replace('\\', "/");
+            if !relative(&exe) || !exe.to_ascii_lowercase().ends_with(".exe") {
+                return None;
+            }
+            let mut record =
+                Install::new(root.into(), "GOG", v["name"].as_str().unwrap_or_default());
+            record.executable = Some(root.join(exe));
+            record.add_key(format!("gog:{id}"));
+            Some(record)
+        })
+        .collect()
+}
+
+/// Resolve conflicting metadata conservatively; an exact entry outranks a
+/// name/root match, but the caller still excludes utility and bootstrap roles.
+pub(crate) fn scan_match<'a>(game: &Game, records: &'a [Install]) -> Option<(&'a Install, bool)> {
+    let exe = Path::new(&game.exe);
+    let stem = crate::game_engines::normalized(&exe.file_stem()?.to_string_lossy());
+    let mut found: Option<(&Install, bool)> = None;
+    let mut conflict = false;
+    let mut products = None;
+    for record in records.iter().filter(|r| r.matches(game)) {
+        let exact = record
+            .executable
+            .as_ref()
+            .is_some_and(|p| core::key(p) == core::key(exe));
+        // Do not guess another EXE if a platform already declared one.
+        if !exact && record.executable.is_some() {
+            continue;
+        }
+        let title = crate::game_engines::normalized(&record.title);
+        let folder = crate::game_engines::normalized(
+            &record
+                .root
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy(),
+        );
+        let named = stem.len() >= 3 && (stem == title || stem == folder);
+        if !exact && !named {
+            let products = products.get_or_insert_with(|| {
+                if crate::game_engines::graphics_import(exe) {
+                    crate::game_name_windows::products(exe)
+                        .iter()
+                        .map(|s| crate::game_engines::normalized(s))
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![]
+                }
+            });
+            if title.len() < 3 || !products.contains(&title) {
+                continue;
+            }
+        }
+        if let Some((prior, prior_exact)) = found {
+            if prior_exact && !exact {
+                continue;
+            }
+            if exact == prior_exact && core::key(&prior.root) != core::key(&record.root) {
+                conflict = true;
+                continue;
+            }
+            if exact == prior_exact && !prior.title.is_empty() {
+                continue;
+            }
+            if exact && !prior_exact {
+                conflict = false;
+            }
+        }
+        found = Some((record, exact));
+    }
+    if conflict { None } else { found }
 }
 
 #[cfg(test)]

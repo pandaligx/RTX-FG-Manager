@@ -111,6 +111,14 @@ pub(crate) fn registry(cancel: &AtomicBool) -> Vec<Install> {
                     if let Some(root) = path(&string(&k, dir_field)) {
                         let mut i = Install::new(root, platform, &string(&k, title_field));
                         i.add_key(format!("{platform}:{}", id.to_lowercase()));
+                        if platform == "gog" {
+                            let declared = string(&k, "exe");
+                            if let Some(exe) = path(&declared)
+                                && core::within(&exe, &i.root)
+                            {
+                                i.executable = Some(exe);
+                            }
+                        }
                         out.push(i);
                     }
                 }

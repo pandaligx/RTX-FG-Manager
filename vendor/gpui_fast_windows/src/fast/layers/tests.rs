@@ -15,7 +15,7 @@ use std::slice;
 use anyhow::{Context as _, Result};
 use gpui::{
     AtlasKey, AtlasTile, Bounds, ContentMask, Corners, DevicePixels, Edges, FontId, GlyphId, Hsla,
-    ImageId, LayerFrame, LayerKey, MonochromeSprite, PlatformAtlas, PolychromeSprite, Quad,
+    ImageId, LayerFrame, LayerKey, MonochromeSprite, Path, PlatformAtlas, PolychromeSprite, Quad,
     RenderGlyphParams, RenderImageParams, Rgba, ScaledPixels, Scene, SceneLayers, Shadow, Size,
     SubpixelSprite, TileCoord, TransformationMatrix, Underline, layer_tile_id,
     layer_tile_texture_id, linear_color_stop, linear_gradient, point, px, rgba, size,
@@ -41,13 +41,50 @@ use windows::Win32::{
 use crate::DirectXAtlas;
 use crate::directx_renderer::{
     DirectXGlobalElements, DirectXRenderPipelines, RENDER_TARGET_FORMAT,
+    create_path_intermediate_msaa_texture_and_view, create_path_intermediate_texture,
 };
-use crate::fast::frame::{FrameState, Target, draw_scene, upload};
+use crate::fast::frame::{FrameState, PathTargets, Target, draw_scene, upload};
 use crate::fast::layers::TileCache;
 use crate::fast::layers::raster::{clear_color, rasterize};
 use crate::fast::layers::tile_cache::create_globals;
 
 const TILE: u32 = 512;
+
+#[cfg(feature = "test-support")]
+#[path = "../rounded_clip_fixtures.rs"]
+mod rounded_clip_tests;
+
+#[cfg(feature = "test-support")]
+#[gpui::test]
+fn rounded_overflow_retained_child_follows_ancestor_clip(cx: &mut gpui::TestAppContext) {
+    let mut harness = Harness::new().expect("retained clipping regression requires a GPU");
+    rounded_clip_tests::retained_frames(cx, |scene, size| {
+        harness.render(scene, size, rgba(0xffffffff))
+    });
+}
+
+#[cfg(feature = "test-support")]
+fn render_div_fixture(cx: &mut gpui::TestAppContext, build: fn() -> gpui::Div) -> (Vec<u8>, usize) {
+    let mut harness =
+        Harness::new().expect("rounded clipping regression requires Direct3D or WARP");
+    rounded_clip_tests::render_with(cx, build, |scene, size| {
+        harness.render(scene, size, rgba(0xffffffff))
+    })
+}
+
+#[cfg(feature = "test-support")]
+#[gpui::test]
+fn rounded_overflow_inside_scroll_tiles_matches_direct_pixels(cx: &mut gpui::TestAppContext) {
+    let mut harness =
+        Harness::new().expect("rounded clipping regression requires Direct3D or WARP");
+    rounded_clip_tests::render_with(cx, rounded_clip_tests::square_fixture, |scene, size| {
+        let direct = harness.render(scene, size, rgba(0xffffffff));
+        let tiled = rounded_clip_tests::tiled_scene(scene, size);
+        let actual = harness.render(&tiled, size, rgba(0xffffffff));
+        assert_same_pixels(&actual, &direct, size.width.0 as usize);
+        actual
+    });
+}
 
 #[test]
 fn harness_renders_a_quad_at_the_right_pixels() {
@@ -122,7 +159,7 @@ fn a_composited_layer_equals_direct_drawing() {
         eprintln!("skipped: no Direct3D 11 device");
         return;
     };
-    composite_and_compare(&mut harness, (37., -91.));
+    composite_and_compare(&mut harness, (37., -91.), false);
 }
 
 #[test]
@@ -131,19 +168,39 @@ fn a_composited_layer_equals_direct_drawing_at_even_translations() {
         eprintln!("skipped: no Direct3D 11 device");
         return;
     };
-    composite_and_compare(&mut harness, (-38., 92.));
+    composite_and_compare(&mut harness, (-38., 92.), false);
+}
+
+/// Paths something draws over stay out of the tiles: the core draws them,
+/// and what it draws over them, over the composited tiles
+/// (`gpui::fast::layers::overlay`), as without a layer. That holds at odd
+/// translations too, as the paths are rasterized where they show.
+#[test]
+fn covered_paths_drawn_over_the_tiles_equal_direct_drawing() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    for translation in [(37., -91.), (-38., 92.), (3., 5.), (101., -233.)] {
+        composite_and_compare(&mut harness, translation, true);
+    }
 }
 
 /// Draws a window with a viewport over a scroll layer at `translation`, once
 /// from the content directly and once from the layer's tiles, twice (the
-/// second frame from the cached tiles), and compares the pixels.
-fn composite_and_compare(harness: &mut Harness, translation: (f32, f32)) {
+/// second frame from the cached tiles), and compares the pixels. With
+/// `covered`, [`add_covered_paths`] is drawn after the content, over the
+/// tiles.
+fn composite_and_compare(harness: &mut Harness, translation: (f32, f32), covered: bool) {
     let window = device_size(700, 500);
     let viewport = sp(40., 30., 600., 400.);
 
     let mut direct = Scene::default();
     direct.insert_primitive(panel());
     add_content(&mut direct, harness, translation, viewport);
+    if covered {
+        add_covered_paths(&mut direct, harness, translation, viewport);
+    }
     direct.insert_primitive(scrollbar());
     direct.finish();
     let expected = harness.render(&direct, window, rgba(0x000000ff));
@@ -151,7 +208,12 @@ fn composite_and_compare(harness: &mut Harness, translation: (f32, f32)) {
     let key = LayerKey(5);
     let tiles = [coord(0, 0), coord(1, 0), coord(0, 1), coord(1, 1)];
     let layer = layer_frame(key, 1, content(harness, (0., 0.), no_mask().bounds), &tiles);
-    let composited = composited_scene(layer, &tiles, translation, viewport);
+    let overlay = |scene: &mut Scene| {
+        if covered {
+            add_covered_paths(scene, harness, translation, viewport);
+        }
+    };
+    let composited = composited_scene(layer, &tiles, translation, viewport, &overlay);
     let actual = harness.render(&composited, window, rgba(0x000000ff));
     assert_same_pixels(&actual, &expected, 700);
 
@@ -178,7 +240,7 @@ fn a_composited_tile_the_cache_lacks_draws_nothing() {
 
     let tiles = [coord(0, 0), coord(1, 0)];
     let layer = layer_frame(LayerKey(8), 1, Scene::default(), &tiles);
-    let composited = composited_scene(layer, &tiles, (0., 0.), viewport);
+    let composited = composited_scene(layer, &tiles, (0., 0.), viewport, &|_| {});
     let actual = harness.render_without_rasterizing(&composited, window, rgba(0x000000ff));
     assert_same_pixels(&actual, &expected, 700);
 }
@@ -192,12 +254,14 @@ fn scrollbar() -> Quad {
 }
 
 /// A window scene: a panel, `layer`'s `tiles` composited at `translation`
-/// inside `viewport`, and a scrollbar over them.
+/// inside `viewport`, what `overlay` draws over them, and a scrollbar over
+/// them.
 fn composited_scene(
     layer: LayerFrame,
     tiles: &[TileCoord],
     translation: (f32, f32),
     viewport: Bounds<ScaledPixels>,
+    overlay: &dyn Fn(&mut Scene),
 ) -> Scene {
     let key = layer.key;
     let mut composited = Scene::default();
@@ -230,6 +294,7 @@ fn composited_scene(
         });
     }
     composited.pop_layer();
+    overlay(&mut composited);
     composited.insert_primitive(scrollbar());
     composited.layers.frames.push(layer);
     composited.finish();
@@ -570,6 +635,64 @@ fn add_content(
     });
 }
 
+/// What GPUI Kit draws for a table's rounded frame: paths filling corner
+/// notches, a bordered quad and a glyph drawn over them, and a path nothing
+/// covers, moved by `offset` and clipped to `clip`, in drawing order.
+fn add_covered_paths(
+    scene: &mut Scene,
+    harness: &Harness,
+    (ox, oy): (f32, f32),
+    clip: Bounds<ScaledPixels>,
+) {
+    let mask = ContentMask { bounds: clip };
+    for (x, y, dx, dy) in [
+        (200., 330., 1., 1.),
+        (330.5, 330., -1., 1.),
+        (200., 410.25, 1., -1.),
+    ] {
+        let corner = point(px(x + ox), px(y + oy));
+        let mut path = Path::new(corner);
+        path.line_to(corner + point(px(9. * dx), px(0.)));
+        path.curve_to(corner + point(px(0.), px(9. * dy)), corner);
+        path.line_to(corner);
+        path.content_mask = ContentMask {
+            bounds: clip.map(|c| px(c.0)),
+        };
+        path.color = Hsla::from(rgba(0x3366ccff)).into();
+        scene.insert_primitive(path.scale(1.));
+    }
+    scene.insert_primitive(Quad {
+        bounds: sp(200. + ox, 330. + oy, 130.5, 80.25),
+        content_mask: mask,
+        background: Hsla::from(rgba(0x00000000)).into(),
+        border_color: Hsla::from(rgba(0x222222ff)),
+        corner_radii: Corners::all(ScaledPixels(9.)),
+        border_widths: Edges::all(ScaledPixels(1.)),
+        ..Default::default()
+    });
+    scene.insert_primitive(MonochromeSprite {
+        order: 0,
+        pad: 0,
+        bounds: sp(204. + ox, 334. + oy, 16., 16.),
+        content_mask: mask,
+        color: Hsla::from(rgba(0xff8800ff)),
+        tile: glyph_tile(harness, 1, false),
+        transformation: TransformationMatrix::unit(),
+    });
+    let mut path = Path::new(point(px(250. + ox), px(360. + oy)));
+    path.line_to(point(px(290.5 + ox), px(372. + oy)));
+    path.curve_to(
+        point(px(255. + ox), px(400. + oy)),
+        point(px(300. + ox), px(395. + oy)),
+    );
+    path.line_to(point(px(250. + ox), px(360. + oy)));
+    path.content_mask = ContentMask {
+        bounds: clip.map(|c| px(c.0)),
+    };
+    path.color = Hsla::from(rgba(0x8800ffcc)).into();
+    scene.insert_primitive(path.scale(1.));
+}
+
 /// A 16×16 glyph of a made-up font, uploaded to the harness's atlas: a
 /// monochrome one, or a subpixel one.
 fn glyph_tile(harness: &Harness, glyph: u32, subpixel: bool) -> AtlasTile {
@@ -714,15 +837,15 @@ impl Harness {
         clear: Rgba,
         rasterize_tiles: bool,
     ) -> Result<Vec<u8>> {
-        let target = Target {
-            device: &self.device,
-            device_context: &self.context,
-            atlas: &self.atlas,
-            globals: &self.globals,
-            resources: None,
-        };
         if rasterize_tiles {
-            rasterize(&target, &mut self.pipelines, &mut self.frame, scene)?;
+            let tiles = Target {
+                device: &self.device,
+                device_context: &self.context,
+                atlas: &self.atlas,
+                globals: &self.globals,
+                paths: None,
+            };
+            rasterize(&tiles, &mut self.pipelines, &mut self.frame, scene)?;
         }
 
         let (width, height) = (size.width.0 as u32, size.height.0 as u32);
@@ -731,6 +854,24 @@ impl Harness {
         unsafe {
             self.device
                 .CreateRenderTargetView(&texture, None, Some(&mut render_target))?
+        };
+        // The window's path textures, as `DirectXResources::new` makes them.
+        let (intermediate_texture, intermediate_srv) =
+            create_path_intermediate_texture(&self.device, width, height)?;
+        let (msaa_texture, msaa_view) =
+            create_path_intermediate_msaa_texture_and_view(&self.device, width, height)?;
+        let target = Target {
+            device: &self.device,
+            device_context: &self.context,
+            atlas: &self.atlas,
+            globals: &self.globals,
+            paths: Some(PathTargets {
+                render_target_view: &render_target,
+                intermediate_texture: &intermediate_texture,
+                intermediate_srv: &intermediate_srv,
+                msaa_texture: &msaa_texture,
+                msaa_view: &msaa_view,
+            }),
         };
         let globals = create_globals(&self.device, width, height)?;
         // What `DirectXRenderer::pre_draw` binds.

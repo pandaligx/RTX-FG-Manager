@@ -25,7 +25,9 @@ pub(crate) fn request_first_frame(window: &WindowsWindow) {
             PostMessageW(
                 Some(window.get_raw_handle()),
                 WM_GPUI_FORCE_UPDATE_WINDOW,
-                WPARAM(0),
+                // Fast 0.1.10 rejects foreign WM_USER messages. Use the same
+                // platform validation token as its other forced-frame posts.
+                WPARAM(window.validation_number),
                 LPARAM(0),
             )
         }

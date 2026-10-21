@@ -117,6 +117,12 @@ pub struct Status {
     pub encore_version: Option<String>,
 }
 impl Status {
+    pub fn supports(&self, version: &str) -> bool {
+        self.encore_version.as_deref().is_some_and(|encore| {
+            version != RECOMMENDED
+                || semver::Version::parse(encore).is_ok_and(|v| v >= semver::Version::new(1, 1, 0))
+        })
+    }
     pub fn label(&self) -> String {
         if let Some(warning) = &self.warning {
             return warning.clone();
@@ -210,21 +216,71 @@ fn accepted(path: &Path, r: &Ownership) -> Result<bool> {
 }
 
 /// Called in a worker; no GPU probe and no game binary is loaded.
-pub fn install(
-    target: &core::DeploymentTarget,
+pub fn install_many(
+    targets: &[core::DeploymentTarget],
     version: &str,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<()> {
-    let target = target.validate(true)?;
+    install_many_with(targets, version, cancel, progress, |cancel, progress| {
+        prepare(version, cancel, progress)
+    })
+}
+
+fn validated_targets(
+    targets: &[core::DeploymentTarget],
+    installing: bool,
+) -> Result<Vec<core::DeploymentTarget>> {
+    ensure!(!targets.is_empty(), "没有实际部署目录");
+    let mut unique = std::collections::BTreeMap::new();
+    for target in targets {
+        let validated = target
+            .validate(installing)
+            .with_context(|| target.directory.display().to_string())?;
+        unique
+            .entry(core::key(&validated.directory))
+            .or_insert(validated);
+    }
+    // Consistent lock order, even if two callers supply the folders differently.
+    Ok(unique.into_values().collect())
+}
+
+fn install_many_with(
+    targets: &[core::DeploymentTarget],
+    version: &str,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(transfer::Progress),
+    prepare_source: impl FnOnce(&AtomicBool, &mut dyn FnMut(transfer::Progress)) -> Result<PathBuf>,
+) -> Result<()> {
+    let targets = validated_targets(targets, true)?;
     let _cache_lock = crate::cache::wait_for_operation(cancel, || {
         progress(transfer::Progress {
             phase: transfer::Phase::Waiting,
             ..Default::default()
         });
     })?;
-    let _lock = win::game_lock(&target.directory)?;
-    core::assert_target_stopped(&target)?;
+    let mut locks = Vec::new();
+    for target in &targets {
+        locks.push(win::game_lock(&target.directory)?);
+        preflight_install(target, version)
+            .with_context(|| target.directory.display().to_string())?;
+    }
+    let source = prepare_source(cancel, progress)?;
+    let mut failures = Vec::new();
+    for target in &targets {
+        ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
+        if let Err(error) =
+            core::assert_target_stopped(target).and_then(|()| install_file_locked(target, &source))
+        {
+            failures.push(format!("{}：{error:#}", target.directory.display()));
+        }
+    }
+    ensure!(failures.is_empty(), "{}", failures.join("\n\n"));
+    Ok(())
+}
+
+fn preflight_install(target: &core::DeploymentTarget, version: &str) -> Result<()> {
+    core::assert_target_stopped(target)?;
     let record = core::record(&target.directory)?.context("请先安装 RTX Encore")?;
     target.validate_record(&record)?;
     ensure!(record.backend == encore::BACKEND, "请先安装 RTX Encore");
@@ -232,7 +288,7 @@ pub fn install(
         !record.cache_pending && !crate::encore_upgrade::has_pending(&target.directory)?,
         "请先完成补丁安装或恢复，再添加 NR 运行库"
     );
-    if version == "310.9.16" {
+    if version == RECOMMENDED {
         ensure!(
             record
                 .upstream_version
@@ -247,10 +303,22 @@ pub fn install(
         scanner::inspect(&target.game_exe).super_resolution,
         "未发现游戏的 DLSS 超分组件；不会添加 NR 运行库"
     );
-    let source = prepare(version, cancel, progress)?;
-    core::assert_target_stopped(&target)?;
-    ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
-    install_file_locked(&target, &source)
+    let root = core::no_links(&target.directory.join(OWN))?;
+    let dest = core::no_links(&target.directory.join(FILE))?;
+    if let Some(r) = read(target)? {
+        original_valid(&root, &r)?;
+        ensure!(
+            accepted(&dest, &r)?,
+            "NR 文件已被其他程序修改，已保留；请先处理冲突"
+        );
+    } else {
+        ensure!(!root.exists(), "发现未完成的 NR 备份，请保留并检查该目录");
+        ensure!(
+            !dest.exists() || (dest.is_file() && dest.metadata()?.len() <= LIMIT),
+            "NR 文件类型或大小异常"
+        );
+    }
+    Ok(())
 }
 fn install_file_locked(target: &core::DeploymentTarget, source: &Path) -> Result<()> {
     let root = core::no_links(&target.directory.join(OWN))?;
@@ -335,6 +403,25 @@ pub fn remove(target: &core::DeploymentTarget) -> Result<()> {
     remove_locked(&target)
 }
 
+/// Remove owned NR from every current folder. External files and folders that
+/// never received NR are skipped; a failed folder does not hide other results.
+pub fn remove_many(targets: &[core::DeploymentTarget]) -> Result<()> {
+    let targets = validated_targets(targets, false)?;
+    let mut failures = Vec::new();
+    for target in targets {
+        let result = (|| {
+            let _lock = win::game_lock(&target.directory)?;
+            core::assert_target_stopped(&target)?;
+            remove_locked(&target)
+        })();
+        if let Err(error) = result {
+            failures.push(format!("{}：{error:#}", target.directory.display()));
+        }
+    }
+    ensure!(failures.is_empty(), "{}", failures.join("\n\n"));
+    Ok(())
+}
+
 pub fn remove_locked(target: &core::DeploymentTarget) -> Result<()> {
     let Some(r) = read(target)? else {
         return Ok(());
@@ -370,6 +457,214 @@ pub fn remove_locked(target: &core::DeploymentTarget) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn multi_game(root: &Path, count: usize) -> Result<scanner::Game> {
+        let mut game = scanner::Game {
+            root: root.display().to_string(),
+            ..Default::default()
+        };
+        for index in 0..count {
+            let dir = root.join(format!("Engine/Binaries/Win64-{index}"));
+            fs::create_dir_all(&dir)?;
+            let mut pe = vec![0; 512];
+            pe[..2].copy_from_slice(b"MZ");
+            pe[60..64].copy_from_slice(&128u32.to_le_bytes());
+            pe[128..132].copy_from_slice(b"PE\0\0");
+            pe[132..134].copy_from_slice(&0x8664u16.to_le_bytes());
+            pe[148..150].copy_from_slice(&240u16.to_le_bytes());
+            pe[150..152].copy_from_slice(&2u16.to_le_bytes());
+            pe[152..154].copy_from_slice(&0x20bu16.to_le_bytes());
+            let exe = dir.join("Game.exe");
+            fs::write(&exe, pe)?;
+            fs::write(dir.join("nvngx_dlss.dll"), b"synthetic SR")?;
+            let mut hashes = std::collections::BTreeMap::new();
+            for name in core::deployment_names(encore::BACKEND, &["version.dll".into()])? {
+                let path = dir.join(&name);
+                fs::write(&path, b"synthetic Encore")?;
+                hashes.insert(name, core::digest(&path)?);
+            }
+            core::atomic_json(
+                &dir.join(core::OWN).join(core::MARKER),
+                &serde_json::json!({
+                    "schema":3, "backend":encore::BACKEND, "scheme_id":encore::SCHEME,
+                    "payload_version":"1.1.4", "proxy":"version.dll", "hashes":hashes
+                }),
+            )?;
+            game.targets.push(exe.display().to_string());
+        }
+        game.exe = game.targets[0].clone();
+        Ok(game)
+    }
+
+    #[test]
+    fn multi_folder_repairs_partial_install_reuses_source_and_restores_each_original() -> Result<()>
+    {
+        let dir = tempfile::tempdir()?;
+        let mut game = multi_game(dir.path(), 2)?;
+        // Another EXE in the same folder must not create a third deployment.
+        game.targets.push(
+            Path::new(&game.exe)
+                .with_file_name("alternate.exe")
+                .display()
+                .to_string(),
+        );
+        game.cleanup_only
+            .push(dir.path().join("old/Game.exe").display().to_string());
+        let targets = game.deployment_targets();
+        assert_eq!(targets.len(), 2);
+        assert!(targets[1].guard_exes.contains(&PathBuf::from(&game.exe)));
+        fs::write(targets[1].directory.join(FILE), b"original second folder")?;
+        let source = dir.path().join("source.dll");
+        fs::write(&source, b"synthetic NR")?;
+        install_file_locked(&targets[0], &source)?;
+        let snapshot = crate::deployment::inspect(&game, &crate::cloud::bundled());
+        assert_eq!(snapshot.total, 2);
+        assert_eq!(snapshot.neural.iter().filter(|n| n.managed).count(), 1);
+        let mut prepared = 0;
+        for _ in 0..2 {
+            install_many_with(
+                &targets,
+                RECOMMENDED,
+                &AtomicBool::new(false),
+                &mut |_| {},
+                |_, _| {
+                    prepared += 1;
+                    Ok(source.clone())
+                },
+            )?;
+        }
+        assert_eq!(prepared, 2); // One preparation per batch, not per folder.
+        for target in &targets {
+            assert_eq!(fs::read(target.directory.join(FILE))?, b"synthetic NR");
+            assert!(read(target)?.is_some());
+        }
+        let snapshot = crate::deployment::inspect(&game, &crate::cloud::bundled());
+        assert_eq!(
+            snapshot
+                .neural
+                .iter()
+                .filter(|n| n.present && n.managed)
+                .count(),
+            2
+        );
+        assert!(snapshot.neural.iter().all(|n| n.supports(RECOMMENDED)));
+        remove_many(&targets)?;
+        assert!(!targets[0].directory.join(FILE).exists());
+        assert_eq!(
+            fs::read(targets[1].directory.join(FILE))?,
+            b"original second folder"
+        );
+        for target in &targets {
+            assert!(!target.directory.join(OWN).exists());
+            assert_eq!(
+                fs::read(target.directory.join("version.dll"))?,
+                b"synthetic Encore"
+            );
+        }
+        assert!(!dir.path().join("old").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn multi_folder_checks_every_encore_version_before_download_or_writes() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let game = multi_game(dir.path(), 2)?;
+        let targets = game.deployment_targets();
+        let marker = targets[1].directory.join(core::OWN).join(core::MARKER);
+        let mut value = core::read_json(&marker, 20000)?;
+        value["payload_version"] = serde_json::json!("1.0.0");
+        core::atomic_json(&marker, &value)?;
+        let result = install_many_with(
+            &targets,
+            RECOMMENDED,
+            &AtomicBool::new(false),
+            &mut |_| {},
+            |_, _| panic!("must not download for an incompatible directory"),
+        );
+        let error = format!("{:#}", result.unwrap_err());
+        assert!(
+            error.contains(&targets[1].validate(true)?.directory.display().to_string()),
+            "{error}"
+        );
+        assert!(error.contains("1.1.0"));
+        assert!(
+            targets
+                .iter()
+                .all(|t| !t.directory.join(FILE).exists() && !t.directory.join(OWN).exists())
+        );
+        let snapshot = crate::deployment::inspect(&game, &crate::cloud::bundled());
+        assert!(snapshot.neural[0].supports(RECOMMENDED));
+        assert!(!snapshot.neural[1].supports(RECOMMENDED));
+        Ok(())
+    }
+
+    #[test]
+    fn multi_folder_removal_keeps_external_and_changed_files_and_can_retry() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let game = multi_game(dir.path(), 4)?;
+        let targets = game.deployment_targets();
+        let source = dir.path().join("source.dll");
+        fs::write(&source, b"synthetic NR")?;
+        install_file_locked(&targets[0], &source)?;
+        install_file_locked(&targets[1], &source)?;
+        fs::write(targets[0].directory.join(FILE), b"externally changed")?;
+        fs::write(targets[2].directory.join(FILE), b"external unmanaged")?;
+        let error = format!("{:#}", remove_many(&targets).unwrap_err());
+        assert!(
+            error.contains(&targets[0].validate(false)?.directory.display().to_string()),
+            "{error}"
+        );
+        assert_eq!(
+            fs::read(targets[0].directory.join(FILE))?,
+            b"externally changed"
+        );
+        assert!(!targets[1].directory.join(FILE).exists());
+        assert_eq!(
+            fs::read(targets[2].directory.join(FILE))?,
+            b"external unmanaged"
+        );
+        assert!(!targets[3].directory.join(FILE).exists());
+        fs::write(targets[0].directory.join(FILE), b"synthetic NR")?;
+        remove_many(&targets)?;
+        assert!(!targets[0].directory.join(FILE).exists());
+        assert_eq!(
+            fs::read(targets[2].directory.join(FILE))?,
+            b"external unmanaged"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn multi_folder_conflict_does_not_partially_install_and_custom_folder_stays_single()
+    -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let mut game = multi_game(dir.path(), 2)?;
+        let targets = game.deployment_targets();
+        let source = dir.path().join("source.dll");
+        fs::write(&source, b"synthetic NR")?;
+        install_file_locked(&targets[1], &source)?;
+        fs::write(targets[1].directory.join(FILE), b"edited by another tool")?;
+        let error = install_many_with(
+            &targets,
+            RECOMMENDED,
+            &AtomicBool::new(false),
+            &mut |_| {},
+            |_, _| panic!("conflict must be caught before download"),
+        )
+        .unwrap_err();
+        assert!(format!("{error:#}").contains("其他程序修改"));
+        assert!(!targets[0].directory.join(FILE).exists());
+        assert_eq!(
+            fs::read(targets[1].directory.join(FILE))?,
+            b"edited by another tool"
+        );
+        game.deployment_dir = dir.path().join("custom-plugins").display().to_string();
+        let custom = game.deployment_targets();
+        assert_eq!(custom.len(), 1);
+        assert_eq!(custom[0].directory, PathBuf::from(game.deployment_dir));
+        assert_eq!(custom[0].game_exe, PathBuf::from(game.exe));
+        Ok(())
+    }
 
     #[test]
     fn standalone_removal_restores_original_and_preserves_other_patch_files() -> Result<()> {

@@ -1,0 +1,14 @@
+# Copy to .env on the server only. Never commit .env or paste its contents in chat.
+PUBLIC_ORIGIN=https://recommend.lgxng.cn
+# Generate a unique random server secret: openssl rand -hex 32
+AUTH_SECRET=
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_USER=
+SMTP_FROM=
+# QQ Mail SMTP authorization code, not the QQ account password.
+SMTP_PASSWORD=
+# Only this verified email can access /admin.
+ADMIN_EMAIL=
+# Global hard cap for verification emails per UTC day.
+DAILY_MAIL_LIMIT=100

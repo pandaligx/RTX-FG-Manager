@@ -71,3 +71,5 @@ jobs:
         with:
           node-version: '24'
       - run: node --test community/tests/*.test.mjs
+      - name: Recommendation service protocols (no SMTP delivery)
+        run: node --test recommendations/tests/*.test.mjs

@@ -92,6 +92,12 @@ Add-Tree 'community/src' @('.mjs', '.json')
 Add-Tree 'community/public' @('.html', '.css', '.js')
 Add-Tree 'community/tests' @('.mjs')
 Add-Tree 'community/migrations' @('.sql')
+foreach ($name in @('recommendations/package.json', 'recommendations/pnpm-lock.yaml', 'recommendations/.gitignore', 'recommendations/.dockerignore', 'recommendations/Dockerfile', 'recommendations/compose.yaml', 'recommendations/config.example', 'recommendations/nginx-location.conf', 'recommendations/README.md')) { Add-File $name }
+Add-Tree 'recommendations/src' @('.mjs')
+Add-File 'recommendations/src/game-directory.json'
+Add-Tree 'recommendations/public' @('.html', '.css', '.js')
+Add-Tree 'recommendations/tests' @('.mjs')
+Add-File 'recommendations/NODEMAILER-LICENSE'
 Add-Tree 'rust/assets' @('.json', '.jsonc', '.svg', '.png', '.ico', '.txt', '.md')
 Add-Tree 'vendor/gpui_fast_windows/src' @('.rs', '.hlsl')
 Add-Tree 'vendor/gpui_fast_windows/resources' @('.rc', '.xml', '.manifest', '.ico')

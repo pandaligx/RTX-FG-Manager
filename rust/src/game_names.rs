@@ -35,6 +35,10 @@ impl Entry {
     pub fn original(&self) -> &str {
         &self.en
     }
+    /// Reviewed store IDs for cross-store features; never infer identity from a title.
+    pub fn platform_keys(&self) -> &[String] {
+        &self.keys
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -294,14 +298,18 @@ pub fn automatic(game: &Game, catalog: &Catalog, chinese: bool) -> String {
         .map(|e| e.zh.clone())
         .unwrap_or(original)
 }
-fn identified<'a>(game: &Game, catalog: &'a Catalog) -> Option<&'a Entry> {
-    catalog.matched(&keys(game)).or_else(|| {
+pub fn identified<'a>(game: &Game, catalog: &'a Catalog) -> Option<&'a Entry> {
+    let keys = keys(game);
+    catalog.matched(&keys).or_else(|| {
         let identity = game.extra.get("name_identity")?;
         // Rule results are valid only for the catalog that evaluated them.
         if identity["revision"].as_u64()? != catalog.revision {
             return None;
         }
-        catalog.entry(identity["catalog_id"].as_str()?)
+        let entry = catalog.entry(identity["catalog_id"].as_str()?)?;
+        keys.iter()
+            .all(|key| entry.keys.contains(key))
+            .then_some(entry)
     })
 }
 pub fn display(game: &Game, catalog: &Catalog, chinese: bool) -> String {
@@ -407,6 +415,41 @@ fn replace_cache(data: &Path, bytes: &[u8], revision: u64) -> Result<Catalog> {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn wuthering_waves_generic_client_needs_its_own_directory() {
+        let catalog = bundled();
+        let parent =
+            Path::new("C:/Games/Wuthering Waves/Wuthering Waves Game/Client/Binaries/Win64");
+        let exe = parent.join("Client-Win64-Shipping.exe");
+        let entry = catalog.rule_match(&exe, parent, &[], &[]).unwrap();
+        assert_eq!(entry.chinese(), "鸣潮");
+        assert_eq!(entry.id(), "Q117750031");
+        let unrelated = Path::new("C:/Games/AnotherGame/Client/Binaries/Win64");
+        assert!(
+            catalog
+                .rule_match(
+                    &unrelated.join("Client-Win64-Shipping.exe"),
+                    unrelated,
+                    &[],
+                    &[]
+                )
+                .is_none()
+        );
+        assert!(
+            catalog
+                .rule_match(&exe, parent, &[], &["steam:292030".into()])
+                .is_none()
+        );
+        let mut game = Game {
+            title: "Client-Win64-Shipping".into(),
+            ..Default::default()
+        };
+        game.extra.insert(
+            "name_identity".into(),
+            json!({"catalog_id":entry.id(),"revision":catalog.revision()}),
+        );
+        assert_eq!(display(&game, &catalog, true), "鸣潮");
+    }
     #[test]
     fn rules_reject_conflicting_platforms_unsafe_paths_and_stale_results() {
         let t = tempfile::tempdir().unwrap();

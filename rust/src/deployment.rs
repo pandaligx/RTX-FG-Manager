@@ -2,6 +2,72 @@
 use crate::{cloud::Catalog, core, scanner::Game};
 use std::{collections::BTreeSet, path::Path};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IssueKind {
+    Residuals,
+    Interrupted,
+    Modified,
+    External,
+    Unavailable,
+}
+impl IssueKind {
+    pub fn from_status(status: &str) -> Option<Self> {
+        if status.starts_with("补丁已移除，缓存待清理") {
+            Some(Self::Residuals)
+        } else if status.starts_with("升级未完成") || status.starts_with("未完成 /") {
+            Some(Self::Interrupted)
+        } else if status.starts_with("DLL 已调整") || status.contains("参数待恢复") {
+            Some(Self::Modified)
+        } else if status.starts_with("已有手动补丁或其他 MOD") {
+            Some(Self::External)
+        } else if status.starts_with("需检查") {
+            Some(Self::Unavailable)
+        } else {
+            None
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Residuals => "残留文件待清理",
+            Self::Interrupted => "补丁安装未完成",
+            Self::Modified => "补丁文件已变化",
+            Self::External => "发现未受管理的文件",
+            Self::Unavailable => "无法读取补丁状态",
+        }
+    }
+    pub fn help(self) -> &'static str {
+        match self {
+            Self::Residuals => {
+                "补丁已移除。可清理当前游戏留下的缓存和安装临时文件，无需清空全部下载缓存。"
+            }
+            Self::Interrupted => "安装或升级未完成。可先卸载并恢复原文件，再重新安装所需方案。",
+            Self::Modified => {
+                "文件与安装记录不一致，可能由手动修改或其他 MOD 引起。请先查看详情，勿直接删除 DLL。"
+            }
+            Self::External => {
+                "此目录有手动补丁、其他 MOD 或旧配置。未确认归属前保留文件；这不代表游戏损坏。"
+            }
+            Self::Unavailable => "暂时无法确认状态。请核对目录是否存在及能否访问，再刷新检测。",
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct Issue {
+    target: core::DeploymentTarget,
+    kind: IssueKind,
+    detail: String,
+}
+impl Issue {
+    pub fn target(&self) -> &core::DeploymentTarget {
+        &self.target
+    }
+    pub fn kind(&self) -> IssueKind {
+        self.kind
+    }
+    pub fn detail(&self) -> &str {
+        &self.detail
+    }
+}
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {
     pub status: String,
@@ -19,23 +85,59 @@ pub struct Snapshot {
     pub details: Vec<String>,
     pub common: Option<(String, Vec<String>, Option<usize>)>,
     pub incompatible_protocol: bool,
+    issues: Vec<Issue>,
 }
 pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
-    let targets = game.deployment_executables();
+    let targets = game.deployment_targets();
     let mut snapshot = Snapshot {
         total: targets.len(),
         ..Default::default()
     };
     let mut selections = Vec::new();
     let mut statuses = Vec::new();
-    for exe in targets {
-        let p = Path::new(&exe);
-        let target = game.deployment_target(p);
+    let mut seen = BTreeSet::new();
+    // Old deployment locations must also expose their cleanup/recovery state.
+    let targets = targets.into_iter().map(|t| (t, false)).chain(
+        game.cleanup_only
+            .iter()
+            .map(|exe| (game.deployment_target(Path::new(exe)), true)),
+    );
+    for (target, cleanup_only) in targets {
+        if !seen.insert(core::key(&target.directory)) {
+            continue;
+        }
         let status = core::status_at(&target);
-        statuses.push(status.clone());
+        if !cleanup_only {
+            statuses.push(status.clone());
+        }
+        if let Some(kind) = IssueKind::from_status(&status) {
+            let mut detail = status.clone();
+            if kind == IssueKind::External {
+                for name in core::PROXIES.iter().chain(
+                    [
+                        core::INI,
+                        crate::encore::CONFIG,
+                        crate::rtxmfg::CONFIG,
+                        ".rtx-fg-script.json",
+                        ".rtx-fg-manager.json",
+                    ]
+                    .iter(),
+                ) {
+                    if target.directory.join(name).exists() {
+                        detail.push_str(&format!("\n{name}"));
+                    }
+                }
+            }
+            snapshot.issues.push(Issue {
+                target: target.clone(),
+                kind,
+                detail,
+            });
+        }
         let record = core::record(&target.directory).ok().flatten();
         if let Some(r) = record.as_ref()
             && r.cache_pending
+            && status.starts_with("补丁已移除，缓存待清理")
         {
             snapshot.cleanup_pending = true;
             if let Ok(root) = crate::delta::root() {
@@ -71,6 +173,12 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
                     r.cleanup_pending_reasons.join("\n")
                 }
             ));
+        }
+        if cleanup_only {
+            snapshot
+                .details
+                .push(format!("{}\n{}", target.directory.display(), status));
+            continue;
         }
         let mut nr = crate::neural_runtime::inspect(&target);
         if status.starts_with("已部署")
@@ -210,6 +318,17 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
     snapshot
 }
 impl Snapshot {
+    pub fn issues(&self) -> &[Issue] {
+        &self.issues
+    }
+    pub fn issue_label(&self) -> Option<&'static str> {
+        let first = self.issues.first()?.kind;
+        Some(if self.issues.iter().all(|i| i.kind == first) {
+            first.label()
+        } else {
+            "多个目录需要处理"
+        })
+    }
     pub fn can_apply(&self, scheme: &str) -> bool {
         self.total > 0
             && self.total == self.installed

@@ -1,0 +1,16 @@
+{
+  "name": "rtx-fg-recommendations",
+  "version": "4.3.6",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "10.1.7"
+  }
+}

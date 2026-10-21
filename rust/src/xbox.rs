@@ -39,7 +39,17 @@ fn logos(
         .collect()
 }
 
+struct Manifest {
+    games: Vec<Game>,
+    identity: String,
+    publisher: String,
+}
+
 pub fn manifest(path: &Path) -> Result<Vec<Game>> {
+    Ok(read_manifest(path)?.games)
+}
+
+fn read_manifest(path: &Path) -> Result<Manifest> {
     let path = core::no_links(path)?;
     let file = fs::File::open(&path)?;
     ensure!(file.metadata()?.len() <= 256 * 1024, "Xbox 游戏清单过大");
@@ -67,6 +77,8 @@ pub fn manifest(path: &Path) -> Result<Vec<Game>> {
     let mut title = String::new();
     let mut store_id = String::new();
     let mut shell_logos = Vec::new();
+    let mut identity = String::new();
+    let mut publisher = String::new();
     loop {
         match reader.read_event()? {
             Event::Start(e) | Event::Empty(e) => {
@@ -81,6 +93,10 @@ pub fn manifest(path: &Path) -> Result<Vec<Game>> {
                         ))
                     })
                     .collect::<Result<std::collections::BTreeMap<_, _>>>()?;
+                if name == b"Identity" && stack.as_slice() == [b"Game".to_vec()] {
+                    identity = attrs.get("Name").cloned().unwrap_or_default();
+                    publisher = attrs.get("Publisher").cloned().unwrap_or_default();
+                }
                 if name == b"ShellVisuals" && stack.as_slice() == [b"Game".to_vec()] {
                     shell_logos = logos(
                         root,
@@ -196,7 +212,11 @@ pub fn manifest(path: &Path) -> Result<Vec<Game>> {
                 .into_owned();
         }
     }
-    Ok(games)
+    Ok(Manifest {
+        games,
+        identity,
+        publisher,
+    })
 }
 
 pub fn declared(exe: &Path) -> Option<Game> {
@@ -212,9 +232,63 @@ pub fn declared(exe: &Path) -> Option<Game> {
     None
 }
 
+/// Installation evidence for a renderer, including reviewed package-specific
+/// child paths. This is not a proof of mod compatibility or a recommendation ID:
+/// COD HQ's StoreId covers more than one game. `declared` stays exact-match only.
+pub fn identified(exe: &Path) -> Option<Game> {
+    let exe = core::no_links(exe).ok()?;
+    for dir in exe.parent()?.ancestors().take(12) {
+        let path = dir.join("MicrosoftGame.config");
+        if !path.is_file() {
+            continue;
+        }
+        let document = read_manifest(&path).ok()?;
+        if let Some(game) = document
+            .games
+            .iter()
+            .find(|g| core::key(&g.exe) == core::key(&exe))
+        {
+            return Some(game.clone());
+        }
+        // The supplied Xbox COD manifest exposes only bootstrapper.exe. Keep a
+        // bounded renderer rule, never a generic "anything under Content" rule.
+        // These are known x64 paths; readable PE headers still take precedence.
+        if !document.identity.eq_ignore_ascii_case("38985CA0.COREBase")
+            || !document
+                .publisher
+                .eq_ignore_ascii_case("CN=07A9AC0F-5502-4D92-BA69-01D5D39D1E92")
+        {
+            return None;
+        }
+        let mut game = document.games.into_iter().find(|game| {
+            game.store_id == "9n201kqxs5bm"
+                && game.machine == 0x8664
+                && core::key(&game.exe) == core::key(&dir.join("bootstrapper.exe"))
+                && game.exe.is_file()
+        })?;
+        let relative = ["cod.exe", "sp26/sp26-cod.exe"]
+            .into_iter()
+            .find(|relative| core::key(&exe) == core::key(&dir.join(relative)))?;
+        if !exe.is_file() {
+            return None;
+        }
+        game.exe = exe.clone();
+        // Keep the child game separate from HQ so a scan does not silently
+        // turn a child-only selection into installation in both directories.
+        if relative.starts_with("sp26/") {
+            game.root = exe.parent()?.into();
+            game.title.push_str(" · sp26");
+        }
+        // Do not share HQ's cloud identity across unrelated COD campaigns.
+        game.store_id.clear();
+        return Some(game);
+    }
+    None
+}
+
 pub fn access_hint(path: &Path) -> String {
     format!(
-        "无法访问游戏文件：{}。Xbox 游戏请在 Xbox 应用的“管理 → 文件 → 浏览”中找到安装目录，再使用“添加游戏文件夹”。如果游戏仍位于受保护的 WindowsApps 目录且不支持管理文件，管理员权限也不能解除此限制。",
+        "无法读取游戏程序：{}。如果是 Xbox / Game Pass 游戏，需要可识别的 MicrosoftGame.config 和对应游戏入口；不能用启动器或辅助程序替代。请从 Xbox 应用的“管理 → 文件 → 浏览”找到完整游戏目录，使用“添加游戏文件夹”。若仍失败，请提供该目录及上级目录的 MicrosoftGame.config 供排查。管理员权限不能解除游戏包的读取保护。",
         path.display()
     )
 }

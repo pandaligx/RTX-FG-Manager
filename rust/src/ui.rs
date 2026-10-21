@@ -36,6 +36,8 @@ use std::{
 mod encore_editor;
 #[path = "ui_game_name.rs"]
 mod game_name_editor;
+#[path = "ui_recommendations.rs"]
+mod recommendations;
 
 #[derive(Clone, PartialEq)]
 enum Command {
@@ -54,15 +56,19 @@ enum Command {
     RefreshGpu,
     GpuEditor,
     RenameGame(String),
+    Recommendations(String),
     UpdateGameNames,
     NeuralVersion(&'static str),
     InstallNeural(&'static str),
     RemoveNeural,
     RetryCleanup,
     CleanupDetails,
+    ReviewGame(String),
+    RecoverGame,
+    CloseReview,
+    RefreshReview,
     DeleteCleanup,
     CleanupLocation(PathBuf),
-    CopyCleanup(String),
     RecheckBlocked,
     All(bool),
     Game(String, bool),
@@ -140,32 +146,15 @@ impl GameFilter {
 }
 /// Display only current deployment locations, never cleanup-only remnants.
 /// Keep scanner order and collapse alternate executables in the same folder.
-fn game_directories(game: &rtx_fg_manager::scanner::Game) -> Vec<(String, String)> {
-    let mut seen = std::collections::BTreeSet::new();
-    game.deployment_executables()
+fn game_directories(game: &rtx_fg_manager::scanner::Game) -> Vec<String> {
+    game.deployment_targets()
         .iter()
-        .filter_map(|exe| {
-            let directory = if game.deployment_dir.is_empty() {
-                std::path::Path::new(exe).parent()?.to_path_buf()
-            } else {
-                PathBuf::from(&game.deployment_dir)
-            };
-            if !seen.insert(core::key(&directory)) {
-                return None;
-            }
-            let label = directory
-                .strip_prefix(&game.root)
-                .ok()
-                .filter(|relative| !relative.as_os_str().is_empty())
-                .unwrap_or(&directory)
-                .display()
-                .to_string();
-            Some((directory.display().to_string(), label))
-        })
+        .map(|target| target.directory.display().to_string())
         .collect()
 }
 pub struct Manager {
     drag_gap: Option<(String, bool)>,
+    folder_feedback: Option<(String, Instant)>,
     choices: RefCell<HashMap<&'static str, ChoiceBinding>>,
     encore_editor: RefCell<Option<(String, Entity<encore_editor::EncoreEditor>)>>,
     encore_invalid: Rc<Cell<bool>>,
@@ -214,12 +203,14 @@ impl Render for GpuEditor {
 struct CleanupDetailsView {
     owner: WeakEntity<Manager>,
     snapshot: rtx_fg_manager::deployment::Snapshot,
+    details_open: bool,
 }
 impl Render for CleanupDetailsView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let view = cx.entity().downgrade();
         self.owner
             .update(cx, |owner, cx| {
-                owner.cleanup_body(&self.snapshot, window, cx)
+                owner.cleanup_body(&self.snapshot, self.details_open, view, window, cx)
             })
             .unwrap_or_else(|_| div().into_any_element())
     }
@@ -310,6 +301,7 @@ impl Manager {
         let theme_choice = c.choice("theme", "跟随系统");
         let language = c.tr.language.clone();
         let mut view = Self {
+            folder_feedback: None,
             choices: RefCell::new(HashMap::new()),
             encore_editor: RefCell::new(None),
             encore_invalid: Rc::new(Cell::new(false)),
@@ -488,6 +480,7 @@ impl Manager {
             Command::Page(p) => self.c.page = p,
             Command::GpuEditor => self.gpu_editor(window, cx),
             Command::RenameGame(exe) => self.rename_game(exe, window, cx),
+            Command::Recommendations(exe) => self.recommendations(exe, window, cx),
             Command::UpdateGameNames => self.c.update_game_names(),
             Command::ConfigHelp => {
                 if self.dialog_active {
@@ -526,12 +519,31 @@ impl Manager {
                 self.c.retry_focused_cleanup();
             }
             Command::CleanupDetails => self.cleanup_dialog(window, cx),
+            Command::ReviewGame(exe) => {
+                if !self.c.busy {
+                    self.c.focus = Some(exe);
+                    self.cleanup_dialog(window, cx);
+                }
+            }
+            Command::RecoverGame => {
+                self.dialog_active = false;
+                window.close_dialog(cx);
+                self.c.request_focused_recovery();
+            }
+            Command::CloseReview => {
+                self.dialog_active = false;
+                window.close_dialog(cx);
+            }
+            Command::RefreshReview => {
+                self.dialog_active = false;
+                window.close_dialog(cx);
+                self.c.refresh();
+            }
             Command::DeleteCleanup => {
                 self.dialog_active = false;
                 window.close_dialog(cx);
                 self.c.preview_cleanup_deletion();
             }
-            Command::CopyCleanup(text) => cx.write_to_clipboard(ClipboardItem::new_string(text)),
             Command::CleanupLocation(path) => {
                 self.c.channel.job(move |_| {
                     let path = core::no_links(&path)?;
@@ -723,7 +735,7 @@ impl Manager {
     }
     fn commit(&mut self, action: &str) {
         match action {
-            "deploy_batch" | "clean_batch" => self.c.confirm_patch(),
+            "deploy_batch" | "clean_batch" | "recover_patch" => self.c.confirm_patch(),
             "remove_nr" => self.c.remove_neural_runtime(),
             "delete_cleanup" => self.c.confirm_cleanup_deletion(),
             "end_processes" => self.c.end_blocked_and_retry(),
@@ -1163,60 +1175,103 @@ impl Manager {
     fn cleanup_body(
         &self,
         snapshot: &rtx_fg_manager::deployment::Snapshot,
+        details_open: bool,
+        view: WeakEntity<CleanupDetailsView>,
         window: &Window,
         cx: &Context<Self>,
     ) -> AnyElement {
-        let mut body = div()
-            .id("cleanup-details-scroll")
-            .v_flex()
-            .gap_3()
-            .max_h(window.viewport_size().height * 0.55)
-            .overflow_y_scroll()
-            .child(self.t("补丁已移除。以下文件尚未清理，归属不明的文件会保留。"));
-        for (i, path) in snapshot.cleanup_paths.iter().enumerate() {
-            let text = path.display().to_string();
-            body = body.child(
+        use rtx_fg_manager::deployment::IssueKind;
+        let mut summary = div().v_flex().gap_3();
+        let mut kinds = Vec::new();
+        for issue in snapshot.issues() {
+            if !kinds.contains(&issue.kind()) {
+                kinds.push(issue.kind());
+                summary = summary.child(
+                    div()
+                        .v_flex()
+                        .gap_1()
+                        .child(
+                            div()
+                                .font_weight(FontWeight::MEDIUM)
+                                .child(self.t(issue.kind().label())),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(self.t(issue.kind().help())),
+                        ),
+                );
+            }
+        }
+        let pending = snapshot.cleanup_pending;
+        let repair = kinds
+            .iter()
+            .any(|k| matches!(k, IssueKind::Interrupted | IssueKind::Modified));
+        let mut details = div().v_flex().gap_3();
+        for issue in snapshot.issues() {
+            let path = issue.target().directory.clone();
+            let id = core::key(&path);
+            details = details.child(
                 div()
                     .v_flex()
-                    .gap_2()
-                    .p_3()
-                    .border_1()
-                    .border_color(cx.theme().border)
-                    .rounded_md()
-                    .child(div().text_sm().child(text.clone()))
+                    .gap_1()
+                    .min_w_0()
                     .child(
                         div()
-                            .h_flex()
-                            .flex_wrap()
-                            .gap_2()
-                            .child(
-                                self.button(
-                                    ("cleanup-open", i),
-                                    "打开位置",
-                                    Command::CleanupLocation(path.clone()),
-                                    cx,
-                                )
-                                .small(),
-                            )
-                            .child(
-                                self.button(
-                                    ("cleanup-copy", i),
-                                    "复制路径",
-                                    Command::CopyCleanup(text),
-                                    cx,
-                                )
-                                .small()
-                                .ghost(),
-                            ),
+                            .text_sm()
+                            .whitespace_normal()
+                            .child(path.display().to_string()),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .whitespace_normal()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(self.t(issue.detail())),
+                    )
+                    .child(
+                        self.button(
+                            SharedString::from(format!("review-open:{id}")),
+                            "打开位置",
+                            Command::CleanupLocation(path),
+                            cx,
+                        )
+                        .small()
+                        .ghost(),
                     ),
             );
         }
-        body = body.child(div().text_sm().text_color(cx.theme().muted_foreground).child(snapshot.cleanup_details.join("\n\n")))
-            .child(self.t("卸载时已自动清理可确认归属的文件。剩余的当前游戏缓存和安装临时文件，可在确认列表后直接删除；共享目录与其他游戏文件会保留。"))
-            .child(div().h_flex().flex_wrap().gap_2().justify_end()
-                .child(self.button("cleanup-retry-dialog", "重新清理", Command::RetryCleanup, cx).disabled(self.c.busy))
-                .child(self.button("cleanup-delete-dialog", "删除并重新清理", Command::DeleteCleanup, cx).with_variant(ButtonVariant::Danger).icon(Icon::default().path("app/trash.svg")).disabled(self.c.busy || self.c.read_only)));
-        body.into_any_element()
+        if pending {
+            details = details.child(div().text_xs().whitespace_normal()
+                .child(snapshot.cleanup_details.iter().map(|s| self.c.text(s)).collect::<Vec<_>>().join("\n\n")))
+                .child(div().text_xs().child(self.t("常规清理仍有残留时，可查看管理器允许删除的具体文件，确认后再删除。共享目录和其他游戏文件会保留。")))
+                .child(self.button("cleanup-preview", "查看可删除文件", Command::DeleteCleanup, cx).small().disabled(self.c.busy || self.c.read_only));
+        }
+        let name = self
+            .c
+            .focus
+            .as_ref()
+            .and_then(|e| self.c.games.iter().find(|g| &g.exe == e))
+            .map(|g| self.c.game_name(g))
+            .unwrap_or_default();
+        div().v_flex().gap_3()
+            .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(name))
+            .child(div().id("review-scroll").v_flex().min_h_0().gap_3()
+                .max_h(window.viewport_size().height * 0.48).overflow_y_scroll()
+                .child(summary)
+                .when(pending, |body| body.child(div().text_sm().child(self.t("仅处理标记为待清理的目录。游戏存档、原文件备份、其他 MOD 和正常部署目录保持不变。"))))
+                .child(Accordion::new("review-details").small()
+                    .item(|item| item.title(self.t("技术详情与文件位置")).open(details_open).child(details))
+                    .on_toggle_click(move |indices: &[usize], _, cx| {
+                        let _ = view.update(cx, |this, cx| { this.details_open = !indices.is_empty(); cx.notify(); });
+                    })))
+            .child(div().h_flex().flex_wrap().justify_end().gap_2()
+                .child(self.button("review-close", "关闭详情", Command::CloseReview, cx).small().ghost())
+                .when(kinds.contains(&IssueKind::Unavailable), |buttons| buttons.child(self.button("review-refresh", "刷新", Command::RefreshReview, cx).small().disabled(self.c.busy)))
+                .when(repair, |buttons| buttons.child(self.button("review-recover", "卸载并恢复", Command::RecoverGame, cx).small().disabled(self.c.busy)))
+                .when(pending, |buttons| buttons.child(self.button("cleanup-retry-dialog", "清理残留", Command::RetryCleanup, cx).small().primary().disabled(self.c.busy))))
+            .into_any_element()
     }
     fn cleanup_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.dialog_active {
@@ -1238,9 +1293,10 @@ impl Manager {
             CleanupDetailsView {
                 owner: view.clone(),
                 snapshot,
+                details_open: false,
             }
         });
-        let title = self.t("待清理文件");
+        let title = self.t("处理游戏状态");
         let width = (window.viewport_size().width - px(64.)).min(window.rem_size() * 40.);
         window.open_dialog(cx, move |dialog, _, cx| {
             let view = view.clone();
@@ -1435,10 +1491,8 @@ impl Manager {
             .map(String::as_str)
             .unwrap_or("正在检测…");
         let (mut label, mut variant) = deployment_label(status);
+        label = self.c.text(&label);
         let snapshot = self.c.deployments.get(exe);
-        let tip = snapshot
-            .map(|s| s.details.join("\n\n"))
-            .unwrap_or_else(|| self.t(status).to_string());
         if !status.starts_with("正在")
             && let Some(d) = snapshot
             && d.installed > 0
@@ -1467,9 +1521,48 @@ impl Manager {
                 TagVariant::Warning
             };
         }
+        if !status.starts_with("正在")
+            && let Some(d) = snapshot
+            && let Some(issue) = d.issue_label()
+        {
+            if d.installed > 0 {
+                label.push_str(&format!(" · {}", self.c.text(issue)));
+            } else {
+                label = self.c.text(issue);
+            }
+            variant = if d
+                .issues()
+                .iter()
+                .all(|i| i.kind() == rtx_fg_manager::deployment::IssueKind::External)
+            {
+                TagVariant::Info
+            } else {
+                TagVariant::Warning
+            };
+        }
+        if let Some(snapshot) = snapshot {
+            let count = snapshot.neural.iter().filter(|n| n.present).count();
+            let missing = snapshot.neural.iter().any(|n| n.managed && !n.present);
+            let warning = snapshot.neural.iter().any(|n| n.warning.is_some());
+            let nr = if missing {
+                Some(self.c.text("NR 文件缺失"))
+            } else if warning {
+                Some(format!("NR · {}", self.c.text("需检查")))
+            } else if count > 0 && count < snapshot.neural.len() {
+                Some(format!("NR {count}/{}", snapshot.neural.len()))
+            } else if count > 0 {
+                Some(self.c.text("NR 已安装"))
+            } else {
+                None
+            };
+            if let Some(nr) = nr {
+                label.push_str(&format!(" · {nr}"));
+                if warning || missing || count < snapshot.neural.len() {
+                    variant = TagVariant::Warning;
+                }
+            }
+        }
         div()
-            .id(SharedString::from(format!("deployment-tip-{exe}")))
-            .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
             .flex_1()
             .min_w_0()
             .text_xs()
@@ -1479,7 +1572,7 @@ impl Manager {
                 TagVariant::Info => cx.theme().info,
                 _ => cx.theme().muted_foreground,
             })
-            .truncate()
+            .whitespace_normal()
             .child(self.t(&label))
             .into_any_element()
     }
@@ -1523,20 +1616,7 @@ impl Manager {
         let selected = self.c.selected.contains(&exe);
         let menu_exe = exe.clone();
         let open_folder = game.deployment_directory().display().to_string();
-        let double_folder = open_folder.clone();
         let open_label = self.t("打开目录");
-        let detail_tip = if !game.deployment_dir.is_empty() {
-            format!(
-                "{}：{}\nEXE: {}",
-                self.t("自定义部署目录"),
-                game.deployment_dir,
-                game.exe
-            )
-        } else if game.targets.len() > 1 {
-            game.targets.join("\n")
-        } else {
-            exe.clone()
-        };
         let view = cx.entity().downgrade();
         let remove_label = self.t("从游戏库移除");
         let rename_label = self.t("修改游戏名称");
@@ -1546,10 +1626,10 @@ impl Manager {
             .icons
             .get(&exe)
             .and_then(|i| i.as_ref())
-            .map(|i| img(i.clone()).size(px(36.)).into_any_element())
+            .map(|i| img(i.clone()).size_full().into_any_element())
             .unwrap_or_else(|| {
                 Self::icon(IconName::LayoutDashboard)
-                    .size(px(32.))
+                    .size_10()
                     .text_color(cx.theme().muted_foreground)
                     .into_any_element()
             });
@@ -1601,11 +1681,8 @@ impl Manager {
                         }))
                 },
             )
-            .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+            .on_click(cx.listener(move |this, _, window, cx| {
                 this.act(Command::Focus(focus.clone()), window, cx);
-                if ev.click_count() == 2 {
-                    this.act(Command::Open(double_folder.clone()), window, cx);
-                }
             }))
             .when(self.c.focus.as_ref() == Some(&exe), |d| {
                 d.bg(cx.theme().secondary)
@@ -1619,7 +1696,14 @@ impl Manager {
                         this.act(Command::Game(exe.clone(), *yes), window, cx)
                     })),
             )
-            .child(game_icon)
+            .child(
+                div()
+                    .size_12()
+                    .flex_shrink_0()
+                    .h_flex()
+                    .justify_center()
+                    .child(game_icon),
+            )
             .child(
                 div()
                     .id(SharedString::from(format!("game-label:{}", game.exe)))
@@ -1648,61 +1732,106 @@ impl Manager {
                         div()
                             .h_flex()
                             .gap_2()
+                            .flex_wrap()
                             .min_w_0()
                             .child(self.deployment_status(&game.exe, cx))
-                            .child(self.neural_badge(&game.exe, cx)),
-                    )
-                    .when(directories.len() <= 1, |column| {
-                        column.child(
-                            div().h_flex().gap_2().min_w_0().child(
-                                div()
-                                    .id(SharedString::from(format!("game-path:{}", game.exe)))
-                                    .tooltip(move |window, cx| {
-                                        Tooltip::new(detail_tip.clone()).build(window, cx)
-                                    })
-                                    .flex_1()
-                                    .min_w_0()
-                                    .text_xs()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .truncate()
-                                    .child(if game.deployment_dir.is_empty() {
-                                        game.root.clone()
-                                    } else {
-                                        format!(
-                                            "{} · {}",
-                                            self.t("自定义部署目录"),
-                                            game.deployment_dir
-                                        )
-                                    }),
+                            .when(
+                                self.c
+                                    .deployments
+                                    .get(&game.exe)
+                                    .is_some_and(|d| !d.issues().is_empty()),
+                                |row| {
+                                    let review_exe = game.exe.clone();
+                                    row.child(
+                                        Button::new(SharedString::from(format!(
+                                            "review-game:{}",
+                                            game.exe
+                                        )))
+                                        .xsmall()
+                                        .ghost()
+                                        .label(self.t("查看原因"))
+                                        .focus_ring(crate::ui_focus::visible(cx))
+                                        .disabled(self.c.busy)
+                                        .on_click(
+                                            cx.listener(move |this, _, window, cx| {
+                                                cx.stop_propagation();
+                                                this.act(
+                                                    Command::ReviewGame(review_exe.clone()),
+                                                    window,
+                                                    cx,
+                                                );
+                                            }),
+                                        ),
+                                    )
+                                },
                             ),
-                        )
-                    })
-                    .when(directories.len() > 1, |column| {
-                        column.child(div().v_flex().min_w_0().gap_0p5().children(
-                            directories.iter().map(|(path, label)| {
-                                let tooltip = path.clone();
+                    )
+                    .child(
+                        div()
+                            .v_flex()
+                            .min_w_0()
+                            .gap_0p5()
+                            .children(directories.iter().map(|path| {
+                                let folder = path.clone();
+                                let open_tip = format!("{}\n{path}", self.t("打开目录"));
+                                let opened = self
+                                    .folder_feedback
+                                    .as_ref()
+                                    .is_some_and(|(recent, _)| recent == path);
                                 div()
                                     .id(SharedString::from(format!(
                                         "game-directory:{}:{path}",
                                         game.exe
                                     )))
                                     .h_flex()
+                                    .items_start()
                                     .gap_2()
                                     .min_w_0()
                                     .text_xs()
                                     .text_color(cx.theme().muted_foreground)
-                                    .tooltip(move |window, cx| {
-                                        Tooltip::new(tooltip.clone()).build(window, cx)
-                                    })
                                     .child(
-                                        Self::icon(IconName::Folder)
-                                            .size(rems(0.875))
-                                            .flex_shrink_0(),
+                                        Button::new(SharedString::from(format!(
+                                            "open-directory:{}:{path}",
+                                            game.exe
+                                        )))
+                                        .custom(
+                                            ButtonCustomVariant::new(cx)
+                                                .hover(*cx.theme().tokens.secondary_hover)
+                                                .active(*cx.theme().tokens.secondary_active),
+                                        )
+                                        .focus_ring(crate::ui_focus::visible(cx))
+                                        .size(rems(1.25))
+                                        .icon(
+                                            Icon::new(if opened {
+                                                IconName::FolderOpen
+                                            } else {
+                                                IconName::Folder
+                                            })
+                                            .size(rems(0.875)),
+                                        )
+                                        .accessibility_label(open_tip.clone())
+                                        .tooltip(open_tip)
+                                        .flex_shrink_0()
+                                        .on_click(
+                                            cx.listener(move |this, _, window, cx| {
+                                                cx.stop_propagation();
+                                                // Brief activation feedback, not a claim that
+                                                // Explorer remains open after this moment.
+                                                this.folder_feedback =
+                                                    Some((folder.clone(), Instant::now()));
+                                                this.act(Command::Open(folder.clone()), window, cx);
+                                            }),
+                                        ),
                                     )
-                                    .child(div().min_w_0().truncate().child(label.clone()))
-                            }),
-                        ))
-                    }),
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .whitespace_normal()
+                                            .child(path.clone()),
+                                    )
+                            })),
+                    ),
             )
             .context_menu(move |menu, _, _| {
                 let exe = menu_exe.clone();
@@ -2470,55 +2599,16 @@ impl Manager {
             })
             .into_any_element()
     }
-    fn neural_badge(&self, exe: &str, cx: &Context<Self>) -> AnyElement {
-        let Some(snapshot) = self.c.deployments.get(exe) else {
-            return div().into_any_element();
-        };
-        let count = snapshot.neural.iter().filter(|n| n.present).count();
-        let missing = snapshot.neural.iter().any(|n| n.managed && !n.present);
-        if count == 0 && !missing {
-            return div().into_any_element();
-        }
-        let tip = snapshot
-            .neural
-            .iter()
-            .map(|n| format!("{}\n{}", self.c.text(&n.label()), n.path.display()))
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        let label = if missing {
-            self.t("NR 文件缺失")
-        } else if snapshot.neural.len() > 1 {
-            SharedString::from(format!("NR {count}/{}", snapshot.neural.len()))
-        } else {
-            self.t("NR 已安装")
-        };
-        Tag::new()
-            .small()
-            .outline()
-            .with_variant(if missing {
-                TagVariant::Warning
-            } else {
-                TagVariant::Secondary
-            })
-            .flex_shrink_0()
-            .child(
-                div()
-                    .id(SharedString::from(format!("nr-status-{exe}")))
-                    .text_color(cx.theme().foreground)
-                    .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
-                    .child(label),
-            )
-            .into_any_element()
-    }
-
     fn neural_panel(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let Some(exe) = &self.c.focus else {
             return div().into_any_element();
         };
         let snapshot = self.c.deployments.get(exe);
-        let nr = snapshot.and_then(|d| d.neural.first());
+        let statuses = snapshot.map(|d| d.neural.as_slice()).unwrap_or_default();
         if self.c.parameter_profile() != rtx_fg_manager::encore::PROFILE
-            && !nr.is_some_and(|n| n.present || n.managed || n.encore_version.is_some())
+            && !statuses
+                .iter()
+                .any(|n| n.present || n.managed || n.encore_version.is_some())
         {
             return div().into_any_element();
         }
@@ -2529,15 +2619,11 @@ impl Manager {
             .copied()
             .unwrap_or(rtx_fg_manager::neural_runtime::RECOMMENDED);
         let evidence = self.c.evidence.get(exe).and_then(Option::as_ref);
-        let ready = nr.and_then(|n| n.encore_version.as_deref());
-        let modern = ready
-            .and_then(|v| semver::Version::parse(v).ok())
-            .is_some_and(|v| v >= semver::Version::new(1, 1, 0));
-        let reason = if snapshot.is_none() {
+        let reason = if statuses.is_empty() {
             "正在检测…"
-        } else if ready.is_none() {
-            "请先安装 RTX Encore。"
-        } else if version == "310.9.16" && !modern {
+        } else if statuses.iter().any(|n| n.encore_version.is_none()) {
+            "请先在所有部署目录安装 RTX Encore。"
+        } else if statuses.iter().any(|n| !n.supports(version)) {
             "NR 310.9.16 需要 RTX Encore 1.1.0 或更新版本"
         } else if evidence.is_none() {
             "正在检测…"
@@ -2558,32 +2644,40 @@ impl Manager {
                 .is_some_and(|p| p.proxy == "nvngx_dlssnr.dll");
         let disabled = self.c.busy || self.c.read_only || !reason.is_empty();
         let label = if active { "安装中…" } else { "安装" };
-        let status = nr
-            .map(|n| {
-                if n.warning.is_some() {
-                    self.c.text("需检查")
-                } else if n.present {
-                    format!(
-                        "{} · {}",
-                        self.c.text("已安装"),
-                        n.version.as_deref().unwrap_or("?")
-                    )
-                } else {
-                    self.c.text("未安装")
-                }
-            })
-            .unwrap_or_else(|| self.c.text("正在检测…"));
-        let tip = nr
-            .map(|n| {
-                format!(
-                    "{}\n{}\n{}",
-                    self.c.text(&n.label()),
-                    n.path.display(),
-                    self.c
-                        .text("仅安装运行库；游戏内开启 DLSS/DLAA 后，按 Insert 设置 NR。")
-                )
-            })
-            .unwrap_or_default();
+        let present = statuses.iter().filter(|n| n.present).count();
+        let mut status = if statuses.is_empty() {
+            self.c.text("正在检测…")
+        } else if present == 0 {
+            self.c.text("未安装")
+        } else if present < statuses.len() {
+            format!("{} · {present}/{}", self.c.text("部分安装"), statuses.len())
+        } else {
+            self.c.text("已安装")
+        };
+        let versions = statuses
+            .iter()
+            .filter(|n| n.present)
+            .map(|n| n.version.as_deref().unwrap_or("?"))
+            .collect::<std::collections::BTreeSet<_>>();
+        if !versions.is_empty() {
+            status.push_str(&format!(
+                " · {}",
+                versions.into_iter().collect::<Vec<_>>().join(" / ")
+            ));
+        }
+        if statuses.iter().any(|n| n.warning.is_some()) {
+            status.push_str(&format!(" · {}", self.c.text("需检查")));
+        }
+        let tip = format!(
+            "{}\n\n{}",
+            statuses
+                .iter()
+                .map(|n| format!("{}\n{}", self.c.text(&n.label()), n.path.display()))
+                .collect::<Vec<_>>()
+                .join("\n\n"),
+            self.c
+                .text("仅安装运行库；游戏内开启 DLSS/DLAA 后，按 Insert 设置 NR。")
+        );
         let runtime_items = [
             ("310.9.16", self.t("310.9.16 · 推荐 · A/B 模型")),
             ("310.8.0", self.t("310.8.0 · 旧版回退")),
@@ -2661,7 +2755,9 @@ impl Manager {
                             .small()
                             .flex_shrink_0()
                             .disabled(
-                                self.c.busy || self.c.read_only || !nr.is_some_and(|n| n.managed),
+                                self.c.busy
+                                    || self.c.read_only
+                                    || !statuses.iter().any(|n| n.managed),
                             ),
                     ),
             );
@@ -2670,7 +2766,7 @@ impl Manager {
         } else if self.c.running_games.contains(exe) {
             "游戏仍在后台运行；操作前将提示处理。"
         } else if snapshot.is_some_and(|s| s.total > 1) {
-            "NR 操作仅针对首个部署目录。"
+            "NR 安装和卸载会处理此游戏的所有部署目录。"
         } else {
             ""
         };
@@ -2761,6 +2857,20 @@ impl Manager {
                             }),
                     ),
             )
+            .when_some(game, |panel, game| {
+                panel.child(
+                    self.button(
+                        "game-recommendations",
+                        "玩家推荐方案",
+                        Command::Recommendations(game.exe.clone()),
+                        cx,
+                    )
+                    .custom(crate::ui_themes::recommendation_button(cx))
+                    .bg(crate::ui_themes::recommendation_accent())
+                    .icon(Icon::new(gpui::assets::IconName::ThumbsUp))
+                    .w_full(),
+                )
+            })
             .child(
                 div()
                     .v_flex()
@@ -2773,13 +2883,39 @@ impl Manager {
             .focus
             .as_ref()
             .and_then(|e| self.c.deployments.get(e))
-            && d.cleanup_pending
+            && !d.issues().is_empty()
         {
-            panel = panel.child(div().v_flex().gap_2()
-                .child(Alert::warning("cleanup-pending", self.t("补丁文件已移除，还有本游戏的缓存或临时文件需要处理。退出游戏后点击重新清理；无需清理其他游戏或全部下载缓存。")).small())
-                .child(div().h_flex().gap_2()
-                    .child(self.button("retry-cleanup", "重新清理", Command::RetryCleanup, cx).disabled(self.c.busy))
-                    .child(self.button("cleanup-details", "查看文件", Command::CleanupDetails, cx).disabled(self.c.busy))));
+            panel = panel.child(
+                div()
+                    .v_flex()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(self.t(d.issue_label().unwrap_or("查看原因"))),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(self.t(d.issues()[0].kind().help())),
+                    )
+                    .child(
+                        self.button(
+                            "cleanup-details",
+                            if d.cleanup_pending {
+                                "清理残留"
+                            } else {
+                                "查看原因"
+                            },
+                            Command::CleanupDetails,
+                            cx,
+                        )
+                        .small()
+                        .disabled(self.c.busy),
+                    ),
+            );
         }
         panel = panel
             .child(self.neural_panel(window, cx))
@@ -3853,6 +3989,9 @@ impl Manager {
                     "检测到以下游戏相关进程仍在运行。结束进程会丢失未保存的游戏进度；确认后仅结束列出的进程，再重新检测并重试本次操作。身份无法核实的进程不会结束。"
                 }
                 "clean_batch" => "确认卸载以下游戏的补丁？请先完全退出这些游戏。",
+                "recover_patch" => {
+                    "仅卸载以下异常目录中可确认归属的补丁，并恢复已记录的原文件。其他目录、存档和未知文件保留；完成后可重新安装。"
+                }
                 "remove_nr" => {
                     "仅撤销管理器安装的 NR 运行库；如安装前已有文件则恢复原件，保留 Encore 和其他补丁。请先退出游戏。"
                 }
@@ -3893,7 +4032,7 @@ impl Manager {
                     ));
                 }
             }
-            if a == "deploy_batch" || a == "clean_batch" {
+            if a == "deploy_batch" || a == "clean_batch" || a == "recover_patch" {
                 message.push_str("\n\n");
                 message.push_str(&self.c.pending_patch_list());
             }
@@ -3952,6 +4091,8 @@ impl Manager {
             "结束并重试"
         } else if action.as_deref() == Some("delete_cleanup") {
             "删除并重新清理"
+        } else if action.as_deref() == Some("recover_patch") {
+            "卸载并恢复"
         } else if action.is_some() {
             "继续"
         } else {
@@ -3960,7 +4101,9 @@ impl Manager {
         let cancel_text = self.t("取消");
         let ok_variant = if matches!(
             action.as_deref(),
-            Some("clean_batch" | "remove_nr" | "end_processes" | "delete_cleanup")
+            Some(
+                "clean_batch" | "recover_patch" | "remove_nr" | "end_processes" | "delete_cleanup"
+            )
         ) {
             ButtonVariant::Danger
         } else {
@@ -4110,6 +4253,14 @@ impl Manager {
         });
     }
     fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self
+            .folder_feedback
+            .as_ref()
+            .is_some_and(|(_, at)| at.elapsed() >= Duration::from_secs(2))
+        {
+            self.folder_feedback = None;
+            cx.notify();
+        }
         let now = Instant::now();
         self.max_gap_ms = self
             .max_gap_ms
@@ -4511,11 +4662,17 @@ fn deployment_label(status: &str) -> (String, TagVariant) {
     } else if status == "未部署" {
         (status.into(), TagVariant::Secondary)
     } else if status.starts_with("补丁已移除，缓存待清理") {
-        ("补丁已移除，缓存待清理".into(), TagVariant::Warning)
+        ("残留文件待清理".into(), TagVariant::Warning)
     } else if status.starts_with("正在") {
         (status.into(), TagVariant::Info)
     } else {
-        ("需检查".into(), TagVariant::Warning)
+        (
+            rtx_fg_manager::deployment::IssueKind::from_status(status)
+                .map(|k| k.label())
+                .unwrap_or("查看补丁状态")
+                .into(),
+            TagVariant::Warning,
+        )
     }
 }
 fn preferred_font_size(state: &Value) -> f32 {
@@ -4621,16 +4778,12 @@ mod layout_tests {
         };
         let directories = super::game_directories(&game);
         assert_eq!(directories.len(), 2);
-        assert_eq!(directories[0].0, first.display().to_string());
-        assert_eq!(directories[1].0, second.display().to_string());
-        assert_eq!(
-            std::path::Path::new(&directories[1].1),
-            std::path::Path::new("Engine/Binaries/Win64rh")
-        );
+        assert_eq!(directories[0], first.display().to_string());
+        assert_eq!(directories[1], second.display().to_string());
         game.deployment_dir = root.join("plugins").display().to_string();
         assert_eq!(
             super::game_directories(&game),
-            [(game.deployment_dir.clone(), "plugins".into())]
+            [game.deployment_dir.clone()]
         );
         game.deployment_dir.clear();
         game.targets.clear();
