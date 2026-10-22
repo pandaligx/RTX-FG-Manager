@@ -61,13 +61,13 @@ class EncoreCloudTests(unittest.TestCase):
                 yield path
         paths = {tuple(field["path"]) for field in fields}
         native_paths = set(leaves(config()))
-        self.assertEqual(len(fields), 100)  # 1.1.0 adds Fast SR and NR hotkey; relocates the NR preset
+        self.assertEqual(len(fields), 128)
         self.assertEqual(len({field["key"] for field in fields}), len(fields))
         self.assertEqual(len(paths), len(fields))
         # Multiplier is exposed through the composite tf_mode selector. The
         # schema marker is not editable; upstream persists menuKey on demand.
         self.assertEqual(native_paths - paths, {("configVersion",), ("frameGeneration", "multiplier")})
-        self.assertEqual(paths - native_paths, {("menuState", "menuKey")})
+        self.assertEqual(paths - native_paths, {("menuState", "menuKey"), ("smoothMotion", "smoothMotionForce"), ("providerPatchPolicy",)})
         self.assertTrue(next(field for field in fields if field["key"] == "menuKey")["optional"])
 
     def test_schema4_three_file_package_retains_full_upstream_version(self):

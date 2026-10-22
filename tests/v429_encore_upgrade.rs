@@ -60,6 +60,111 @@ fn encore_files(proxy: &str) -> BTreeMap<String, Vec<u8>> {
     ])
 }
 
+fn install_120(target: &core::DeploymentTarget) -> Result<String> {
+    let mut files = encore_files("version.dll");
+    files.insert("version.dll".into(), pe(true, 3));
+    for name in encore::INTEL_FILES {
+        files.insert(
+            name.into(),
+            if name.ends_with(".dll") {
+                pe(true, 9)
+            } else {
+                b"Intel license".to_vec()
+            },
+        );
+    }
+    core::deploy_prepared_context_at_with_overrides(
+        target,
+        encore::BACKEND,
+        &["version.dll".into()],
+        None,
+        files,
+        Some("1.2.0"),
+        Some(&context(encore::PROFILE)),
+        None,
+        Some("1.2.0"),
+    )
+}
+
+#[test]
+fn intel_private_runtimes_upgrade_preserve_config_and_uninstall_by_ownership() -> Result<()> {
+    for upgrade_old in [false, true] {
+        let (_temp, target) = fixture(false)?;
+        if upgrade_old {
+            let mut old_files = encore_files("version.dll");
+            old_files.insert(encore::CONFIG.into(), br#"{"configVersion":4,"frameGeneration":{"mode":"game","multiplier":4,"flipMeteringBypass":false},"unknown":true}"#.to_vec());
+            core::deploy_prepared_context_at_with_overrides(
+                &target,
+                encore::BACKEND,
+                &["version.dll".into()],
+                None,
+                old_files,
+                Some("1.1.4"),
+                Some(&context(encore::PROFILE)),
+                None,
+                Some("1.1.4"),
+            )?;
+        }
+        let config = target.directory.join(encore::CONFIG);
+        let old = if upgrade_old {
+            Some(fs::read(&config)?)
+        } else {
+            None
+        };
+        fs::write(
+            target.directory.join("libxess.dll"),
+            b"game original Intel runtime",
+        )?;
+        install_120(&target)?;
+        if let Some(before) = old {
+            assert_eq!(fs::read(&config)?, before);
+        }
+        let record = core::record(&target.directory)?.unwrap();
+        record.validate()?;
+        assert_eq!(record.hashes.len(), 7);
+        for name in encore::INTEL_FILES {
+            assert!(target.directory.join(name).is_file());
+        }
+        let logs = target.directory.join("rtx-encore-logs");
+        fs::create_dir_all(&logs)?;
+        fs::write(logs.join("rtx-encore_frames_12345.jsonl"), b"generated")?;
+        fs::write(logs.join("rtx-encore_frames_user.jsonl"), b"manual")?;
+        assert!(cleanup::clean_outcome_at(&target)?.complete);
+        for name in encore::INTEL_FILES {
+            assert!(!target.directory.join(name).exists());
+        }
+        assert!(!target.directory.join("rtx-encore-runtimes").exists());
+        assert!(!logs.join("rtx-encore_frames_12345.jsonl").exists());
+        assert_eq!(
+            fs::read(logs.join("rtx-encore_frames_user.jsonl"))?,
+            b"manual"
+        );
+        assert_eq!(
+            fs::read(target.directory.join("libxess.dll"))?,
+            b"game original Intel runtime"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn intel_unknown_or_replaced_runtime_is_not_overwritten_or_deleted() -> Result<()> {
+    let (_temp, target) = fixture(false)?;
+    upgrade(&target, "version.dll", &BTreeMap::new())?;
+    let path = target.directory.join(encore::INTEL_FILES[0]);
+    fs::create_dir_all(path.parent().unwrap())?;
+    fs::write(&path, b"user runtime")?;
+    assert!(install_120(&target).is_err());
+    assert_eq!(fs::read(&path)?, b"user runtime");
+    fs::remove_file(&path)?;
+    install_120(&target)?;
+    fs::write(&path, b"changed after installation")?;
+    cleanup::clean_outcome_at(&target)?;
+    assert_eq!(fs::read(&path)?, b"changed after installation");
+    assert!(!target.directory.join(encore::INTEL_FILES[1]).exists());
+    Ok(())
+}
+
 fn upgrade(
     target: &core::DeploymentTarget,
     proxy: &str,

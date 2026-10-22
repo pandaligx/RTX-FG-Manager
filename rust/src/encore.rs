@@ -13,6 +13,12 @@ pub const CONFIG: &str = "rtx-encore.jsonc";
 pub const NOTICES: &str = "rtx-encore-THIRD-PARTY-NOTICES.md";
 pub const SCHEME: &str = "dlssg-transfusion-1.4.5.3";
 pub const SOURCE: &str = "https://github.com/SilyNoMeta/rtx-encore";
+pub const INTEL_FILES: [&str; 4] = [
+    "rtx-encore-runtimes/intel/libxess.dll",
+    "rtx-encore-runtimes/intel/libxess_fg.dll",
+    "rtx-encore-runtimes/intel/libxell.dll",
+    "rtx-encore-runtimes/intel/LICENSE.txt",
+];
 pub const PROXIES: [&str; 19] = [
     "version.dll",
     "dinput8.dll",
@@ -53,6 +59,8 @@ pub enum FieldKind {
     Integer,
     Decimal,
     Hotkey,
+    InheritDecimal,
+    InheritBool,
 }
 #[derive(Debug, Clone, Deserialize)]
 pub struct Choice {
@@ -74,6 +82,8 @@ pub struct Field {
     pub dependencies: Vec<String>,
     pub help: String,
     pub optional: bool,
+    #[serde(default)]
+    pub since: Option<String>,
 }
 pub fn fields() -> &'static [Field] {
     static FIELDS: OnceLock<Vec<Field>> = OnceLock::new();
@@ -93,6 +103,33 @@ pub fn default_config() -> &'static [u8] {
 }
 pub fn field(key: &str) -> Option<&'static Field> {
     fields().iter().find(|f| f.key == key)
+}
+pub fn supports_120(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::parse("1.2.0-beta.1").expect("constant"))
+}
+pub fn field_available(field: &Field, version: Option<&str>) -> bool {
+    if field.key == "smoothMotionForce" && supports_120(version) {
+        return false;
+    }
+    if field.key == "providerPatchPolicy"
+        && version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .is_some_and(|v| v >= semver::Version::new(1, 2, 1))
+    {
+        return false;
+    }
+    field.since.as_deref().is_none_or(|since| {
+        version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .zip(semver::Version::parse(since).ok())
+            .is_some_and(|(v, min)| v >= min)
+    })
+}
+pub fn requires_restart(field: &Field, version: Option<&str>) -> bool {
+    field.restart
+        && !(supports_120(version) && matches!(field.key.as_str(), "dlssSrPreset" | "dlssRrPreset"))
 }
 
 pub fn valid_hotkey(value: &str) -> bool {
@@ -174,7 +211,9 @@ pub fn valid_value(key: &str, value: &str) -> bool {
         FieldKind::Bool => matches!(value, "0" | "1"),
         FieldKind::Choice => f.choices.iter().any(|c| c.value == value),
         FieldKind::Hotkey => valid_hotkey(value),
-        FieldKind::Integer | FieldKind::Decimal => {
+        FieldKind::InheritBool => matches!(value, "inherit" | "0" | "1"),
+        FieldKind::InheritDecimal if value == "inherit" => true,
+        FieldKind::Integer | FieldKind::Decimal | FieldKind::InheritDecimal => {
             if value.is_empty() || value.trim() != value {
                 return false;
             }
@@ -292,6 +331,9 @@ fn supported_container(path: &[String]) -> bool {
         "diagnostics",
         "keyboardShortcuts",
         "menuState",
+        "renderingEngines",
+        "xefg",
+        "superResolutionInputs",
     ];
     if path.len() == 1 {
         return roots.contains(&path[0].as_str());
@@ -302,6 +344,7 @@ fn supported_container(path: &[String]) -> bool {
                 "core",
                 "appearance",
                 "passStyles",
+                "passTuning",
                 "optimizations",
                 "experimental",
                 "openExperimental",
@@ -371,6 +414,19 @@ fn multiplier(doc: &Document) -> Result<u64> {
 }
 fn decode(f: &Field, value: &Value) -> Result<String> {
     let result = match f.kind {
+        FieldKind::InheritDecimal | FieldKind::InheritBool if value.as_str() == Some("inherit") => {
+            "inherit".into()
+        }
+        FieldKind::InheritDecimal => value
+            .as_f64()
+            .context("Invalid inherited decimal")?
+            .to_string(),
+        FieldKind::InheritBool => if value.as_bool().context("Invalid inherited boolean")? {
+            "1"
+        } else {
+            "0"
+        }
+        .into(),
         FieldKind::Bool => if value.as_bool().context("Invalid Encore boolean type")? {
             "1"
         } else {
@@ -403,6 +459,11 @@ fn decode(f: &Field, value: &Value) -> Result<String> {
 }
 fn encode(f: &Field, value: &str) -> Result<Value> {
     Ok(match f.kind {
+        FieldKind::InheritDecimal | FieldKind::InheritBool if value == "inherit" => {
+            json!("inherit")
+        }
+        FieldKind::InheritDecimal => json!(value.parse::<f64>()?),
+        FieldKind::InheritBool => json!(value == "1"),
         FieldKind::Bool => json!(value == "1"),
         FieldKind::Integer => json!(value.parse::<u64>()?),
         FieldKind::Decimal => json!(value.parse::<f64>()?),

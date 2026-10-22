@@ -719,6 +719,13 @@ impl Record {
         let p = normalize_proxies(&self.selected())?;
         ensure!(self.proxy == p[0], "部署记录的 DLL 入口不一致");
         let mut names = deployment_names(&self.backend, &p)?;
+        if self.backend == crate::encore::BACKEND
+            && crate::encore::INTEL_FILES
+                .iter()
+                .any(|n| self.hashes.contains_key(*n))
+        {
+            names.extend(crate::encore::INTEL_FILES.iter().map(|n| (*n).to_owned()));
+        }
         if self.backend == crate::rtxmfg::BACKEND
             && self.hashes.contains_key(crate::rtxmfg::NOTICES)
         {
@@ -1057,6 +1064,9 @@ pub fn deploy_prepared_context_at_with_overrides(
 ) -> Result<String> {
     let config = config_name(backend);
     let mut expected = deployment_names(backend, proxies)?;
+    if backend == crate::encore::BACKEND && crate::encore::supports_120(upstream_version) {
+        expected.extend(crate::encore::INTEL_FILES.iter().map(|n| (*n).to_owned()));
+    }
     if backend == crate::rtxmfg::BACKEND && crate::mfg_plugin::supported(upstream_version) {
         expected.push(crate::rtxmfg::NOTICES.into());
     }

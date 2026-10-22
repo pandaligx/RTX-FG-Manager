@@ -6,12 +6,76 @@ fn values(pairs: &[(&str, &str)]) -> Values {
         .map(|(k, v)| ((*k).into(), (*v).into()))
         .collect()
 }
+
+#[test]
+fn encore121_hides_retired_policy_without_erasing_legacy_configuration() {
+    let policy = encore::field("providerPatchPolicy").unwrap();
+    assert!(encore::field_available(policy, Some("1.2.0")));
+    assert!(!encore::field_available(policy, Some("1.2.1")));
+    assert!(!encore::field_available(policy, Some("1.3.0")));
+    assert!(!encore::field_available(policy, Some("1.1.4")));
+    let original = b"{\"configVersion\":4, /* preserved */ \"providerPatchPolicy\":\"exact\"}";
+    let out = encore::configure(original, &values(&[("nrIntensity", "0.5")])).unwrap();
+    assert!(String::from_utf8_lossy(&out).contains("/* preserved */"));
+    assert_eq!(encore::read(&out).unwrap()["providerPatchPolicy"], "exact");
+}
+
+#[test]
+fn encore120_inheritance_types_and_version_gates_are_explicit() {
+    let base = b"{\"configVersion\":4,\"vendor\":true}";
+    let out = encore::configure(
+        base,
+        &values(&[("nrPass1Intensity", "0.25"), ("nrPass1AutoMask", "1")]),
+    )
+    .unwrap();
+    let doc = rtx_fg_manager::jsonc::Document::parse(&out).unwrap();
+    assert_eq!(
+        doc.value["neuralRendering"]["passTuning"]["nrPass1Intensity"],
+        0.25
+    );
+    assert_eq!(
+        doc.value["neuralRendering"]["passTuning"]["nrPass1AutoMask"],
+        true
+    );
+    let out = encore::configure(
+        &out,
+        &values(&[
+            ("nrPass1Intensity", "inherit"),
+            ("nrPass1AutoMask", "inherit"),
+        ]),
+    )
+    .unwrap();
+    assert_eq!(encore::read(&out).unwrap()["nrPass1AutoMask"], "inherit");
+    for value in ["-1", "2.1", "NaN", "true"] {
+        assert!(!encore::valid_value("nrPass1Intensity", value));
+    }
+    let engine = encore::field("reconstructionEngine").unwrap();
+    assert!(!encore::field_available(engine, None));
+    assert!(!encore::field_available(engine, Some("1.1.4")));
+    assert!(encore::field_available(engine, Some("1.2.0")));
+    assert!(!encore::field_available(
+        encore::field("smoothMotionForce").unwrap(),
+        Some("1.2.0")
+    ));
+    assert!(encore::requires_restart(
+        encore::field("dlssSrPreset").unwrap(),
+        Some("1.1.4")
+    ));
+    assert!(!encore::requires_restart(
+        encore::field("dlssSrPreset").unwrap(),
+        Some("1.2.0")
+    ));
+    assert!(encore::requires_restart(
+        encore::field("dlssFgPreset").unwrap(),
+        Some("1.2.0")
+    ));
+}
 #[test]
 fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults() {
     encore::validate_cloud_config(encore::DEFAULT_CONFIG).unwrap();
     let read = encore::read(encore::DEFAULT_CONFIG).unwrap();
     assert_eq!(read, encore::defaults());
-    assert_eq!(encore::fields().len(), 100);
+    assert_eq!(encore::fields().len(), 128);
     assert_eq!(read["menuKey"], "45");
     assert_eq!(read["nrOpenFastProjection"], "1");
     assert_eq!(read["nrFastProcessing"], "1");
@@ -81,12 +145,12 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
             out.insert(path.clone());
         }
     }
-    // The base JSONC was captured from rc.3; the three 1.0.0 switches were
-    // added from upstream SETTINGS.md, without executing the new signed DLL.
+    // The template follows documented defaults through 1.2.1. Retired controls
+    // remain in the editor metadata for older installs, not in new configs.
     let captured = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG).unwrap();
     let mut actual = std::collections::BTreeSet::new();
     leaves(&captured.value, &mut Vec::new(), &mut actual);
-    assert_eq!(actual.len(), 101);
+    assert_eq!(actual.len(), 127);
     let represented: std::collections::BTreeSet<_> =
         encore::fields().iter().map(|f| f.path.clone()).collect();
     let absent: Vec<_> = actual.difference(&represented).cloned().collect();
@@ -300,6 +364,8 @@ fn every_editor_field_can_be_written_and_has_four_translations() {
             encore::FieldKind::Integer => f.min.unwrap_or(0.0).to_string(),
             encore::FieldKind::Decimal => f.min.unwrap_or(0.125).to_string(),
             encore::FieldKind::Hotkey => "Ctrl+Alt+F12".into(),
+            encore::FieldKind::InheritDecimal => "0.25".into(),
+            encore::FieldKind::InheritBool => "1".into(),
         };
         let out = encore::configure(
             encore::DEFAULT_CONFIG,

@@ -160,6 +160,12 @@ def encore_value_valid(field, value):
     if not isinstance(value, str):
         return False
     kind = field["kind"]
+    if kind == "inheritbool":
+        return value in {"inherit", "0", "1"}
+    if kind == "inheritdecimal":
+        if value == "inherit":
+            return True
+        kind = "decimal"
     if kind == "bool":
         return value in {"0", "1"}
     if kind == "choice":
@@ -225,13 +231,15 @@ def validate_encore_config(config):
         if field["key"] == "tf_mode":
             require(isinstance(value, str) and value in {"game", "fixed", "dynamic"}, "Invalid Encore mode")
             continue
-        if kind == "bool":
+        if kind in {"inheritbool", "inheritdecimal"} and value == "inherit":
+            valid_type, encoded = True, "inherit"
+        elif kind in {"bool", "inheritbool"}:
             valid_type = type(value) is bool
             encoded = "1" if value is True else "0"
         elif kind == "integer":
             valid_type = type(value) is int
             encoded = str(value)
-        elif kind == "decimal":
+        elif kind in {"decimal", "inheritdecimal"}:
             valid_type = type(value) in {int, float}
             encoded = str(value)
         elif kind == "choice" and all(re.fullmatch(r"[0-9]+", choice["value"]) for choice in field["choices"]):

@@ -48,6 +48,7 @@ fn complete_archive_extracts_only_the_selected_logical_entry() {
     package.archive_prefix = "chosen".into();
     package.files = vec![cloud::File {
         name: "settings.ini".into(),
+        archive_path: None,
         bytes: 3,
         sha256: core::hash(b"one"),
     }];

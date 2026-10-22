@@ -2503,6 +2503,15 @@ impl Manager {
                 self.button("gpu-editor", "修改显卡型号", Command::GpuEditor, cx)
                     .w_full(),
             )
+            .when_some(self.recommended_gpu_name(), |d, name| {
+                d.child(
+                    div()
+                        .text_xs()
+                        .whitespace_normal()
+                        .text_color(cx.theme().warning)
+                        .child(self.t("当前游戏推荐显卡名称：{0}").replace("{0}", &name)),
+                )
+            })
             .child(
                 div()
                     .h_flex()
@@ -2868,7 +2877,13 @@ impl Manager {
                     .custom(crate::ui_themes::recommendation_button(cx))
                     .bg(crate::ui_themes::recommendation_accent())
                     .icon(Icon::new(gpui::assets::IconName::ThumbsUp))
-                    .w_full(),
+                    .w_full()
+                    .with_animation(
+                        SharedString::from(format!("recommendation-enter-{}", game.exe)),
+                        Animation::new(Duration::from_millis(400))
+                            .with_easing(gpui_component::animation::ease_out_cubic),
+                        |button, progress| button.opacity(0.65 + 0.35 * progress),
+                    ),
                 )
             })
             .child(
@@ -3379,7 +3394,7 @@ impl Manager {
                                 .child(self.t("即时生效，控件与间距同步缩放")),
                         )
                         .child(
-                            self.button("font-reset", "恢复默认", Command::FontSize(14), cx)
+                            self.button("font-reset", "恢复默认", Command::FontSize(13), cx)
                                 .ghost(),
                         ),
                 ),
@@ -3598,9 +3613,29 @@ impl Manager {
             )
             .into_any_element()
     }
+    fn recommended_gpu_name(&self) -> Option<String> {
+        let game = self
+            .c
+            .games
+            .iter()
+            .find(|g| Some(g.exe.as_str()) == self.c.focus.as_deref())?;
+        let requirement = game.extra.get("recommendation_gpu")?;
+        let name = requirement.get("name")?.as_str()?;
+        if requirement.get("scheme")?.as_str()? != self.c.cloud_scheme()
+            || !gpu_alias::NAMES.contains(&name)
+        {
+            return None;
+        }
+        Some(name.into())
+    }
     fn gpu_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.dialog_active {
             return;
+        }
+        if let Some(name) = self.recommended_gpu_name()
+            && let Some(index) = gpu_alias::NAMES.iter().position(|v| *v == name)
+        {
+            self.c.alias_index = index;
         }
         self.dialog_active = true;
         let owner = cx.entity();
@@ -4679,7 +4714,7 @@ fn preferred_font_size(state: &Value) -> f32 {
     state["ui_font_size"]
         .as_f64()
         .filter(|n| n.is_finite())
-        .unwrap_or(14.)
+        .unwrap_or(13.)
         .round()
         .clamp(12., 18.) as f32
 }
@@ -4722,8 +4757,9 @@ mod layout_tests {
     #[test]
     fn font_preferences_and_responsive_panes_remain_bounded() {
         for (value, expected) in [
-            (serde_json::Value::Null, 14.),
-            (serde_json::json!("large"), 14.),
+            (serde_json::Value::Null, 13.),
+            (serde_json::json!("large"), 13.),
+            (serde_json::json!(17), 17.),
             (serde_json::json!(0), 12.),
             (serde_json::json!(40), 18.),
         ] {
@@ -4734,7 +4770,7 @@ mod layout_tests {
         }
         for dpi in [1., 1.25, 1.5, 2., 3.] {
             for physical_width in [800., 1366., 1920., 2560., 3840.] {
-                for font in [12., 14., 18.] {
+                for font in [12., 13., 14., 18.] {
                     for collapsed in [false, true] {
                         let scale = font / 14.;
                         let width = physical_width / dpi;

@@ -1,5 +1,11 @@
 Helper libraries used by this project
 
+Intel XeSS / XeFG / XeLL runtime dependencies for RTX Encore 1.2.0
+Official source: https://github.com/intel/xess/releases/tag/v3.0.2
+The separate complete patch download includes the original Intel binaries and
+LICENSE.txt in rtx-encore-runtimes/intel. They are not built into the manager EXE.
+The reviewed upstream license is also retained in rust/assets/licenses/INTEL-XESS-LICENSE.txt.
+
 Game name catalog (rust/assets/game-names.json)
 Source: Wikidata contributors, https://www.wikidata.org/wiki/Wikidata:Data_access
 Structured data: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/

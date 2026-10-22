@@ -78,6 +78,6 @@ test('Bundled directory is reproducible, valid and matches the client name catal
 });
 test('Schema-three migration leaves posts and feedback unchanged',t=>{
   const dir=mkdtempSync(join(tmpdir(),'rtxfg-games-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const file=join(dir,'test.sqlite');let db=openStore(file);
-  db.exec("INSERT INTO users VALUES('author','a@example.com',0,1);DROP TABLE game_keys;DROP TABLE game_mapping_changes;PRAGMA user_version=3;");db.close();
-  db=openStore(file);assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);assert.equal(db.prepare('SELECT COUNT(*) n FROM users').get().n,1);db.close();
+  db.exec("INSERT INTO users VALUES('author','a@example.com',0,1);DROP TABLE game_keys;DROP TABLE game_mapping_changes;ALTER TABLE recipes DROP COLUMN created;PRAGMA user_version=3;");db.close();
+  db=openStore(file);assert.equal(db.prepare('PRAGMA user_version').get().user_version,5);assert.equal(db.prepare('SELECT COUNT(*) n FROM users').get().n,1);db.close();
 });

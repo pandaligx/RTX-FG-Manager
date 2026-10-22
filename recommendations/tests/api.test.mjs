@@ -14,11 +14,39 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 function fixture(t,extra={}) {
   const db=openStore(':memory:');t.after(()=>db.close());let clock=1800000000;const mail=[];
   const api=createApi(db,{secret:'unit-test-'.repeat(5),now:()=>clock,sendCode:async(email,code)=>mail.push({email,code}),adminEmail:'admin@example.com',...extra});
-  const call=(method,path,body,token,ip='test-ip',feedback=false)=>api({method,url:new URL(path,'http://localhost'),body,headers:{...(token?{authorization:'Bearer '+token}:{}),...(feedback?{'x-rtxfg-feedback':feedback===3?'3':'2'}:{})},ip});
+  const call=(method,path,body,token,ip='test-ip',feedback=false)=>api({method,url:new URL(path,'http://localhost'),body,headers:{...(token?{authorization:'Bearer '+token}:{}),...(feedback?{'x-rtxfg-feedback':feedback===true?'2':String(feedback)}:{})},ip});
   const login=async(email='player@example.com')=>{const c=await call('POST','/v1/auth/code',{email});const m=mail.at(-1);return call('POST','/v1/auth/verify',{challenge:c.challenge,code:m.code});};
   return {db,mail,call,login,tick:s=>{clock+=s;}};
 }
 const reject=(promise,code)=>assert.rejects(promise,e=>e.message===code);
+test('Historical dates are recovered only when the first revision is still present',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'rtxfg-dates-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const file=join(dir,'test.sqlite');let db=openStore(file);
+  db.exec("INSERT INTO users VALUES('author','a@example.com',0,1)");
+  for(const revision of [1,2])db.prepare('INSERT INTO recipes(id,author,game,revision,content,updated,submission) VALUES(?,?,?,?,?,?,?)').run(String(revision),'author','steam:292030',revision,JSON.stringify(content()),100,String(revision));
+  db.exec('ALTER TABLE recipes DROP COLUMN created; PRAGMA user_version=4;');db.close();db=openStore(file);
+  assert.equal(db.prepare("SELECT created FROM recipes WHERE id='1'").get().created,100);
+  assert.equal(db.prepare("SELECT created FROM recipes WHERE id='2'").get().created,null);db.close();
+});
+test('Publication dates survive edits and remain opt-in for older clients',async t=>{
+  const f=fixture(t),a=await f.login();
+  const r=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:content()},a.token,'test-ip',5);
+  assert.equal(r.createdAt,r.updatedAt);f.tick(86400);
+  const edit=await f.call('PUT','/v1/recipes/'+r.id,{revision:1,content:{...content(),notes:'Edited'}},a.token,'test-ip',5);
+  assert.equal(edit.createdAt,r.createdAt);assert.ok(edit.updatedAt>edit.createdAt);
+  for(const feedback of [false,2,3,4])assert.equal(Object.hasOwn(await f.call('GET','/v1/recipes/'+r.id,null,a.token,'test-ip',feedback),'createdAt'),false);
+});
+test('Like counts determine global pagination regardless of dislikes and hardware',async t=>{
+  const f=fixture(t),a=await f.login(),b=await f.login('b@example.com'),c=await f.login('c@example.com'),d=await f.login('d@example.com');
+  const high=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:content()},a.token);
+  const low=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:content()},a.token);
+  for(const user of [b,c])await f.call('PUT','/v1/recipes/'+high.id+'/vote',{revision:1,value:1},user.token);
+  await f.call('PUT','/v1/recipes/'+high.id+'/vote',{revision:1,value:-1},d.token);
+  await f.call('PUT','/v1/recipes/'+low.id+'/vote',{revision:1,value:1},b.token);
+  // Give the tied net-score card a later update; likes still take priority.
+  f.tick(1);await f.call('PUT','/v1/recipes/'+low.id,{revision:1,content:content()},a.token);
+  assert.deepEqual((await f.call('GET','/v1/recipes?game=steam:292030',null,null,'test-ip',5)).items.map(v=>v.id),[high.id,low.id]);
+});
 test('OTP is one-use, bound to challenge, expires, and five wrong attempts persist',async t=>{
   const f=fixture(t);const c=await f.call('POST','/v1/auth/code',{email:'A@EXAMPLE.COM'}),code=f.mail[0].code;
   assert.equal(f.mail[0].email,'a@example.com');assert.ok(!JSON.stringify(f.db.prepare('SELECT * FROM codes').get()).includes(code));
@@ -97,7 +125,7 @@ test('Feedback is exclusive, reversible, retained across edits and legacy-compat
   c=await f.call('PUT',path+'/vote',{revision:2,value:1},b.token,'test-ip',true);
   assert.equal(c.likes,1);assert.equal(c.dislikes,0);
   const legacy=await f.call('GET',path,null,b.token);assert.equal(Object.hasOwn(legacy,'disliked'),false);
-  assert.equal(f.db.prepare('PRAGMA user_version').get().user_version,4);
+  assert.equal(f.db.prepare('PRAGMA user_version').get().user_version,5);
 });
 
 test('Owners edit an existing full-quota share without duplication and may delete only their own',async t=>{
@@ -146,7 +174,7 @@ test('Version-one database upgrade preserves accounts, recipes and positive feed
   const file=join(dir,'test.sqlite');let db=openStore(file);
   db.exec("INSERT INTO users VALUES('author','a@example.com',0,1),('reader','r@example.com',0,1)");
   db.prepare('INSERT INTO recipes(id,author,game,content,updated,submission) VALUES(?,?,?,?,?,?)').run('recipe','author','steam:292030',JSON.stringify(content()),1,'submission');
-  db.exec("INSERT INTO likes VALUES('recipe',1,'reader'); DROP TABLE dislikes; DROP TABLE game_keys; DROP TABLE game_mapping_changes; ALTER TABLE reports DROP COLUMN active; ALTER TABLE reports DROP COLUMN reviewed_revision; PRAGMA user_version=1;");db.close();
+  db.exec("INSERT INTO likes VALUES('recipe',1,'reader'); DROP TABLE dislikes; DROP TABLE game_keys; DROP TABLE game_mapping_changes; ALTER TABLE reports DROP COLUMN active; ALTER TABLE reports DROP COLUMN reviewed_revision; ALTER TABLE recipes DROP COLUMN created; PRAGMA user_version=1;");db.close();
   db=openStore(file);assert.equal(db.prepare('SELECT COUNT(*) n FROM likes').get().n,1);assert.equal(db.prepare('SELECT COUNT(*) n FROM users').get().n,2);db.close();
   db=openStore(file);assert.equal(db.prepare('SELECT COUNT(*) n FROM recipes').get().n,1);assert.equal(db.prepare('SELECT COUNT(*) n FROM dislikes').get().n,0);db.close();
 });

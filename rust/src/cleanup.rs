@@ -460,7 +460,7 @@ fn scan_encore_logs(
     static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
     let rotated = ROTATED.get_or_init(|| {
         regex::Regex::new(
-            r"^(rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}((\.crash)?\.log|\.dump[0-9]{1,10}\.dmp))$",
+            r"^(rtx-encore_frames_[0-9]{1,10}\.jsonl|rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}((\.crash)?\.log|\.dump[0-9]{1,10}\.dmp))$",
         )
         .expect("fixed Encore session-log pattern")
     });
@@ -667,6 +667,23 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
             }
         }
         if record.backend == crate::encore::BACKEND {
+            for name in crate::encore::INTEL_FILES {
+                if let Some(expected) = record.hashes.get(name) {
+                    let path = core::no_links(&dir.join(name))?;
+                    if path.is_file() && core::digest(&path)? == *expected {
+                        targets.insert(path.clone(), expected.clone());
+                    } else if path.exists() {
+                        kept.insert(path);
+                    }
+                }
+            }
+            if crate::encore::INTEL_FILES
+                .iter()
+                .any(|name| record.hashes.contains_key(*name))
+            {
+                dirs.insert(dir.join("rtx-encore-runtimes/intel"));
+                dirs.insert(dir.join("rtx-encore-runtimes"));
+            }
             let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
             if notice.exists() {
                 if notice.is_file()

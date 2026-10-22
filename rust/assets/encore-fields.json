@@ -2231,7 +2231,7 @@
       "smoothMotionApi=vulkan"
     ],
     "help": "忽略游戏 NVIDIA 配置中的排除项；可能产生异常。仅 Vulkan，需要重启。",
-    "optional": false,
+    "optional": true,
     "source_help": "Vulkan: run Smooth Motion even where the game's NVIDIA profile excludes it. Unexpected results are possible. Restart the game to apply."
   },
   {
@@ -2552,5 +2552,893 @@
     "help": "游戏窗口内开启或关闭 NR，用于对比画面与帧率。",
     "optional": true,
     "source_help": "Combinations such as Ctrl+Alt+4 or Ctrl+Shift+F5; several separated by commas; empty disables the action."
+  },
+  {
+    "key": "reconstructionEngine",
+    "path": [
+      "renderingEngines",
+      "reconstructionEngine"
+    ],
+    "label": "重建引擎",
+    "group": "image",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "xess",
+        "label": "Intel XeSS（实验）"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "实验功能，需要兼容的游戏输入；默认跟随游戏，RR 保持原引擎。1.2.0 的 Vulkan 需启动前选择 XeSS；1.2.1 起可在兼容游戏中即时切换，但须启动前安装兼容 Intel 运行库。更换运行库仍需重启。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "frameGenerationEngine",
+    "path": [
+      "renderingEngines",
+      "frameGenerationEngine"
+    ],
+    "label": "帧生成引擎",
+    "group": "frames",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "xefg",
+        "label": "Intel XeFG（实验）"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "实验功能，需要兼容的游戏输入。选中不代表已实际启用；默认跟随游戏。不能为任意游戏凭空添加帧生成。不要假定与 NR、Smooth Motion 的组合已经验证。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "xefgMfg4VariablePacing",
+    "path": [
+      "xefg",
+      "xefgMfg4VariablePacing"
+    ],
+    "label": "XeFG 多帧可变节奏",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [
+      "frameGenerationEngine=xefg"
+    ],
+    "help": "仅 XeFG。关闭可能使高于 2X 的倍率不可用。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "xefgUiHandling",
+    "path": [
+      "xefg",
+      "xefgUiHandling"
+    ],
+    "label": "XeFG 界面处理",
+    "group": "frames",
+    "kind": "choice",
+    "default": "interpolate",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "interpolate",
+        "label": "插值处理"
+      },
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "frameGenerationEngine=xefg"
+    ],
+    "help": "分离游戏 UI 需要受支持的输入。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "xefgUiAlpha",
+    "path": [
+      "xefg",
+      "xefgUiAlpha"
+    ],
+    "label": "XeFG 界面透明度格式",
+    "group": "frames",
+    "kind": "choice",
+    "default": "unknown",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "unknown",
+        "label": "自动 / 未知"
+      },
+      {
+        "value": "straight",
+        "label": "直通 Alpha"
+      },
+      {
+        "value": "premultiplied",
+        "label": "预乘 Alpha"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "frameGenerationEngine=xefg"
+    ],
+    "help": "仅在已知游戏 UI 格式时修改。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "srHdr",
+    "path": [
+      "superResolutionInputs",
+      "srHdr"
+    ],
+    "label": "超分输入 HDR",
+    "group": "image",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "on",
+        "label": "开启"
+      },
+      {
+        "value": "off",
+        "label": "关闭"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "覆盖 SR/DLAA 输入，不启用显示器 HDR，也不把 SDR 转为 HDR。错误设置可能损坏画面；默认跟随游戏。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "srAutoExposure",
+    "path": [
+      "superResolutionInputs",
+      "srAutoExposure"
+    ],
+    "label": "超分自动曝光",
+    "group": "image",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "on",
+        "label": "开启"
+      },
+      {
+        "value": "off",
+        "label": "关闭"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "覆盖 SR/DLAA 输入，不启用显示器 HDR，也不把 SDR 转为 HDR。错误设置可能损坏画面；默认跟随游戏。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "providerPatchPolicy",
+    "path": [
+      "providerPatchPolicy"
+    ],
+    "label": "NVIDIA 运行库兼容策略",
+    "group": "system",
+    "kind": "choice",
+    "default": "heuristic",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "heuristic",
+        "label": "启发式（默认）"
+      },
+      {
+        "value": "exact",
+        "label": "仅已核对版本"
+      }
+    ],
+    "restart": true,
+    "dependencies": [],
+    "help": "仅本机生效。启发式允许符合限制的其他签名 NVIDIA 运行库，不保证游戏兼容性。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass1Intensity",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass1Intensity"
+    ],
+    "label": "NR 第 1 遍强度",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=1"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass1LocalStructure",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass1LocalStructure"
+    ],
+    "label": "NR 第 1 遍局部结构",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=1"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass1LocalTone",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass1LocalTone"
+    ],
+    "label": "NR 第 1 遍局部色调",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=1"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass1SkinStructure",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass1SkinStructure"
+    ],
+    "label": "NR 第 1 遍皮肤结构",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=1"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass1AutoMask",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass1AutoMask"
+    ],
+    "label": "NR 第 1 遍人物遮罩",
+    "group": "image",
+    "kind": "inheritbool",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "开启"
+      },
+      {
+        "value": "0",
+        "label": "关闭"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=1"
+    ],
+    "help": "继承全局人物遮罩，或为此遍单独设置。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass2Intensity",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass2Intensity"
+    ],
+    "label": "NR 第 2 遍强度",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=2"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass2LocalStructure",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass2LocalStructure"
+    ],
+    "label": "NR 第 2 遍局部结构",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=2"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass2LocalTone",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass2LocalTone"
+    ],
+    "label": "NR 第 2 遍局部色调",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=2"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass2SkinStructure",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass2SkinStructure"
+    ],
+    "label": "NR 第 2 遍皮肤结构",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=2"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass2AutoMask",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass2AutoMask"
+    ],
+    "label": "NR 第 2 遍人物遮罩",
+    "group": "image",
+    "kind": "inheritbool",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "开启"
+      },
+      {
+        "value": "0",
+        "label": "关闭"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=2"
+    ],
+    "help": "继承全局人物遮罩，或为此遍单独设置。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass3Intensity",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass3Intensity"
+    ],
+    "label": "NR 第 3 遍强度",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=3"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass3LocalStructure",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass3LocalStructure"
+    ],
+    "label": "NR 第 3 遍局部结构",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=3"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass3LocalTone",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass3LocalTone"
+    ],
+    "label": "NR 第 3 遍局部色调",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=3"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass3SkinStructure",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass3SkinStructure"
+    ],
+    "label": "NR 第 3 遍皮肤结构",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=3"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass3AutoMask",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass3AutoMask"
+    ],
+    "label": "NR 第 3 遍人物遮罩",
+    "group": "image",
+    "kind": "inheritbool",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "开启"
+      },
+      {
+        "value": "0",
+        "label": "关闭"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=3"
+    ],
+    "help": "继承全局人物遮罩，或为此遍单独设置。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass4Intensity",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass4Intensity"
+    ],
+    "label": "NR 第 4 遍强度",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=4"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass4LocalStructure",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass4LocalStructure"
+    ],
+    "label": "NR 第 4 遍局部结构",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=4"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass4LocalTone",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass4LocalTone"
+    ],
+    "label": "NR 第 4 遍局部色调",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=4"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass4SkinStructure",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass4SkinStructure"
+    ],
+    "label": "NR 第 4 遍皮肤结构",
+    "group": "image",
+    "kind": "inheritdecimal",
+    "default": "inherit",
+    "min": 0,
+    "max": 2,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "100%"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=4"
+    ],
+    "help": "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPass4AutoMask",
+    "path": [
+      "neuralRendering",
+      "passTuning",
+      "nrPass4AutoMask"
+    ],
+    "label": "NR 第 4 遍人物遮罩",
+    "group": "image",
+    "kind": "inheritbool",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "1",
+        "label": "开启"
+      },
+      {
+        "value": "0",
+        "label": "关闭"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=4"
+    ],
+    "help": "继承全局人物遮罩，或为此遍单独设置。",
+    "optional": true,
+    "since": "1.2.0-beta.1"
   }
 ]

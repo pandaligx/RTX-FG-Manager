@@ -4,7 +4,7 @@ import { need } from './contracts.mjs';
 export function openStore(path) {
   const db = new DatabaseSync(path);
   const version=db.prepare('PRAGMA user_version').get().user_version;
-  need(version <= 4, 'database_newer_than_service', 503);
+  need(version <= 5, 'database_newer_than_service', 503);
   db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,blocked INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY,user TEXT NOT NULL REFERENCES users(id),expires INTEGER NOT NULL);
@@ -33,6 +33,12 @@ export function openStore(path) {
       CREATE TABLE game_mapping_changes(id INTEGER PRIMARY KEY,source TEXT NOT NULL,target TEXT NOT NULL,changes TEXT NOT NULL,created INTEGER NOT NULL,actor TEXT NOT NULL,undone INTEGER NOT NULL DEFAULT 0);
       PRAGMA user_version=4;`);
   });
+  if(version<5) transaction(db,()=>{
+    // Older revisions did not retain the original publication date. Do not invent it.
+    db.exec(`ALTER TABLE recipes ADD COLUMN created INTEGER;
+      UPDATE recipes SET created=updated WHERE revision=1;
+      PRAGMA user_version=5;`);
+  });
   return db;
 }
 export function transaction(db, operation) {
@@ -60,8 +66,9 @@ export const selectRecipes = `SELECT r.*,(SELECT COUNT(*) FROM likes l JOIN user
   (SELECT COUNT(*) FROM dislikes l JOIN users u ON l.user=u.id
   WHERE l.recipe=r.id AND l.revision=r.revision AND u.blocked=0) dislikes
   FROM recipes r JOIN users author ON author.id=r.author`;
-export function publicRecipe(db,row,user,feedback=false,reporting=false) {
+export function publicRecipe(db,row,user,feedback=false,reporting=false,dates=false) {
   return { id:row.id,author:row.author,revision:row.revision,updatedAt:row.updated,likes:Number(row.likes || 0),
+    ...(dates ? {createdAt:row.created ?? null} : {}),
     liked:!!(user && db.prepare('SELECT 1 FROM likes WHERE recipe=? AND revision=? AND user=?').get(row.id,row.revision,user.id)),
     ...(feedback ? {dislikes:Number(row.dislikes || 0),disliked:!!(user && db.prepare('SELECT 1 FROM dislikes WHERE recipe=? AND revision=? AND user=?').get(row.id,row.revision,user.id))} : {}),
     ...(reporting ? {reported:!!(user && db.prepare('SELECT 1 FROM reports WHERE recipe=? AND user=? AND active=1').get(row.id,user.id))} : {}),

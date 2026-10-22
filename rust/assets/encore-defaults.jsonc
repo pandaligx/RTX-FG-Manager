@@ -1,4 +1,18 @@
 {
+  "renderingEngines": {
+    "reconstructionEngine": "game",
+    "frameGenerationEngine": "game"
+  },
+  "xefg": {
+    "xefgMfg4VariablePacing": true,
+    "xefgUiHandling": "interpolate",
+    "xefgUiAlpha": "unknown"
+  },
+  "superResolutionInputs": {
+    "srHdr": "game",
+    "srAutoExposure": "game"
+  },
+
   "configVersion": 4,                        // Settings apply live unless the comment says to restart the game. Editable in the RTX Encore native menu (Insert).
   "frameGeneration": {
     "mode": "game",                          // fixed (the multiplier below), dynamic (DLSS-G picks the multiplier to reach the target FPS) or game (the game or NVIDIA Profile Inspector decides).
@@ -7,9 +21,8 @@
     "dynamicExperimental56": false           // Let Dynamic mode go up to 5x and 6x (needs plenty of VRAM). Off: Dynamic stays at 4x or less.
   },
   "smoothMotion": {
-    "smoothMotionEnabled": false,            // Driver Smooth Motion for RTX 30, with the NVIDIA 620.12, 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply.
-    "smoothMotionApi": "d3d12",              // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
-    "smoothMotionForce": false               // Vulkan: run Smooth Motion even where the game's NVIDIA profile excludes it. Unexpected results are possible. Restart the game to apply.
+    "smoothMotionEnabled": false,            // RTX 30 only: supported driver layouts 621.01, 620.12, 617.42, 617.14, 616.92, 616.64 and 591.86; upstream game tests cover 617.14 and 621.01. Restart to apply.
+    "smoothMotionApi": "d3d12"              // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
   },
   "dlssSuperResolution": {
     "fastSuperResolution": false, // RTX 30, DX12, SR 310.9.x preset M/L; restart. Not RR/DLAA.
@@ -18,9 +31,9 @@
   },
   "dlssPresets": {
     "dlssNrPreset": "b", // NR 310.9.16: b smaller network, a larger network, auto DLL default; live. Open ignores.
-    "dlssSrPreset": "game",                  // SR preset: game (no override), default, a-f (legacy), j, k, l or m. Applies to all quality modes; supported models depend on the DLSS DLL. Restart to apply.
-    "dlssRrPreset": "game",                  // RR preset: game (no override), default, a-c (legacy), d or e. Does not enable RR. Driver/model selection may override SR/RR hints. Restart to apply.
-    "dlssFgPreset": "game",                  // FG preset: game (no override), a, b or c. A/B use Normal; C automatically enables Lite (faster, with image-quality trade-offs) and needs 310.9.16.0. Fast frame generation remains independent for every preset. Qualified NVIDIA releases 310.6.0.0, 310.7.0.0, 310.7.128.0, 310.7.129.0, 310.8.0.0, 310.9.0.0, 310.9.1.0 and 310.9.16.0; unknown binaries are untouched and logged. B needs compatible HUD-less/UI inputs. Lite keeps NVIDIA's native image policy: frameProtection, protectionTuning and UI recomposition are unavailable. No driver-profile writes. Restart to apply.
+    "dlssSrPreset": "game",                  // SR preset: game, default, a-f, j, k, l or m. Supported models depend on the DLSS DLL. Encore 1.2 can change this live in its Insert menu.
+    "dlssRrPreset": "game",                  // RR preset: game, default, a-c, d or e. Does not enable RR. Encore 1.2 can change this live in its Insert menu; driver/model selection may override hints.
+    "dlssFgPreset": "game",                  // FG preset: game (no override), a, b or c. A/B use Normal; C enables Lite and needs compatible 310.9.16.0. Fast FG is independent. Encore 1.2.1 no longer requires NVIDIA runtimes to appear in a fixed list; game and runtime feature requirements still apply. B needs compatible HUD-less/UI inputs. Lite keeps NVIDIA's native image policy: protection tuning and UI recomposition are unavailable. Restart to apply.
     "dlssFgLite": "game"                     // Diagnostic-only JSON override; not shown as a menu setting. Leave game to follow the preset (A/B Normal, C Lite) or the game/driver. Only for diagnostics with qualified 310.9.16.0: off forces Normal, on forces Lite, taking priority over the preset. Restart to apply.
   },
   "nativeMenuFeatures": {
@@ -29,6 +42,28 @@
     "hairEnabled": true                      // Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change.
   },
   "neuralRendering": {
+    "passTuning": {
+      "nrPass1Intensity": "inherit",
+      "nrPass1LocalStructure": "inherit",
+      "nrPass1LocalTone": "inherit",
+      "nrPass1SkinStructure": "inherit",
+      "nrPass1AutoMask": "inherit",
+      "nrPass2Intensity": "inherit",
+      "nrPass2LocalStructure": "inherit",
+      "nrPass2LocalTone": "inherit",
+      "nrPass2SkinStructure": "inherit",
+      "nrPass2AutoMask": "inherit",
+      "nrPass3Intensity": "inherit",
+      "nrPass3LocalStructure": "inherit",
+      "nrPass3LocalTone": "inherit",
+      "nrPass3SkinStructure": "inherit",
+      "nrPass3AutoMask": "inherit",
+      "nrPass4Intensity": "inherit",
+      "nrPass4LocalStructure": "inherit",
+      "nrPass4LocalTone": "inherit",
+      "nrPass4SkinStructure": "inherit",
+      "nrPass4AutoMask": "inherit"
+    },
     "core": {                                // Activation, engine and NR scaler: the main quality/performance controls.
       "nrEnabled": false,                    // DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0 or 310.9.16. The first launch prepares it in the background.
       "nrEngine": "nvidia",                  // nvidia (default) or opendlss (experimental). Open runs dedicated in a Direct3D game (on its own device beside the game) and in-game in a Vulkan game (on the game's device). Restart to apply; no engine fallback.

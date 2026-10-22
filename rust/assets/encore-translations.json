@@ -1,5 +1,10 @@
 {
-  "平滑 X3 / X4": ["Smooth out X3 / X4", "Плавность X3 / X4", "X3 / X4 を滑らかにする", "X3 / X4 부드럽게"],
+  "平滑 X3 / X4": [
+    "Smooth out X3 / X4",
+    "Плавность X3 / X4",
+    "X3 / X4 を滑らかにする",
+    "X3 / X4 부드럽게"
+  ],
   "当 X3/X4 比 X2 更不流畅时可尝试；让 Streamline 安排生成帧的间隔。Encore 1.1.2 支持 DX12/Vulkan，修改后重启游戏。默认关闭。": [
     "Try this if X3/X4 looks choppier than X2. Streamline spaces generated frames. Encore 1.1.2 supports DX12/Vulkan. Restart the game after changing it. Off by default.",
     "Попробуйте, если X3/X4 менее плавные, чем X2. Streamline распределяет сгенерированные кадры. В Encore 1.1.2 поддерживаются DX12/Vulkan. После изменения перезапустите игру. По умолчанию выключено.",
@@ -2021,5 +2026,293 @@
     "Исправьте некорректный ввод",
     "無効な入力を修正してから適用してください",
     "잘못된 입력을 수정한 후 적용하세요"
+  ],
+  "重建引擎": [
+    "Reconstruction engine",
+    "Reconstruction engine",
+    "Reconstruction engine",
+    "Reconstruction engine"
+  ],
+  "实验功能，需要兼容的游戏输入。选中不代表已实际启用；默认跟随游戏。1.2.0 游戏内菜单可即时切换；Vulkan 必须启动前选择 XeSS。RR 保持原引擎。": [
+    "Experimental; requires compatible inputs. Game is the default. Switching in the 1.2 menu is live; Vulkan XeSS must be selected before launch. RR keeps its original engine.",
+    "Experimental; requires compatible inputs. Game is the default. Switching in the 1.2 menu is live; Vulkan XeSS must be selected before launch. RR keeps its original engine.",
+    "Experimental; requires compatible inputs. Game is the default. Switching in the 1.2 menu is live; Vulkan XeSS must be selected before launch. RR keeps its original engine.",
+    "Experimental; requires compatible inputs. Game is the default. Switching in the 1.2 menu is live; Vulkan XeSS must be selected before launch. RR keeps its original engine."
+  ],
+  "Intel XeSS（实验）": [
+    "Intel XeSS (experimental)",
+    "Intel XeSS (experimental)",
+    "Intel XeSS (experimental)",
+    "Intel XeSS (experimental)"
+  ],
+  "帧生成引擎": [
+    "Frame generation engine",
+    "Frame generation engine",
+    "Frame generation engine",
+    "Frame generation engine"
+  ],
+  "实验功能，需要兼容的游戏输入。选中不代表已实际启用；默认跟随游戏。不能为任意游戏凭空添加帧生成。不要假定与 NR、Smooth Motion 的组合已经验证。": [
+    "Experimental; requires compatible inputs and a restart. Does not add FG to every game. Combinations with NR or Smooth Motion are not qualified.",
+    "Experimental; requires compatible inputs and a restart. Does not add FG to every game. Combinations with NR or Smooth Motion are not qualified.",
+    "Experimental; requires compatible inputs and a restart. Does not add FG to every game. Combinations with NR or Smooth Motion are not qualified.",
+    "Experimental; requires compatible inputs and a restart. Does not add FG to every game. Combinations with NR or Smooth Motion are not qualified."
+  ],
+  "Intel XeFG（实验）": [
+    "Intel XeFG (experimental)",
+    "Intel XeFG (experimental)",
+    "Intel XeFG (experimental)",
+    "Intel XeFG (experimental)"
+  ],
+  "XeFG 多帧可变节奏": [
+    "XeFG variable multi-frame pacing",
+    "XeFG variable multi-frame pacing",
+    "XeFG variable multi-frame pacing",
+    "XeFG variable multi-frame pacing"
+  ],
+  "仅 XeFG。关闭可能使高于 2X 的倍率不可用。": [
+    "XeFG only. Disabling may make factors above X2 unavailable. Restart to apply.",
+    "XeFG only. Disabling may make factors above X2 unavailable. Restart to apply.",
+    "XeFG only. Disabling may make factors above X2 unavailable. Restart to apply.",
+    "XeFG only. Disabling may make factors above X2 unavailable. Restart to apply."
+  ],
+  "XeFG 界面处理": [
+    "XeFG UI handling",
+    "XeFG UI handling",
+    "XeFG UI handling",
+    "XeFG UI handling"
+  ],
+  "分离游戏 UI 需要受支持的输入。": [
+    "Separate game UI requires compatible inputs. Restart to apply.",
+    "Separate game UI requires compatible inputs. Restart to apply.",
+    "Separate game UI requires compatible inputs. Restart to apply.",
+    "Separate game UI requires compatible inputs. Restart to apply."
+  ],
+  "插值处理": [
+    "Interpolate",
+    "Interpolate",
+    "Interpolate",
+    "Interpolate"
+  ],
+  "XeFG 界面透明度格式": [
+    "XeFG UI alpha format",
+    "XeFG UI alpha format",
+    "XeFG UI alpha format",
+    "XeFG UI alpha format"
+  ],
+  "仅在已知游戏 UI 格式时修改。": [
+    "Change only when the game UI alpha format is known. Restart to apply.",
+    "Change only when the game UI alpha format is known. Restart to apply.",
+    "Change only when the game UI alpha format is known. Restart to apply.",
+    "Change only when the game UI alpha format is known. Restart to apply."
+  ],
+  "自动 / 未知": [
+    "Automatic / unknown",
+    "Automatic / unknown",
+    "Automatic / unknown",
+    "Automatic / unknown"
+  ],
+  "直通 Alpha": [
+    "Straight alpha",
+    "Straight alpha",
+    "Straight alpha",
+    "Straight alpha"
+  ],
+  "预乘 Alpha": [
+    "Premultiplied alpha",
+    "Premultiplied alpha",
+    "Premultiplied alpha",
+    "Premultiplied alpha"
+  ],
+  "超分输入 HDR": [
+    "Super Resolution HDR input",
+    "Super Resolution HDR input",
+    "Super Resolution HDR input",
+    "Super Resolution HDR input"
+  ],
+  "覆盖 SR/DLAA 输入，不启用显示器 HDR，也不把 SDR 转为 HDR。错误设置可能损坏画面；默认跟随游戏。": [
+    "Override SR/DLAA input flags. Does not enable monitor HDR or convert SDR to HDR. Incorrect assumptions may degrade the image. Keep Game unless needed; restart to apply.",
+    "Override SR/DLAA input flags. Does not enable monitor HDR or convert SDR to HDR. Incorrect assumptions may degrade the image. Keep Game unless needed; restart to apply.",
+    "Override SR/DLAA input flags. Does not enable monitor HDR or convert SDR to HDR. Incorrect assumptions may degrade the image. Keep Game unless needed; restart to apply.",
+    "Override SR/DLAA input flags. Does not enable monitor HDR or convert SDR to HDR. Incorrect assumptions may degrade the image. Keep Game unless needed; restart to apply."
+  ],
+  "超分自动曝光": [
+    "Super Resolution auto exposure",
+    "Super Resolution auto exposure",
+    "Super Resolution auto exposure",
+    "Super Resolution auto exposure"
+  ],
+  "NVIDIA 运行库兼容策略": [
+    "NVIDIA provider compatibility policy",
+    "NVIDIA provider compatibility policy",
+    "NVIDIA provider compatibility policy",
+    "NVIDIA provider compatibility policy"
+  ],
+  "仅本机生效。启发式允许符合限制的其他签名 NVIDIA 运行库，不保证游戏兼容性。": [
+    "Local only. Heuristic admits other eligible signed NVIDIA providers; it does not guarantee game compatibility. Restart to apply.",
+    "Local only. Heuristic admits other eligible signed NVIDIA providers; it does not guarantee game compatibility. Restart to apply.",
+    "Local only. Heuristic admits other eligible signed NVIDIA providers; it does not guarantee game compatibility. Restart to apply.",
+    "Local only. Heuristic admits other eligible signed NVIDIA providers; it does not guarantee game compatibility. Restart to apply."
+  ],
+  "启发式（默认）": [
+    "Heuristic (default)",
+    "Heuristic (default)",
+    "Heuristic (default)",
+    "Heuristic (default)"
+  ],
+  "仅已核对版本": [
+    "Reviewed versions only",
+    "Reviewed versions only",
+    "Reviewed versions only",
+    "Reviewed versions only"
+  ],
+  "NR 第 1 遍强度": [
+    "NR pass 1 intensity",
+    "NR pass 1 intensity",
+    "NR pass 1 intensity",
+    "NR pass 1 intensity"
+  ],
+  "inherit 继承全局；数值 0–2 对应 0–200%。强度为 0 仍执行此遍；后续遍的色调继承后续遍全局色调。": [
+    "Inherit the global setting, or set this pass independently. Numeric values 0–2 mean 0–200%; intensity 0 still runs the pass. Later-pass tone inherits the later-pass global tone.",
+    "Inherit the global setting, or set this pass independently. Numeric values 0–2 mean 0–200%; intensity 0 still runs the pass. Later-pass tone inherits the later-pass global tone.",
+    "Inherit the global setting, or set this pass independently. Numeric values 0–2 mean 0–200%; intensity 0 still runs the pass. Later-pass tone inherits the later-pass global tone.",
+    "Inherit the global setting, or set this pass independently. Numeric values 0–2 mean 0–200%; intensity 0 still runs the pass. Later-pass tone inherits the later-pass global tone."
+  ],
+  "继承全局": [
+    "Inherit global",
+    "Inherit global",
+    "Inherit global",
+    "Inherit global"
+  ],
+  "100%": [
+    "100%",
+    "100%",
+    "100%",
+    "100%"
+  ],
+  "NR 第 1 遍局部结构": [
+    "NR pass 1 local structure",
+    "NR pass 1 local structure",
+    "NR pass 1 local structure",
+    "NR pass 1 local structure"
+  ],
+  "NR 第 1 遍局部色调": [
+    "NR pass 1 local tone",
+    "NR pass 1 local tone",
+    "NR pass 1 local tone",
+    "NR pass 1 local tone"
+  ],
+  "NR 第 1 遍皮肤结构": [
+    "NR pass 1 skin structure",
+    "NR pass 1 skin structure",
+    "NR pass 1 skin structure",
+    "NR pass 1 skin structure"
+  ],
+  "NR 第 1 遍人物遮罩": [
+    "NR pass 1 character mask",
+    "NR pass 1 character mask",
+    "NR pass 1 character mask",
+    "NR pass 1 character mask"
+  ],
+  "继承全局人物遮罩，或为此遍单独设置。": [
+    "Inherit the global setting, or set this pass independently. Numeric values 0–2 mean 0–200%; intensity 0 still runs the pass. Later-pass tone inherits the later-pass global tone.",
+    "Inherit the global setting, or set this pass independently. Numeric values 0–2 mean 0–200%; intensity 0 still runs the pass. Later-pass tone inherits the later-pass global tone.",
+    "Inherit the global setting, or set this pass independently. Numeric values 0–2 mean 0–200%; intensity 0 still runs the pass. Later-pass tone inherits the later-pass global tone.",
+    "Inherit the global setting, or set this pass independently. Numeric values 0–2 mean 0–200%; intensity 0 still runs the pass. Later-pass tone inherits the later-pass global tone."
+  ],
+  "NR 第 2 遍强度": [
+    "NR pass 2 intensity",
+    "NR pass 2 intensity",
+    "NR pass 2 intensity",
+    "NR pass 2 intensity"
+  ],
+  "NR 第 2 遍局部结构": [
+    "NR pass 2 local structure",
+    "NR pass 2 local structure",
+    "NR pass 2 local structure",
+    "NR pass 2 local structure"
+  ],
+  "NR 第 2 遍局部色调": [
+    "NR pass 2 local tone",
+    "NR pass 2 local tone",
+    "NR pass 2 local tone",
+    "NR pass 2 local tone"
+  ],
+  "NR 第 2 遍皮肤结构": [
+    "NR pass 2 skin structure",
+    "NR pass 2 skin structure",
+    "NR pass 2 skin structure",
+    "NR pass 2 skin structure"
+  ],
+  "NR 第 2 遍人物遮罩": [
+    "NR pass 2 character mask",
+    "NR pass 2 character mask",
+    "NR pass 2 character mask",
+    "NR pass 2 character mask"
+  ],
+  "NR 第 3 遍强度": [
+    "NR pass 3 intensity",
+    "NR pass 3 intensity",
+    "NR pass 3 intensity",
+    "NR pass 3 intensity"
+  ],
+  "NR 第 3 遍局部结构": [
+    "NR pass 3 local structure",
+    "NR pass 3 local structure",
+    "NR pass 3 local structure",
+    "NR pass 3 local structure"
+  ],
+  "NR 第 3 遍局部色调": [
+    "NR pass 3 local tone",
+    "NR pass 3 local tone",
+    "NR pass 3 local tone",
+    "NR pass 3 local tone"
+  ],
+  "NR 第 3 遍皮肤结构": [
+    "NR pass 3 skin structure",
+    "NR pass 3 skin structure",
+    "NR pass 3 skin structure",
+    "NR pass 3 skin structure"
+  ],
+  "NR 第 3 遍人物遮罩": [
+    "NR pass 3 character mask",
+    "NR pass 3 character mask",
+    "NR pass 3 character mask",
+    "NR pass 3 character mask"
+  ],
+  "NR 第 4 遍强度": [
+    "NR pass 4 intensity",
+    "NR pass 4 intensity",
+    "NR pass 4 intensity",
+    "NR pass 4 intensity"
+  ],
+  "NR 第 4 遍局部结构": [
+    "NR pass 4 local structure",
+    "NR pass 4 local structure",
+    "NR pass 4 local structure",
+    "NR pass 4 local structure"
+  ],
+  "NR 第 4 遍局部色调": [
+    "NR pass 4 local tone",
+    "NR pass 4 local tone",
+    "NR pass 4 local tone",
+    "NR pass 4 local tone"
+  ],
+  "NR 第 4 遍皮肤结构": [
+    "NR pass 4 skin structure",
+    "NR pass 4 skin structure",
+    "NR pass 4 skin structure",
+    "NR pass 4 skin structure"
+  ],
+  "NR 第 4 遍人物遮罩": [
+    "NR pass 4 character mask",
+    "NR pass 4 character mask",
+    "NR pass 4 character mask",
+    "NR pass 4 character mask"
+  ],
+  "实验功能，需要兼容的游戏输入；默认跟随游戏，RR 保持原引擎。1.2.0 的 Vulkan 需启动前选择 XeSS；1.2.1 起可在兼容游戏中即时切换，但须启动前安装兼容 Intel 运行库。更换运行库仍需重启。": [
+    "Experimental; compatible game inputs are required. Game is the default; RR keeps its original engine. Vulkan in 1.2.0 needs XeSS selected before launch. From 1.2.1, compatible games support live switching if compatible Intel runtimes were installed before launch. Replacing runtimes still requires a restart.",
+    "Experimental; compatible game inputs are required. Game is the default; RR keeps its original engine. Vulkan in 1.2.0 needs XeSS selected before launch. From 1.2.1, compatible games support live switching if compatible Intel runtimes were installed before launch. Replacing runtimes still requires a restart.",
+    "Experimental; compatible game inputs are required. Game is the default; RR keeps its original engine. Vulkan in 1.2.0 needs XeSS selected before launch. From 1.2.1, compatible games support live switching if compatible Intel runtimes were installed before launch. Replacing runtimes still requires a restart.",
+    "Experimental; compatible game inputs are required. Game is the default; RR keeps its original engine. Vulkan in 1.2.0 needs XeSS selected before launch. From 1.2.1, compatible games support live switching if compatible Intel runtimes were installed before launch. Replacing runtimes still requires a restart."
   ]
 }

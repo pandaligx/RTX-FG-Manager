@@ -118,13 +118,13 @@ fn transaction_files(j: &Journal) -> BTreeMap<String, String> {
     files.extend(
         j.before
             .iter()
-            .map(|(n, h)| (format!("old.{n}"), h.clone())),
+            .map(|(n, h)| (format!("old.{}", n.replace('/', "__")), h.clone())),
     );
     files.extend(
         j.new
             .hashes
             .iter()
-            .map(|(n, h)| (format!("next.{n}"), h.clone())),
+            .map(|(n, h)| (format!("next.{}", n.replace('/', "__")), h.clone())),
     );
     files
 }
@@ -220,7 +220,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
                 "原文件位置已被其他文件占用：{name}"
             );
             ensure!(
-                matches(&work.join(format!("old.{name}")), hash)?,
+                matches(&work.join(format!("old.{}", name.replace('/', "__"))), hash)?,
                 "原件备份缺失或已改变：{name}"
             );
         }
@@ -240,7 +240,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
     for (name, hash) in &j.before {
         let path = core::no_links(&target.directory.join(name))?;
         if !path.exists() {
-            let backup = core::no_links(&work.join(format!("old.{name}")))?;
+            let backup = core::no_links(&work.join(format!("old.{}", name.replace('/', "__"))))?;
             ensure!(matches(&backup, hash)?, "原件备份在恢复期间改变：{name}");
             win::rename_no_replace(&backup, &path)?;
         }
@@ -390,11 +390,17 @@ pub fn upgrade_locked(
         core::write_new(&work.join("old.install.json"), &marker_bytes)?;
         checkpoint("marker-backup")?;
         for (name, bytes) in &originals {
-            core::write_new(&work.join(format!("old.{name}")), bytes)?;
+            core::write_new(
+                &work.join(format!("old.{}", name.replace('/', "__"))),
+                bytes,
+            )?;
             checkpoint(&format!("backup:{name}"))?;
         }
         for (name, bytes) in &files {
-            core::write_new(&work.join(format!("next.{name}")), bytes)?;
+            core::write_new(
+                &work.join(format!("next.{}", name.replace('/', "__"))),
+                bytes,
+            )?;
             checkpoint(&format!("stage:{name}"))?;
         }
         core::assert_target_stopped(target)?;
@@ -408,7 +414,7 @@ pub fn upgrade_locked(
                 "升级前原文件已变化：{name}"
             );
             ensure!(
-                matches(&work.join(format!("old.{name}")), hash)?,
+                matches(&work.join(format!("old.{}", name.replace('/', "__"))), hash)?,
                 "原件备份核验失败：{name}"
             );
         }
@@ -423,9 +429,14 @@ pub fn upgrade_locked(
         let mut names = files.keys().collect::<Vec<_>>();
         names.sort_by_key(|n| j.new.selected().contains(n));
         for name in names {
-            let stage = core::no_links(&work.join(format!("next.{name}")))?;
+            let stage = core::no_links(&work.join(format!("next.{}", name.replace('/', "__"))))?;
             ensure!(matches(&stage, &j.new.hashes[name])?, "升级暂存文件已变化");
-            win::rename_no_replace(&stage, &core::no_links(&dir.join(name))?)?;
+            let destination = core::no_links(&dir.join(name))?;
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent)?;
+                core::no_links(parent)?;
+            }
+            win::rename_no_replace(&stage, &destination)?;
             checkpoint(&format!("publish:{name}"))?;
         }
         core::assert_target_stopped(target)?;
@@ -635,6 +646,58 @@ mod tests {
     }
     fn clear_fault() {
         FAULT.with(|f| *f.borrow_mut() = None);
+    }
+
+    #[test]
+    fn private_runtime_staging_and_publication_failures_restore_originals() -> Result<()> {
+        for crash in [false, true] {
+            for point in [
+                "stage:rtx-encore-runtimes/intel/libxess.dll",
+                "publish:rtx-encore-runtimes/intel/libxess_fg.dll",
+            ] {
+                let (_temp, target) = fixture()?;
+                install(&target)?;
+                let before = snapshot(&target.directory)?;
+                let mut files = BTreeMap::from([
+                    ("dinput8.dll".into(), pe(true, 7)),
+                    (encore::CONFIG.into(), encore::DEFAULT_CONFIG.to_vec()),
+                    (encore::NOTICES.into(), b"updated license".to_vec()),
+                ]);
+                for name in encore::INTEL_FILES {
+                    files.insert(
+                        name.into(),
+                        if name.ends_with(".dll") {
+                            pe(true, 8)
+                        } else {
+                            b"Intel license".to_vec()
+                        },
+                    );
+                }
+                fault(point, crash);
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    core::deploy_prepared_context_at_with_overrides(
+                        &target,
+                        encore::BACKEND,
+                        &["dinput8.dll".into()],
+                        None,
+                        files,
+                        Some("1.2.0"),
+                        Some(&context(encore::PROFILE)),
+                        None,
+                        Some("1.2.0"),
+                    )
+                }));
+                clear_fault();
+                if crash {
+                    assert!(result.is_err(), "{point}");
+                    assert!(recover(&target)?);
+                } else {
+                    assert!(result.unwrap().is_err(), "{point}");
+                }
+                assert_eq!(snapshot(&target.directory)?, before, "{point}");
+            }
+        }
+        Ok(())
     }
     fn recover(target: &core::DeploymentTarget) -> Result<bool> {
         let _lock = win::game_lock(&target.directory)?;

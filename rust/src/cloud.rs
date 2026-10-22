@@ -45,6 +45,9 @@ fn valid_upstream_version(value: &str, version: &str) -> bool {
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct File {
+    /// Shared, verified dependency inside a complete scheme archive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archive_path: Option<String>,
     pub name: String,
     pub bytes: u64,
     pub sha256: String,
@@ -451,6 +454,7 @@ impl Catalog {
                 for f in &p.files {
                     ensure!(
                         allowed.contains(&f.name)
+                            && f.archive_path.is_none()
                             && seen.insert(&f.name)
                             && f.bytes > 0
                             && f.bytes <= LIMIT
@@ -475,11 +479,19 @@ impl Catalog {
             }
             ensure!(!p.component, "Components require a directory protocol");
             let encore = policy.parameter_profile == crate::encore::PROFILE;
+            let intel = encore && crate::encore::supports_120(p.upstream_version.as_deref());
             let mfg_notice = policy.parameter_profile == crate::rtxmfg::PROFILE
                 && crate::mfg_plugin::supported(p.upstream_version.as_deref());
             ensure!(
                 core::PROXIES.contains(&p.proxy.as_str())
-                    && p.files.len() == if encore || mfg_notice { 3 } else { 2 },
+                    && p.files.len()
+                        == if intel {
+                            7
+                        } else if encore || mfg_notice {
+                            3
+                        } else {
+                            2
+                        },
                 "Invalid cloud proxy"
             );
             ensure!(
@@ -510,6 +522,9 @@ impl Catalog {
             if encore {
                 expected_entries.insert(crate::encore::NOTICES);
             }
+            if intel {
+                expected_entries.extend(crate::encore::INTEL_FILES);
+            }
             if mfg_notice {
                 expected_entries.insert(crate::rtxmfg::NOTICES);
             }
@@ -522,6 +537,12 @@ impl Catalog {
                 "Invalid package entries"
             );
             for f in &p.files {
+                ensure!(
+                    f.archive_path.as_ref().is_none_or(|path| intel
+                        && crate::encore::INTEL_FILES.contains(&f.name.as_str())
+                        && *path == format!("shared/{}", f.name)),
+                    "Invalid shared runtime archive path"
+                );
                 ensure!(
                     f.bytes > 0 && f.bytes <= LIMIT && core::valid_hash(&f.sha256),
                     "Invalid entry digest/size"
@@ -959,7 +980,9 @@ pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
         );
     }
     for f in &p.files {
-        let path = if p.archive_prefix.is_empty() {
+        let path = if let Some(path) = &f.archive_path {
+            path.clone()
+        } else if p.archive_prefix.is_empty() {
             f.name.clone()
         } else {
             format!("{}/{}", p.archive_prefix, f.name)

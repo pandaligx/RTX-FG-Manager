@@ -19,6 +19,7 @@ pub(super) struct EncoreEditor {
     errors: BTreeSet<String>,
     invalid: Rc<Cell<bool>>,
     tr: i18n::Translator,
+    version: Option<String>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -53,6 +54,7 @@ impl EncoreEditor {
             errors: BTreeSet::new(),
             invalid,
             tr: i18n::Translator::new("zh-CN"),
+            version: None,
             _subscriptions: subscriptions,
         }
     }
@@ -80,6 +82,7 @@ impl EncoreEditor {
         let defaults = encore::defaults();
         let selected: Vec<_> = encore::fields()
             .iter()
+            .filter(|field| encore::field_available(field, self.version.as_deref()))
             .filter(|field| !group_only || field.group == self.group)
             .map(|field| field.key.clone())
             .collect();
@@ -176,7 +179,7 @@ impl EncoreEditor {
                         this.set(&key, &field.default, cx);
                     })),
             );
-        if field.restart {
+        if encore::requires_restart(field, self.version.as_deref()) {
             heading = heading.child(
                 div()
                     .text_xs()
@@ -195,7 +198,10 @@ impl EncoreEditor {
                     this.set(&key, if *yes { "1" } else { "0" }, cx);
                 }))
                 .into_any_element()
-        } else if matches!(field.kind, encore::FieldKind::Choice) {
+        } else if matches!(
+            field.kind,
+            encore::FieldKind::Choice | encore::FieldKind::InheritBool
+        ) {
             let selected = field
                 .choices
                 .iter()
@@ -248,7 +254,12 @@ impl EncoreEditor {
             .rounded_md()
             .child(heading)
             .child(control);
-        if !field.choices.is_empty() && !matches!(field.kind, encore::FieldKind::Choice) {
+        if !field.choices.is_empty()
+            && !matches!(
+                field.kind,
+                encore::FieldKind::Choice | encore::FieldKind::InheritBool
+            )
+        {
             let mut quick = div().h_flex().flex_wrap().gap_1();
             for (index, choice) in field.choices.iter().enumerate() {
                 let key = field.key.clone();
@@ -320,6 +331,20 @@ impl Render for EncoreEditor {
         }
         let language = c.tr.language.clone();
         let values = c.preset_values(&self.exe);
+        let installed = c.deployments.get(&self.exe);
+        self.version = if installed.is_some_and(|s| s.installed > 0) {
+            installed.and_then(|s| {
+                s.neural
+                    .iter()
+                    .filter_map(|n| n.encore_version.as_ref())
+                    .filter_map(|v| semver::Version::parse(v).ok().map(|n| (n, v)))
+                    .min_by(|a, b| a.0.cmp(&b.0))
+                    .map(|(_, v)| v.clone())
+            })
+        } else {
+            let p = c.catalog.selected(encore::SCHEME);
+            Some(p.upstream_version.as_ref().unwrap_or(&p.version).clone())
+        };
         let locked = c.busy
             || c.read_only
             || c.running_games.contains(&self.exe)
@@ -373,6 +398,7 @@ impl Render for EncoreEditor {
         }
         let fields: Vec<_> = encore::fields()
             .iter()
+            .filter(|field| encore::field_available(field, self.version.as_deref()))
             .filter(|field| {
                 if self.query.is_empty() {
                     field.group == self.group

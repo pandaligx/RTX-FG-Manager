@@ -26,6 +26,7 @@ fn fixture(config: &[u8]) -> Result<(cloud::Catalog, Vec<u8>)> {
         archive.write_all(bytes)?;
         files.push(cloud::File {
             name: name.into(),
+            archive_path: None,
             bytes: bytes.len() as u64,
             sha256: core::hash(bytes),
         });
@@ -67,6 +68,69 @@ fn fixture(config: &[u8]) -> Result<(cloud::Catalog, Vec<u8>)> {
 }
 
 const TEMPLATE: &[u8] = include_bytes!("../rust/assets/encore-defaults.jsonc");
+
+#[test]
+fn encore120_shared_dependencies_are_exact_and_extract_with_the_selected_proxy() -> Result<()> {
+    let (mut catalog, oldzip) = fixture(TEMPLATE)?;
+    let mut contents = cloud::unpack(&catalog.packages[0], &oldzip)?;
+    let dll = contents["version.dll"].clone();
+    for name in encore::INTEL_FILES {
+        contents.insert(
+            name.into(),
+            if name.ends_with(".dll") {
+                dll.clone()
+            } else {
+                b"Intel license".to_vec()
+            },
+        );
+    }
+    let p = &mut catalog.packages[0];
+    p.version = "1.2.0".into();
+    p.upstream_version = Some("1.2.0".into());
+    p.archive_prefix = "selected".into();
+    p.files.clear();
+    let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    for (name, data) in &contents {
+        let shared = encore::INTEL_FILES.contains(&name.as_str());
+        let path = format!("{}/{}", if shared { "shared" } else { "selected" }, name);
+        zip.start_file(&path, zip::write::FileOptions::default())?;
+        zip.write_all(data)?;
+        p.files.push(cloud::File {
+            name: name.clone(),
+            archive_path: shared.then_some(path),
+            bytes: data.len() as u64,
+            sha256: core::hash(data),
+        });
+    }
+    let bytes = zip.finish()?.into_inner();
+    p.bytes = bytes.len() as u64;
+    p.sha256 = core::hash(&bytes);
+    catalog.validate()?;
+    assert_eq!(cloud::unpack(&catalog.packages[0], &bytes)?, contents);
+    for path in [
+        "../libxess.dll",
+        "selected/version.dll",
+        "shared/rtx-encore-runtimes/intel/other.dll",
+    ] {
+        let mut bad = catalog.clone();
+        bad.packages[0]
+            .files
+            .iter_mut()
+            .find(|f| f.name == encore::INTEL_FILES[0])
+            .unwrap()
+            .archive_path = Some(path.into());
+        assert!(bad.validate().is_err(), "{path}");
+    }
+    let mut bad = catalog;
+    bad.packages[0]
+        .files
+        .iter_mut()
+        .find(|f| f.name == encore::CONFIG)
+        .unwrap()
+        .archive_path = Some(format!("shared/{}", encore::CONFIG));
+    assert!(bad.validate().is_err());
+    Ok(())
+}
 
 #[test]
 fn canonical_package_exposes_nineteen_single_choice_routes_and_three_gpu_series() -> Result<()> {

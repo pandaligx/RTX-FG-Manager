@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.3.7
+
+- Keep recommendation cards compact with a direct "View full details" button and legible default avatars. Present setup details in a compact table, with full-length notes, copying and fixed actions. Add a brief entrance fade to the recommendation button. Default to font size 13 while preserving saved preferences. Update to Encore 1.2.1, hide its retired compatibility policy and clarify Vulkan engine switching.
+
+- Support RTX Encore 1.2.0: experimental XeSS/XeFG engines, SR input controls and per-pass NR tuning. Gate new settings by the installed patch version and preserve JSONC comments and unknown fields. NR remains on 310.9.16.
+- Include official Intel runtimes in the complete Encore bundle, in a private directory with transaction recovery and ownership-based removal. Clean generated frame-time JSONL logs while retaining game-owned files.
+- Display recommendation publication dates and rank by useful votes. Selecting a setup that needs a GPU display-name change opens explicit guidance and retains the requirement in the inspector.
+- Keep historical shares readable. Confirm use of a newer version of the same project; retain the author's tested version. Removed projects and unavailable loaders cannot be applied automatically. The service remains compatible with older clients.
+
+
 ## 4.3.6
 
 - Fix the Windows file picker rejecting some protected Xbox / Game Pass executables before validation. Recognize the sp26 renderer under the known COD package identity, retaining manifest, architecture and directory checks without substituting launchers or changing game permissions.

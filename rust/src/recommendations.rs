@@ -209,6 +209,21 @@ pub struct Recipe {
 }
 impl Recipe {
     pub fn validate(&self, catalog: &cloud::Catalog) -> Result<()> {
+        self.validate_public()?;
+        ensure!(
+            catalog.schemes().iter().any(|p| p.scheme_id == self.scheme),
+            "此方案已下架，不能自动替换为其他项目"
+        );
+        let allowed = catalog.proxies(&self.scheme);
+        ensure!(
+            self.entries.len() <= catalog.selection_limit(&self.scheme)
+                && self.entries.iter().all(|p| allowed.contains(p)),
+            "当前版本不再支持此推荐的 DLL 入口，请选择其他分享"
+        );
+        Ok(())
+    }
+    /// Reading historical cards must not depend on the currently available downloads.
+    fn validate_public(&self) -> Result<()> {
         ensure!(self.schema == 1, "此推荐需要更新管理器");
         self.game.validate()?;
         ensure!(
@@ -241,15 +256,17 @@ impl Recipe {
             public_text(text, max, empty)?;
         }
         ensure!(
-            catalog.schemes().iter().any(|p| p.scheme_id == self.scheme),
-            "当前管理器不支持此推荐方案"
+            self.scheme.len() <= 80
+                && regex::Regex::new(r"^[a-z0-9][a-z0-9.-]+$")?.is_match(&self.scheme),
+            "推荐方案标识无效"
         );
-        let allowed = catalog.proxies(&self.scheme);
+        let loader = regex::Regex::new(r"^[a-zA-Z0-9_-]+\.(dll|asi)$")?;
         ensure!(
             !self.entries.is_empty()
-                && self.entries.len() <= catalog.selection_limit(&self.scheme)
+                && self.entries.len() <= 6
                 && self.entries.len() == self.entries.iter().collect::<BTreeSet<_>>().len()
-                && self.entries.iter().all(|p| allowed.contains(p)),
+                && self.entries.iter().all(|p| p.len() <= 80
+                    && (loader.is_match(p) || p == "OptiScaler/plugins/MFGUnlocker.asi")),
             "推荐包含不支持的 DLL 入口"
         );
         ensure!(
@@ -274,6 +291,27 @@ impl Recipe {
             "推荐包含未知选项"
         );
         Ok(())
+    }
+    /// Stable scheme IDs identify projects; version differences always remain visible.
+    pub fn available_version(&self, catalog: &cloud::Catalog) -> Result<String> {
+        self.validate(catalog)?;
+        let payload = catalog.selected(&self.scheme);
+        let current = payload
+            .upstream_version
+            .as_deref()
+            .unwrap_or(&payload.version);
+        ensure!(
+            semver::Version::parse(current)? >= semver::Version::parse(&self.patch_version)?,
+            "推荐使用的补丁比当前版本新，请先刷新资源或更新管理器"
+        );
+        Ok(current.to_owned())
+    }
+    pub fn required_gpu_name(&self) -> Option<&'static str> {
+        match self.gpu_alias.as_str() {
+            "rtx4060" => Some("NVIDIA GeForce RTX 4060"),
+            "rtx5090" => Some("NVIDIA GeForce RTX 5090"),
+            _ => None,
+        }
     }
 }
 /// Read records and lightweight NR metadata only. No hashing/downloading game DLLs.
@@ -345,6 +383,8 @@ pub struct Card {
     pub author: String,
     pub revision: u64,
     pub updated_at: u64,
+    #[serde(default)]
+    pub created_at: Option<u64>,
     pub likes: u64,
     pub liked: bool,
     #[serde(default)]
@@ -358,7 +398,7 @@ pub struct Card {
     pub content: Recipe,
 }
 impl Card {
-    fn validate(&self, game: &str, catalog: &cloud::Catalog) -> Result<()> {
+    fn validate(&self, game: &str, _catalog: &cloud::Catalog) -> Result<()> {
         ensure!(
             self.content.game.id == game
                 && uuid::Uuid::parse_str(&self.id).is_ok()
@@ -368,7 +408,7 @@ impl Card {
                 && ["visible", "hidden"].contains(&self.status.as_str()),
             "推荐不属于当前游戏或格式无效"
         );
-        self.content.validate(catalog)
+        self.content.validate_public()
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -393,13 +433,6 @@ impl Page {
         Ok(())
     }
 }
-fn gpu_key(value: &str) -> String {
-    value
-        .to_ascii_lowercase()
-        .replace([' ', '-', '_'], "")
-        .replace("nvidia", "")
-        .replace("geforce", "")
-}
 /// A full address takes precedence; a selected suffix only completes an account name.
 pub fn complete_email(value: &str, domain: &str) -> String {
     let value = value.trim();
@@ -409,17 +442,21 @@ pub fn complete_email(value: &str, domain: &str) -> String {
         format!("{value}@{domain}")
     }
 }
-pub fn rank(items: &mut [Card], gpu: &str, driver: &str) {
-    let gpu = gpu_key(gpu);
-    items.sort_by_key(|c| {
-        std::cmp::Reverse((
-            !gpu.is_empty() && gpu_key(&c.content.gpu_model) == gpu,
-            !driver.is_empty() && c.content.driver == driver,
-            i128::from(c.likes) - i128::from(c.dislikes),
-            c.likes,
-            c.updated_at,
-        ))
+pub fn rank(items: &mut [Card]) {
+    // Match the server's global pagination order, including ties.
+    items.sort_by(|a, b| {
+        b.likes
+            .cmp(&a.likes)
+            .then(b.updated_at.cmp(&a.updated_at))
+            .then(a.id.cmp(&b.id))
     });
+}
+pub fn date(timestamp: u64) -> Option<String> {
+    chrono::DateTime::from_timestamp(i64::try_from(timestamp).ok()?, 0).map(|v| {
+        v.with_timezone(&chrono::Local)
+            .format("%Y-%m-%d")
+            .to_string()
+    })
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -496,7 +533,7 @@ impl Client {
         let mut request = self
             .http
             .request(method, format!("{ORIGIN}{route}"))
-            .header("X-RTXFG-Feedback", "4");
+            .header("X-RTXFG-Feedback", "5");
         if authenticated {
             let s = self.session.as_ref().context("请先用邮箱验证码登录")?;
             request = request.bearer_auth(&s.token);
@@ -845,16 +882,16 @@ mod tests {
         assert!(serde_json::from_value::<Recipe>(value).is_err());
     }
     #[test]
-    fn ranking_prioritizes_gpu_and_driver_over_popularity() {
+    fn ranking_prioritizes_likes_over_hardware_match() {
         let mut cards = vec![
             card("RTX 5090", "581.80", 100),
             card("NVIDIA GeForce RTX 3060", "580.00", 20),
             card("RTX 3060", "581.80", 1),
         ];
-        rank(&mut cards, "NVIDIA GeForce RTX 3060", "581.80");
+        rank(&mut cards);
         assert_eq!(
             cards.iter().map(|c| c.likes).collect::<Vec<_>>(),
-            vec![1, 20, 100]
+            vec![100, 20, 1]
         );
     }
     #[test]
@@ -943,15 +980,46 @@ mod tests {
         assert_eq!(complete_email("  ", "qq.com"), "");
     }
     #[test]
-    fn feedback_preserves_old_cards_and_demotes_negative_results() {
+    fn negative_feedback_does_not_override_like_order() {
         let mut old = card("RTX 3060", "581.80", 3);
         assert!(!old.disliked && old.dislikes == 0);
         old.dislikes = 4;
         let mut cards = vec![old.clone(), card("RTX 3060", "581.80", 1)];
-        rank(&mut cards, "RTX 3060", "581.80");
-        assert_eq!(cards[0].likes, 1);
+        rank(&mut cards);
+        assert_eq!(cards[0].likes, 3);
         old.liked = true;
         old.disliked = true;
         assert!(old.validate("steam:292030", &cloud::bundled()).is_err());
+    }
+    #[test]
+    fn unavailable_recommendations_remain_readable_but_cannot_be_applied() {
+        let catalog = cloud::bundled();
+        let mut old = card("RTX 3060", "581.80", 1);
+        old.content.patch_version = "1.0.0".into();
+        assert!(old.content.available_version(&catalog).is_ok());
+        old.content.patch_version = "99.0.0".into();
+        assert!(old.content.available_version(&catalog).is_err());
+        old.content.scheme = "retired-project".into();
+        old.validate("steam:292030", &catalog).unwrap();
+        assert!(old.content.available_version(&catalog).is_err());
+        old.content.scheme = crate::encore::SCHEME.into();
+        old.content.entries = vec!["retired.dll".into()];
+        old.validate("steam:292030", &catalog).unwrap();
+        assert!(old.content.available_version(&catalog).is_err());
+        old.content.entries = vec!["../evil.dll".into()];
+        assert!(old.validate("steam:292030", &catalog).is_err());
+    }
+    #[test]
+    fn gpu_requirement_and_publication_date_are_explicit() {
+        let mut c = card("RTX 3060", "581.80", 0);
+        assert!(c.created_at.is_none());
+        assert!(c.content.required_gpu_name().is_none());
+        c.content.gpu_alias = "rtx5090".into();
+        assert_eq!(
+            c.content.required_gpu_name(),
+            Some(crate::gpu_alias::NAMES[1])
+        );
+        assert!(date(1792636800).unwrap().starts_with("2026-10-"));
+        assert!(date(u64::MAX).is_none());
     }
 }

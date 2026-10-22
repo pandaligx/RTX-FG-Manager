@@ -24,10 +24,10 @@ export function createApi(db, options) {
     const user = auth.user(headers.authorization, method!=='GET');
     // Older test clients reject unknown JSON fields. Opt in to the feedback extension.
     const feedback=headers['x-rtxfg-feedback'];
-    const crossStore=feedback==='4';
+    const crossStore=['4','5'].includes(feedback);
     const context=url.searchParams.get('game');
     const card = (row,requested=context) => {
-      const result=publicRecipe(db,row,user,['2','3','4'].includes(feedback),['3','4'].includes(feedback));
+      const result=publicRecipe(db,row,user,['2','3','4','5'].includes(feedback),['3','4','5'].includes(feedback),feedback==='5');
       if(crossStore && requested) {
         need(games.resolve(requested)===games.resolve(row.game),'game_mismatch');
         result.content.game={id:requested,name:games.describe(requested).name};
@@ -50,7 +50,7 @@ export function createApi(db, options) {
       const group=crossStore?games.ids(game):[game],scope=` WHERE r.game IN (${group.map(()=>'?')})`;
       const where = scope+(mine ? " AND r.author=? AND r.status!='deleted'" : reported ? " AND r.status!='deleted' AND EXISTS(SELECT 1 FROM reports p WHERE p.recipe=r.id AND p.user=? AND p.active=1)" : " AND r.status='visible' AND author.blocked=0");
       const args = mine || reported ? [...group,user.id] : group;
-      const rows = db.prepare('SELECT * FROM ('+selectRecipes+where+') ORDER BY (likes-dislikes) DESC,likes DESC,updated DESC,id LIMIT 25 OFFSET ?').all(...args,offset);
+      const rows = db.prepare('SELECT * FROM ('+selectRecipes+where+') ORDER BY likes DESC,updated DESC,id LIMIT 25 OFFSET ?').all(...args,offset);
       const count = db.prepare('SELECT COUNT(*) count FROM recipes r JOIN users author ON author.id=r.author'+where).get(...args).count;
       return { items: rows.slice(0,24).map(row=>card(row,game)), total:Number(count), nextOffset:rows.length>24?offset+24:null };
     }
@@ -82,7 +82,7 @@ export function createApi(db, options) {
         const count=db.prepare(`SELECT COUNT(*) count FROM recipes WHERE author=? AND game IN (${group.map(()=>'?')}) AND status!='deleted'`).get(user.id,...group).count;
         need(count<5,'five_recipes_per_game',409);
         const id=randomUUID();
-        db.prepare('INSERT INTO recipes(id,author,game,content,updated,submission) VALUES(?,?,?,?,?,?)').run(id,user.id,content.game.id,encoded,t,body.submission);
+        db.prepare('INSERT INTO recipes(id,author,game,content,updated,submission,created) VALUES(?,?,?,?,?,?,?)').run(id,user.id,content.game.id,encoded,t,body.submission,t);
         return card(lookup(id));
       });
     }
@@ -117,7 +117,7 @@ export function createApi(db, options) {
             db.prepare("INSERT INTO audit(actor,action,target,created) VALUES('system','report_threshold_hide',?,?)").run(row.id,t);
           }
         }
-        return ['3','4'].includes(feedback) ? card(lookup(row.id)) : {ok:true};
+        return ['3','4','5'].includes(feedback) ? card(lookup(row.id)) : {ok:true};
       }
       need(!match[2],'not_found',404); need(row.author===user.id,'not_owner',403);
       if(method==='DELETE') {
