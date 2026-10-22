@@ -14,6 +14,21 @@ spec.loader.exec_module(pub)
 
 
 class PublicationTests(unittest.TestCase):
+    def test_large_resource_receipt_and_download_bound_keep_exe_limit(self):
+        digest='a'*64;size=274667717
+        url=pub.asset_url(pub.PAYLOAD_REPO,'payloads','encore-complete-'+digest[:12]+'.zip')
+        receipt={'schema':1,'scope':'immutable-resource-readback',
+                 'verified_at':datetime.now(timezone.utc).isoformat(),
+                 'metadata_sha256':['b'*64],'assets':{url:{'bytes':size,'sha256':digest}}}
+        with patch.dict(os.environ,{'RTXFG_RESOURCE_RECEIPTS':json.dumps(receipt)}), patch.object(pub,'verify') as verify:
+            pub.verify_metadata_artifact(url,size,digest,'b'*64)
+            verify.assert_not_called()
+        with patch.object(pub.urllib.request,'urlopen',side_effect=RuntimeError('download reached')):
+            with self.assertRaisesRegex(RuntimeError,'download reached'):pub.verify(url,size,digest)
+            with self.assertRaisesRegex(RuntimeError,'Invalid artifact'):pub.verify(url,512*1024*1024+1,digest)
+            for other in [url.replace('.zip','.exe'),url.replace('.zip','.json'),url.replace('gitcode.com','example.com')]:
+                with self.assertRaisesRegex(RuntimeError,'Invalid artifact'):pub.verify(other,size,digest)
+
     def test_split_bundle_index_can_only_complete_an_unchanged_final_catalog(self):
         catalog='cloud/bundles/catalog.json';index='cloud/bundles/indexes/bundles-'+'a'*20+'.json'
         entry=('100644','blob','catalog');blob=('100644','blob','index')

@@ -26,6 +26,14 @@ API = 'https://api.gitcode.com/api/v5/repos/'
 VERIFIED = set()
 
 
+def artifact_size_limit(url):
+    prefixes = ('https://gitcode.com/' + PAYLOAD_REPO + '/releases/download/',
+                'https://github.com/' + GH_REPO + '/releases/download/')
+    if url.startswith(prefixes) and url.endswith('.zip'):
+        return 512 * 1024 * 1024
+    return 256 * 1024 * 1024
+
+
 def verify_metadata_artifact(url, size, digest, metadata_digest):
     """Reuse a publisher-approved readback for identical immutable resources only.
 
@@ -51,7 +59,7 @@ def verify_metadata_artifact(url, size, digest, metadata_digest):
                 re.fullmatch(r'(?:r|bundles)-[0-9a-f]{20}\.json', name)
                 or (re.fullmatch(r'[A-Za-z0-9._-]+-[0-9a-f]{12}\.zip', name)
                     and name.endswith('-' + digest[:12] + '.zip'))))
-            if valid and immutable and type(size) is int and 0 < size <= 256 * 1024 * 1024:
+            if valid and immutable and type(size) is int and 0 < size <= artifact_size_limit(url):
                 row = receipt['assets'].get(url)
                 if row == {'bytes': size, 'sha256': digest} and re.fullmatch('[0-9a-f]{64}', digest):
                     print('Reused completed anonymous readback: ' + name)
@@ -107,7 +115,7 @@ def public_bytes(url, limit):
 
 
 def verify(url, size, digest):
-    if type(size) is not int or not 0 < size <= 256 * 1024 * 1024 or not re.fullmatch('[0-9a-f]{64}', digest):
+    if type(size) is not int or not 0 < size <= artifact_size_limit(url) or not re.fullmatch('[0-9a-f]{64}', digest):
         raise RuntimeError('Invalid artifact size/digest')
     key = (url, size, digest)
     if key in VERIFIED:
@@ -141,7 +149,8 @@ def upload(repo, tag, path, allow_exe=False):
     if path.suffix.lower() not in ('.zip', '.json', '.txt', '.exe'):
         raise RuntimeError('Unexpected asset type')
     data = path.read_bytes()
-    if not data or len(data) > (256 if is_exe else 128) * 1024 * 1024:
+    limit_mb = 256 if is_exe else 512 if repo == PAYLOAD_REPO and path.suffix.lower() == '.zip' else 128
+    if not data or len(data) > limit_mb * 1024 * 1024:
         raise RuntimeError('Asset exceeds publication bound')
     digest = hashlib.sha256(data).hexdigest()
     url = asset_url(repo, tag, path.name)
