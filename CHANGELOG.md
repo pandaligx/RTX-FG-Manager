@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.3.8
+
+- Support RTX Encore 1.2.2 with post-reconstruction sharpening mode and strength, off by default and shown only for supported versions. Preserve configuration/comments and complete bundles with dedicated proxies and shared Intel runtimes.
+- Refine the compact native layout: consistent settings icons and independent columns; clearer DLL entries and player hardware in recommendation details, retaining full notes and fixed footer actions.
+- Reorganize Settings into Appearance, Software updates, Game library and Cache maintenance, with aligned controls, a theme shortcut and a responsive single-column layout for smaller windows or larger text.
+- Fix recommendations remaining on offline records after a retained email session becomes invalid. Clear the rejected session and fetch public setups again; sign in when sharing or rating. Distinguish login expiry from connection failures.
+- Prevent a delayed recommendation request from clearing a newer sign-in. Keep local sign-out available during service outages and report errors saving the sign-out state.
+- Preserve pending parameter changes after a partial multi-folder apply; a successful first folder no longer hides failures in other folders.
+- Animate the sidebar's SVG thumbs-up when selecting a game or hovering over Player recommendations. Interface animations default to On; explicitly saved System/On/Off choices are preserved.
+
 ## 4.3.7
 
 - Keep recommendation cards compact with a direct "View full details" button and legible default avatars. Present setup details in a compact table, with full-length notes, copying and fixed actions. Add a brief entrance fade to the recommendation button. Default to font size 13 while preserving saved preferences. Update to Encore 1.2.1, hide its retired compatibility policy and clarify Vulkan engine switching.

@@ -29,6 +29,10 @@
     "dlssRenderScale": "game",               // Force the DLSS render resolution: game, dlaa, quality, balanced, performance, ultra-performance or custom. The game must use DLSS already.
     "dlssCustomScale": 67                    // Render scale in percent (50 to 100) when dlssRenderScale is custom.
   },
+  "superResolutionSharpening": {
+    "srSharpening": "off", // Encore 1.2.2: off, game or custom; applies live after reconstruction/NR.
+    "srSharpness": 30 // Custom strength 0-100%; zero adds no sharpening pass.
+  },
   "dlssPresets": {
     "dlssNrPreset": "b", // NR 310.9.16: b smaller network, a larger network, auto DLL default; live. Open ignores.
     "dlssSrPreset": "game",                  // SR preset: game, default, a-f, j, k, l or m. Supported models depend on the DLSS DLL. Encore 1.2 can change this live in its Insert menu.

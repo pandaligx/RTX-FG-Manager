@@ -2314,5 +2314,29 @@
     "Experimental; compatible game inputs are required. Game is the default; RR keeps its original engine. Vulkan in 1.2.0 needs XeSS selected before launch. From 1.2.1, compatible games support live switching if compatible Intel runtimes were installed before launch. Replacing runtimes still requires a restart.",
     "Experimental; compatible game inputs are required. Game is the default; RR keeps its original engine. Vulkan in 1.2.0 needs XeSS selected before launch. From 1.2.1, compatible games support live switching if compatible Intel runtimes were installed before launch. Replacing runtimes still requires a restart.",
     "Experimental; compatible game inputs are required. Game is the default; RR keeps its original engine. Vulkan in 1.2.0 needs XeSS selected before launch. From 1.2.1, compatible games support live switching if compatible Intel runtimes were installed before launch. Replacing runtimes still requires a restart."
+  ],
+  "重建后锐化": [
+    "Post-reconstruction sharpening",
+    "Резкость после реконструкции",
+    "再構成後のシャープ化",
+    "재구성 후 선명화"
+  ],
+  "锐化强度（%）": [
+    "Sharpness (%)",
+    "Сила резкости (%)",
+    "シャープ化の強度（%）",
+    "선명도 (%)"
+  ],
+  "默认关闭；跟随游戏使用游戏传入的锐度，自定义使用下方强度。作用于 DLSS、DLAA、RR 与替代 XeSS，NR 开启时在其后处理。即时生效。": [
+    "Off by default. Game uses the sharpness supplied by the game; Custom uses the strength below. Applies to DLSS, DLAA, RR and replacement XeSS, after NR when active. Changes apply live.",
+    "По умолчанию выключено. Game использует резкость игры, Custom — указанную ниже силу. Работает с DLSS, DLAA, RR и заменяющим XeSS, после NR, если он включён. Применяется сразу.",
+    "既定はオフ。ゲーム指定はゲームから渡される強度、カスタムは下の値を使用します。DLSS、DLAA、RR、置換 XeSS に適用され、NR 有効時はその後に処理します。変更は即時反映されます。",
+    "기본값은 꺼짐입니다. 게임 설정은 게임이 전달한 선명도를, 사용자 지정은 아래 강도를 사용합니다. DLSS, DLAA, RR 및 대체 XeSS에 적용되며 NR이 켜져 있으면 그 뒤에 처리합니다. 즉시 적용됩니다."
+  ],
+  "0–100%，默认 30%；仅自定义模式使用。0 不增加锐化处理。高强度可能产生光晕、放大噪点，并与游戏后续锐化叠加。": [
+    "0–100%, default 30%; used only in Custom mode. Zero adds no sharpening pass. High strengths may create halos, amplify noise and add to the game’s later sharpening.",
+    "0–100%, по умолчанию 30%; только для Custom. Ноль отключает дополнительный проход. Высокая сила может вызвать ореолы, усилить шум и резкость, добавляемую игрой позже.",
+    "0～100%、既定は30%。カスタム時のみ使用します。0では追加処理を行いません。強すぎると輪郭の光やノイズが増え、ゲーム側の後処理と重なる場合があります。",
+    "0~100%, 기본값은 30%이며 사용자 지정에서만 사용합니다. 0이면 추가 처리가 없습니다. 강도가 높으면 후광과 노이즈가 늘고 게임의 후속 선명화와 중첩될 수 있습니다."
   ]
 }

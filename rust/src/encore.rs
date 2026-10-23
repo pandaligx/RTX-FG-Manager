@@ -1,4 +1,4 @@
-//! RTX Encore JSONC v4, including 1.1.0 NR and 1.1.2 frame-pacing settings.
+//! RTX Encore JSONC v4, including 1.2 engines and 1.2.2 sharpening settings.
 //! Legacy paths remain writable for games whose patch has not been upgraded.
 //! Deployment never requires a fixed DLL hash.
 use crate::{jsonc::Document, presets::Values};
@@ -334,6 +334,7 @@ fn supported_container(path: &[String]) -> bool {
         "renderingEngines",
         "xefg",
         "superResolutionInputs",
+        "superResolutionSharpening",
     ];
     if path.len() == 1 {
         return roots.contains(&path[0].as_str());

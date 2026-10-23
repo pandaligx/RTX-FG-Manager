@@ -142,5 +142,10 @@
   "玩家备注": "Player notes",
   "复制备注": "Copy notes",
   "备注已复制": "Notes copied",
-  "完整备注与操作步骤见“查看完整方案”": "Open “View full setup” to read all notes and steps."
+  "完整备注与操作步骤见“查看完整方案”": "Open “View full setup” to read all notes and steps.",
+  "登录已失效，仍可浏览最新推荐；分享或评价时请重新登录。": "Your session expired. You can still browse current setups; sign in again to share or rate.",
+  "无法清除已失效的登录记录": "Could not clear the expired sign-in record.",
+  "界面动效": "Interface animations",
+  "控制推荐图标等界面动效，仅影响管理器。": "Animate recommendation icons and other interface elements. Only affects the manager.",
+  "玩家硬件": "Player hardware"
 }

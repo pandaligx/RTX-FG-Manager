@@ -1,7 +1,7 @@
 //! Game-scoped deployment recipes. Community content never supplies file paths,
 //! download URLs or commands. Selecting a recipe only changes the local choices.
 use crate::{cloud, core, game_names, neural_runtime, scanner::Game};
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use reqwest::{Method, blocking::Client as Http};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
@@ -11,12 +11,30 @@ use std::{
     fs,
     io::Read,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 use zeroize::{Zeroize, Zeroizing};
 
 const ORIGIN: &str = "https://recommend.lgxng.cn";
 const RESPONSE_LIMIT: u64 = 512 * 1024;
+// Window instances share one on-disk session. Compare and replace it under the
+// same lock so a late response cannot delete a newer window's successful login.
+static SESSION_FILE_LOCK: Mutex<()> = Mutex::new(());
+fn read_session(root: &Path) -> Result<Option<Session>> {
+    let path = core::no_links(&root.join("session.json"))?;
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    ensure!(file.metadata()?.len() <= 65536, "登录凭据无效");
+    let mut bytes = Vec::new();
+    file.take(65537).read_to_end(&mut bytes)?;
+    ensure!(bytes.len() <= 65536, "登录凭据无效");
+    let protected: Vec<u8> = serde_json::from_slice(&bytes)?;
+    Ok(Some(serde_json::from_slice(&unseal(&protected, false)?)?))
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 #[non_exhaustive]
@@ -490,19 +508,52 @@ pub struct Challenge {
 pub struct Client {
     http: Http,
     root: PathBuf,
+    auth: Arc<Mutex<AuthState>>,
+    #[cfg(test)]
+    origin: String,
+}
+#[derive(Default)]
+struct AuthState {
     session: Option<Session>,
+    expired: bool,
+}
+#[derive(Debug)]
+enum ServiceError {
+    LoginExpired,
+    Unavailable,
+    Api(&'static str),
+}
+impl std::fmt::Display for ServiceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::LoginExpired => "登录已过期，请重新获取邮箱验证码",
+            Self::Unavailable => "推荐服务暂时无法连接，请稍后刷新",
+            Self::Api(message) => message,
+        })
+    }
+}
+impl std::error::Error for ServiceError {}
+
+/// Only connection/server outages may be presented as offline browsing.
+pub fn allows_offline_cache(error: &anyhow::Error) -> bool {
+    matches!(
+        error.downcast_ref::<ServiceError>(),
+        Some(ServiceError::Unavailable)
+    )
 }
 impl Client {
     pub fn new(data: &Path) -> Result<Self> {
         let root = data.join("recommendations");
         fs::create_dir_all(&root)?;
-        let session = fs::read(root.join("session.json"))
-            .ok()
-            .filter(|b| b.len() <= 65536)
-            .and_then(|b| serde_json::from_slice::<Vec<u8>>(&b).ok())
-            .and_then(|b| unseal(&b, false).ok())
-            .and_then(|b| serde_json::from_slice::<Session>(&b).ok())
-            .filter(|s| s.expires_at > chrono::Utc::now().timestamp());
+        let session_file = SESSION_FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let session = read_session(&root).ok().flatten();
+        let expired = session
+            .as_ref()
+            .is_some_and(|s| s.expires_at <= chrono::Utc::now().timestamp());
+        if expired {
+            fs::remove_file(root.join("session.json"))?;
+        }
+        drop(session_file);
         Ok(Self {
             http: Http::builder()
                 .connect_timeout(Duration::from_secs(5))
@@ -511,13 +562,74 @@ impl Client {
                 .user_agent(format!("RTXFG/{}", crate::VERSION))
                 .build()?,
             root,
-            session,
+            auth: Arc::new(Mutex::new(AuthState {
+                session: session.filter(|_| !expired),
+                expired,
+            })),
+            #[cfg(test)]
+            origin: ORIGIN.to_string(),
         })
     }
     pub fn logged_in(&self) -> bool {
-        self.session
+        self.auth
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .session
             .as_ref()
             .is_some_and(|s| s.expires_at > chrono::Utc::now().timestamp())
+    }
+    pub fn login_expired(&self) -> bool {
+        let auth = self.auth.lock().unwrap_or_else(|e| e.into_inner());
+        auth.expired
+            || auth
+                .session
+                .as_ref()
+                .is_some_and(|s| s.expires_at <= chrono::Utc::now().timestamp())
+    }
+    fn active_session(&self) -> Result<Option<Session>> {
+        let session = self
+            .auth
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .session
+            .clone();
+        if let Some(s) = &session
+            && s.expires_at <= chrono::Utc::now().timestamp()
+        {
+            self.clear_session(&s.token, true)?;
+            return Ok(None);
+        }
+        Ok(session)
+    }
+    fn clear_session(&self, rejected_token: &str, expired: bool) -> Result<()> {
+        let mut auth = self.auth.lock().unwrap_or_else(|e| e.into_inner());
+        // A delayed response from an older request must not log out a new login.
+        if auth
+            .session
+            .as_ref()
+            .is_some_and(|s| s.token == rejected_token)
+        {
+            auth.session = None;
+            auth.expired = expired;
+            let _file_lock = SESSION_FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            if read_session(&self.root)?.is_some_and(|s| s.token == rejected_token) {
+                fs::remove_file(self.root.join("session.json"))
+                    .context("无法清除已失效的登录记录")?;
+            }
+        } else if !expired && auth.session.is_none() {
+            auth.expired = false;
+        }
+        Ok(())
+    }
+    fn origin(&self) -> &str {
+        #[cfg(test)]
+        {
+            &self.origin
+        }
+        #[cfg(not(test))]
+        {
+            ORIGIN
+        }
     }
     fn request<T: DeserializeOwned>(
         &self,
@@ -532,31 +644,45 @@ impl Client {
         );
         let mut request = self
             .http
-            .request(method, format!("{ORIGIN}{route}"))
+            .request(method, format!("{}{route}", self.origin()))
             .header("X-RTXFG-Feedback", "5");
-        if authenticated {
-            let s = self.session.as_ref().context("请先用邮箱验证码登录")?;
+        let session = if authenticated {
+            Some(self.active_session()?.ok_or(ServiceError::LoginExpired)?)
+        } else {
+            None
+        };
+        if let Some(s) = &session {
             request = request.bearer_auth(&s.token);
         }
         if let Some(body) = body {
             request = request.json(&body);
         }
-        let response = request
-            .send()
-            .map_err(|_| anyhow::anyhow!("推荐服务暂时无法连接，请稍后刷新"))?;
+        let response = request.send().map_err(|_| ServiceError::Unavailable)?;
         let status = response.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED
+            && let Some(s) = &session
+        {
+            self.clear_session(&s.token, true)?;
+            return Err(ServiceError::LoginExpired.into());
+        }
         let mut bytes = Vec::new();
-        response.take(RESPONSE_LIMIT + 1).read_to_end(&mut bytes)?;
+        response
+            .take(RESPONSE_LIMIT + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| ServiceError::Unavailable)?;
         ensure!(
             bytes.len() <= RESPONSE_LIMIT as usize,
             "推荐服务返回内容过大"
         );
         if !status.is_success() {
+            if status.is_server_error() {
+                return Err(ServiceError::Unavailable.into());
+            }
             let value: Value = serde_json::from_slice(&bytes).unwrap_or_default();
-            bail!(
-                "{}",
-                error_message(value["error"].as_str().unwrap_or("unavailable"))
-            );
+            return Err(ServiceError::Api(error_message(
+                value["error"].as_str().unwrap_or("unavailable"),
+            ))
+            .into());
         }
         serde_json::from_slice(&bytes).context("推荐服务返回格式无效")
     }
@@ -579,7 +705,22 @@ impl Client {
             ],
         )?;
         let route = format!("{}?{}", query.path(), query.query().unwrap_or_default());
-        let page: Page = self.request(Method::GET, &route, None, self.logged_in())?;
+        let authenticated = self.active_session()?.is_some() || mine || reported;
+        let page: Page = match self.request(Method::GET, &route, None, authenticated) {
+            Err(e)
+                if !mine
+                    && !reported
+                    && matches!(
+                        e.downcast_ref::<ServiceError>(),
+                        Some(ServiceError::LoginExpired)
+                    ) =>
+            {
+                // Public browsing never depends on a retained account session.
+                // Retry once, anonymously; never replay writes or private filters.
+                self.request(Method::GET, &route, None, false)?
+            }
+            result => result?,
+        };
         page.validate(&game.id, catalog)?;
         if offset == 0 && !mine && !reported {
             let _ = core::atomic_json(&self.cache_path(&game.id), &page);
@@ -630,18 +771,22 @@ impl Client {
         let bytes = Zeroizing::new(serde_json::to_vec(&s)?);
         let protected = unseal(&bytes, true)?;
         let path = self.root.join("session.json");
+        let mut auth = self.auth.lock().unwrap_or_else(|e| e.into_inner());
+        let _file_lock = SESSION_FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         core::atomic_json(&path, &*protected)?;
-        self.session = Some(s);
+        auth.session = Some(s);
+        auth.expired = false;
         Ok(())
     }
     pub fn logout(&mut self) -> Result<()> {
-        let result = self.request::<Value>(Method::POST, "/v1/auth/logout", Some(json!({})), true);
-        self.session = None;
-        let path = self.root.join("session.json");
-        if path.exists() {
-            fs::remove_file(path)?;
+        let session = self.active_session()?;
+        if let Some(session) = session {
+            // Signing out locally still works during an outage. Persistence errors
+            // are propagated so the UI never claims a retained login was removed.
+            let _ = self.request::<Value>(Method::POST, "/v1/auth/logout", Some(json!({})), true);
+            self.clear_session(&session.token, false)?;
         }
-        result.map(|_| ())
+        Ok(())
     }
     pub fn share(
         &self,
@@ -859,6 +1004,265 @@ fn unseal(input: &[u8], protect: bool) -> Result<Zeroizing<Vec<u8>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufRead, BufReader, Write};
+
+    fn mock_service(replies: Vec<(u16, Value)>) -> (String, std::thread::JoinHandle<Vec<String>>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let worker = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + Duration::from_secs(8);
+            let mut requests = Vec::new();
+            for (status, body) in replies {
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(
+                                std::time::Instant::now() < deadline,
+                                "Expected request did not arrive"
+                            );
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(e) => panic!("{e}"),
+                    }
+                };
+                stream.set_nonblocking(false).unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut reader = BufReader::new(&mut stream);
+                let mut request = String::new();
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    assert!(reader.read_line(&mut line).unwrap() > 0);
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = value.trim().parse::<usize>().unwrap();
+                    }
+                    request.push_str(&line);
+                }
+                let mut body_bytes = vec![0; length];
+                reader.read_exact(&mut body_bytes).unwrap();
+                requests.push(request);
+                let body = serde_json::to_vec(&body).unwrap();
+                write!(stream, "HTTP/1.1 {status} Mock\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).unwrap();
+                stream.write_all(&body).unwrap();
+            }
+            requests
+        });
+        (origin, worker)
+    }
+    fn save_test_session(data: &Path, token: &str, expires_at: i64) {
+        let root = data.join("recommendations");
+        fs::create_dir_all(&root).unwrap();
+        let session = json!({"token": token, "expiresAt": expires_at,
+            "user": {"id": uuid::Uuid::new_v4().to_string(), "admin": false}});
+        let protected = unseal(&serde_json::to_vec(&session).unwrap(), true).unwrap();
+        core::atomic_json(&root.join("session.json"), &*protected).unwrap();
+    }
+    fn online_test_client(data: &Path, origin: String) -> Client {
+        let mut client = Client::new(data).unwrap();
+        client.http = Http::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(3))
+            .build()
+            .unwrap();
+        client.origin = origin;
+        client
+    }
+    #[test]
+    fn retained_revoked_login_refreshes_public_cards_and_clears_saved_login() {
+        let data = tempfile::tempdir().unwrap();
+        save_test_session(
+            data.path(),
+            &"a".repeat(43),
+            chrono::Utc::now().timestamp() + 86400,
+        );
+        let new_card = card("RTX 5090", "581.80", 4);
+        let page = json!({"items":[new_card],"total":1,"nextOffset":null});
+        let (origin, server) = mock_service(vec![
+            (401, json!({"error":"session_expired"})),
+            (200, page.clone()),
+            (200, page),
+        ]);
+        let client = online_test_client(data.path(), origin);
+        let worker_client = client.clone();
+        let game = GameIdentity::new("steam:292030".into(), "The Witcher 3".into()).unwrap();
+        core::atomic_json(
+            &client.cache_path(&game.id),
+            &json!({"items":[],"total":0,"nextOffset":null}),
+        )
+        .unwrap();
+        let fresh = worker_client
+            .browse(&game, &cloud::bundled(), 0, false, false)
+            .unwrap();
+        assert_eq!(fresh.items[0].id, new_card.id);
+        assert!(!client.logged_in());
+        assert!(client.login_expired());
+        assert!(!client.root.join("session.json").exists());
+        assert!(!Client::new(data.path()).unwrap().logged_in());
+        assert_eq!(client.cached(&game, &cloud::bundled()).unwrap().total, 1);
+        client
+            .browse(&game, &cloud::bundled(), 12, false, false)
+            .unwrap();
+        let requests = server.join().unwrap();
+        assert!(
+            requests[0]
+                .to_ascii_lowercase()
+                .contains("authorization: bearer ")
+        );
+        assert!(!requests[1].to_ascii_lowercase().contains("authorization:"));
+        assert!(!requests[2].to_ascii_lowercase().contains("authorization:"));
+    }
+    #[test]
+    fn valid_login_keeps_personal_feedback_and_saved_session() {
+        let data = tempfile::tempdir().unwrap();
+        save_test_session(
+            data.path(),
+            &"b".repeat(43),
+            chrono::Utc::now().timestamp() + 86400,
+        );
+        let mut voted = card("RTX 3060", "581.80", 2);
+        voted.liked = true;
+        let (origin, server) = mock_service(vec![(
+            200,
+            json!({"items":[voted],"total":1,"nextOffset":null}),
+        )]);
+        let client = online_test_client(data.path(), origin);
+        let result = client
+            .browse(&voted.content.game, &cloud::bundled(), 0, false, false)
+            .unwrap();
+        assert!(result.items[0].liked && client.logged_in());
+        assert!(!client.login_expired());
+        assert!(client.root.join("session.json").exists());
+        assert_eq!(server.join().unwrap().len(), 1);
+    }
+    #[test]
+    fn private_filters_and_writes_never_retry_anonymously_or_use_cache() {
+        for operation in ["mine", "reported", "vote"] {
+            let data = tempfile::tempdir().unwrap();
+            save_test_session(
+                data.path(),
+                &"c".repeat(43),
+                chrono::Utc::now().timestamp() + 86400,
+            );
+            let (origin, server) = mock_service(vec![(401, json!({"error":"session_expired"}))]);
+            let client = online_test_client(data.path(), origin);
+            let c = card("RTX 3060", "581.80", 1);
+            let error = if operation == "vote" {
+                client.vote(&c, 1, &cloud::bundled()).unwrap_err()
+            } else {
+                client
+                    .browse(
+                        &c.content.game,
+                        &cloud::bundled(),
+                        0,
+                        operation == "mine",
+                        operation == "reported",
+                    )
+                    .unwrap_err()
+            };
+            assert!(matches!(
+                error.downcast_ref::<ServiceError>(),
+                Some(ServiceError::LoginExpired)
+            ));
+            assert!(!allows_offline_cache(&error));
+            assert!(!client.logged_in());
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
+    }
+    #[test]
+    fn only_service_outages_allow_offline_cache_without_discarding_login() {
+        for (status, body, offline) in [
+            (503, json!({"error":"unavailable"}), true),
+            (403, json!({"error":"forbidden"}), false),
+            (429, json!({"error":"rate_limited"}), false),
+            (200, json!({"invalid":"page"}), false),
+        ] {
+            let data = tempfile::tempdir().unwrap();
+            save_test_session(
+                data.path(),
+                &"d".repeat(43),
+                chrono::Utc::now().timestamp() + 86400,
+            );
+            let (origin, server) = mock_service(vec![(status, body)]);
+            let client = online_test_client(data.path(), origin);
+            let game = card("RTX 3060", "581.80", 1).content.game;
+            let error = client
+                .browse(&game, &cloud::bundled(), 0, false, false)
+                .unwrap_err();
+            assert_eq!(allows_offline_cache(&error), offline);
+            assert!(client.logged_in());
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
+    }
+    #[test]
+    fn local_expiry_and_late_rejection_cannot_restore_or_clear_the_wrong_session() {
+        let data = tempfile::tempdir().unwrap();
+        save_test_session(
+            data.path(),
+            &"e".repeat(43),
+            chrono::Utc::now().timestamp() - 1,
+        );
+        let client = Client::new(data.path()).unwrap();
+        assert!(!client.logged_in() && client.login_expired());
+        assert!(!client.root.join("session.json").exists());
+        save_test_session(
+            data.path(),
+            &"f".repeat(43),
+            chrono::Utc::now().timestamp() + 86400,
+        );
+        let client = Client::new(data.path()).unwrap();
+        client.clear_session(&"e".repeat(43), true).unwrap();
+        assert!(client.logged_in() && !client.login_expired());
+        assert!(client.root.join("session.json").exists());
+        client
+            .auth
+            .lock()
+            .unwrap()
+            .session
+            .as_mut()
+            .unwrap()
+            .expires_at = 0;
+        assert!(client.active_session().unwrap().is_none());
+        assert!(client.login_expired());
+        assert!(!client.root.join("session.json").exists());
+    }
+    #[test]
+    fn closed_window_request_cannot_delete_a_new_windows_saved_login() {
+        let data = tempfile::tempdir().unwrap();
+        let expires = chrono::Utc::now().timestamp() + 86400;
+        save_test_session(data.path(), &"a".repeat(43), expires);
+        let old_window = Client::new(data.path()).unwrap();
+        // Another window finishes a fresh login before the old request's 401 arrives.
+        save_test_session(data.path(), &"b".repeat(43), expires);
+        let new_window = Client::new(data.path()).unwrap();
+        old_window.clear_session(&"a".repeat(43), true).unwrap();
+        assert!(!old_window.logged_in());
+        assert!(new_window.logged_in());
+        assert!(Client::new(data.path()).unwrap().logged_in());
+    }
+    #[test]
+    fn logout_removes_local_session_even_if_server_unavailable_or_already_revoked() {
+        for status in [503, 401] {
+            let data = tempfile::tempdir().unwrap();
+            save_test_session(
+                data.path(),
+                &"g".repeat(43),
+                chrono::Utc::now().timestamp() + 86400,
+            );
+            let (origin, server) = mock_service(vec![(status, json!({"error":"unavailable"}))]);
+            let mut client = online_test_client(data.path(), origin);
+            client.logout().unwrap();
+            assert!(!client.logged_in() && !client.login_expired());
+            assert!(!Client::new(data.path()).unwrap().logged_in());
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
+    }
     fn card(gpu: &str, driver: &str, likes: u64) -> Card {
         serde_json::from_value(json!({"id":uuid::Uuid::new_v4().to_string(),"author":uuid::Uuid::new_v4().to_string(),"revision":1,"updatedAt":100,"likes":likes,"liked":false,"mine":false,"status":"visible",
           "content":{"schema":1,"game":{"id":"steam:292030","name":"The Witcher 3"},"title":"Working setup","notes":"DX12","scheme":crate::encore::SCHEME,"patchVersion":"1.1.4","entries":["dxgi.dll"],"renderer":"dx12","gpuModel":gpu,"driver":driver,"gpuAlias":"unchanged","neuralRuntime":"none"}})).unwrap()

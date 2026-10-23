@@ -32,12 +32,13 @@ pub enum Event {
     RefreshDone,
     Status(String, String),
     Evidence(String, scanner::Evidence),
-    PresetRead(
-        String,
-        Option<(String, rtx_fg_manager::presets::Values)>,
-        bool,
-        u64,
-    ),
+    PresetRead {
+        exe: String,
+        values: Option<(String, rtx_fg_manager::presets::Values)>,
+        running: bool,
+        epoch: u64,
+        consistent: bool,
+    },
     PresetApplied(String, String, rtx_fg_manager::presets::Values),
     PresetReadFailed(String, String, bool, u64),
     Devices(Vec<gpu_alias::Device>),
@@ -195,6 +196,44 @@ fn parameter_target(game: &Game) -> core::DeploymentTarget {
     // represented by the first real deployment, just as installation is.
     let paths = game.deployment_executables();
     game.deployment_target(std::path::Path::new(paths.first().unwrap_or(&game.exe)))
+}
+
+struct ParameterSnapshot {
+    values: Option<(String, rtx_fg_manager::presets::Values)>,
+    consistent: bool,
+}
+fn inspect_game_parameters(
+    game: &Game,
+    catalog: &cloud::Catalog,
+    mut inspect: impl FnMut(
+        &core::DeploymentTarget,
+        &cloud::Catalog,
+    ) -> Result<Option<(String, rtx_fg_manager::presets::Values)>>,
+) -> Result<ParameterSnapshot> {
+    let targets = game.deployment_targets();
+    let first = parameter_target(game);
+    let values = inspect(&first, catalog)?;
+    let normalize = |target: &core::DeploymentTarget,
+                     value: Option<(String, rtx_fg_manager::presets::Values)>| {
+        value.and_then(|(scheme, values)| {
+            let policy = catalog.scheme_policies.get(&scheme)?;
+            let mut normalized =
+                rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            normalized.extend(values);
+            rtx_fg_manager::presets::Context::new(&scheme, policy, &target.game_exe)
+                .normalize(&mut normalized);
+            Some((scheme, normalized))
+        })
+    };
+    let baseline = normalize(&first, values.clone());
+    // A primary-folder success is not proof that a multi-folder apply completed.
+    // Unreadable, missing or differently configured siblings keep the draft retryable.
+    let consistent = baseline.is_some()
+        && targets.iter().all(|target| {
+            core::key(&target.directory) == core::key(&first.directory)
+                || inspect(target, catalog).is_ok_and(|v| normalize(target, v) == baseline)
+        });
+    Ok(ParameterSnapshot { values, consistent })
 }
 
 fn uses_explicit_edits(profile: &str) -> bool {
@@ -2551,12 +2590,33 @@ impl Controller {
                 .map(parameter_target)
                 .unwrap_or_else(|| core::DeploymentTarget::for_game(std::path::Path::new(&exe)));
             let catalog = self.catalog.clone();
+            let game = self.games.iter().find(|g| g.exe == exe).cloned();
             let epoch = self.status_epoch;
             self.channel.job(move |c| {
                 let running = core::assert_target_stopped(&location).is_err();
-                let values = rtx_fg_manager::presets::inspect_at(&location, &catalog);
+                let values = match game {
+                    Some(game) => inspect_game_parameters(
+                        &game,
+                        &catalog,
+                        rtx_fg_manager::presets::inspect_at,
+                    ),
+                    None => {
+                        rtx_fg_manager::presets::inspect_at(&location, &catalog).map(|values| {
+                            ParameterSnapshot {
+                                values,
+                                consistent: true,
+                            }
+                        })
+                    }
+                };
                 match values {
-                    Ok(values) => c.send(Event::PresetRead(target, values, running, epoch)),
+                    Ok(snapshot) => c.send(Event::PresetRead {
+                        exe: target,
+                        values: snapshot.values,
+                        running,
+                        epoch,
+                        consistent: snapshot.consistent,
+                    }),
                     Err(error) => c.send(Event::PresetReadFailed(
                         target,
                         format!(
@@ -2952,7 +3012,13 @@ impl Controller {
                         self.evidence.insert(exe, Some(evidence));
                     }
                 }
-                Event::PresetRead(exe, values, running, epoch) => {
+                Event::PresetRead {
+                    exe,
+                    values,
+                    running,
+                    epoch,
+                    consistent,
+                } => {
                     self.preset_reads.remove(&exe);
                     if epoch != self.status_epoch || !self.games.iter().any(|g| g.exe == exe) {
                         continue;
@@ -2996,7 +3062,7 @@ impl Controller {
                             .normalize(&mut baseline);
                             // A game menu or an earlier successful apply may
                             // already match the draft. No difference, no prompt.
-                            if self.preset_values_for(&exe, &scheme) == baseline {
+                            if consistent && self.preset_values_for(&exe, &scheme) == baseline {
                                 self.discard_presets(Some((&exe, &scheme)));
                             }
                         }
@@ -3436,6 +3502,89 @@ mod tests {
         c.tick_close();
     }
     #[test]
+    fn partial_multi_folder_parameter_apply_keeps_pending_edits_for_retry() {
+        use rtx_fg_manager::encore;
+        let (_dir, mut c) = controller();
+        let exe = "Multi.exe";
+        let scheme = encore::SCHEME;
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: exe.into(),
+            targets: vec!["A/Game.exe".into(), "B/Game.exe".into()],
+            ..Default::default()
+        }];
+        let disk = encore::defaults();
+        c.disk_presets
+            .insert((exe.into(), scheme.into()), disk.clone());
+        c.set_game_option(exe, "tf_mode", "4");
+        assert!(c.preset_dirty(exe));
+        let mut first_directory = disk;
+        first_directory.insert("tf_mode".into(), "4".into());
+        // The first directory succeeded, but the second could not be written.
+        c.channel.send(Event::PresetRead {
+            exe: exe.into(),
+            values: Some((scheme.into(), first_directory)),
+            running: false,
+            epoch: c.status_epoch,
+            consistent: false,
+        });
+        c.events();
+        assert!(
+            c.preset_dirty(exe),
+            "a primary-directory read must not erase a partial failure"
+        );
+        assert_eq!(
+            c.explicit_preset_values(exe, scheme)
+                .get("tf_mode")
+                .map(String::as_str),
+            Some("4")
+        );
+        c.channel.send(Event::PresetApplied(
+            exe.into(),
+            scheme.into(),
+            c.preset_values(exe),
+        ));
+        c.events();
+        assert!(!c.preset_dirty(exe));
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn parameter_snapshot_requires_every_folder_to_match_before_discarding_edits() {
+        use rtx_fg_manager::{encore, presets::Values};
+        let catalog = cloud::bundled();
+        let game = Game {
+            exe: "Launcher.exe".into(),
+            targets: vec!["A/Game.exe".into(), "B/Game.exe".into()],
+            ..Default::default()
+        };
+        let full = Some((encore::SCHEME.into(), encore::defaults()));
+        for other in [
+            Ok(None),
+            Err(anyhow::anyhow!("second directory is locked")),
+            Ok(Some((
+                encore::SCHEME.into(),
+                Values::from([("tf_mode".into(), "4".into())]),
+            ))),
+        ] {
+            let mut reads = vec![Ok(full.clone()), other].into_iter();
+            let snapshot =
+                inspect_game_parameters(&game, &catalog, |_, _| reads.next().unwrap()).unwrap();
+            assert_eq!(snapshot.values, full);
+            assert!(!snapshot.consistent);
+        }
+        // Omitted default fields and explicit defaults are semantically equal.
+        let mut reads = vec![
+            Ok(full.clone()),
+            Ok(Some((encore::SCHEME.into(), Values::new()))),
+        ]
+        .into_iter();
+        let snapshot =
+            inspect_game_parameters(&game, &catalog, |_, _| reads.next().unwrap()).unwrap();
+        assert!(snapshot.consistent);
+        assert!(reads.next().is_none());
+    }
+    #[test]
     fn encore_dirty_fields_merge_over_latest_menu_values_and_clear_after_apply() {
         use rtx_fg_manager::encore;
         let (_dir, mut c) = controller();
@@ -3468,12 +3617,13 @@ mod tests {
         );
         disk.insert("reflexFrameLimit".into(), "141".into());
         disk.insert("tf_mode".into(), "2".into());
-        c.channel.send(Event::PresetRead(
-            "Encore-A.exe".into(),
-            Some((scheme.into(), disk)),
-            false,
-            c.status_epoch,
-        ));
+        c.channel.send(Event::PresetRead {
+            exe: "Encore-A.exe".into(),
+            values: Some((scheme.into(), disk)),
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.preset_values("Encore-A.exe")["reflexFrameLimit"], "141");
         assert_eq!(c.preset_values("Encore-A.exe")["tf_mode"], "4");
@@ -3762,15 +3912,16 @@ mod tests {
         assert_eq!(c.cloud_scheme(), "rtxfg-0.3.5-dx12-vulkan");
         assert_eq!(c.proxies(), vec!["version.dll"]);
         assert_eq!(c.preset_values("B.exe")["logging_level"], "1");
-        c.channel.send(Event::PresetRead(
-            "A.exe".into(),
-            Some((
+        c.channel.send(Event::PresetRead {
+            exe: "A.exe".into(),
+            values: Some((
                 "upstream-0.3.5-310-9".into(),
                 BTreeMap::from([("logging_level".into(), "0".into())]),
             )),
-            false,
-            c.status_epoch,
-        ));
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.cloud_scheme(), "rtxfg-0.3.5-dx12-vulkan");
         c.focus = Some("A.exe".into());
@@ -4817,15 +4968,16 @@ mod tests {
         c.state["cloud_scheme"] = json!(extended);
         assert_eq!(c.preset_values(exe)["max_generated_frames"], "3");
         c.set_game_option(exe, "max_generated_frames", "2");
-        c.channel.send(Event::PresetRead(
-            exe.into(),
-            Some((
+        c.channel.send(Event::PresetRead {
+            exe: exe.into(),
+            values: Some((
                 extended.into(),
                 BTreeMap::from([("max_generated_frames".into(), "1".into())]),
             )),
-            false,
-            c.status_epoch,
-        ));
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.preset_values(exe)["max_generated_frames"], "2");
         c.state["cloud_scheme"] = json!(original);
@@ -4837,15 +4989,16 @@ mod tests {
             c.preset_values(exe),
         ));
         c.events();
-        c.channel.send(Event::PresetRead(
-            exe.into(),
-            Some((
+        c.channel.send(Event::PresetRead {
+            exe: exe.into(),
+            values: Some((
                 extended.into(),
                 BTreeMap::from([("max_generated_frames".into(), "1".into())]),
             )),
-            false,
-            c.status_epoch,
-        ));
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.preset_values(exe)["max_generated_frames"], "1");
         c.running_games.insert(exe.into());
@@ -4879,15 +5032,16 @@ mod tests {
             scheme.clone(),
             applied.clone(),
         ));
-        c.channel.send(Event::PresetRead(
-            exe.clone(),
-            Some((
+        c.channel.send(Event::PresetRead {
+            exe: exe.clone(),
+            values: Some((
                 scheme.clone(),
                 BTreeMap::from([("max_generated_frames".into(), "1".into())]),
             )),
-            false,
-            old_epoch,
-        ));
+            running: false,
+            epoch: old_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.disk_presets[&(exe.clone(), scheme)], applied);
         assert!(!c.preset_reads.contains(&exe));

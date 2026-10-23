@@ -82,6 +82,7 @@ enum Command {
     Scheme(usize),
     Language(String),
     Themes,
+    Motion(&'static str),
     Source(String),
     CloudSource(String),
     Boolean(String, bool),
@@ -184,6 +185,8 @@ pub struct Manager {
     preset_close: Option<bool>, // true: app exit; false: editor dismissal
     theme_preview: Option<u64>,
     theme_generation: u64,
+    recommendation_motion_epoch: u64,
+    recommendation_hovered: bool,
 }
 /// Render after Manager::render has released its entity borrow. Building a
 /// live editor inside Root::render_dialog_layer would recursively borrow Manager.
@@ -253,6 +256,7 @@ impl Manager {
         cx: &mut Context<Self>,
     ) -> Self {
         crate::ui_focus::observe(cx);
+        cx.set_reduce_motion(preferred_reduce_motion(&state, win::reduced_motion()));
         let mut c = Controller::new(data, state, error, smoke);
         if !c.boolean("sidebar_compact_default_v3", false) {
             c.state["sidebar_collapsed"] = json!(true);
@@ -332,6 +336,8 @@ impl Manager {
             preset_close: None,
             theme_preview: None,
             theme_generation: 0,
+            recommendation_motion_epoch: 0,
+            recommendation_hovered: false,
         };
         view.filter();
         view.theme(window, cx);
@@ -646,6 +652,15 @@ impl Manager {
                 self.theme(window, cx)
             }
             Command::Themes => self.open_themes(window, cx),
+            Command::Motion(mode) => {
+                self.c.state["ui_motion"] = json!(mode);
+                cx.set_reduce_motion(preferred_reduce_motion(
+                    &self.c.state,
+                    win::reduced_motion(),
+                ));
+                self.recommendation_motion_epoch = self.recommendation_motion_epoch.wrapping_add(1);
+                self.c.save();
+            }
             Command::ApplyPreset => self.c.apply_focused_parameters(),
             Command::RetrySave => self.c.save(),
             Command::Source(s) | Command::CloudSource(s) => {
@@ -2878,11 +2893,32 @@ impl Manager {
                     .bg(crate::ui_themes::recommendation_accent())
                     .icon(Icon::new(gpui::assets::IconName::ThumbsUp))
                     .w_full()
+                    .on_hover(cx.listener(|this, hovered, _, cx| {
+                        if *hovered && !this.recommendation_hovered {
+                            this.recommendation_motion_epoch =
+                                this.recommendation_motion_epoch.wrapping_add(1);
+                            cx.notify();
+                        }
+                        this.recommendation_hovered = *hovered;
+                    }))
                     .with_animation(
-                        SharedString::from(format!("recommendation-enter-{}", game.exe)),
-                        Animation::new(Duration::from_millis(400))
-                            .with_easing(gpui_component::animation::ease_out_cubic),
-                        |button, progress| button.opacity(0.65 + 0.35 * progress),
+                        SharedString::from(format!(
+                            "recommendation-thumb-{}-{}",
+                            game.exe, self.recommendation_motion_epoch
+                        )),
+                        Animation::new(Duration::from_millis(700)),
+                        |button, progress| {
+                            // Animate the bundled Lucide SVG, preserving button geometry,
+                            // label contrast and GPUI's reduced-motion behavior.
+                            let lift = (std::f32::consts::PI * progress).sin().max(0.);
+                            let scale = 1. + 0.18 * lift;
+                            button.icon(
+                                Icon::new(gpui::assets::IconName::ThumbsUp).transform(
+                                    Transformation::scale(size(scale, scale))
+                                        .with_rotation(radians(-0.22 * lift)),
+                                ),
+                            )
+                        },
                     ),
                 )
             })
@@ -3123,6 +3159,40 @@ impl Manager {
             )
             .into_any_element()
     }
+    fn settings_section(&self, title: &str, icon: IconName, cx: &App) -> Div {
+        div()
+            .v_flex()
+            .w_full()
+            .min_w_0()
+            .gap_3()
+            .p_4()
+            .border_1()
+            .border_color(cx.theme().border)
+            .rounded_lg()
+            .child(
+                div()
+                    .h_flex()
+                    .gap_2()
+                    .pb_2()
+                    .border_b_1()
+                    .border_color(cx.theme().border)
+                    .child(
+                        Icon::new(icon)
+                            .size_4()
+                            .text_color(cx.theme().muted_foreground),
+                    )
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child(self.t(title))),
+            )
+    }
+    fn settings_row(&self, label: &str, control: AnyElement) -> Div {
+        div()
+            .h_flex()
+            .w_full()
+            .min_w_0()
+            .gap_4()
+            .child(div().flex_1().min_w_0().child(self.t(label)))
+            .child(div().w(rems(14.)).flex_shrink_0().child(control))
+    }
     fn update_panel(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let source = self.c.choice("download_source", "domestic");
         let mut panel = div()
@@ -3132,13 +3202,17 @@ impl Manager {
             .flex_shrink_0()
             .gap_3()
             .child(
-                div()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(self.t("软件更新")),
+                self.settings_row(
+                    "当前版本",
+                    div()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(format!("v{VERSION}"))
+                        .into_any_element(),
+                ),
             )
-            .child(format!("v{VERSION}"))
             .child(
-                div().w_full().child(
+                self.settings_row(
+                    "下载来源",
                     self.menu(
                         "source",
                         self.t(match source.as_str() {
@@ -3160,13 +3234,20 @@ impl Manager {
             ("auto_download", "自动下载更新", false),
         ] {
             panel = panel.child(
-                Switch::new(key)
-                    .focus_ring(crate::ui_focus::visible(cx))
-                    .label(self.t(label))
-                    .checked(self.c.boolean(key, default))
-                    .on_click(cx.listener(move |this, yes, window, cx| {
-                        this.act(Command::Boolean(key.into(), *yes), window, cx)
-                    })),
+                div()
+                    .h_flex()
+                    .w_full()
+                    .gap_4()
+                    .child(div().flex_1().min_w_0().child(self.t(label)))
+                    .child(
+                        Switch::new(key)
+                            .focus_ring(crate::ui_focus::visible(cx))
+                            .accessibility_label(self.t(label))
+                            .checked(self.c.boolean(key, default))
+                            .on_click(cx.listener(move |this, yes, window, cx| {
+                                this.act(Command::Boolean(key.into(), *yes), window, cx)
+                            })),
+                    ),
             );
         }
         panel = panel.child(
@@ -3176,9 +3257,13 @@ impl Manager {
                 .flex_wrap()
                 .child(
                     self.button("check-update", "检查更新", Command::CheckUpdate, cx)
+                        .with_size(gpui_component::Size::Medium)
                         .disabled(self.c.update_busy),
                 )
-                .child(self.button("release-notes", "更新日志", Command::ReleaseNotes, cx)),
+                .child(
+                    self.button("release-notes", "更新日志", Command::ReleaseNotes, cx)
+                        .with_size(gpui_component::Size::Medium),
+                ),
         );
         if !self.c.update_status.is_empty() {
             panel = panel.child(div().text_sm().child(self.t(&self.c.update_status)));
@@ -3286,247 +3371,330 @@ impl Manager {
         panel.into_any_element()
     }
     fn settings(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let language = self.c.choice("language", "system");
+        // Scale the column breakpoint with the app font. Each section keeps one
+        // reading order and the outer viewport owns scrolling at every width.
         let wide = f32::from(window.viewport_size().width) - self.layout(window).nav
-            >= 800. * self.scale();
-        let preferences = div().v_flex().w_full().min_w_0().gap_5().child(
-            div()
-                .v_flex()
-                .gap_2()
-                .w_full()
-                .min_w_0()
-                .child(
-                    div()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(self.t("语言")),
-                )
-                .child(
-                    self.menu(
-                        "language",
-                        i18n::LANGUAGES
-                            .iter()
-                            .find(|(c, _)| *c == language)
-                            .map(|(c, s)| {
-                                if *c == "system" {
-                                    self.t("跟随系统")
-                                } else {
-                                    (*s).into()
-                                }
-                            })
-                            .unwrap_or_else(|| "System".into()),
-                        i18n::LANGUAGES
-                            .iter()
-                            .map(|(c, s)| {
-                                (
-                                    if *c == "system" {
-                                        self.t("跟随系统")
-                                    } else {
-                                        (*s).into()
-                                    },
-                                    Command::Language((*c).into()),
-                                    *c == language,
-                                )
-                            })
-                            .collect(),
-                        false,
-                        window,
-                        cx,
-                    ),
-                ),
-        );
-        let preferences = preferences.child(
-            div()
-                .v_flex()
-                .gap_3()
-                .w_full()
-                .min_w_0()
-                .child(
-                    div()
-                        .h_flex()
-                        .justify_between()
-                        .child(
-                            div()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(self.t("字体大小")),
-                        )
-                        .child(format!("{} px", preferred_font_size(&self.c.state) as u8)),
-                )
-                .child(
-                    div()
-                        .h_flex()
-                        .gap_3()
-                        .w_full()
-                        .child(
-                            self.button(
-                                "font-smaller",
-                                "缩小字体",
-                                Command::FontSize(
-                                    (preferred_font_size(&self.c.state) as u8).saturating_sub(1),
-                                ),
-                                cx,
-                            )
-                            .label("A−")
-                            .tooltip(self.t("缩小字体"))
-                            .disabled(preferred_font_size(&self.c.state) <= 12.),
-                        )
-                        .child(Slider::new(&self.font_slider).flex_1().min_w_0())
-                        .child(
-                            self.button(
-                                "font-larger",
-                                "放大字体",
-                                Command::FontSize(preferred_font_size(&self.c.state) as u8 + 1),
-                                cx,
-                            )
-                            .label("A+")
-                            .tooltip(self.t("放大字体"))
-                            .disabled(preferred_font_size(&self.c.state) >= 18.),
-                        ),
-                )
-                .child(
-                    div()
-                        .h_flex()
-                        .justify_between()
-                        .gap_2()
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(self.t("即时生效，控件与间距同步缩放")),
-                        )
-                        .child(
-                            self.button("font-reset", "恢复默认", Command::FontSize(13), cx)
-                                .ghost(),
-                        ),
-                ),
-        );
-        let preferences=preferences.child(div().v_flex().gap_2().child(div().font_weight(FontWeight::SEMIBOLD).child(self.t("软件缓存"))).child(div().text_xs().text_color(cx.theme().muted_foreground).child(self.t("清理下载、更新暂存及未使用的已识别组件缓存；保留游戏列表、参数和归属记录。需要时重新下载或生成缓存。"))).child(self.button("clear-cache","清理缓存",Command::ClearCache,cx).disabled(self.c.busy||self.c.update_busy)));
-        let preferences = preferences.child(
-            div()
-                .v_flex()
-                .gap_2()
-                .child(
-                    div()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(self.t("游戏名称")),
-                )
-                .child(
-                    Checkbox::new("chinese-game-names")
-                        .focus_ring(crate::ui_focus::visible(cx))
-                        .label(self.t("中文界面优先显示中文游戏名"))
-                        .checked(self.c.boolean("chinese_game_names", true))
-                        .on_click(cx.listener(|this, yes, window, cx| {
-                            this.act(
-                                Command::Boolean("chinese_game_names".into(), *yes),
-                                window,
-                                cx,
-                            )
-                        })),
-                )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(self.c.text(&format!(
-                            "离线名称库：{0} 条 · {1}",
-                            self.c.game_names.len(),
-                            self.c.game_names.revision()
-                        ))),
-                )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(self.t("名称优先读取安装记录；无法确认时保留原名，可手动改名。")),
-                )
-                .when(!self.c.names_status.is_empty(), |d| {
-                    d.child(div().text_xs().child(self.t(&self.c.names_status)))
+            >= 924. * self.scale();
+        let language = self.c.choice("language", "system");
+        let language_menu = self.menu(
+            "language",
+            i18n::LANGUAGES
+                .iter()
+                .find(|(code, _)| *code == language)
+                .map(|(code, label)| {
+                    if *code == "system" {
+                        self.t("跟随系统")
+                    } else {
+                        (*label).into()
+                    }
                 })
-                .child(
+                .unwrap_or_else(|| self.t("跟随系统")),
+            i18n::LANGUAGES
+                .iter()
+                .map(|(code, label)| {
+                    (
+                        if *code == "system" {
+                            self.t("跟随系统")
+                        } else {
+                            (*label).into()
+                        },
+                        Command::Language((*code).into()),
+                        *code == language,
+                    )
+                })
+                .collect(),
+            false,
+            window,
+            cx,
+        );
+        let motion = self.c.choice("ui_motion", "on");
+        let motion_choices = [("system", "跟随系统"), ("on", "开启"), ("off", "关闭")];
+        let motion_menu = self.menu(
+            "ui-motion",
+            self.t(motion_choices
+                .iter()
+                .find(|(key, _)| *key == motion)
+                .map(|(_, label)| *label)
+                .unwrap_or("开启")),
+            motion_choices
+                .into_iter()
+                .map(|(key, label)| (self.t(label), Command::Motion(key), key == motion))
+                .collect(),
+            false,
+            window,
+            cx,
+        );
+        let theme = if self.c.choice("theme", "跟随系统") == "跟随系统" {
+            self.t("跟随系统")
+        } else {
+            cx.theme().theme_name().to_string().into()
+        };
+        let font_size = preferred_font_size(&self.c.state) as u8;
+        let appearance = self
+            .settings_section("外观", IconName::Palette, cx)
+            .child(self.settings_row("语言", language_menu))
+            .child(
+                self.settings_row(
+                    "主题",
+                    self.button("settings-theme", "更换主题…", Command::Themes, cx)
+                        .with_size(gpui_component::Size::Medium)
+                        .label(format!("{theme}…"))
+                        .tooltip(self.t("更换主题…"))
+                        .icon(IconName::Palette)
+                        .w_full()
+                        .into_any_element(),
+                ),
+            )
+            .child(self.settings_row("界面动效", motion_menu))
+            .child(
+                div()
+                    .v_flex()
+                    .gap_3()
+                    .pt_4()
+                    .border_t_1()
+                    .border_color(cx.theme().border)
+                    .child(
+                        div()
+                            .h_flex()
+                            .justify_between()
+                            .gap_2()
+                            .child(self.t("字体大小"))
+                            .child(
+                                div()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(format!("{font_size} px")),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .h_flex()
+                            .w_full()
+                            .gap_3()
+                            .child(
+                                self.button(
+                                    "font-smaller",
+                                    "缩小字体",
+                                    Command::FontSize(font_size.saturating_sub(1)),
+                                    cx,
+                                )
+                                .label("A−")
+                                .accessibility_label(self.t("缩小字体"))
+                                .tooltip(self.t("缩小字体"))
+                                .disabled(font_size <= 12),
+                            )
+                            .child(Slider::new(&self.font_slider).flex_1().min_w_0())
+                            .child(
+                                self.button(
+                                    "font-larger",
+                                    "放大字体",
+                                    Command::FontSize(font_size + 1),
+                                    cx,
+                                )
+                                .label("A+")
+                                .accessibility_label(self.t("放大字体"))
+                                .tooltip(self.t("放大字体"))
+                                .disabled(font_size >= 18),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .h_flex()
+                            .gap_3()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .text_sm()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(self.t("即时生效，控件与间距同步缩放")),
+                            )
+                            .child(
+                                self.button("font-reset", "恢复默认", Command::FontSize(13), cx)
+                                    .ghost(),
+                            ),
+                    ),
+            );
+        let updates = self
+            .settings_section("软件更新", IconName::RefreshCw, cx)
+            .child(self.update_panel(window, cx));
+        let library = self
+            .settings_section("游戏库", IconName::Folder, cx)
+            .child(
+                div()
+                    .h_flex()
+                    .gap_4()
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(self.t("中文界面优先显示中文游戏名")),
+                    )
+                    .child(
+                        Switch::new("chinese-game-names")
+                            .focus_ring(crate::ui_focus::visible(cx))
+                            .accessibility_label(self.t("中文界面优先显示中文游戏名"))
+                            .checked(self.c.boolean("chinese_game_names", true))
+                            .on_click(cx.listener(|this, yes, window, cx| {
+                                this.act(
+                                    Command::Boolean("chinese_game_names".into(), *yes),
+                                    window,
+                                    cx,
+                                )
+                            })),
+                    ),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(self.t("名称优先读取安装记录；无法确认时保留原名，可手动改名。")),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(self.c.text(&format!(
+                        "离线名称库：{0} 条 · {1}",
+                        self.c.game_names.len(),
+                        self.c.game_names.revision()
+                    ))),
+            )
+            .when(!self.c.names_status.is_empty(), |d| {
+                d.child(div().text_sm().child(self.t(&self.c.names_status)))
+            })
+            .child(
+                div().h_flex().child(
                     self.button(
                         "update-game-names",
                         "更新名称库",
                         Command::UpdateGameNames,
                         cx,
                     )
+                    .with_size(gpui_component::Size::Medium)
                     .disabled(self.c.names_busy || self.c.read_only),
                 ),
-        );
-        let mut links = div()
-            .grid()
-            .w_full()
-            .grid_cols(if wide { 2 } else { 1 })
-            .gap_2();
-        for (icon, label, url) in [
+            );
+        let maintenance = self.settings_section("缓存维护", IconName::Settings, cx)
+            .child(div().text_sm().text_color(cx.theme().muted_foreground)
+                .child(self.t("清理下载、更新暂存及未使用的已识别组件缓存；保留游戏列表、参数和归属记录。需要时重新下载或生成缓存。")))
+            .child(div().h_flex().child(self.button("clear-cache", "清理缓存", Command::ClearCache, cx)
+                .with_size(gpui_component::Size::Medium)
+                .disabled(self.c.busy || self.c.update_busy)));
+        let mut links = div().h_flex().w_full().flex_wrap().gap_x_4().gap_y_2();
+        for (label, url) in [
             (
-                IconName::Github,
                 "GitHub · sdli1995",
                 "https://github.com/sdli1995/dlssg_for_sm86",
             ),
-            (IconName::Globe, "小南瓜 · lgxng.cn", "https://lgxng.cn/"),
+            ("小南瓜 · lgxng.cn", "https://lgxng.cn/"),
+            ("GitHub · pandaligx", "https://github.com/pandaligx"),
+            ("哔哩哔哩 · 小南瓜", "https://b23.tv/5mHCHFn"),
             (
-                IconName::Github,
-                "GitHub · pandaligx",
-                "https://github.com/pandaligx",
-            ),
-            (
-                IconName::Play,
-                "哔哩哔哩 · 小南瓜",
-                "https://b23.tv/5mHCHFn",
-            ),
-            (
-                IconName::Play,
                 "哔哩哔哩 · 大大大怪将军阁下（测试支持）",
                 "https://space.bilibili.com/608531525",
             ),
             (
-                IconName::Play,
                 "哔哩哔哩 · 云外逸声",
                 "https://space.bilibili.com/256887068",
             ),
         ] {
+            // Base Link provides keyboard activation and link semantics, while
+            // this app supplies the quiet theme treatment and existing opener.
             links = links.child(
-                div().h_flex().child(
-                    self.button(url, label, Command::Open(url.into()), cx)
-                        .icon(if url.contains("bilibili.com") || url.contains("b23.tv") {
-                            Icon::default().path("app/bilibili.svg").size(px(14.))
-                        } else {
-                            Icon::new(icon).size(px(14.))
-                        })
-                        .ghost(),
-                ),
+                gpui::base::Link::new(url)
+                    .href(url)
+                    .accessibility_label(self.t(label))
+                    .on_activate(cx.listener(move |this, _, window, cx| {
+                        this.act(Command::Open(url.into()), window, cx)
+                    }))
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .underline()
+                    .cursor_pointer()
+                    .hover(|d| d.text_color(cx.theme().foreground))
+                    .when(crate::ui_focus::visible(cx), |d| {
+                        d.focus(|s| s.bg(cx.theme().muted))
+                    })
+                    .child(self.t(label)),
             );
         }
-        let panel = div()
+        // Independent columns keep short sections compact; the narrow layout
+        // retains a single reading order at larger font sizes.
+        let sections = if wide {
+            div()
+                .h_flex()
+                .items_start()
+                .w_full()
+                .min_w_0()
+                .gap_4()
+                .child(
+                    div()
+                        .v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .gap_4()
+                        .child(appearance)
+                        .child(library),
+                )
+                .child(
+                    div()
+                        .v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .gap_4()
+                        .child(updates)
+                        .child(maintenance),
+                )
+        } else {
+            div()
+                .v_flex()
+                .w_full()
+                .min_w_0()
+                .gap_4()
+                .child(appearance)
+                .child(updates)
+                .child(library)
+                .child(maintenance)
+        };
+        let content = div()
             .v_flex()
             .w_full()
+            .max_w(rems(80.))
             .min_w_0()
-            .flex_shrink_0()
             .gap_5()
-            .p_5()
             .child(
                 div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(self.t("设置")),
+                    .v_flex()
+                    .gap_1()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(self.t("设置")),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(self.t("外观与偏好更改后自动保存")),
+                    ),
             )
+            .child(sections)
             .child(
                 div()
-                    .grid()
-                    .w_full()
-                    .min_w_0()
-                    .grid_cols(if wide { 2 } else { 1 })
-                    .gap_8()
-                    .items_start()
-                    .child(self.update_panel(window, cx))
-                    .child(preferences),
-            )
-            .child(
-                div()
-                    .mt_2()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(self.t("关于与致谢")),
-            )
-            .child(links);
+                    .v_flex()
+                    .gap_3()
+                    .pt_4()
+                    .border_t_1()
+                    .border_color(cx.theme().border)
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(self.t("关于与致谢")),
+                    )
+                    .child(links),
+            );
         div()
             .id("settings-scroll")
             .v_flex()
@@ -3535,7 +3703,7 @@ impl Manager {
             .min_w_0()
             .overflow_y_scroll()
             .bg(cx.theme().background)
-            .child(panel)
+            .child(div().v_flex().items_center().w_full().p_5().child(content))
             .into_any_element()
     }
     fn download_ring(&self, diameter: f32, cx: &App) -> AnyElement {
@@ -4319,6 +4487,10 @@ impl Manager {
         }
         if self.system_poll.elapsed() > Duration::from_secs(2) {
             self.system_poll = Instant::now();
+            cx.set_reduce_motion(preferred_reduce_motion(
+                &self.c.state,
+                win::reduced_motion(),
+            ));
             self.c.poll_hags();
             let choice = self.c.choice("theme", "跟随系统");
             if choice != self.theme_choice || choice == "跟随系统" {
@@ -4710,6 +4882,13 @@ fn deployment_label(status: &str) -> (String, TagVariant) {
         )
     }
 }
+fn preferred_reduce_motion(state: &Value, system: bool) -> bool {
+    match state["ui_motion"].as_str() {
+        Some("system") => system,
+        Some("off") => true,
+        _ => false,
+    }
+}
 fn preferred_font_size(state: &Value) -> f32 {
     state["ui_font_size"]
         .as_f64()
@@ -4754,6 +4933,29 @@ mod layout_tests {
     use super::{GameFilter, deployment_label, fitted_bounds, game_display_name};
     use gpui::component::tag::TagVariant;
     use gpui::{Bounds, point, px, size};
+    #[test]
+    fn motion_defaults_on_and_preserves_explicit_choices() {
+        for system in [false, true] {
+            for value in [
+                serde_json::Value::Null,
+                serde_json::json!("on"),
+                serde_json::json!("invalid"),
+            ] {
+                assert!(!super::preferred_reduce_motion(
+                    &serde_json::json!({"ui_motion":value}),
+                    system
+                ));
+            }
+            assert_eq!(
+                super::preferred_reduce_motion(&serde_json::json!({"ui_motion":"system"}), system),
+                system
+            );
+            assert!(super::preferred_reduce_motion(
+                &serde_json::json!({"ui_motion":"off"}),
+                system
+            ));
+        }
+    }
     #[test]
     fn font_preferences_and_responsive_panes_remain_bounded() {
         for (value, expected) in [

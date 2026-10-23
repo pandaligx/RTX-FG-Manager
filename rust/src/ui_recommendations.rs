@@ -226,6 +226,16 @@ impl Recommendations {
         while let Ok(result) = self.rx.try_recv() {
             self.busy = false;
             self.message.clear();
+            if !self.logged_in() {
+                self.mine = false;
+                self.reported = false;
+                for card in self.cards.iter_mut().chain(self.preview.iter_mut()) {
+                    card.mine = false;
+                    card.liked = false;
+                    card.disliked = false;
+                    card.reported = false;
+                }
+            }
             match result {
                 Err(e) => {
                     if e == "登录已过期，请重新获取邮箱验证码" {
@@ -367,7 +377,8 @@ impl Recommendations {
             move || match client.browse(&id, &catalog, offset, mine, reported) {
                 Ok(page) => Ok(Update::Page(page, append, false)),
                 Err(e) => {
-                    if !append
+                    if rec::allows_offline_cache(&e)
+                        && !append
                         && !mine
                         && !reported
                         && let Some(page) = client.cached(&id, &catalog)
@@ -644,7 +655,7 @@ impl Recommendations {
         );
         let table = DescriptionList::horizontal()
             .columns(1)
-            .label_width(rems(8.))
+            .label_width(rems(7.))
             .small()
             .item(
                 self.t("补丁方案"),
@@ -655,7 +666,20 @@ impl Recommendations {
             )
             .item(
                 self.t("DLL 入口"),
-                value(recipe.entries.join(" + ")).into_any_element(),
+                div()
+                    .h_flex()
+                    .flex_wrap()
+                    .gap_1()
+                    .min_w_0()
+                    .children(recipe.entries.iter().map(|entry| {
+                        div()
+                            .px_2()
+                            .py_0p5()
+                            .rounded_sm()
+                            .bg(cx.theme().muted)
+                            .child(entry.clone())
+                    }))
+                    .into_any_element(),
                 1,
             )
             .item(
@@ -674,23 +698,30 @@ impl Recommendations {
             )
             .item(self.t("游戏版本"), value(platform).into_any_element(), 1)
             .item(
-                self.t("玩家显卡"),
-                value(if recipe.gpu_model.is_empty() {
-                    "—".into()
-                } else {
-                    recipe.gpu_model.clone()
-                })
-                .into_any_element(),
-                1,
-            )
-            .item(
-                self.t("驱动版本"),
-                value(if recipe.driver.is_empty() {
-                    "—".into()
-                } else {
-                    recipe.driver.clone()
-                })
-                .into_any_element(),
+                self.t("玩家硬件"),
+                div()
+                    .v_flex()
+                    .min_w_0()
+                    .gap_1()
+                    .child(value(if recipe.gpu_model.is_empty() {
+                        "—".into()
+                    } else {
+                        recipe.gpu_model.clone()
+                    }))
+                    .child(
+                        value(format!(
+                            "{} · {}",
+                            self.t("驱动版本"),
+                            if recipe.driver.is_empty() {
+                                "—"
+                            } else {
+                                &recipe.driver
+                            }
+                        ))
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground),
+                    )
+                    .into_any_element(),
                 1,
             );
         div().min_w_0().flex_shrink_0().text_sm().child(table)
@@ -699,10 +730,10 @@ impl Recommendations {
         let copy = notes.to_owned();
         div()
             .v_flex()
-            .gap_1()
+            .gap_2()
             .min_w_0()
             .flex_shrink_0()
-            .pt_2()
+            .pt_3()
             .border_t_1()
             .border_color(cx.theme().border)
             .child(
@@ -839,7 +870,7 @@ impl Recommendations {
             .into_any_element()
     }
     fn browse(&self, cx: &Context<Self>) -> Div {
-        let mut body = div().v_flex().gap_3().flex_shrink_0().min_w_0().child(
+        let mut body = div().v_flex().gap_2().flex_shrink_0().min_w_0().child(
             div()
                 .text_xs()
                 .text_color(cx.theme().muted_foreground)
@@ -1122,7 +1153,7 @@ impl Render for Recommendations {
                             if let Some(mut client) = this.client.clone().filter(|c| c.logged_in())
                             {
                                 this.job(move || {
-                                    let _ = client.logout();
+                                    client.logout()?;
                                     Ok(Update::Logout(client))
                                 });
                             } else {
@@ -1131,6 +1162,15 @@ impl Render for Recommendations {
                             cx.notify();
                         })),
                     ),
+            );
+        }
+        if self.mode == Mode::Browse && self.client.as_ref().is_some_and(rec::Client::login_expired)
+        {
+            top = top.child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(self.t("登录已失效，仍可浏览最新推荐；分享或评价时请重新登录。")),
             );
         }
         let mut primary = None;
@@ -1384,8 +1424,18 @@ impl Render for Recommendations {
                     let changed = available
                         .as_ref()
                         .is_ok_and(|v| *v != card.content.patch_version);
-                    body=body.child(div().font_weight(FontWeight::SEMIBOLD).whitespace_normal().child(card.content.title.clone()))
-                        .child(div().text_xs().text_color(cx.theme().muted_foreground).child(self.card_date(card)))
+                    body=body.child(
+                        div().h_flex().items_start().min_w_0().gap_3().pb_2()
+                            .child(Avatar::new().small().text_color(cx.theme().foreground)
+                                .placeholder(Icon::new(IconName::User)).flex_shrink_0())
+                            .child(div().v_flex().flex_1().min_w_0().gap_1()
+                                .child(div().font_weight(FontWeight::SEMIBOLD).whitespace_normal().child(card.content.title.clone()))
+                                .child(div().h_flex().flex_wrap().gap_x_3().gap_y_1().text_xs().text_color(cx.theme().muted_foreground)
+                                    .child(self.card_date(card))
+                                    .child(div().h_flex().gap_1().child(Icon::new(gpui::assets::IconName::ThumbsUp).size_3())
+                                        .child(format!("{} {}", self.t("有用"),card.likes)))
+                                    .child(div().h_flex().gap_1().child(Icon::new(gpui::assets::IconName::ThumbsDown).size_3())
+                                        .child(format!("{} {}",self.t("无用"),card.dislikes))))))
                         .when(!card.content.platform.is_empty() && card.content.platform!="unknown" && card.content.platform!=rec::platform(&self.game),|d|d.child(div().text_sm().text_color(cx.theme().warning).child(self.t("此方案来自其他平台，请核对游戏版本和图形接口后使用。"))))
                         .when(changed,|d|d.child(div().text_sm().text_color(cx.theme().warning).child(self.t("玩家测试版本 {0}；将使用同项目当前版本 {1}。原点赞针对玩家分享，不代表新版已通过测试。").replace("{0}",&card.content.patch_version).replace("{1}",available.as_deref().unwrap_or_default()))))
                         .when_some(available.as_ref().err(),|d,e|d.child(div().text_sm().text_color(cx.theme().warning).child(self.t(&e.to_string()))))

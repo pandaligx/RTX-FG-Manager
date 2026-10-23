@@ -18,6 +18,21 @@ use windows::{
 pub fn wide(s: impl AsRef<OsStr>) -> Vec<u16> {
     s.as_ref().encode_wide().chain(Some(0)).collect()
 }
+/// Read Windows' animation preference without changing any system setting.
+pub fn reduced_motion() -> bool {
+    let mut enabled = windows::core::BOOL(1);
+    // SAFETY: SPI_GETCLIENTAREAANIMATION writes one BOOL to this live buffer.
+    unsafe {
+        SystemParametersInfoW(
+            SPI_GETCLIENTAREAANIMATION,
+            0,
+            Some((&mut enabled as *mut windows::core::BOOL).cast()),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+        .is_ok()
+            && !enabled.as_bool()
+    }
+}
 /// Match GPUI's Windows DisplayId to the monitor under the launch pointer.
 pub fn launch_monitor() -> Option<u64> {
     use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};

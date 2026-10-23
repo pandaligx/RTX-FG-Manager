@@ -212,6 +212,59 @@
     "source_help": "Render scale in percent (50 to 100) when dlssRenderScale is custom."
   },
   {
+    "key": "srSharpening",
+    "path": [
+      "superResolutionSharpening",
+      "srSharpening"
+    ],
+    "label": "重建后锐化",
+    "group": "image",
+    "kind": "choice",
+    "default": "off",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "off",
+        "label": "关闭"
+      },
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "custom",
+        "label": "自定义"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "默认关闭；跟随游戏使用游戏传入的锐度，自定义使用下方强度。作用于 DLSS、DLAA、RR 与替代 XeSS，NR 开启时在其后处理。即时生效。",
+    "optional": true,
+    "since": "1.2.2"
+  },
+  {
+    "key": "srSharpness",
+    "path": [
+      "superResolutionSharpening",
+      "srSharpness"
+    ],
+    "label": "锐化强度（%）",
+    "group": "image",
+    "kind": "integer",
+    "default": "30",
+    "min": 0,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "srSharpening=custom"
+    ],
+    "help": "0–100%，默认 30%；仅自定义模式使用。0 不增加锐化处理。高强度可能产生光晕、放大噪点，并与游戏后续锐化叠加。",
+    "optional": true,
+    "since": "1.2.2"
+  },
+  {
     "key": "reflexFrameLimit",
     "path": [
       "nativeMenuFeatures",

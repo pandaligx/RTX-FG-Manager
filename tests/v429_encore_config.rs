@@ -8,6 +8,52 @@ fn values(pairs: &[(&str, &str)]) -> Values {
 }
 
 #[test]
+fn encore122_sharpening_is_opt_in_versioned_and_preserves_user_content() {
+    let mode = encore::field("srSharpening").unwrap();
+    let strength = encore::field("srSharpness").unwrap();
+    for version in [None, Some("1.2.1"), Some("1.2.2-beta.1")] {
+        assert!(!encore::field_available(mode, version));
+        assert!(!encore::field_available(strength, version));
+    }
+    assert!(encore::field_available(mode, Some("1.2.2")));
+    assert!(!encore::requires_restart(mode, Some("1.2.2")));
+    let defaults = encore::defaults();
+    assert_eq!(defaults["srSharpening"], "off");
+    assert_eq!(defaults["srSharpness"], "30");
+    assert!(!encore::field_enabled("srSharpness", &defaults, None));
+    let original = b"{\r\n// keep comment\r\n\"configVersion\":4,\"menuState\":{\"menuKey\":36},\"vendor\":{\"srSharpness\":999}}\r\n";
+    assert_eq!(
+        encore::configure(original, &Values::new()).unwrap(),
+        original
+    );
+    let output = encore::configure(
+        original,
+        &values(&[("srSharpening", "custom"), ("srSharpness", "45")]),
+    )
+    .unwrap();
+    let parsed = rtx_fg_manager::jsonc::Document::parse(&output).unwrap();
+    assert_eq!(parsed.value["superResolutionSharpening"]["srSharpness"], 45);
+    assert_eq!(parsed.value["vendor"]["srSharpness"], 999);
+    assert_eq!(parsed.value["menuState"]["menuKey"], 36);
+    assert!(String::from_utf8_lossy(&output).contains("// keep comment\r\n"));
+    assert!(encore::field_enabled(
+        "srSharpness",
+        &encore::read(&output).unwrap(),
+        None
+    ));
+    for value in ["-1", "101", "30.5", "NaN"] {
+        assert!(!encore::valid_value("srSharpness", value));
+    }
+    for value in ["0", "30", "100"] {
+        assert!(encore::valid_value("srSharpness", value));
+    }
+    for value in ["off", "game", "custom"] {
+        assert!(encore::valid_value("srSharpening", value));
+    }
+    assert!(!encore::valid_value("srSharpening", "on"));
+}
+
+#[test]
 fn encore121_hides_retired_policy_without_erasing_legacy_configuration() {
     let policy = encore::field("providerPatchPolicy").unwrap();
     assert!(encore::field_available(policy, Some("1.2.0")));
@@ -75,7 +121,7 @@ fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults
     encore::validate_cloud_config(encore::DEFAULT_CONFIG).unwrap();
     let read = encore::read(encore::DEFAULT_CONFIG).unwrap();
     assert_eq!(read, encore::defaults());
-    assert_eq!(encore::fields().len(), 128);
+    assert_eq!(encore::fields().len(), 130);
     assert_eq!(read["menuKey"], "45");
     assert_eq!(read["nrOpenFastProjection"], "1");
     assert_eq!(read["nrFastProcessing"], "1");
@@ -145,12 +191,12 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
             out.insert(path.clone());
         }
     }
-    // The template follows documented defaults through 1.2.1. Retired controls
+    // The template follows documented defaults through 1.2.2. Retired controls
     // remain in the editor metadata for older installs, not in new configs.
     let captured = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG).unwrap();
     let mut actual = std::collections::BTreeSet::new();
     leaves(&captured.value, &mut Vec::new(), &mut actual);
-    assert_eq!(actual.len(), 127);
+    assert_eq!(actual.len(), 129);
     let represented: std::collections::BTreeSet<_> =
         encore::fields().iter().map(|f| f.path.clone()).collect();
     let absent: Vec<_> = actual.difference(&represented).cloned().collect();

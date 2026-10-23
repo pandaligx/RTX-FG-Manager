@@ -61,7 +61,7 @@ class EncoreCloudTests(unittest.TestCase):
                 yield path
         paths = {tuple(field["path"]) for field in fields}
         native_paths = set(leaves(config()))
-        self.assertEqual(len(fields), 128)
+        self.assertEqual(len(fields), 130)
         self.assertEqual(len({field["key"] for field in fields}), len(fields))
         self.assertEqual(len(paths), len(fields))
         # Multiplier is exposed through the composite tf_mode selector. The
