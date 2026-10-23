@@ -5,6 +5,7 @@ import json
 import runpy
 import tempfile
 import unittest
+from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
@@ -26,6 +27,50 @@ def fixture(url):
 
 
 class DownloadStats(unittest.TestCase):
+    def test_scheduled_temporary_regression_defers_without_writing_or_refreshing_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'docs').mkdir();stats['refresh'](root,fixture)
+            before={p.name:p.read_bytes() for p in (root/'docs').iterdir()}
+            def zero(url):
+                d=fixture(url)
+                if url.startswith(GC):d['download_statistics_history_total']=0
+                return d
+            with patch('builtins.print') as output:
+                result=stats['scheduled_refresh'](root,zero,retry_delays=())
+            self.assertIsNone(result)
+            self.assertIn('deferred',str(output.call_args_list))
+            self.assertEqual(before,{p.name:p.read_bytes() for p in (root/'docs').iterdir()})
+            self.assertEqual(stats['scheduled_refresh'](root,fixture)['total'],267)
+
+    def test_scheduled_outage_requires_fresh_valid_baseline_and_keeps_auth_errors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'docs').mkdir()
+            def outage(url):raise TimeoutError('private transport details')
+            with self.assertRaises(TimeoutError):stats['scheduled_refresh'](root,outage,retry_delays=())
+            data=stats['refresh'](root,fixture)
+            for age in (24*3600,25*3600,-60):
+                now=datetime.fromisoformat(data['updated_at'])+timedelta(seconds=age)
+                with self.subTest(age=age),self.assertRaises(TimeoutError):
+                    stats['scheduled_refresh'](root,outage,now=now,retry_delays=())
+            with patch('builtins.print') as output:
+                self.assertIsNone(stats['scheduled_refresh'](root,outage,retry_delays=()))
+                self.assertNotIn('private',str(output.call_args_list))
+            def denied(url):raise stats['urllib'].error.HTTPError(url,401,'Unauthorized',{},None)
+            with self.assertRaises(stats['urllib'].error.HTTPError):stats['scheduled_refresh'](root,denied,retry_delays=())
+            data['total']=0;(root/'docs/download-stats.json').write_text(json.dumps(data),'utf-8')
+            with self.assertRaises(TimeoutError):stats['scheduled_refresh'](root,outage,retry_delays=())
+
+    def test_workflow_result_distinguishes_success_from_deferred_refresh(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output=Path(tmp)/'output';summary=Path(tmp)/'summary'
+            with patch.dict(stats['os'].environ,{'GITHUB_OUTPUT':str(output),'GITHUB_STEP_SUMMARY':str(summary)}):
+                stats['record_refresh_result'](None)
+                self.assertEqual(output.read_text(),'refreshed=false\n')
+                self.assertIn('No new count or timestamp',summary.read_text())
+                stats['record_refresh_result']({'total':267})
+                self.assertTrue(output.read_text().endswith('refreshed=true\n'))
+                self.assertIn('267',summary.read_text())
+
     def test_complete_total_includes_resources_excludes_drafts_deduplicates_assets(self):
         data = stats['collect'](fixture)
         self.assertEqual([s['downloads'] for s in data['sources']], [207, 30, 30])

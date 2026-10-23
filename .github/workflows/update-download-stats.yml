@@ -31,12 +31,14 @@ jobs:
           python -B -m unittest discover -s tests -p test_download_stats.py -v
           python -B -m unittest discover -s tests -p test_publication.py -v
       - name: Refresh complete public statistics
+        id: refresh
         timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
-        run: python -B tools/update_download_stats.py
+        run: python -B tools/update_download_stats.py --defer-unavailable
       - name: Commit badge and source counts together
+        if: steps.refresh.outputs.refreshed == 'true'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -47,6 +49,7 @@ jobs:
           fi
       # GITHUB_TOKEN commits do not trigger push workflows; mirror explicitly.
       - name: Mirror updated documentation to GitCode
+        if: steps.refresh.outputs.refreshed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}

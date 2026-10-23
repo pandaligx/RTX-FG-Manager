@@ -180,13 +180,66 @@ def refresh(root, fetch=get_json, *, retry_delays=(5, 15), sleep=time.sleep):
     return snapshot
 
 
+def scheduled_refresh(root, fetch=get_json, *, now=None, **kwargs):
+    """Defer a temporary outage only while a valid complete snapshot is fresh.
+
+    Do not advance counters or timestamps on a deferred refresh. Authentication,
+    malformed data and an outage lasting a day remain failures.
+    """
+    try:
+        return refresh(root, fetch, **kwargs)
+    except Exception as exc:
+        if not retryable(exc):
+            raise
+        previous = root / 'docs' / 'download-stats.json'
+        try:
+            baseline = json.loads(previous.read_text(encoding='utf-8'))
+            sources = source_counts(baseline)
+            expected = {('GitHub', 'pandaligx/RTX-FG-Manager', 'published_release_assets')}
+            expected.update(('GitCode', 'gcw_qWIjmve7/' + repo,
+                             'platform_reported_repository_history') for repo in REPOS)
+            if sources.keys() != expected:
+                raise ValueError('Incomplete baseline')
+            checked = datetime.fromisoformat(baseline['updated_at'])
+            age = ((now or datetime.now(timezone.utc)) - checked).total_seconds()
+            fresh = 0 <= age < 24 * 3600
+        except (OSError, ValueError, KeyError, TypeError):
+            fresh = False
+        if not fresh:
+            raise exc
+        print('::warning::Download statistics refresh deferred: a temporary platform '
+              'failure or counter decrease occurred. The previous complete snapshot '
+              'is unchanged; the next scheduled run will retry. No fresh counts published.')
+        return None
+
+
+def record_refresh_result(result):
+    refreshed = result is not None
+    if path := os.environ.get('GITHUB_OUTPUT'):
+        with Path(path).open('a', encoding='utf-8') as output:
+            output.write('refreshed=' + str(refreshed).lower() + '\n')
+    if path := os.environ.get('GITHUB_STEP_SUMMARY'):
+        message = (f"Updated the complete combined download count to **{result['total']:,}**."
+                   if refreshed else
+                   'Refresh deferred: the platform returned incomplete/decreasing counters or '
+                   'was temporarily unavailable. **No new count or timestamp was published.** '
+                   'The previous complete snapshot is retained; the six-hour schedule retries '
+                   'automatically. An outage lasting 24 hours remains a failure.')
+        with Path(path).open('a', encoding='utf-8') as output:
+            output.write('### Download statistics\n\n' + message + '\n')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--defer-unavailable', action='store_true',
+                        help='Defer temporary failures for less than 24 hours; do not publish stale data as fresh')
     args = parser.parse_args()
     try:
-        result = refresh(args.root)
-        print(f"Combined reported downloads: {result['total']:,}")
+        result = (scheduled_refresh if args.defer_unavailable else refresh)(args.root)
+        record_refresh_result(result)
+        if result is not None:
+            print(f"Combined reported downloads: {result['total']:,}")
     except Exception as exc:
         # Do not print authenticated request details or remote response bodies.
         if isinstance(exc, CounterRegression):
