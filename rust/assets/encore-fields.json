@@ -104,7 +104,7 @@
     "choices": [],
     "restart": true,
     "dependencies": [],
-    "help": "仅RTX30且匹配受支持驱动；与DLSS帧生成是不同功能。",
+    "help": "RTX 30 需受支持驱动；Encore 1.3 起实验支持 RTX 20，要求 621.01 驱动及 DX12。与 DLSS 帧生成不同。",
     "optional": false,
     "source_help": "Driver Smooth Motion for RTX 30, with the NVIDIA 620.12, 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply."
   },
@@ -141,6 +141,37 @@
     "help": "必须与游戏实际使用的图形接口一致。",
     "optional": false,
     "source_help": "d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply."
+  },
+  {
+    "key": "smoothMotionTuringVariant",
+    "path": [
+      "smoothMotion",
+      "smoothMotionTuringVariant"
+    ],
+    "label": "RTX 20 平滑运动版本",
+    "group": "frames",
+    "kind": "choice",
+    "default": "v1",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "v1",
+        "label": "V1"
+      },
+      {
+        "value": "v2",
+        "label": "V2"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "smoothMotionEnabled=1",
+      "smoothMotionApi=d3d12"
+    ],
+    "help": "仅 RTX 20 的实验功能，要求驱动 621.01及 DX12。默认 V1；更改后重启游戏，其他显卡不受影响。",
+    "optional": true,
+    "since": "1.3.0"
   },
   {
     "key": "dlssRenderScale",
@@ -369,7 +400,7 @@
       "nrEnabled=1"
     ],
     "help": "Open为高度实验引擎；切换后重启，没有引擎自动回退。",
-    "optional": false,
+    "optional": true,
     "source_help": "nvidia (default) or opendlss (experimental). Open runs dedicated in a Direct3D game (on its own device beside the game) and in-game in a Vulkan game (on the game's device). Restart to apply; no engine fallback."
   },
   {
@@ -875,6 +906,164 @@
     "source_help": "Faster NR processing with the same output bit for bit. Restart the game to apply."
   },
   {
+    "key": "nrFoveation",
+    "path": [
+      "neuralRendering",
+      "experimental",
+      "nrFoveation"
+    ],
+    "label": "中央优先 NR（实验）",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "中央保持完整 NR，边缘效果较柔和以降低开销；不支持时使用普通 NR。默认关闭，效果因游戏而异。",
+    "optional": true,
+    "since": "1.3.0"
+  },
+  {
+    "key": "nrFoveaPreset",
+    "path": [
+      "neuralRendering",
+      "experimental",
+      "nrFoveaPreset"
+    ],
+    "label": "中央优先 NR 预设",
+    "group": "image",
+    "kind": "choice",
+    "default": "balanced",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "light",
+        "label": "轻度"
+      },
+      {
+        "value": "balanced",
+        "label": "均衡"
+      },
+      {
+        "value": "strong",
+        "label": "强度"
+      },
+      {
+        "value": "custom",
+        "label": "自定义"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrFoveation=1"
+    ],
+    "help": "轻度保留更多完整画面；强度越高，边缘越柔和。自定义可调整下方四项。",
+    "optional": true,
+    "since": "1.3.0"
+  },
+  {
+    "key": "nrFoveaWidth",
+    "path": [
+      "neuralRendering",
+      "experimental",
+      "nrFoveaWidth"
+    ],
+    "label": "中央区域宽度（%）",
+    "group": "image",
+    "kind": "integer",
+    "default": "55",
+    "min": 1,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrFoveation=1",
+      "nrFoveaPreset=custom"
+    ],
+    "help": "完整 NR 区域占画面宽度的比例。",
+    "optional": true,
+    "since": "1.3.0"
+  },
+  {
+    "key": "nrFoveaHeight",
+    "path": [
+      "neuralRendering",
+      "experimental",
+      "nrFoveaHeight"
+    ],
+    "label": "中央区域高度（%）",
+    "group": "image",
+    "kind": "integer",
+    "default": "55",
+    "min": 1,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrFoveation=1",
+      "nrFoveaPreset=custom"
+    ],
+    "help": "完整 NR 区域占画面高度的比例。",
+    "optional": true,
+    "since": "1.3.0"
+  },
+  {
+    "key": "nrFoveaFalloff",
+    "path": [
+      "neuralRendering",
+      "experimental",
+      "nrFoveaFalloff"
+    ],
+    "label": "每侧过渡宽度（%）",
+    "group": "image",
+    "kind": "integer",
+    "default": "8",
+    "min": 0,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrFoveation=1",
+      "nrFoveaPreset=custom"
+    ],
+    "help": "从中央向边缘过渡的宽度；0 为无过渡。",
+    "optional": true,
+    "since": "1.3.0"
+  },
+  {
+    "key": "nrFoveaEdge",
+    "path": [
+      "neuralRendering",
+      "experimental",
+      "nrFoveaEdge"
+    ],
+    "label": "边缘 NR 细节（%）",
+    "group": "image",
+    "kind": "integer",
+    "default": "50",
+    "min": 25,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrFoveation=1",
+      "nrFoveaPreset=custom"
+    ],
+    "help": "越低通常越快，边缘效果也越柔和。",
+    "optional": true,
+    "since": "1.3.0"
+  },
+  {
     "key": "nrPaddingAware",
     "path": [
       "neuralRendering",
@@ -956,7 +1145,7 @@
       "nrEngine=opendlss"
     ],
     "help": "需要明确选择匹配硬件的Open后端；兼容模式非常慢。",
-    "optional": false,
+    "optional": true,
     "source_help": "disabled (choose explicitly), rtx40 (RTX 40/50), rtx30 (RTX 30, experimental) or compat (very slow, for qualification). Independent of NVIDIA precision. Restart to apply."
   },
   {
@@ -992,7 +1181,7 @@
       "nrEngine=opendlss"
     ],
     "help": "共享路径仅D3D12单次处理；Vulkan始终在游戏设备内执行。",
-    "optional": false,
+    "optional": true,
     "source_help": "Direct3D games only, where Open runs: dedicated (default; on its own device beside the game), shared (experimental, Direct3D 12 only, one NR pass: on the game's device, on a queue of its own) or in_game (experimental: in the game's own command list). Restart to apply; no fallback between them. A Vulkan game always runs it in-game."
   },
   {
@@ -1016,7 +1205,7 @@
       "nrOpenBackend=rtx30"
     ],
     "help": "仅Open/RTX30；更快但会增加显存，显存紧张时关闭。",
-    "optional": false,
+    "optional": true,
     "source_help": "Open on RTX 30 only: shorter NR time, same image, for more VRAM: about 160 MB at 1440p DLSS Balanced. Leave off when VRAM is nearly full. Restart to apply."
   },
   {
@@ -1040,7 +1229,7 @@
       "nrOpenBackend=rtx30"
     ],
     "help": "仅Open/RTX30；可能产生小幅图像差异。",
-    "optional": false,
+    "optional": true,
     "source_help": "Open on RTX 30 only: shorter NR time, with a slightly different image. Restart to apply."
   },
   {
@@ -1064,7 +1253,7 @@
       "nrOpenBackend=rtx40"
     ],
     "help": "仅Open/RTX40或50。",
-    "optional": false,
+    "optional": true,
     "source_help": "Open on RTX 40/50 only: shorter NR time on large sizes, same output. Restart to apply."
   },
   {
@@ -1088,7 +1277,7 @@
       "nrOpenBackend=rtx30"
     ],
     "help": "仅Open/RTX30；不增加显存，可能有小幅图像差异。",
-    "optional": false,
+    "optional": true,
     "source_help": "Open on RTX 30 only: fast precision. Shorter NR time, no extra VRAM, a slightly different image. Restart to apply."
   },
   {
@@ -1112,7 +1301,7 @@
       "nrPasses=1"
     ],
     "help": "仅Open单次处理；可能出现运动拖影和细节延迟，增加少量显存。",
-    "optional": false,
+    "optional": true,
     "source_help": "Open, one NR pass: ultra-fast mode. About half the NR time, the same on every frame. The image changes: the NR layer follows the image one frame late and can lag or smear in motion; a surface just uncovered or just come on screen is given what NR had made of look-alike surfaces nearby (the two tolerances below). A few MB of VRAM. Restart to apply."
   },
   {
@@ -1137,7 +1326,7 @@
       "nrPasses=1"
     ],
     "help": "越低越少拖影，但更多区域暂时等待神经渲染。",
-    "optional": false,
+    "optional": true,
     "source_help": "nrOpenUltraFast only: how far the previous frame may differ, where a pixel was, before what NR had made there is dropped (0 to 0.3 of the code range). Lower: fewer ghosts behind what moves, more surface left to fill. Whatever this value, what moved unlike the pixel there (a character the camera turns round) is dropped. Applied live."
   },
   {
@@ -1162,7 +1351,7 @@
       "nrPasses=1"
     ],
     "help": "0关闭新露出区域的邻近填充。",
-    "optional": false,
+    "optional": true,
     "source_help": "nrOpenUltraFast only: a surface just uncovered or just come on screen takes what NR had made of surfaces of the previous frame that look like it; this is how alike they must be (0 to 0.3). 0: no filling, such a surface shows without NR until the network reaches it. Applied live."
   },
   {
@@ -1185,7 +1374,7 @@
       "nrEngine=opendlss"
     ],
     "help": "Open确定性噪声种子，修改会重置历史。",
-    "optional": false,
+    "optional": true,
     "source_help": "Open deterministic noise seed. Applied live with history reset."
   },
   {

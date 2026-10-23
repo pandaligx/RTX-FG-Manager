@@ -36,8 +36,38 @@ fn runtime(version: &str) -> Result<Runtime> {
         .context("不支持的 NR 运行库版本")
 }
 
+fn download_sources(runtime: &Runtime, prefer_github: bool) -> Vec<transfer::Source> {
+    let mut sources: Vec<_> = runtime
+        .urls
+        .iter()
+        .map(|url| {
+            let name = match reqwest::Url::parse(url)
+                .ok()
+                .and_then(|url| url.host_str().map(str::to_owned))
+                .as_deref()
+            {
+                Some("github.com" | "raw.githubusercontent.com") => "github",
+                Some("gitcode.com" | "api.gitcode.com" | "raw.gitcode.com") => "gitcode",
+                _ => "NR",
+            };
+            transfer::Source {
+                name: name.into(),
+                url: url.clone(),
+            }
+        })
+        .collect();
+    let preferred = if prefer_github { "github" } else { "gitcode" };
+    sources.sort_by_key(|source| match source.name.as_str() {
+        name if name == preferred => 0,
+        "github" | "gitcode" => 1,
+        _ => 2,
+    });
+    sources
+}
+
 fn prepare(
     version: &str,
+    prefer_github: bool,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<PathBuf> {
@@ -53,15 +83,7 @@ fn prepare(
     let archive = core::no_links(&root.join(format!("{}.zip", r.archive_sha256)))?;
     transfer::download(
         &transfer::Request {
-            sources: r
-                .urls
-                .iter()
-                .enumerate()
-                .map(|(i, url)| transfer::Source {
-                    name: format!("NR {}", i + 1),
-                    url: url.clone(),
-                })
-                .collect(),
+            sources: download_sources(&r, prefer_github),
             bytes: Some(r.archive_size),
             sha256: Some(r.archive_sha256),
             limit: LIMIT,
@@ -219,11 +241,12 @@ fn accepted(path: &Path, r: &Ownership) -> Result<bool> {
 pub fn install_many(
     targets: &[core::DeploymentTarget],
     version: &str,
+    prefer_github: bool,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<()> {
     install_many_with(targets, version, cancel, progress, |cancel, progress| {
-        prepare(version, cancel, progress)
+        prepare(version, prefer_github, cancel, progress)
     })
 }
 
@@ -457,6 +480,24 @@ pub fn remove_locked(target: &core::DeploymentTarget) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn download_preference_orders_both_mirrors_without_losing_fallback() -> Result<()> {
+        for version in ["310.8.0", RECOMMENDED] {
+            let runtime = runtime(version)?;
+            let domestic = download_sources(&runtime, false);
+            let github = download_sources(&runtime, true);
+            assert_eq!(domestic.len(), 2);
+            assert_eq!(github.len(), 2);
+            assert_eq!(domestic[0].name, "gitcode");
+            assert_eq!(domestic[1].name, "github");
+            assert_eq!(github[0].name, "github");
+            assert_eq!(github[1].name, "gitcode");
+            assert_eq!(domestic[0].url, github[1].url);
+            assert_eq!(domestic[1].url, github[0].url);
+        }
+        Ok(())
+    }
 
     fn multi_game(root: &Path, count: usize) -> Result<scanner::Game> {
         let mut game = scanner::Game {

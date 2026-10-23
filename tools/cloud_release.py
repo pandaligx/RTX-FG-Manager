@@ -255,6 +255,8 @@ def validate_encore_config(config):
     require(config["general"]["gpuSeries"] == "auto", "Cloud Encore must auto-detect GPU")
     require(config["smoothMotion"]["smoothMotionEnabled"] is False, "Cloud Encore must not enable driver Smooth Motion")
     require(config["neuralRendering"]["core"]["nrEnabled"] is False, "Cloud Encore must not enable Neural Rendering")
+    require(config["neuralRendering"].get("experimental", {}).get("nrFoveation", False) is False,
+            "Cloud Encore must not enable experimental foveated NR")
 
 
 def package_from_zip(scheme, item, data):

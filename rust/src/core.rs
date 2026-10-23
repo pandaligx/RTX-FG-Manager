@@ -878,7 +878,18 @@ pub fn apply_parameters_at(
     let ini = no_links(&dir.join(config_name(&record.backend)))?;
     ensure!(ini.metadata()?.len() <= 1024 * 1024, "INI 文件过大");
     let before = fs::read(&ini)?;
-    let after = context.configure(&before, values)?;
+    let after = if record.backend == crate::encore::BACKEND {
+        crate::encore::configure_for_version(
+            &before,
+            values,
+            record
+                .upstream_version
+                .as_deref()
+                .or(record.payload_version.as_deref()),
+        )?
+    } else {
+        context.configure(&before, values)?
+    };
     if record.backend == crate::rtxmfg::BACKEND {
         crate::rtxmfg_settings::preflight(
             &target,
@@ -1090,6 +1101,16 @@ pub fn deploy_prepared_context_at_with_overrides(
     crate::rtxmfg_settings::recover_locked(&target)?;
     crate::upstream040_upgrade::recover_locked(&target)?;
     let no_overrides = crate::presets::Values::new();
+    if backend == crate::encore::BACKEND {
+        data.insert(
+            config.into(),
+            crate::encore::configure_for_version(
+                &data[config],
+                explicit_overrides.unwrap_or(&no_overrides),
+                upstream_version.or(payload_version),
+            )?,
+        );
+    }
     let mfg_overrides = explicit_overrides.unwrap_or(&no_overrides);
     if backend == crate::rtxmfg::BACKEND {
         crate::rtxmfg_settings::preflight(
@@ -1324,7 +1345,13 @@ pub fn deploy_prepared_context_at_with_overrides(
                 let current = fs::read(&ini)?;
                 let updated = if backend == crate::encore::BACKEND {
                     let empty = crate::presets::Values::new();
-                    crate::encore::configure(&current, explicit_overrides.unwrap_or(&empty))?
+                    crate::encore::configure_for_version(
+                        &current,
+                        explicit_overrides.unwrap_or(&empty),
+                        r.upstream_version
+                            .as_deref()
+                            .or(r.payload_version.as_deref()),
+                    )?
                 } else if backend == crate::rtxmfg::BACKEND {
                     if let Some(values) = explicit_overrides.filter(|v| !v.is_empty()) {
                         crate::rtxmfg::configure(&current, values)?

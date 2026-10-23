@@ -74,6 +74,17 @@ impl EncoreEditor {
             }
         });
         self.errors.remove(key);
+        if key == "nrFoveaPreset" && value != "custom" {
+            for key in [
+                "nrFoveaWidth",
+                "nrFoveaHeight",
+                "nrFoveaFalloff",
+                "nrFoveaEdge",
+            ] {
+                self.errors.remove(key);
+                self.inputs.remove(key);
+            }
+        }
         self.invalid.set(!self.errors.is_empty());
         cx.notify();
     }
@@ -305,7 +316,7 @@ impl EncoreEditor {
                 div()
                     .text_xs()
                     .text_color(cx.theme().muted_foreground)
-                    .child(self.t("需先启用相关功能，并使用兼容的显卡系列。")),
+                    .child(self.t("请先开启所需功能，并满足该参数的启用条件。")),
             );
         }
         if self.errors.contains(&field.key) {
@@ -399,6 +410,7 @@ impl Render for EncoreEditor {
         let fields: Vec<_> = encore::fields()
             .iter()
             .filter(|field| encore::field_available(field, self.version.as_deref()))
+            .filter(|field| encore::field_visible(field, &values))
             .filter(|field| {
                 if self.query.is_empty() {
                     field.group == self.group

@@ -256,7 +256,13 @@ fn read_json_preset_values(
     anyhow::ensure!(path.metadata()?.len() <= 1024 * 1024, "配置文件过大");
     let bytes = std::fs::read(path)?;
     if profile == rtx_fg_manager::encore::PROFILE {
-        rtx_fg_manager::encore::read(&bytes)
+        let record = core::record(&target.directory)?;
+        let version = record.as_ref().and_then(|r| {
+            r.upstream_version
+                .as_deref()
+                .or(r.payload_version.as_deref())
+        });
+        rtx_fg_manager::encore::read_for_version(&bytes, version)
     } else {
         let mut values = rtx_fg_manager::rtxmfg::read(&bytes)?;
         values.extend(rtx_fg_manager::rtxmfg_settings::read_ui_at(target)?);
@@ -2031,6 +2037,7 @@ impl Controller {
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
         let retry = self.retry_request(RetryAction::InstallNr(version));
+        let prefer_github = self.choice("download_source", "domestic") == "github";
         self.channel.operation(move |c| {
             if defer_if_running(c, &targets, retry)? {
                 return Ok(());
@@ -2041,6 +2048,7 @@ impl Controller {
             rtx_fg_manager::neural_runtime::install_many(
                 &targets,
                 version,
+                prefer_github,
                 &cancel,
                 &mut |transfer| {
                     c.send(Event::PayloadProgress(cloud::CloudProgress {
@@ -2429,7 +2437,29 @@ impl Controller {
                                 &p,
                             );
                             let name = core::config_name(&payload.backend);
-                            files.insert(name.into(), context.configure(&files[name], &options)?);
+                            let configured = if payload.backend == rtx_fg_manager::encore::BACKEND {
+                                let version = payload
+                                    .upstream_version
+                                    .as_deref()
+                                    .or(Some(&payload.version));
+                                let available = options
+                                    .iter()
+                                    .filter(|(key, _)| {
+                                        rtx_fg_manager::encore::field(key).is_some_and(|f| {
+                                            rtx_fg_manager::encore::field_available(f, version)
+                                        })
+                                    })
+                                    .map(|(k, v)| (k.clone(), v.clone()))
+                                    .collect();
+                                rtx_fg_manager::encore::configure_for_version(
+                                    &files[name],
+                                    &available,
+                                    version,
+                                )?
+                            } else {
+                                context.configure(&files[name], &options)?
+                            };
+                            files.insert(name.into(), configured);
                             core::deploy_prepared_context_at_with_overrides(
                                 &game.deployment_target(&p),
                                 &payload.backend,

@@ -84,7 +84,6 @@ enum Command {
     Themes,
     Motion(&'static str),
     Source(String),
-    CloudSource(String),
     Boolean(String, bool),
     CheckUpdate,
     Download,
@@ -663,7 +662,7 @@ impl Manager {
             }
             Command::ApplyPreset => self.c.apply_focused_parameters(),
             Command::RetrySave => self.c.save(),
-            Command::Source(s) | Command::CloudSource(s) => {
+            Command::Source(s) => {
                 self.c.state["download_source"] = json!(s);
                 self.c.state["cloud_source"] = json!(s);
                 self.c.state["update_source"] =
@@ -2971,45 +2970,6 @@ impl Manager {
         panel = panel
             .child(self.neural_panel(window, cx))
             .child(self.proxy_panel(window, cx));
-        let cloud_source = self.c.choice("download_source", "domestic");
-        panel = panel.child(
-            div()
-                .v_flex()
-                .gap_2()
-                .child(div().text_sm().child(self.t("下载线路")))
-                .child(self.menu(
-                    "cloud-source",
-                    self.t(if cloud_source == "github" {
-                        "GitHub 优先"
-                    } else {
-                        "GitCode 优先"
-                    }),
-                    vec![
-                        (
-                            self.t("GitCode 优先"),
-                            Command::CloudSource("domestic".into()),
-                            cloud_source != "github",
-                        ),
-                        (
-                            self.t("GitHub 优先"),
-                            Command::CloudSource("github".into()),
-                            cloud_source == "github",
-                        ),
-                    ],
-                    self.c.busy,
-                    window,
-                    cx,
-                )),
-        );
-        panel =
-            panel.child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(self.t(
-                        "DLL 按需从云端下载，国内优先，失败后尝试 GitHub；已缓存文件可离线使用。",
-                    )),
-            );
         if self.c.cloud_scheme().starts_with("upstream") {
             panel = panel
                 .child(Alert::info("upstream-scope", self.t("此上游方案使用 D3D12；Vulkan 可选择三角洲扩展或独立 Vulkan 方案，兼容性需按游戏实测。")).small());
@@ -3114,6 +3074,15 @@ impl Manager {
                             .text_xs()
                             .text_color(cx.theme().muted_foreground)
                             .child(target_hint),
+                    )
+                    .child(
+                        div()
+                            .w_full()
+                            .min_w_0()
+                            .text_xs()
+                            .whitespace_normal()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(self.t("温馨提示：网络游戏使用任何第三方注入工具，均存在被检测或封禁的可能，请酌情考虑！")),
                     )
                     .child(
                         self.button("deploy", "安装并应用", Command::Patch(false), cx)

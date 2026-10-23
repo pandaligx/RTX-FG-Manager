@@ -1441,7 +1441,7 @@ impl Render for Recommendations {
                         .when_some(available.as_ref().err(),|d,e|d.child(div().text_sm().text_color(cx.theme().warning).child(self.t(&e.to_string()))))
                         .child(self.recipe_summary(&card.content,cx))
                         .when(!card.content.notes.is_empty(), |d| d.child(self.player_notes(&card.content.notes,cx)))
-                        .child(div().text_xs().text_color(cx.theme().muted_foreground).child(self.t("选择后将填入当前游戏的方案和 DLL，随后点击安装。显卡型号和神经渲染不会自动更改。")));
+                        .child(div().text_xs().text_color(cx.theme().muted_foreground).child(self.t("选择后填入当前游戏的方案和 DLL，随后点击安装。显卡型号、神经渲染及备注中的参数和游戏设置需另行设置。")));
                     primary = Some(
                         self.button(
                             "recipe-apply",

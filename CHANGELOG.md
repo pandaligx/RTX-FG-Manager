@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.9
+
+- Support RTX Encore 1.3.0: opt-in foveated NR with four custom controls, and the experimental RTX 20 Smooth Motion V1/V2 selector (NVIDIA 621.01, DX12; restart required). Show controls only for supported patch versions.
+- Retire OpenNR settings for 1.3.0 while keeping older installations editable. Upgrading an OpenNR configuration turns NR off and explains how to enable NVIDIA NR explicitly; preserve comments, unknown fields, per-directory settings and transaction recovery.
+- Keep the 4.3.8 native interface. Add the online-game injection risk notice, improve game-name candidate searches with missing spaces or punctuation, and clarify that settings in player notes require manual configuration. NR runtime remains 310.9.16.
+
+- Choose the download source in Settings; remove the duplicate sidebar selector. Patches, NR runtimes and manager updates follow that preference, retaining fallback sources and offline caches. Match the risk notice to the smaller text above it.
+
 ## 4.3.8
 
 - Support RTX Encore 1.2.2 with post-reconstruction sharpening mode and strength, off by default and shown only for supported versions. Preserve configuration/comments and complete bundles with dedicated proxies and shared Intel runtimes.

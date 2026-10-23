@@ -1,4 +1,4 @@
-//! RTX Encore JSONC v4, including 1.2 engines and 1.2.2 sharpening settings.
+//! RTX Encore JSONC v4, including 1.3 foveated NR and Turing Smooth Motion.
 //! Legacy paths remain writable for games whose patch has not been upgraded.
 //! Deployment never requires a fixed DLL hash.
 use crate::{jsonc::Document, presets::Values};
@@ -109,7 +109,18 @@ pub fn supports_120(version: Option<&str>) -> bool {
         .and_then(|v| semver::Version::parse(v).ok())
         .is_some_and(|v| v >= semver::Version::parse("1.2.0-beta.1").expect("constant"))
 }
+pub fn supports_130(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(1, 3, 0))
+}
+fn removed_open_field(key: &str) -> bool {
+    key == "nrEngine" || key.starts_with("nrOpen")
+}
 pub fn field_available(field: &Field, version: Option<&str>) -> bool {
+    if supports_130(version) && removed_open_field(&field.key) {
+        return false;
+    }
     if field.key == "smoothMotionForce" && supports_120(version) {
         return false;
     }
@@ -259,6 +270,15 @@ pub fn field_enabled(key: &str, values: &Values, _gpu: Option<i32>) -> bool {
             false
         }
     })
+}
+
+/// Keep the four custom values out of the normal preset view. The values are
+/// retained when another preset is selected, and reset still covers them.
+pub fn field_visible(field: &Field, values: &Values) -> bool {
+    !matches!(
+        field.key.as_str(),
+        "nrFoveaWidth" | "nrFoveaHeight" | "nrFoveaFalloff" | "nrFoveaEdge"
+    ) || values.get("nrFoveaPreset").is_some_and(|v| v == "custom")
 }
 
 fn document(bytes: &[u8]) -> Result<Document> {
@@ -543,6 +563,79 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
     read(&out)?;
     Ok(out)
 }
+
+pub fn used_open_nr(bytes: &[u8]) -> Result<bool> {
+    let f = field("nrEngine").expect("legacy engine metadata");
+    Ok(resolve(&document(bytes)?, &f.path)?
+        .0
+        .is_some_and(|v| v == "opendlss"))
+}
+
+/// 1.3 removed OpenNR. Retire only known keys inside documented containers;
+/// unrelated objects, comments, shortcuts and menu state are not rewritten.
+/// The upgrade journal retains the original bytes for rollback.
+pub fn migrate_130(bytes: &[u8]) -> Result<Vec<u8>> {
+    let open = used_open_nr(bytes)?;
+    let doc = document(bytes)?;
+    let mut retired = Vec::new();
+    for f in fields().iter().filter(|f| removed_open_field(&f.key)) {
+        retired.extend(resolve(&doc, &f.path)?.1);
+    }
+    let mut out = bytes.to_vec();
+    for p in retired {
+        out = document(&out)?.remove(&p)?;
+    }
+    if open {
+        // Remove flat/legacy aliases as well so the DLL cannot read a stale true.
+        let f = field("nrEnabled").expect("NR activation metadata");
+        let (_, aliases) = resolve(&document(&out)?, &f.path)?;
+        for p in aliases.into_iter().filter(|p| p != &f.path) {
+            out = document(&out)?.remove(&p)?;
+        }
+        out = document(&out)?.set(&f.path, json!(false))?;
+    }
+    read(&out)?;
+    Ok(out)
+}
+
+pub fn read_for_version(bytes: &[u8], version: Option<&str>) -> Result<Values> {
+    if supports_130(version) {
+        read(&migrate_130(bytes)?)
+    } else {
+        read(bytes)
+    }
+}
+
+pub fn configure_for_version(
+    bytes: &[u8],
+    values: &Values,
+    version: Option<&str>,
+) -> Result<Vec<u8>> {
+    for key in values.keys() {
+        let f = field(if key == "nrPreset" {
+            "dlssNrPreset"
+        } else {
+            key
+        })
+        .context("Unknown Encore field")?;
+        ensure!(
+            field_available(f, version),
+            "Encore setting unavailable in installed version: {key}"
+        );
+    }
+    if !supports_130(version) {
+        return configure(bytes, values);
+    }
+    let open = used_open_nr(bytes)?;
+    let migrated = migrate_130(bytes)?;
+    let mut values = values.clone();
+    if open {
+        // Even a stale draft from the previous engine must not silently turn
+        // NVIDIA NR on. Once migrated, an explicit later enable works normally.
+        values.insert("nrEnabled".into(), "0".into());
+    }
+    configure(&migrated, &values)
+}
 /// 1.1.0 moves only the legacy NR model setting. Keep all unrelated bytes as-is.
 pub fn migrate_nr(bytes: &[u8]) -> Result<Vec<u8>> {
     let doc = document(bytes)?;
@@ -633,6 +726,7 @@ pub fn validate_cloud_config(bytes: &[u8]) -> Result<()> {
         ("gpuSeries", "auto"),
         ("smoothMotionEnabled", "0"),
         ("nrEnabled", "0"),
+        ("nrFoveation", "0"),
     ] {
         ensure!(
             values.get(key).is_some_and(|v| v == value),

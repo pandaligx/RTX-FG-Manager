@@ -87,6 +87,84 @@ fn install_120(target: &core::DeploymentTarget) -> Result<String> {
 }
 
 #[test]
+fn encore130_multi_directory_upgrade_keeps_individual_settings_and_cleans_owned_files() -> Result<()>
+{
+    let (_temp, first) = fixture(false)?;
+    let plugin = first.directory.join("plugins");
+    fs::create_dir(&plugin)?;
+    let second = core::DeploymentTarget::custom(&first.game_exe, &plugin);
+    for (i, target) in [&first, &second].into_iter().enumerate() {
+        install_120(target)?;
+        let bytes = format!(
+            "{{\n// directory {i}\n\"configVersion\":4,\"neuralRendering\":{{\"core\":{{\"nrEngine\":\"opendlss\",\"nrEnabled\":true}},\"appearance\":{{\"nrIntensity\":{}}}}},\"menuState\":{{\"menuKey\":36}},\"vendor\":{i}}}",
+            if i == 0 { "0.5" } else { "1.5" }
+        );
+        fs::write(target.directory.join(encore::CONFIG), bytes)?;
+        fs::write(
+            target.directory.join("other-plugin.dll"),
+            b"keep unrelated plugin",
+        )?;
+    }
+    for target in [&first, &second] {
+        let mut files = encore_files("version.dll");
+        files.insert("version.dll".into(), pe(true, 4));
+        for name in encore::INTEL_FILES {
+            files.insert(
+                name.into(),
+                if name.ends_with(".dll") {
+                    pe(true, 9)
+                } else {
+                    b"Intel license".to_vec()
+                },
+            );
+        }
+        let message = core::deploy_prepared_context_at_with_overrides(
+            target,
+            encore::BACKEND,
+            &["version.dll".into()],
+            None,
+            files,
+            Some("1.3.0"),
+            Some(&context(encore::PROFILE)),
+            None,
+            Some("1.3.0"),
+        )?;
+        assert!(message.contains("OpenNR"));
+        assert!(core::status_at(target).starts_with("已部署"));
+        let path = target.directory.join(encore::CONFIG);
+        let current = fs::read(&path)?;
+        assert_eq!(encore::read(&current)?["nrEnabled"], "0");
+        assert_eq!(encore::read(&current)?["menuKey"], "36");
+        core::apply_parameters_at(
+            target,
+            &context(encore::PROFILE),
+            &BTreeMap::from([
+                ("nrEnabled".into(), "1".into()),
+                ("nrFoveation".into(), "1".into()),
+            ]),
+        )?;
+        assert_eq!(encore::read(&fs::read(path)?)?["nrEnabled"], "1");
+    }
+    assert_eq!(
+        encore::read(&fs::read(first.directory.join(encore::CONFIG))?)?["nrIntensity"],
+        "0.5"
+    );
+    assert_eq!(
+        encore::read(&fs::read(second.directory.join(encore::CONFIG))?)?["nrIntensity"],
+        "1.5"
+    );
+    for target in [&second, &first] {
+        assert!(cleanup::clean_outcome_at(target)?.complete);
+        assert!(!target.directory.join(encore::CONFIG).exists());
+        assert_eq!(
+            fs::read(target.directory.join("other-plugin.dll"))?,
+            b"keep unrelated plugin"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn intel_private_runtimes_upgrade_preserve_config_and_uninstall_by_ownership() -> Result<()> {
     for upgrade_old in [false, true] {
         let (_temp, target) = fixture(false)?;

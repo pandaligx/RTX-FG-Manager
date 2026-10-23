@@ -637,6 +637,13 @@ pub fn inspect_at(
             .is_some_and(|r| r.backend == crate::transfusion::BACKEND)
     {
         crate::encore::read(&crate::encore::migrate(&bytes, &Values::new())?)?
+    } else if policy.parameter_profile == crate::encore::PROFILE {
+        let version = record.as_ref().and_then(|r| {
+            r.upstream_version
+                .as_deref()
+                .or(r.payload_version.as_deref())
+        });
+        crate::encore::read_for_version(&bytes, version)?
     } else {
         read_values(&bytes, &policy.parameter_profile)?
     };

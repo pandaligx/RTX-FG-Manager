@@ -64,6 +64,15 @@ pub(crate) fn is_chinese(value: &str) -> bool {
         .chars()
         .any(|c| ('\u{3400}'..='\u{9fff}').contains(&c))
 }
+// Search hints only: never use a fuzzy title as an identity or platform ID.
+// Keep letters and digits (including sequel numbers); ignore spacing and punctuation.
+fn search_key(value: &str) -> String {
+    value
+        .chars()
+        .flat_map(char::to_lowercase)
+        .filter(|c| c.is_alphanumeric())
+        .collect()
+}
 pub fn valid_key(key: &str) -> bool {
     let Some((platform, id)) = key.split_once(':') else {
         return false;
@@ -158,7 +167,8 @@ impl Catalog {
     }
     pub fn search(&self, query: &str) -> Vec<Entry> {
         let query = query.trim().to_lowercase();
-        if query.chars().count() < 2 {
+        let compact = search_key(&query);
+        if compact.chars().count() < 2 {
             return Vec::new();
         }
         let mut hits: Vec<_> = self
@@ -167,8 +177,23 @@ impl Catalog {
             .filter_map(|e| {
                 let en = e.en.to_lowercase();
                 let zh = e.zh.to_lowercase();
-                (en.contains(&query) || zh.contains(&query))
-                    .then_some((en != query && zh != query, e))
+                let en_key = search_key(&en);
+                let zh_key = search_key(&zh);
+                let exact = en == query || zh == query;
+                let compact_exact = en_key == compact || zh_key == compact;
+                let direct = en.contains(&query) || zh.contains(&query);
+                (direct || en_key.contains(&compact) || zh_key.contains(&compact)).then_some((
+                    if exact {
+                        0
+                    } else if compact_exact {
+                        1
+                    } else if direct {
+                        2
+                    } else {
+                        3
+                    },
+                    e,
+                ))
             })
             .collect();
         hits.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.en.cmp(&b.1.en)));
@@ -534,6 +559,28 @@ mod tests {
         {"id":"Q1","zh":"巫师3","en":"The Witcher 3","keys":["steam:292030","gog:1207664663"]},
         {"id":"Q2","zh":"巫师3：资料片","en":"The Witcher 3 DLC","keys":["steam:378648"]}
     ]})).unwrap()).unwrap()
+    }
+    #[test]
+    fn compact_title_search_is_a_candidate_only_and_keeps_sequels_separate() {
+        let c = Catalog::parse(
+            &serde_json::to_vec(&json!({"schema":1,"revision":1,"source":"test","entries":[
+                {"id":"Q1","zh":"007：初露锋芒","en":"007 First Light","keys":["steam:100"]},
+                {"id":"Q2","zh":"007：初露锋芒 2","en":"007 First Light 2","keys":["steam:101"]}
+            ]}))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(c.search("007FirstLight")[0].id(), "Q1");
+        assert_eq!(c.search("007-first-light")[0].id(), "Q1");
+        assert_eq!(c.search("007FirstLight2").len(), 1);
+        assert_eq!(c.search("007FirstLight2")[0].id(), "Q2");
+        assert!(c.search(".- ").is_empty());
+        let game = Game {
+            title: "007FirstLight".into(),
+            ..Default::default()
+        };
+        assert!(identified(&game, &c).is_none());
+        assert_eq!(display(&game, &c, true), "007FirstLight");
     }
     #[test]
     fn exact_ids_only_and_conflicts_do_not_guess() {

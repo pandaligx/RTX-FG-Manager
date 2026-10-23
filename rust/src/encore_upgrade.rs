@@ -300,6 +300,11 @@ pub fn upgrade_locked(
     let original = originals
         .get(core::config_name(&old.backend))
         .context("旧配置文件缺失")?;
+    let retired_open = encore::supports_130(
+        new.upstream_version
+            .as_deref()
+            .or(new.payload_version.as_deref()),
+    ) && encore::used_open_nr(original)?;
     let migrated = if old.backend == encore::BACKEND {
         let needs_nr_migration = new
             .upstream_version
@@ -307,15 +312,21 @@ pub fn upgrade_locked(
             .or(new.payload_version.as_deref())
             .and_then(|v| semver::Version::parse(v).ok())
             .is_some_and(|v| v >= semver::Version::new(1, 1, 0));
-        let migrated = if needs_nr_migration {
+        if needs_nr_migration {
             encore::migrate_nr(original)?
         } else {
             original.clone()
-        };
-        encore::configure(&migrated, explicit_overrides.unwrap_or(&empty))?
+        }
     } else {
-        encore::migrate(original, explicit_overrides.unwrap_or(&empty))?
+        encore::migrate(original, &empty)?
     };
+    let migrated = encore::configure_for_version(
+        &migrated,
+        explicit_overrides.unwrap_or(&empty),
+        new.upstream_version
+            .as_deref()
+            .or(new.payload_version.as_deref()),
+    )?;
     let migrated = if new
         .upstream_version
         .as_deref()
@@ -465,7 +476,11 @@ pub fn upgrade_locked(
             }
         };
     }
-    Ok("已升级至 RTX Encore；保留并迁移原配置，重新启动游戏后生效".into())
+    Ok(if retired_open {
+        "已升级至 RTX Encore；旧 OpenNR 已移除，神经渲染已关闭。如需使用，请在参数设置中手动开启 NVIDIA NR。"
+    } else {
+        "已升级至 RTX Encore；保留并迁移原配置，重新启动游戏后生效"
+    }.into())
 }
 
 fn checkpoint(_name: &str) -> Result<()> {
@@ -702,6 +717,60 @@ mod tests {
     fn recover(target: &core::DeploymentTarget) -> Result<bool> {
         let _lock = win::game_lock(&target.directory)?;
         recover_locked(target)
+    }
+
+    #[test]
+    fn open_nr_130_migration_rolls_back_exact_bytes_on_failure_or_interruption() -> Result<()> {
+        for crash in [false, true] {
+            for point in [
+                "stage:rtx-encore.jsonc",
+                "remove:rtx-encore.jsonc",
+                "publish:dinput8.dll",
+            ] {
+                let (_temp, target) = fixture()?;
+                install(&target)?;
+                fs::write(target.directory.join(encore::CONFIG), b"\xef\xbb\xbf{\r\n// old engine\r\n\"configVersion\":4,\"neuralRendering\":{\"core\":{\"nrEngine\":\"opendlss\",\"nrEnabled\":true}},\"vendor\":99}\r\n")?;
+                let before = snapshot(&target.directory)?;
+                let mut files = BTreeMap::from([
+                    ("dinput8.dll".into(), pe(true, 3)),
+                    (encore::CONFIG.into(), encore::DEFAULT_CONFIG.to_vec()),
+                    (encore::NOTICES.into(), b"new license".to_vec()),
+                ]);
+                for name in encore::INTEL_FILES {
+                    files.insert(
+                        name.into(),
+                        if name.ends_with(".dll") {
+                            pe(true, 4)
+                        } else {
+                            b"Intel license".to_vec()
+                        },
+                    );
+                }
+                fault(point, crash);
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    core::deploy_prepared_context_at_with_overrides(
+                        &target,
+                        encore::BACKEND,
+                        &["dinput8.dll".into()],
+                        None,
+                        files,
+                        Some("1.3.0"),
+                        Some(&context(encore::PROFILE)),
+                        None,
+                        Some("1.3.0"),
+                    )
+                }));
+                clear_fault();
+                if crash {
+                    assert!(result.is_err());
+                    assert!(recover(&target)?);
+                } else {
+                    assert!(result.unwrap().is_err());
+                }
+                assert_eq!(snapshot(&target.directory)?, before, "{point}");
+            }
+        }
+        Ok(())
     }
 
     #[test]

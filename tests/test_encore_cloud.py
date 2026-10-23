@@ -61,13 +61,14 @@ class EncoreCloudTests(unittest.TestCase):
                 yield path
         paths = {tuple(field["path"]) for field in fields}
         native_paths = set(leaves(config()))
-        self.assertEqual(len(fields), 130)
+        self.assertEqual(len(fields), 137)
         self.assertEqual(len({field["key"] for field in fields}), len(fields))
         self.assertEqual(len(paths), len(fields))
         # Multiplier is exposed through the composite tf_mode selector. The
         # schema marker is not editable; upstream persists menuKey on demand.
         self.assertEqual(native_paths - paths, {("configVersion",), ("frameGeneration", "multiplier")})
-        self.assertEqual(paths - native_paths, {("menuState", "menuKey"), ("smoothMotion", "smoothMotionForce"), ("providerPatchPolicy",)})
+        retired = {tuple(f["path"]) for f in fields if f["key"] == "nrEngine" or f["key"].startswith("nrOpen")}
+        self.assertEqual(paths - native_paths, retired | {("menuState", "menuKey"), ("smoothMotion", "smoothMotionForce"), ("providerPatchPolicy",)})
         self.assertTrue(next(field for field in fields if field["key"] == "menuKey")["optional"])
 
     def test_schema4_three_file_package_retains_full_upstream_version(self):
@@ -96,7 +97,8 @@ class EncoreCloudTests(unittest.TestCase):
         malformed.append(value)
         for path, bad in ((["neuralRendering", "core", "nrEnabled"], "false"),
                           (["neuralRendering", "appearance", "nrIntensity"], 2.1),
-                          (["neuralRendering", "openExperimental", "nrOpenUltraFastGhostTolerance"], 0.31),
+                          (["neuralRendering", "experimental", "nrFoveaEdge"], 24),
+                          (["neuralRendering", "experimental", "nrFoveaPreset"], "invalid"),
                           (["frameGeneration", "multiplier"], True),
                           (["overlay", "metrics"], []),
                           (["diagnostics", "logFilesKept"], 0)):
@@ -114,7 +116,8 @@ class EncoreCloudTests(unittest.TestCase):
         for section, key, changed in ((["frameGeneration"], "mode", "fixed"),
                                       (["general"], "gpuSeries", "rtx30"),
                                       (["smoothMotion"], "smoothMotionEnabled", True),
-                                      (["neuralRendering", "core"], "nrEnabled", True)):
+                                      (["neuralRendering", "core"], "nrEnabled", True),
+                                      (["neuralRendering", "experimental"], "nrFoveation", True)):
             value = config()
             owner = value
             for part in section:
