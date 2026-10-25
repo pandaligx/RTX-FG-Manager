@@ -13,6 +13,56 @@ impl Render for RuntimeView {
     }
 }
 impl Manager {
+    pub(super) fn runtime_path(&self, path: &std::path::Path, cx: &mut Context<Self>) -> Div {
+        let folder = path.parent().unwrap_or(path).display().to_string();
+        let opened = self
+            .folder_feedback
+            .as_ref()
+            .is_some_and(|(p, _)| *p == folder);
+        div()
+            .h_flex()
+            .items_start()
+            .gap_2()
+            .min_w_0()
+            .text_xs()
+            .text_color(cx.theme().muted_foreground)
+            .child(
+                Button::new(SharedString::from(format!(
+                    "runtime-path-{}",
+                    path.display()
+                )))
+                .custom(
+                    ButtonCustomVariant::new(cx)
+                        .hover(*cx.theme().tokens.secondary_hover)
+                        .active(*cx.theme().tokens.secondary_active),
+                )
+                .focus_ring(crate::ui_focus::visible(cx))
+                .size(rems(1.25))
+                .icon(
+                    Icon::new(if opened {
+                        IconName::FolderOpen
+                    } else {
+                        IconName::Folder
+                    })
+                    .size(rems(0.875)),
+                )
+                .accessibility_label(self.t("打开目录"))
+                .tooltip(self.t("打开目录"))
+                .flex_shrink_0()
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.folder_feedback = Some((folder.clone(), Instant::now()));
+                    this.act(Command::Open(folder.clone()), window, cx);
+                })),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .whitespace_normal()
+                    .child(path.display().to_string()),
+            )
+    }
+
     pub(super) fn clear_runtime_window(&mut self, cx: &mut Context<Self>) {
         self.runtime_window = None;
         self.runtime_feedback = None;
@@ -55,7 +105,7 @@ impl Manager {
             work.center(),
             size(
                 (window.rem_size() * 52.).min(work.size.width),
-                (window.rem_size() * 55.).min(work.size.height),
+                (window.rem_size() * 47.).min(work.size.height),
             ),
         );
         let options = WindowOptions {
@@ -146,17 +196,18 @@ impl Manager {
         let mut rows = div()
             .id("runtime-file-scroll")
             .v_flex()
-            .gap_3()
+            .gap_2()
             .min_w_0()
             .min_h_0()
             .flex_1()
-            .p_4()
+            .px_3()
+            .py_2()
             .overflow_y_scroll();
         for kind in runtime_files::KINDS {
             if kind == "xemfg" {
                 rows = rows.child(
                     div()
-                        .pb_3()
+                        .pb_2()
                         .border_b_1()
                         .border_color(cx.theme().border)
                         .child(self.neural_panel(window, cx)),
@@ -231,7 +282,7 @@ impl Manager {
             let mut card = div()
                 .v_flex()
                 .gap_2()
-                .pb_3()
+                .pb_2()
                 .border_b_1()
                 .border_color(cx.theme().border)
                 .min_w_0()
@@ -249,13 +300,7 @@ impl Manager {
                         .child(runtime_version_indicator(current, &selected, cx)),
                 );
             for path in paths {
-                card = card.child(
-                    div()
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground)
-                        .whitespace_normal()
-                        .child(path.display().to_string()),
-                );
+                card = card.child(self.runtime_path(path, cx));
             }
             if let Some(warning) = statuses.iter().find_map(|s| s.warning.as_ref()) {
                 card = card.child(
@@ -265,7 +310,7 @@ impl Manager {
                         .child(self.t(warning)),
                 );
             }
-            if single_version {
+            if single_version && self.c.runtime_catalog_load.failed() {
                 card = card.child(
                     div()
                         .text_xs()
@@ -371,21 +416,74 @@ impl Manager {
                     } else {
                         cx.theme().foreground
                     })
-                    .child(self.t(message)),
+                    .child(self.t(if *error && message.starts_with("下载失败") {
+                        "下载失败，已保留现有文件。请检查网络后重试。"
+                    } else {
+                        message
+                    })),
             );
         }
-        div().v_flex().size_full().min_w_0().min_h_0().text_sm().bg(cx.theme().background).text_color(cx.theme().foreground)
+        div()
+            .v_flex()
+            .size_full()
+            .min_w_0()
+            .min_h_0()
+            .text_sm()
+            .bg(cx.theme().background)
+            .text_color(cx.theme().foreground)
             .child(TitleBar::new().child(div().pl_3().child(self.t("DLSS / XeSS 运行库"))))
-            .child(div().v_flex().gap_2().px_4().py_3().flex_shrink_0()
-                    .child(div().h_flex().gap_2().justify_between()
-                        .child(div().font_weight(FontWeight::SEMIBOLD).child(game))
-                        .child(self.button("runtime-refresh", if self.c.runtime_catalog_load.loading() { "正在加载…" } else { "刷新" }, Command::RefreshRuntimeFiles, cx).small().disabled(self.c.busy || self.c.runtime_catalog_load.loading())))
-                .child(div().text_xs().whitespace_normal()
-                    .text_color(if self.c.runtime_catalog_load.failed() { cx.theme().warning } else { cx.theme().muted_foreground })
-                    .child(self.t(self.c.runtime_catalog_load.message())))
-                .child(div().text_xs().text_color(cx.theme().muted_foreground).child(self.t("仅更新游戏共用的 DLSS 文件，可能影响不同适配方案；遇到问题可恢复原件。补丁专用运行库随完整方案更新。"))))
+            .child(
+                div()
+                    .v_flex()
+                    .gap_1()
+                    .px_3()
+                    .py_2()
+                    .flex_shrink_0()
+                    .child(
+                        div()
+                            .h_flex()
+                            .gap_2()
+                            .justify_between()
+                            .child(div().font_weight(FontWeight::SEMIBOLD).child(game))
+                            .child(
+                                self.button(
+                                    "runtime-refresh",
+                                    if self.c.runtime_catalog_load.loading() {
+                                        "正在加载…"
+                                    } else {
+                                        "刷新"
+                                    },
+                                    Command::RefreshRuntimeFiles,
+                                    cx,
+                                )
+                                .small()
+                                .disabled(self.c.busy || self.c.runtime_catalog_load.loading()),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .whitespace_normal()
+                            .text_color(if self.c.runtime_catalog_load.failed() {
+                                cx.theme().warning
+                            } else {
+                                cx.theme().muted_foreground
+                            })
+                            .child(self.t(self.c.runtime_catalog_load.message())),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(self.t(
+                                "DLSS 更新保留原件，可随时恢复；游戏共用文件可能影响其他方案。",
+                            )),
+                    ),
+            )
             .child(rows)
-            .child(footer.child(div().text_color(cx.theme().muted_foreground).child(self.t("XeSS 运行库仅用于 MFG 1.7+ 独立模式，安装后需在参数设置或 Backspace 菜单开启。DLSS 原件可在此单独恢复。"))))
+            .when(self.c.busy || self.runtime_feedback.is_some(), |view| {
+                view.child(footer)
+            })
             .into_any_element()
     }
 }

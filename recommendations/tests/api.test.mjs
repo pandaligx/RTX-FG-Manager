@@ -11,6 +11,70 @@ import { recipe, digest } from '../src/contracts.mjs';
 
 const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX12 推荐',notes:'先关闭游戏再安装。',
   scheme:'dlssg-transfusion-1.4.5.3',patchVersion:'1.1.4',entries:['dxgi.dll'],renderer:'dx12',gpuModel:'NVIDIA GeForce RTX 3060',driver:'581.80',gpuAlias:'unchanged',neuralRuntime:'none'});
+const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
+const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
+test('Complete setups keep exact runtime versions and protocol 6 cannot erase them',async t=>{
+  const f=fixture(t),u=await f.login();
+  const card=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:complete()},u.token,'test-ip',7);
+  assert.equal(card.content.runtimes.components.length,2);
+  const route='/v1/recipes/'+card.id;
+  for(const old of [false,2,3,4,5,6])assert.equal(Object.hasOwn((await f.call('GET',route,null,u.token,'test-ip',old)).content,'runtimes'),false);
+  const legacy=(await f.call('GET',route,null,u.token,'test-ip',6)).content;legacy.notes='旧客户端修改备注';
+  await f.call('PUT',route,{revision:1,content:legacy},u.token,'test-ip',6);
+  const updated=await f.call('GET',route,null,u.token,'test-ip',7);
+  assert.deepEqual(updated.content.runtimes,card.content.runtimes);assert.deepEqual(updated.content.presets,card.content.presets);
+  legacy.patchVersion='1.4.1';await f.call('PUT',route,{revision:2,content:legacy},u.token,'test-ip',6);
+  assert.equal(Object.hasOwn((await f.call('GET',route,null,u.token,'test-ip',7)).content,'runtimes'),false);
+  const meta=await f.call('GET','/v1/preset-metadata');assert.equal(meta['dlssg-transfusion-1.4.5.3'].fields.srSharpness.max,100);
+});
+test('Runtime inventory rejects paths, URLs, unknown keys, duplicate and oversized components',()=>{
+  assert.equal(recipe(complete()).runtimes.components.length,2);
+  for(const value of ['C:/Users/private','https://files.example/dll','1.2','1.2.3.4.5','9'.repeat(41)]){
+    const c=complete();c.runtimes.components[0].versions=[value];assert.throws(()=>recipe(c));
+  }
+  for(const key of ['path','url','username']){const c=complete();c.runtimes.components[0][key]='private';assert.throws(()=>recipe(c));}
+  const duplicate=complete();duplicate.runtimes.components.push(duplicate.runtimes.components[0]);assert.throws(()=>recipe(duplicate));
+  const invalid=complete();invalid.runtimes.components[0].source='managed';assert.throws(()=>recipe(invalid));
+  const size=complete();size.runtimes.components[0].versions=Array.from({length:9},(_,i)=>'1.0.'+i);assert.throws(()=>recipe(size));
+});
+test('Runtime variants are not incorrectly flagged as duplicate setups',async t=>{
+  const f=fixture(t),u=await f.login('admin@example.com');
+  await f.call('POST','/v1/recipes',{submission:randomUUID(),content:complete()},u.token,'test-ip',7);
+  const different=complete();different.runtimes.components[0].versions=['310.9.1.0'];
+  await f.call('POST','/v1/recipes',{submission:randomUUID(),content:different},u.token,'test-ip',7);
+  assert.equal((await f.call('GET','/v1/admin/recipes?filter=duplicates',null,u.token)).total,0);
+});
+test('Parameter sharing roundtrips, preserves defaults and does not break old clients',async t=>{
+  const f=fixture(t),user=await f.login();
+  const card=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:shared()},user.token,'test-ip',6);
+  assert.equal(card.content.presets.values.nrIntensity,'0.5');
+  const route='/v1/recipes/'+card.id;
+  for(const feedback of [false,2,3,4,5]){
+    const old=await f.call('GET',route,null,user.token,'test-ip',feedback);
+    assert.equal(Object.hasOwn(old.content,'presets'),false);
+  }
+  const legacy=await f.call('GET',route,null,user.token,'test-ip',5);legacy.content.notes='修改备注';
+  await f.call('PUT',route,{revision:1,content:legacy.content},user.token,'test-ip',5);
+  const updated=await f.call('GET',route,null,user.token,'test-ip',6);
+  assert.deepEqual(updated.content.presets,card.content.presets);
+  assert.equal(updated.content.notes,'修改备注');
+  legacy.content.patchVersion='1.4.1';
+  await f.call('PUT',route,{revision:2,content:legacy.content},user.token,'test-ip',5);
+  assert.equal(Object.hasOwn((await f.call('GET',route,null,user.token,'test-ip',6)).content,'presets'),false);
+});
+test('Sharing rejects private, cross-project, unsupported, malformed and out-of-range parameters',()=>{
+  const c=shared();assert.equal(recipe(c).presets.values.nrIntensity,'0.5');
+  for(const key of ['hotkeyToggleNr','logDirectory','nvngxPath','unknown','__proto__']){
+    const bad=shared();bad.presets.values=JSON.parse(JSON.stringify(bad.presets.values).slice(0,-1)+`,"${key}":"1"}`);
+    assert.throws(()=>recipe(bad));
+  }
+  for(const value of ['NaN','Infinity','C:\\Users\\me','10000000','<script>','']){
+    const bad=shared();bad.presets.values.nrIntensity=value;assert.throws(()=>recipe(bad));
+  }
+  const mismatch=shared();mismatch.presets.profile='upstream040';assert.throws(()=>recipe(mismatch));
+  const missing=shared();delete missing.presets.defaults.nrEnabled;assert.throws(()=>recipe(missing));
+  const old=shared();old.presets.values.nrOpenFast='1';old.presets.defaults.nrOpenFast='0';assert.throws(()=>recipe(old));
+});
 function fixture(t,extra={}) {
   const db=openStore(':memory:');t.after(()=>db.close());let clock=1800000000;const mail=[];
   const api=createApi(db,{secret:'unit-test-'.repeat(5),now:()=>clock,sendCode:async(email,code)=>mail.push({email,code}),adminEmail:'admin@example.com',...extra});

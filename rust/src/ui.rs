@@ -378,6 +378,29 @@ impl Manager {
             }
         })
         .detach();
+        // Exit progress belongs to the application, not a utility/main-window
+        // update lease. On Windows a closing or occluded window may stop driving
+        // its own frame work while another native window is active.
+        cx.spawn(async move |this, cx| {
+            loop {
+                smol::Timer::after(Duration::from_millis(50)).await;
+                let result = this.update(cx, |this, cx| {
+                    if this.c.closing {
+                        this.c.events();
+                        this.c.tick_close();
+                        if this.c.saved {
+                            cx.quit();
+                        } else {
+                            cx.notify();
+                        }
+                    }
+                });
+                if result.is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
         view
     }
     fn scale(&self) -> f32 {
@@ -2825,7 +2848,6 @@ impl Manager {
             .small()
             .tooltip(runtime_label.clone())
             .label(runtime_label)
-            .w_full()
             .icon(IconName::ChevronDown)
             .disabled(self.c.busy)
             .dropdown_menu(move |mut menu, _, _| {
@@ -2864,13 +2886,14 @@ impl Manager {
                     )
                     .child(runtime_version_indicator(status, version, cx)),
             )
-            .child(runtime_picker)
+            .children(statuses.iter().map(|n| self.runtime_path(&n.path, cx)))
             .child(
                 div()
                     .h_flex()
                     .flex_wrap()
                     .gap_2()
                     .justify_end()
+                    .child(runtime_picker)
                     .child(
                         self.button("nr-install", label, Command::InstallNeural(version), cx)
                             .small()
@@ -3075,7 +3098,7 @@ impl Manager {
             .child(
                 self.button(
                     "runtime-files",
-                    "DLSS / XeSS 运行库…",
+                    "DLSS / XeSS 运行库",
                     Command::RuntimeFiles,
                     cx,
                 )
@@ -4793,7 +4816,7 @@ impl Render for Manager {
                         self.c.page != 2 && self.c.update_busy && !self.c.checking,
                         |d| d.child(self.download_bar(cx)),
                     )
-                    .when(self.c.closing, |d| d.child(self.t("正在安全结束操作…"))),
+                    .when(self.c.closing, |d| d.child(self.t(self.c.close_status()))),
             )
     }
 }

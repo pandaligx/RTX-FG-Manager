@@ -82,6 +82,45 @@ pub fn versions(kind: &str) -> Vec<String> {
     versions.dedup();
     versions
 }
+/// Only when sharing a managed component: verify that its recorded package is
+/// still the installed package. No DLLs are executed or uploaded.
+pub fn installed_package_version(
+    target: &core::DeploymentTarget,
+    kind: &str,
+) -> Result<Option<String>> {
+    let Some(record) = read(target, kind)? else {
+        return Ok(None);
+    };
+    if !record.complete {
+        return Ok(None);
+    }
+    for version in versions(kind) {
+        let package = version_package(kind, &version)?;
+        let dlls = package
+            .files
+            .iter()
+            .filter(|a| a.name.ends_with(".dll"))
+            .collect::<Vec<_>>();
+        let mut same = true;
+        for asset in dlls {
+            let entry = record.entries.iter().find(|e| {
+                std::path::Path::new(&e.path)
+                    .file_name()
+                    .is_some_and(|n| n.eq_ignore_ascii_case(&asset.name))
+            });
+            if let Some(entry) = entry {
+                same &= entry.installed == asset.sha256
+                    && matches(&destination(target, kind, entry)?, &asset.sha256)?;
+            } else {
+                same = false;
+            }
+        }
+        if same {
+            return Ok(Some(version));
+        }
+    }
+    Ok(None)
+}
 fn prepare(
     kind: &str,
     github: bool,

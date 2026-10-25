@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import {presetMetadata} from './presets.mjs';
 import { ApiError, exact, need, recipe, gameId, text, uuid } from './contracts.mjs';
 import { authService } from './auth.mjs';
 import { gameDirectory } from './games.mjs';
@@ -15,6 +16,8 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1 };
+    if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
       return {ok:true};
@@ -24,10 +27,12 @@ export function createApi(db, options) {
     const user = auth.user(headers.authorization, method!=='GET');
     // Older test clients reject unknown JSON fields. Opt in to the feedback extension.
     const feedback=headers['x-rtxfg-feedback'];
-    const crossStore=['4','5'].includes(feedback);
+    const crossStore=['4','5','6','7'].includes(feedback);
     const context=url.searchParams.get('game');
     const card = (row,requested=context) => {
-      const result=publicRecipe(db,row,user,['2','3','4','5'].includes(feedback),['3','4','5'].includes(feedback),feedback==='5');
+      const result=publicRecipe(db,row,user,['2','3','4','5','6','7'].includes(feedback),['3','4','5','6','7'].includes(feedback),['5','6','7'].includes(feedback));
+      if(!['6','7'].includes(feedback)) delete result.content.presets;
+      if(feedback!=='7') delete result.content.runtimes;
       if(crossStore && requested) {
         need(games.resolve(requested)===games.resolve(row.game),'game_mismatch');
         result.content.game={id:requested,name:games.describe(requested).name};
@@ -117,7 +122,7 @@ export function createApi(db, options) {
             db.prepare("INSERT INTO audit(actor,action,target,created) VALUES('system','report_threshold_hide',?,?)").run(row.id,t);
           }
         }
-        return ['3','4','5'].includes(feedback) ? card(lookup(row.id)) : {ok:true};
+        return ['3','4','5','6','7'].includes(feedback) ? card(lookup(row.id)) : {ok:true};
       }
       need(!match[2],'not_found',404); need(row.author===user.id,'not_owner',403);
       if(method==='DELETE') {
@@ -129,6 +134,10 @@ export function createApi(db, options) {
       need(row.revision===body.revision,'revision_changed',409);
       const content=recipe(body.content); need(games.resolve(content.game.id)===games.resolve(row.game),'game_cannot_change');
       const original=JSON.parse(row.content);content.game=original.game;
+      // Legacy editors never saw this extension. Preserve it for metadata-only
+      // edits; a change of patch/project drops it instead of mixing protocols.
+      if(!['6','7'].includes(feedback) && original.presets && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.presets=original.presets;
+      if(feedback!=='7' && original.runtimes && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.runtimes=original.runtimes;
       if(!crossStore)for(const field of ['platform','edition'])if(original[field])content[field]=original[field];
       db.prepare('UPDATE recipes SET content=?,revision=revision+1,updated=? WHERE id=?').run(JSON.stringify(content),t,row.id);
       // Feedback belongs to the shared setup across edits. Keep the revision guard
@@ -154,7 +163,7 @@ export function createApi(db, options) {
           SELECT *,json_array(COALESCE((SELECT canonical FROM game_keys WHERE id=c.game),game),json_extract(content,'$.platform'),json_extract(content,'$.edition'),json_extract(content,'$.scheme'),json_extract(content,'$.patchVersion'),
           (SELECT json_group_array(value) FROM (SELECT value FROM json_each(json_extract(c.content,'$.entries')) ORDER BY value)),
           json_extract(content,'$.renderer'),json_extract(content,'$.gpuAlias'),json_extract(content,'$.neuralRuntime'),
-          lower(replace(json_extract(content,'$.gpuModel'),' ','')),json_extract(content,'$.driver')) duplicateKey
+          lower(replace(json_extract(content,'$.gpuModel'),' ','')),json_extract(content,'$.driver'),json_extract(content,'$.presets.values'),json_extract(content,'$.runtimes')) duplicateKey
           FROM candidates c), reviewed AS (SELECT *,COUNT(*) OVER(PARTITION BY duplicateKey) duplicateCount,
           (SELECT COUNT(*) FROM reports p JOIN users u ON u.id=p.user WHERE p.recipe=k.id AND p.active=1 AND u.blocked=0) reports FROM keyed k)`;
         const clauses=[],args=[];

@@ -26,7 +26,7 @@ def current_source_export_files():
         files.update(re.findall(r"'([^']+)'", group))
     files.update(re.findall(r"Add-File '([^']+)'", script))
     trees = re.findall(r"Add-Tree '([^']+)' @\(([^)]*)\)", script)
-    if len(trees) != 16:
+    if len(trees) != 17:
         raise AssertionError('Review the source exporter Add-Tree structure')
     for directory, group in trees:
         extensions = set(re.findall(r"'([^']+)'", group))
@@ -70,6 +70,8 @@ class SourceAllowlistTests(unittest.TestCase):
                          'tests/test_encore_cloud.py',
                          'tests/v429_encore_cloud.rs',
                          'recommendations/src/api.mjs', 'recommendations/Dockerfile',
+                         'recommendations/src/presets.mjs',
+                         'recommendations/src/preset-contracts.json',
                          'recommendations/config.example', 'recommendations/NODEMAILER-LICENSE'):
             self.assertIn(required, files)
         self.assertEqual(sum(path.startswith('rust/assets/themes/') and path.endswith('.json')

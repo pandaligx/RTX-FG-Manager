@@ -26,6 +26,8 @@ pub mod mfg_plugin;
 pub mod operation_history;
 pub mod preferences;
 pub mod presets;
+pub mod recommendation_presets;
+pub mod recommendation_runtimes;
 pub mod recommendations;
 pub mod release_notes;
 pub mod rtxmfg;

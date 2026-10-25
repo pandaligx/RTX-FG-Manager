@@ -107,6 +107,10 @@ impl Channel {
 }
 #[derive(Clone)]
 pub enum RetryAction {
+    Recommendation(
+        Box<rtx_fg_manager::recommendations::Recipe>,
+        rtx_fg_manager::recommendation_presets::Action,
+    ),
     Patch(bool, BTreeSet<String>),
     InstallNr(&'static str),
     RemoveNr,
@@ -2034,6 +2038,11 @@ impl Controller {
         }
         self.blocked = None;
         match request.action {
+            RetryAction::Recommendation(recipe, action) => {
+                if let Err(e) = self.use_recommendation(*recipe, action) {
+                    self.warning = Some(e.to_string());
+                }
+            }
             RetryAction::Patch(clean, paths) => self.perform(clean, paths),
             RetryAction::InstallNr(version) => self.install_neural_runtime(version),
             RetryAction::RemoveNr => self.remove_neural_runtime(),
@@ -2116,6 +2125,116 @@ impl Controller {
             c.send(Event::Notice(if remove { "运行库已恢复原件；管理器添加的文件已移除。" } else if kind == "xemfg" { "XeSS 运行库已安装。请在参数设置中启用独立 XeSS 多帧生成，再启动游戏；也可按 Backspace 设置。" } else { "DLSS 运行库已更新并保留原件备份。若游戏出现兼容问题，可在运行库窗口恢复。" }.into()));
             Ok(())
         });
+    }
+    pub fn use_recommendation(
+        &mut self,
+        recipe: rtx_fg_manager::recommendations::Recipe,
+        action: rtx_fg_manager::recommendation_presets::Action,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            !self.busy && !self.closing && !self.read_only,
+            "当前正在处理游戏，请稍后再试"
+        );
+        let game = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("请选择游戏"))?;
+        anyhow::ensure!(
+            rtx_fg_manager::recommendations::identify(&game, &self.game_names)
+                .is_some_and(|id| id.id == recipe.game.id),
+            "推荐不属于当前游戏"
+        );
+        let version = recipe.available_version(&self.catalog)?;
+        if action.parameters() {
+            recipe
+                .presets
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("此分享未附带参数，请选择仅安装方案"))?
+                .validate(&recipe.scheme, &version)?;
+        }
+        anyhow::ensure!(
+            self.first_pending_preset().is_none(),
+            "请先应用或放弃本机未应用的参数"
+        );
+        self.set_selection(
+            recipe.scheme.clone(),
+            self.cloud_series(),
+            recipe.entries.clone(),
+        );
+        self.selected.clear();
+        self.selected.insert(game.exe.clone());
+        if let Some(g) = self.games.iter_mut().find(|g| g.exe == game.exe) {
+            if let Some(name) = recipe.required_gpu_name() {
+                g.extra.insert(
+                    "recommendation_gpu".into(),
+                    json!({"scheme":recipe.scheme,"name":name}),
+                );
+            } else {
+                g.extra.remove("recommendation_gpu");
+            }
+        }
+        self.save();
+        self.status_epoch += 1;
+        self.busy = true;
+        self.critical = true;
+        self.progress = action.label().into();
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancel = self.cancel.clone();
+        let data = self.data.clone();
+        let mut catalog = self.catalog.clone();
+        catalog.prefer_github = self.choice("download_source", "domestic") == "github";
+        let series = self.cloud_series();
+        let retry = self.retry_request(RetryAction::Recommendation(
+            Box::new(recipe.clone()),
+            action,
+        ));
+        self.channel.operation(move |c| {
+            let targets = game.deployment_targets();
+            if defer_if_running(c, &targets, retry)? {
+                return Ok(());
+            }
+            for t in &targets {
+                ensure_directory_outside_data(&t.directory, &data)?;
+            }
+            rtx_fg_manager::recommendation_presets::execute(
+                &game,
+                &catalog,
+                &recipe,
+                action,
+                series,
+                &cancel,
+                |p| c.send(Event::PayloadProgress(p)),
+            )?;
+            if action.parameters()
+                && let Some(snapshot) =
+                    inspect_game_parameters(&game, &catalog, rtx_fg_manager::presets::inspect_at)?
+                        .values
+            {
+                c.send(Event::PresetApplied(
+                    game.exe.clone(),
+                    snapshot.0,
+                    snapshot.1,
+                ));
+            }
+            c.send(Event::Notice(
+                match action {
+                    rtx_fg_manager::recommendation_presets::Action::InstallAndApply => {
+                        "方案与运行库已安装，玩家参数已应用；下次启动游戏生效。"
+                    }
+                    rtx_fg_manager::recommendation_presets::Action::InstallOnly => {
+                        "方案已安装；玩家参数未应用。"
+                    }
+                    rtx_fg_manager::recommendation_presets::Action::ParametersOnly => {
+                        "玩家参数已应用；下次启动游戏生效。"
+                    }
+                }
+                .into(),
+            ));
+            Ok(())
+        });
+        Ok(())
     }
     pub fn install_neural_runtime(&mut self, version: &'static str) {
         if self.busy || self.closing || self.read_only {
@@ -3574,16 +3693,33 @@ impl Controller {
         self.runtime_catalog_load.pending = false;
         self.pending_runtime_catalog = None;
     }
+    pub fn close_status(&self) -> &'static str {
+        if self.critical {
+            "正在结束文件操作，请稍候…"
+        } else if self.hags_writing {
+            "正在保存 GPU 调度设置…"
+        } else if self.update_installing {
+            "正在完成管理器更新…"
+        } else {
+            "正在保存设置…"
+        }
+    }
     pub fn tick_close(&mut self) {
         if self.closing
             && !self.saved
             && !self.critical
             && !self.hags_writing
-            && (!self.update_busy || self.checking)
+            // A cancelled update download touches its private cache only and
+            // aria2 watches this process. Never wait for a network callback
+            // (or signature service) to allow the application to close.
+            && !self.update_installing
         {
             if let Some(store) = self.store.take() {
                 self.channel.job(move |c| {
-                    c.send(Event::Saved(store.finish()));
+                    let result =
+                        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| store.finish()))
+                            .unwrap_or_else(|_| Err(anyhow::anyhow!("设置保存线程异常")));
+                    c.send(Event::Saved(result));
                     Ok(())
                 });
             } else if self.read_only {
@@ -4661,6 +4797,37 @@ mod tests {
         assert!(c.store.is_none());
         assert!(c.cancel.load(Ordering::Relaxed));
         assert!(c.update_cancel.load(Ordering::Relaxed));
+    }
+    #[test]
+    fn close_does_not_require_cancelled_update_download_callback() {
+        let (_dir, mut c) = controller();
+        c.update_busy = true;
+        c.checking = false;
+        c.update_installing = false;
+        c.close();
+        c.tick_close();
+        assert!(c.store.is_none());
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while !c.saved && Instant::now() < deadline {
+            c.events();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(c.saved, "a stalled download must not trap safe exit");
+    }
+    #[test]
+    fn close_still_waits_for_installer_and_hags_write() {
+        let (_dir, mut c) = controller();
+        c.update_installing = true;
+        c.close();
+        c.tick_close();
+        assert!(c.store.is_some());
+        c.update_installing = false;
+        c.hags_writing = true;
+        c.tick_close();
+        assert!(c.store.is_some());
+        c.hags_writing = false;
+        c.tick_close();
+        assert!(c.store.is_none());
     }
     #[test]
     fn cancelled_update_cannot_publish_stale_result_or_restart_download() {

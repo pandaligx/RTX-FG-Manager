@@ -29,6 +29,8 @@ ALLOWED = {
     'recommendations/config.example', 'recommendations/nginx-location.conf', 'recommendations/README.md',
     'recommendations/NODEMAILER-LICENSE',
     'recommendations/src/game-directory.json',
+    'recommendations/src/preset-contracts.json',
+    'recommendations/public/icons/LICENSE',
     'tools/update_download_stats.py', 'tests/test_download_stats.py',
     'tools/sync_runtimes.py', 'tests/test_runtime_sync.py', '.github/workflows/sync-runtimes.yml',
     'docs/runtime-sync.md', 'cloud/runtime-catalog.json',
@@ -69,6 +71,7 @@ ALLOWED = {
 TREES = (
     (r'recommendations/src/[^/]+', {'.mjs'}),
     (r'recommendations/public/[^/]+', {'.html', '.css', '.js'}),
+    (r'recommendations/public/icons/[a-z-]+\.svg', {'.svg'}),
     (r'recommendations/tests/[^/]+', {'.mjs'}),
     (r'cloud/names/names-[0-9a-f]{20}\.json', {'.json'}),
     (r'help/[^/]+', {'.html', '.css', '.js'}),

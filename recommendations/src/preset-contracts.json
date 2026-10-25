@@ -1,0 +1,1992 @@
+{
+  "dlssg-transfusion-1.4.5.3": {
+    "profile": "rtx_encore_json_v4",
+    "fields": {
+      "tf_mode": {
+        "values": [
+          "game",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "dynamic"
+        ],
+        "label": "请求倍率",
+        "labels": {
+          "game": "跟随游戏",
+          "2": "2X",
+          "3": "3X",
+          "4": "4X",
+          "5": "5X（实验）",
+          "6": "6X（实验）",
+          "dynamic": "动态倍率"
+        }
+      },
+      "tf_target": {
+        "number": true,
+        "min": 0.0,
+        "max": 1000.0,
+        "integer": true,
+        "inherit": false,
+        "label": "动态目标帧率",
+        "labels": {}
+      },
+      "tf_dynamic56": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "动态允许5X/6X",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "smoothMotionEnabled": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "Smooth Motion",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "smoothMotionApi": {
+        "values": [
+          "d3d12",
+          "d3d11",
+          "vulkan"
+        ],
+        "label": "Smooth Motion图形接口",
+        "labels": {
+          "d3d12": "DirectX12",
+          "d3d11": "DirectX11",
+          "vulkan": "Vulkan"
+        }
+      },
+      "smoothMotionTuringVariant": {
+        "values": [
+          "v1",
+          "v2"
+        ],
+        "since": "1.3.0",
+        "label": "RTX 20 平滑运动版本",
+        "labels": {
+          "v1": "V1",
+          "v2": "V2"
+        }
+      },
+      "dlssRenderScale": {
+        "values": [
+          "game",
+          "dlaa",
+          "quality",
+          "balanced",
+          "performance",
+          "ultra-performance",
+          "custom"
+        ],
+        "label": "DLSS渲染比例",
+        "labels": {
+          "game": "跟随游戏",
+          "dlaa": "DLAA",
+          "quality": "质量",
+          "balanced": "平衡",
+          "performance": "性能",
+          "ultra-performance": "极致性能",
+          "custom": "自定义"
+        }
+      },
+      "dlssCustomScale": {
+        "number": true,
+        "min": 50.0,
+        "max": 100.0,
+        "integer": true,
+        "inherit": false,
+        "label": "DLSS自定义比例",
+        "labels": {}
+      },
+      "srSharpening": {
+        "values": [
+          "off",
+          "game",
+          "custom"
+        ],
+        "since": "1.2.2",
+        "label": "重建后锐化",
+        "labels": {
+          "off": "关闭",
+          "game": "跟随游戏",
+          "custom": "自定义"
+        }
+      },
+      "srSharpness": {
+        "number": true,
+        "min": 0.0,
+        "max": 100.0,
+        "integer": true,
+        "inherit": false,
+        "since": "1.2.2",
+        "label": "锐化强度（%）",
+        "labels": {}
+      },
+      "reflexFrameLimit": {
+        "number": true,
+        "min": 0.0,
+        "max": 1000.0,
+        "integer": true,
+        "inherit": false,
+        "label": "Reflex渲染帧率上限",
+        "labels": {}
+      },
+      "vsyncOff": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "请求关闭垂直同步",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "hairEnabled": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "光追毛发转换",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrEnabled": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "神经渲染",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrEngine": {
+        "values": [
+          "nvidia",
+          "opendlss"
+        ],
+        "until": "1.3.0",
+        "label": "神经渲染引擎",
+        "labels": {
+          "nvidia": "NVIDIA",
+          "opendlss": "Open（高度实验）"
+        }
+      },
+      "nrPasses": {
+        "number": true,
+        "min": 1.0,
+        "max": 4.0,
+        "integer": true,
+        "inherit": false,
+        "label": "神经渲染处理次数",
+        "labels": {}
+      },
+      "nrLaterPassLocalTone": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": false,
+        "label": "后续处理局部色调",
+        "labels": {}
+      },
+      "nrResolution": {
+        "values": [
+          "render",
+          "output",
+          "quality",
+          "balanced",
+          "performance",
+          "ultra-performance",
+          "custom"
+        ],
+        "label": "神经渲染分辨率",
+        "labels": {
+          "render": "跟随渲染分辨率",
+          "output": "输出分辨率",
+          "quality": "质量67%",
+          "balanced": "平衡58%",
+          "performance": "性能50%",
+          "ultra-performance": "极致性能33%",
+          "custom": "自定义"
+        }
+      },
+      "nrResolutionScale": {
+        "number": true,
+        "min": 33.0,
+        "max": 100.0,
+        "integer": true,
+        "inherit": false,
+        "label": "神经渲染自定义比例",
+        "labels": {}
+      },
+      "nrIntensity": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": false,
+        "label": "效果强度",
+        "labels": {}
+      },
+      "nrStyle": {
+        "values": [
+          "0",
+          "1",
+          "2"
+        ],
+        "label": "全局图像风格",
+        "labels": {
+          "0": "默认",
+          "1": "自然",
+          "2": "电影"
+        }
+      },
+      "nrLocalTone": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": false,
+        "label": "局部色调",
+        "labels": {}
+      },
+      "nrLocalStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": false,
+        "label": "局部结构",
+        "labels": {}
+      },
+      "nrAutoMask": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "自动角色遮罩",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrSkinStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": false,
+        "label": "皮肤结构",
+        "labels": {}
+      },
+      "nrHdrExposure": {
+        "number": true,
+        "min": null,
+        "max": null,
+        "integer": false,
+        "inherit": false,
+        "label": "HDR曝光",
+        "labels": {}
+      },
+      "nrPass1Style": {
+        "values": [
+          "inherit",
+          "default",
+          "natural",
+          "cinematic"
+        ],
+        "label": "第1次处理风格",
+        "labels": {
+          "inherit": "跟随全局",
+          "default": "默认",
+          "natural": "自然",
+          "cinematic": "电影"
+        }
+      },
+      "nrPass2Style": {
+        "values": [
+          "inherit",
+          "default",
+          "natural",
+          "cinematic"
+        ],
+        "label": "第2次处理风格",
+        "labels": {
+          "inherit": "跟随全局",
+          "default": "默认",
+          "natural": "自然",
+          "cinematic": "电影"
+        }
+      },
+      "nrPass3Style": {
+        "values": [
+          "inherit",
+          "default",
+          "natural",
+          "cinematic"
+        ],
+        "label": "第3次处理风格",
+        "labels": {
+          "inherit": "跟随全局",
+          "default": "默认",
+          "natural": "自然",
+          "cinematic": "电影"
+        }
+      },
+      "nrPass4Style": {
+        "values": [
+          "inherit",
+          "default",
+          "natural",
+          "cinematic"
+        ],
+        "label": "第4次处理风格",
+        "labels": {
+          "inherit": "跟随全局",
+          "default": "默认",
+          "natural": "自然",
+          "cinematic": "电影"
+        }
+      },
+      "nrPrecision": {
+        "values": [
+          "exact",
+          "fast"
+        ],
+        "label": "NVIDIA运算精度",
+        "labels": {
+          "exact": "精确",
+          "fast": "快速"
+        }
+      },
+      "nrFastProcessing": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "NVIDIA快速处理",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrFoveation": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.3.0",
+        "label": "中央优先 NR（实验）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrFoveaPreset": {
+        "values": [
+          "light",
+          "balanced",
+          "strong",
+          "custom"
+        ],
+        "since": "1.3.0",
+        "label": "中央优先 NR 预设",
+        "labels": {
+          "light": "轻度",
+          "balanced": "均衡",
+          "strong": "强度",
+          "custom": "自定义"
+        }
+      },
+      "nrFoveaWidth": {
+        "number": true,
+        "min": 1.0,
+        "max": 100.0,
+        "integer": true,
+        "inherit": false,
+        "since": "1.3.0",
+        "label": "中央区域宽度（%）",
+        "labels": {}
+      },
+      "nrFoveaHeight": {
+        "number": true,
+        "min": 1.0,
+        "max": 100.0,
+        "integer": true,
+        "inherit": false,
+        "since": "1.3.0",
+        "label": "中央区域高度（%）",
+        "labels": {}
+      },
+      "nrFoveaFalloff": {
+        "number": true,
+        "min": 0.0,
+        "max": 100.0,
+        "integer": true,
+        "inherit": false,
+        "since": "1.3.0",
+        "label": "每侧过渡宽度（%）",
+        "labels": {}
+      },
+      "nrFoveaEdge": {
+        "number": true,
+        "min": 25.0,
+        "max": 100.0,
+        "integer": true,
+        "inherit": false,
+        "since": "1.3.0",
+        "label": "边缘 NR 细节（%）",
+        "labels": {}
+      },
+      "nrPaddingAware": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "尺寸填充优化",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrMaxInFlight": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": true,
+        "inherit": false,
+        "label": "NR并行帧数限制",
+        "labels": {}
+      },
+      "nrOpenBackend": {
+        "values": [
+          "disabled",
+          "rtx30",
+          "rtx40",
+          "compat"
+        ],
+        "until": "1.3.0",
+        "label": "Open硬件后端",
+        "labels": {
+          "disabled": "未选择",
+          "rtx30": "RTX30（实验）",
+          "rtx40": "RTX40/50",
+          "compat": "兼容验证（很慢）"
+        }
+      },
+      "nrOpenExecution": {
+        "values": [
+          "dedicated",
+          "shared",
+          "in_game"
+        ],
+        "until": "1.3.0",
+        "label": "Open执行路径",
+        "labels": {
+          "dedicated": "独立设备",
+          "shared": "共享设备（实验）",
+          "in_game": "游戏命令列表（实验）"
+        }
+      },
+      "nrOpenVramForSpeed": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "until": "1.3.0",
+        "label": "Open显存换速度",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrOpenFastProjection": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "until": "1.3.0",
+        "label": "Open快速投影",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrOpenSharedLoads": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "until": "1.3.0",
+        "label": "Open共享加载",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrOpenFast": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "until": "1.3.0",
+        "label": "Open快速精度",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrOpenUltraFast": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "until": "1.3.0",
+        "label": "Open超快速模式",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrOpenUltraFastGhostTolerance": {
+        "number": true,
+        "min": 0.0,
+        "max": 0.3,
+        "integer": false,
+        "inherit": false,
+        "until": "1.3.0",
+        "label": "超快速拖影容差",
+        "labels": {}
+      },
+      "nrOpenUltraFastFillTolerance": {
+        "number": true,
+        "min": 0.0,
+        "max": 0.3,
+        "integer": false,
+        "inherit": false,
+        "until": "1.3.0",
+        "label": "超快速填充容差",
+        "labels": {}
+      },
+      "nrOpenSeed": {
+        "number": true,
+        "min": 0.0,
+        "max": 4294967295.0,
+        "integer": true,
+        "inherit": false,
+        "until": "1.3.0",
+        "label": "Open噪声种子",
+        "labels": {}
+      },
+      "nrUiCorrection": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "模型界面修正",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "dlssNrPreset": {
+        "values": [
+          "b",
+          "a",
+          "auto"
+        ],
+        "label": "NR 模型预设",
+        "labels": {
+          "b": "B · 较小网络",
+          "a": "A · 较大网络",
+          "auto": "DLL 默认"
+        }
+      },
+      "highMultiplierQuality": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "高倍率画质保护",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "frameProtection": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "生成帧保护",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "fastFrameGeneration": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "快速帧生成",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "protectionTuning": {
+        "values": [
+          "refined",
+          "classic"
+        ],
+        "label": "帧保护策略",
+        "labels": {
+          "refined": "精细",
+          "classic": "经典"
+        }
+      },
+      "autoUiRecomposition": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "自动UI重组",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "uiAssist": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "D3D12界面辅助",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "forceUiRecomposition": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "强制UI重组",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "flipMeteringBypass": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "平滑 X3 / X4",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "smoothMotionForce": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "until": "1.2.0-beta.1",
+        "label": "强制 Vulkan Smooth Motion",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "dlssSrPreset": {
+        "values": [
+          "game",
+          "default",
+          "a",
+          "b",
+          "c",
+          "d",
+          "e",
+          "f",
+          "j",
+          "k",
+          "l",
+          "m"
+        ],
+        "label": "DLSS 超分预设",
+        "labels": {
+          "game": "跟随游戏 / 预设",
+          "default": "DLL 默认",
+          "a": "A",
+          "b": "B",
+          "c": "C",
+          "d": "D",
+          "e": "E",
+          "f": "F",
+          "j": "J",
+          "k": "K",
+          "l": "L",
+          "m": "M"
+        }
+      },
+      "dlssRrPreset": {
+        "values": [
+          "game",
+          "default",
+          "a",
+          "b",
+          "c",
+          "d",
+          "e"
+        ],
+        "label": "光线重建预设",
+        "labels": {
+          "game": "跟随游戏 / 预设",
+          "default": "DLL 默认",
+          "a": "A",
+          "b": "B",
+          "c": "C",
+          "d": "D",
+          "e": "E"
+        }
+      },
+      "dlssFgPreset": {
+        "values": [
+          "game",
+          "a",
+          "b",
+          "c"
+        ],
+        "label": "DLSS 帧生成预设",
+        "labels": {
+          "game": "跟随游戏 / 预设",
+          "a": "A",
+          "b": "B",
+          "c": "C"
+        }
+      },
+      "fastSuperResolution": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "快速超分（RTX 30）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "reconstructionEngine": {
+        "values": [
+          "game",
+          "xess"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "重建引擎",
+        "labels": {
+          "game": "跟随游戏",
+          "xess": "Intel XeSS（实验）"
+        }
+      },
+      "frameGenerationEngine": {
+        "values": [
+          "game",
+          "xefg"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "帧生成引擎",
+        "labels": {
+          "game": "跟随游戏",
+          "xefg": "Intel XeFG（实验）"
+        }
+      },
+      "xefgMfg4VariablePacing": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "XeFG 多帧可变节奏",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "xefgUiHandling": {
+        "values": [
+          "interpolate",
+          "game"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "XeFG 界面处理",
+        "labels": {
+          "interpolate": "插值处理",
+          "game": "跟随游戏"
+        }
+      },
+      "xefgUiAlpha": {
+        "values": [
+          "unknown",
+          "straight",
+          "premultiplied"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "XeFG 界面透明度格式",
+        "labels": {
+          "unknown": "自动 / 未知",
+          "straight": "直通 Alpha",
+          "premultiplied": "预乘 Alpha"
+        }
+      },
+      "srHdr": {
+        "values": [
+          "game",
+          "on",
+          "off"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "超分输入 HDR",
+        "labels": {
+          "game": "跟随游戏",
+          "on": "开启",
+          "off": "关闭"
+        }
+      },
+      "srAutoExposure": {
+        "values": [
+          "game",
+          "on",
+          "off"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "超分自动曝光",
+        "labels": {
+          "game": "跟随游戏",
+          "on": "开启",
+          "off": "关闭"
+        }
+      },
+      "nrPass1Intensity": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 1 遍强度",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass1LocalStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 1 遍局部结构",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass1LocalTone": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 1 遍局部色调",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass1SkinStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 1 遍皮肤结构",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass1AutoMask": {
+        "values": [
+          "inherit",
+          "0",
+          "1"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 1 遍人物遮罩",
+        "labels": {
+          "inherit": "跟随游戏",
+          "1": "开启",
+          "0": "关闭"
+        }
+      },
+      "nrPass2Intensity": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 2 遍强度",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass2LocalStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 2 遍局部结构",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass2LocalTone": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 2 遍局部色调",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass2SkinStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 2 遍皮肤结构",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass2AutoMask": {
+        "values": [
+          "inherit",
+          "0",
+          "1"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 2 遍人物遮罩",
+        "labels": {
+          "inherit": "跟随游戏",
+          "1": "开启",
+          "0": "关闭"
+        }
+      },
+      "nrPass3Intensity": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 3 遍强度",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass3LocalStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 3 遍局部结构",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass3LocalTone": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 3 遍局部色调",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass3SkinStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 3 遍皮肤结构",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass3AutoMask": {
+        "values": [
+          "inherit",
+          "0",
+          "1"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 3 遍人物遮罩",
+        "labels": {
+          "inherit": "跟随游戏",
+          "1": "开启",
+          "0": "关闭"
+        }
+      },
+      "nrPass4Intensity": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 4 遍强度",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass4LocalStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 4 遍局部结构",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass4LocalTone": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 4 遍局部色调",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass4SkinStructure": {
+        "number": true,
+        "min": 0.0,
+        "max": 2.0,
+        "integer": false,
+        "inherit": true,
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 4 遍皮肤结构",
+        "labels": {
+          "inherit": "继承全局",
+          "1": "100%"
+        }
+      },
+      "nrPass4AutoMask": {
+        "values": [
+          "inherit",
+          "0",
+          "1"
+        ],
+        "since": "1.2.0-beta.1",
+        "label": "NR 第 4 遍人物遮罩",
+        "labels": {
+          "inherit": "跟随游戏",
+          "1": "开启",
+          "0": "关闭"
+        }
+      },
+      "nrPlacement": {
+        "values": [
+          "after-sr",
+          "before-sr"
+        ],
+        "since": "1.4.0",
+        "label": "NR 处理位置",
+        "labels": {
+          "after-sr": "Post-SR（默认）",
+          "before-sr": "Pre-SR（实验）"
+        }
+      },
+      "nrPass1Preset": {
+        "values": [
+          "inherit",
+          "auto",
+          "a",
+          "b"
+        ],
+        "since": "1.4.0",
+        "label": "NR 第 1 遍模型",
+        "labels": {
+          "inherit": "继承全局",
+          "auto": "运行库默认",
+          "a": "A",
+          "b": "B"
+        }
+      },
+      "nrPass2Preset": {
+        "values": [
+          "inherit",
+          "auto",
+          "a",
+          "b"
+        ],
+        "since": "1.4.0",
+        "label": "NR 第 2 遍模型",
+        "labels": {
+          "inherit": "继承全局",
+          "auto": "运行库默认",
+          "a": "A",
+          "b": "B"
+        }
+      },
+      "nrPass3Preset": {
+        "values": [
+          "inherit",
+          "auto",
+          "a",
+          "b"
+        ],
+        "since": "1.4.0",
+        "label": "NR 第 3 遍模型",
+        "labels": {
+          "inherit": "继承全局",
+          "auto": "运行库默认",
+          "a": "A",
+          "b": "B"
+        }
+      },
+      "nrPass4Preset": {
+        "values": [
+          "inherit",
+          "auto",
+          "a",
+          "b"
+        ],
+        "since": "1.4.0",
+        "label": "NR 第 4 遍模型",
+        "labels": {
+          "inherit": "继承全局",
+          "auto": "运行库默认",
+          "a": "A",
+          "b": "B"
+        }
+      }
+    }
+  },
+  "rtx40mfg-1.3.3-hf2": {
+    "profile": "rtxmfg_universal_133",
+    "fields": {
+      "rtx_mode": {
+        "values": [
+          "follow",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "dynamic"
+        ],
+        "label": "请求倍率",
+        "labels": {
+          "follow": "跟随游戏",
+          "1": "1X",
+          "2": "2X",
+          "3": "3X",
+          "4": "4X",
+          "5": "5X",
+          "6": "6X",
+          "dynamic": "动态多帧（仅 DX12）"
+        }
+      },
+      "rtx_target": {
+        "number": true,
+        "min": 0,
+        "max": 1000,
+        "integer": true,
+        "label": "动态目标帧率",
+        "labels": {
+          "0": "跟随显示器刷新率",
+          "60": "60 FPS",
+          "90": "90 FPS",
+          "120": "120 FPS",
+          "144": "144 FPS",
+          "165": "165 FPS",
+          "180": "180 FPS",
+          "240": "240 FPS",
+          "360": "360 FPS"
+        }
+      },
+      "rtx_preset": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "label": "DLSS 帧生成预设",
+        "labels": {
+          "0": "跟随游戏 / 驱动",
+          "1": "A",
+          "2": "B",
+          "3": "C · 性能模式"
+        }
+      },
+      "rtx_vsync": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "垂直同步",
+        "labels": {
+          "0": "跟随游戏",
+          "1": "关闭"
+        }
+      },
+      "rtx_sr_preset": {
+        "values": [
+          "0",
+          "10",
+          "11",
+          "12",
+          "13"
+        ],
+        "since": "1.6.0",
+        "label": "DLSS 超分辨率预设",
+        "labels": {
+          "0": "跟随游戏 / 驱动",
+          "10": "J",
+          "11": "K",
+          "12": "L",
+          "13": "M"
+        }
+      },
+      "rtx_rr_preset": {
+        "values": [
+          "0",
+          "4",
+          "5",
+          "6"
+        ],
+        "since": "1.6.0",
+        "label": "DLSS 光线重建预设",
+        "labels": {
+          "0": "跟随游戏 / 驱动",
+          "4": "D",
+          "5": "E",
+          "6": "F（驱动 580+）"
+        }
+      },
+      "rtx_flip_metering": {
+        "values": [
+          "1",
+          "0"
+        ],
+        "since": "1.6.0",
+        "label": "RTX 30 帧调度",
+        "labels": {
+          "1": "驱动调度（默认）",
+          "0": "旧版 CPU 调度"
+        }
+      },
+      "rtx_gpu_override": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.6.0",
+        "label": "解锁游戏帧生成选项（实验）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启（仅当前游戏）"
+        }
+      },
+      "rtx_reflex_limit": {
+        "number": true,
+        "min": 0,
+        "max": 1000,
+        "integer": true,
+        "label": "Reflex 帧率限制",
+        "labels": {
+          "0": "关闭",
+          "60": "60 FPS",
+          "90": "90 FPS",
+          "120": "120 FPS",
+          "144": "144 FPS",
+          "165": "165 FPS",
+          "180": "180 FPS",
+          "240": "240 FPS",
+          "360": "360 FPS"
+        }
+      },
+      "rtx_nr": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.7.0",
+        "label": "DLSS 神经渲染",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "rtx_nr_stage": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "since": "1.7.0",
+        "label": "NR 处理位置",
+        "labels": {
+          "0": "自动",
+          "1": "超分前（DX12）",
+          "2": "超分后",
+          "3": "Present（DX12）"
+        }
+      },
+      "rtx_nr_preset": {
+        "values": [
+          "0",
+          "1",
+          "2"
+        ],
+        "since": "1.7.0",
+        "label": "NR 模型预设",
+        "labels": {
+          "0": "运行库默认",
+          "1": "A",
+          "2": "B"
+        }
+      },
+      "rtx_nr_scale_auto": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.7.0",
+        "label": "NR 自动分辨率",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "rtx_nr_scale": {
+        "number": true,
+        "min": 0,
+        "max": 200,
+        "since": "1.7.0",
+        "label": "NR 分辨率比例",
+        "labels": {
+          "75": "75%",
+          "85": "85%",
+          "100": "100%"
+        }
+      },
+      "rtx_nr_intensity": {
+        "number": true,
+        "min": 0,
+        "max": 1,
+        "since": "1.7.0",
+        "label": "NR 强度",
+        "labels": {
+          "0": "0%",
+          "0.25": "25%",
+          "0.5": "50%",
+          "0.75": "75%",
+          "1": "100%"
+        }
+      },
+      "rtx_nr_passes": {
+        "values": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "since": "1.7.0",
+        "label": "NR 处理遍数",
+        "labels": {
+          "1": "1",
+          "2": "2",
+          "3": "3",
+          "4": "4",
+          "5": "5",
+          "6": "6",
+          "7": "7",
+          "8": "8",
+          "9": "9",
+          "10": "10"
+        }
+      },
+      "rtx_nr_half": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.7.0",
+        "label": "NR 隔帧处理（DX12）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "rtx_xemfg": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.7.0",
+        "label": "独立 XeSS 多帧生成（实验）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "rtx_xemfg_frames": {
+        "values": [
+          "2",
+          "3",
+          "4",
+          "5",
+          "6"
+        ],
+        "since": "1.7.0",
+        "label": "XeSS 最大倍率",
+        "labels": {
+          "2": "2X",
+          "3": "3X",
+          "4": "4X",
+          "5": "5X",
+          "6": "6X"
+        }
+      },
+      "rtx_xemfg_dynamic": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.7.0",
+        "label": "XeSS 动态倍率",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "rtx_xemfg_target": {
+        "number": true,
+        "min": 0,
+        "max": 1000,
+        "integer": true,
+        "since": "1.7.0",
+        "label": "XeSS 动态目标帧率",
+        "labels": {
+          "0": "自动",
+          "60": "60 FPS",
+          "120": "120 FPS",
+          "144": "144 FPS",
+          "165": "165 FPS",
+          "240": "240 FPS"
+        }
+      },
+      "rtx_xemfg_rounding": {
+        "values": [
+          "0",
+          "1",
+          "2"
+        ],
+        "since": "1.7.0",
+        "label": "XeSS 倍率取整",
+        "labels": {
+          "0": "不超过目标",
+          "1": "最接近目标",
+          "2": "达到目标"
+        }
+      },
+      "rtx_xemfg_allow1x": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.7.0",
+        "label": "XeSS 允许回到 1X",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "rtx_xemfg_cap": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.7.0",
+        "label": "XeSS 使用目标限帧",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      }
+    }
+  },
+  "upstream-0.3.5-310-9": {
+    "profile": "upstream040",
+    "fields": {
+      "enabled": {
+        "values": [
+          "1",
+          "0"
+        ],
+        "label": "补丁开关",
+        "labels": {
+          "1": "开启",
+          "0": "关闭"
+        }
+      },
+      "optimized": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "label": "内核模式",
+        "labels": {
+          "0": "0 · 原厂数值",
+          "1": "1 · 逐位一致",
+          "2": "2 · 上游默认（有损加速）",
+          "3": "3 · 最快（有损）"
+        }
+      },
+      "max_generated_frames": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "label": "倍率上限",
+        "labels": {
+          "0": "运行库默认",
+          "1": "2X",
+          "2": "3X",
+          "3": "4X（推荐）",
+          "4": "5X",
+          "5": "6X"
+        }
+      },
+      "preset": {
+        "values": [
+          "Auto",
+          "A",
+          "B",
+          "C"
+        ],
+        "label": "DLSS 帧生成预设",
+        "labels": {
+          "Auto": "Auto · 自动",
+          "A": "A · 关闭 UI 重组",
+          "B": "B · 开启 UI 重组",
+          "C": "C · 性能模式"
+        }
+      },
+      "logging_level": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "label": "日志级别",
+        "labels": {
+          "0": "0 · 关闭",
+          "1": "1 · 仅错误（推荐）",
+          "2": "2 · 诊断",
+          "3": "3 · 详细"
+        }
+      },
+      "fg_engine": {
+        "values": [
+          "DLSS",
+          "XeSS"
+        ],
+        "label": "帧生成引擎",
+        "labels": {
+          "DLSS": "DLSS",
+          "XeSS": "XeSS · 2X"
+        }
+      },
+      "sr_mode": {
+        "values": [
+          "Off",
+          "On",
+          "M-INT8",
+          "L-INT8",
+          "M-FP16",
+          "L-FP16"
+        ],
+        "label": "超分模式",
+        "labels": {
+          "Off": "关闭",
+          "On": "INT8 · 保留游戏预设",
+          "M-INT8": "强制 M · INT8",
+          "L-INT8": "强制 L · INT8",
+          "M-FP16": "强制 M · FP16 对照",
+          "L-FP16": "强制 L · FP16 对照"
+        }
+      },
+      "sr_tier": {
+        "values": [
+          "Auto",
+          "Quality",
+          "Balanced",
+          "Performance",
+          "UltraPerformance"
+        ],
+        "label": "超分作用档位",
+        "labels": {
+          "Auto": "全部档位",
+          "Quality": "质量",
+          "Balanced": "平衡",
+          "Performance": "性能",
+          "UltraPerformance": "极致性能"
+        }
+      },
+      "xess_flow": {
+        "values": [
+          "Coarse",
+          "Middle",
+          "Fine"
+        ],
+        "label": "XeSS 光流分辨率",
+        "labels": {
+          "Coarse": "粗",
+          "Middle": "中",
+          "Fine": "细"
+        }
+      },
+      "xess_hudless": {
+        "values": [
+          "1",
+          "0"
+        ],
+        "label": "XeSS 使用无 HUD 输入",
+        "labels": {
+          "1": "开启",
+          "0": "关闭"
+        }
+      },
+      "frame_timing": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "帧时间日志",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      }
+    }
+  },
+  "rtxfg-0.3.5-dx12-vulkan": {
+    "profile": "upstream035",
+    "fields": {
+      "enabled": {
+        "values": [
+          "1",
+          "0"
+        ],
+        "label": "补丁开关",
+        "labels": {
+          "1": "开启",
+          "0": "关闭"
+        }
+      },
+      "optimized": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "label": "内核模式",
+        "labels": {
+          "0": "0 · 原厂数值",
+          "1": "1 · 逐位一致（推荐）",
+          "2": "2 · 更快（有损）",
+          "3": "3 · 最快（有损）"
+        }
+      },
+      "max_generated_frames": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "label": "倍率上限",
+        "labels": {
+          "0": "运行库默认",
+          "1": "2X",
+          "2": "3X",
+          "3": "4X（推荐）",
+          "4": "5X",
+          "5": "6X"
+        }
+      },
+      "preset": {
+        "values": [
+          "Auto",
+          "A",
+          "B"
+        ],
+        "label": "UI 重组预设",
+        "labels": {
+          "Auto": "Auto · 自动",
+          "A": "A · 关闭 UI 重组",
+          "B": "B · 开启 UI 重组"
+        }
+      },
+      "logging_level": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "label": "日志级别",
+        "labels": {
+          "0": "0 · 关闭",
+          "1": "1 · 仅错误（推荐）",
+          "2": "2 · 诊断",
+          "3": "3 · 详细"
+        }
+      }
+    }
+  },
+  "pipotoufik-mfg-vulkan-sm86-7": {
+    "profile": "mfg_vulkan_sm86_7",
+    "fields": {
+      "max_interpolated_frames": {
+        "values": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "label": "倍率上限",
+        "labels": {
+          "1": "2X",
+          "2": "3X",
+          "3": "4X",
+          "4": "5X",
+          "5": "6X（默认）"
+        }
+      },
+      "force_multiplier": {
+        "values": [
+          "0",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6"
+        ],
+        "label": "请求倍率",
+        "labels": {
+          "0": "跟随游戏",
+          "2": "2X",
+          "3": "3X",
+          "4": "4X",
+          "5": "5X",
+          "6": "6X"
+        }
+      },
+      "dynamic_mfg": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "动态多帧（兼容 DX12）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "dynamic_target_fps": {
+        "values": [
+          "0",
+          "60",
+          "90",
+          "120",
+          "144",
+          "165",
+          "180",
+          "240",
+          "360"
+        ],
+        "label": "动态目标帧率",
+        "labels": {
+          "0": "跟随游戏",
+          "60": "60 FPS",
+          "90": "90 FPS",
+          "120": "120 FPS",
+          "144": "144 FPS",
+          "165": "165 FPS",
+          "180": "180 FPS",
+          "240": "240 FPS",
+          "360": "360 FPS"
+        }
+      },
+      "mfg_logging": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "补丁日志",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "mfg_bilinear": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "双线性采样优化",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "conv13_shared": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "卷积输入复用 · k13",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "conv0_shared": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "卷积输入复用 · k0",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      },
+      "residual_vector": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "label": "残差向量读取优化",
+        "labels": {
+          "0": "关闭",
+          "1": "开启"
+        }
+      }
+    }
+  }
+}

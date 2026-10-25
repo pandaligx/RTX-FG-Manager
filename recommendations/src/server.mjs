@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openStore } from './store.mjs';
@@ -28,6 +28,9 @@ const assets=new Map([
   ['/admin.css',{type:'text/css; charset=utf-8',bytes:readFileSync(resolve(root,'../public/admin.css'))}],
 ]);
 assets.set('/',assets.get('/admin'));
+for(const name of readdirSync(resolve(root,'../public/icons')).filter(n=>/^[a-z-]+\.svg$/.test(n))) {
+  assets.set('/icons/'+name,{type:'image/svg+xml',bytes:readFileSync(resolve(root,'../public/icons',name))});
+}
 const server=httpServer(api,{origin:env.PUBLIC_ORIGIN || 'https://recommend.lgxng.cn',trustProxy:env.TRUST_PROXY==='1',assets});
 server.listen(Number(env.PORT || 8080),env.HOST || '127.0.0.1',()=>console.log('recommendations_ready'));
 for(const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>{

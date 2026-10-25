@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { presetSnapshot } from './presets.mjs';
+import { runtimeSnapshot } from './runtimes.mjs';
 
 export class ApiError extends Error {
   constructor(code, status = 400) { super(code); this.status = status; }
@@ -45,7 +47,7 @@ export const schemes = {
   'pipotoufik-mfg-vulkan-sm86-7': ['version.dll'],
 };
 export function recipe(input) {
-  exact(input, ['schema','game','title','notes','scheme','patchVersion','entries','renderer','gpuModel','driver','gpuAlias','neuralRuntime','platform','edition']);
+  exact(input, ['schema','game','title','notes','scheme','patchVersion','entries','renderer','gpuModel','driver','gpuAlias','neuralRuntime','platform','edition','presets','runtimes']);
   need(input.schema === 1, 'unsupported_schema');
   exact(input.game, ['id','name']);
   const game = { id: gameId(input.game.id), name: text(input.game.name, 120) };
@@ -64,6 +66,8 @@ export function recipe(input) {
   need(['none','310.9.16','unknown'].includes(input.neuralRuntime), 'invalid_neural_runtime');
   need(input.platform===undefined || ['unknown','steam','epic','ea','gog','ubisoft','xbox','battlenet','wegame','hoyo','cube','sonkwo','standalone'].includes(input.platform),'invalid_platform');
   return { schema: 1, game, title: text(input.title, 80), notes: text(input.notes || '', 500, true),
+    ...(input.presets===undefined?{}:{presets:presetSnapshot(input.presets,input.scheme,input.patchVersion)}),
+    ...(input.runtimes===undefined?{}:{runtimes:runtimeSnapshot(input.runtimes)}),
     ...(input.platform?{platform:input.platform}:{}),...(input.edition?{edition:text(input.edition,80)}:{}),
     scheme: input.scheme, patchVersion: input.patchVersion, entries: input.entries,
     renderer: input.renderer, gpuModel: text(input.gpuModel || '', 80, true),

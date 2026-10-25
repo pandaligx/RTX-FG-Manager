@@ -1,5 +1,5 @@
 //! Game-scoped deployment recipes. Community content never supplies file paths,
-//! download URLs or commands. Selecting a recipe only changes the local choices.
+//! download URLs or commands. Installation and parameter application are explicit actions.
 use crate::{cloud, core, game_names, neural_runtime, scanner::Game};
 use anyhow::{Context, Result, ensure};
 use reqwest::{Method, blocking::Client as Http};
@@ -220,6 +220,10 @@ pub struct Recipe {
     pub driver: String,
     pub gpu_alias: String,
     pub neural_runtime: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presets: Option<crate::recommendation_presets::Snapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtimes: Option<crate::recommendation_runtimes::Snapshot>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub platform: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -243,6 +247,12 @@ impl Recipe {
     /// Reading historical cards must not depend on the currently available downloads.
     fn validate_public(&self) -> Result<()> {
         ensure!(self.schema == 1, "此推荐需要更新管理器");
+        if let Some(presets) = &self.presets {
+            presets.validate(&self.scheme, &self.patch_version)?;
+        }
+        if let Some(runtimes) = &self.runtimes {
+            runtimes.validate()?;
+        }
         self.game.validate()?;
         ensure!(
             [
@@ -332,7 +342,8 @@ impl Recipe {
         }
     }
 }
-/// Read records and lightweight NR metadata only. No hashing/downloading game DLLs.
+/// Read applied settings and runtime version resources. Known managed XeSS SDK
+/// association checks its two owned DLL hashes; no game DLL is uploaded or run.
 pub fn installed_recipe(
     game: &Game,
     identity: GameIdentity,
@@ -377,13 +388,24 @@ pub fn installed_recipe(
             } else {
                 "none".into()
             },
+            presets: None,
+            runtimes: Some(crate::recommendation_runtimes::capture(&target)?),
         };
+        let mut current = current;
+        current.presets = Some(crate::recommendation_presets::capture(
+            &target,
+            catalog,
+            &current.scheme,
+            &current.patch_version,
+        )?);
         current.validate(catalog)?;
         if let Some(old) = &found {
             ensure!(
                 old.scheme == current.scheme
                     && old.entries == current.entries
                     && old.patch_version == current.patch_version
+                    && old.presets == current.presets
+                    && old.runtimes == current.runtimes
                     && old.neural_runtime == current.neural_runtime,
                 "多个目录安装的方案不一致，请先统一后再分享"
             );
@@ -645,7 +667,7 @@ impl Client {
         let mut request = self
             .http
             .request(method, format!("{}{route}", self.origin()))
-            .header("X-RTXFG-Feedback", "5");
+            .header("X-RTXFG-Feedback", "7");
         let session = if authenticated {
             Some(self.active_session()?.ok_or(ServiceError::LoginExpired)?)
         } else {
@@ -729,10 +751,23 @@ impl Client {
     }
     fn cache_path(&self, id: &str) -> PathBuf {
         self.root
-            .join(format!("{:x}.json", Sha256::digest(id.as_bytes())))
+            .join(format!("{:x}.setup-v2.json", Sha256::digest(id.as_bytes())))
     }
     pub fn cached(&self, game: &GameIdentity, catalog: &cloud::Catalog) -> Option<Page> {
-        let b = fs::read(self.cache_path(&game.id)).ok()?;
+        let b = fs::read(self.cache_path(&game.id))
+            .or_else(|_| {
+                fs::read(self.root.join(format!(
+                    "{:x}.presets-v1.json",
+                    Sha256::digest(game.id.as_bytes())
+                )))
+            })
+            .or_else(|_| {
+                fs::read(
+                    self.root
+                        .join(format!("{:x}.json", Sha256::digest(game.id.as_bytes()))),
+                )
+            })
+            .ok()?;
         if b.len() > RESPONSE_LIMIT as usize {
             return None;
         }
@@ -942,6 +977,12 @@ fn error_message(code: &str) -> &'static str {
         "revision_changed" => "此方案已更新，请刷新后再操作",
         "game_mismatch" | "game_cannot_change" => "游戏关联已变化，请刷新后重新选择",
         "private_or_unsafe_text" => "备注不能包含路径、链接或敏感信息",
+        "invalid_preset_protocol" | "unsupported_preset_version" => {
+            "分享参数与补丁版本不匹配，请重新读取已安装方案"
+        }
+        "invalid_preset_snapshot" | "invalid_preset_value" | "invalid_preset_combination" => {
+            "分享参数不完整或数值无效，请检查当前游戏设置"
+        }
         "not_found" => "此方案已被移除或隐藏，请刷新",
         "own_recipe_like" => "不能评价自己的方案",
         "own_recipe_report" => "不能举报自己的方案",

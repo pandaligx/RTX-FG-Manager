@@ -1,6 +1,6 @@
 [package]
 name = "rtx-fg-manager"
-version = "4.3.10"
+version = "4.3.11"
 edition = "2024"
 publish = false
 build = "rust/build.rs"
@@ -12,6 +12,7 @@ include = [
     "tests/*.rs",
     "tests/fixture-manifest.json",
     "tests/fixtures/catalog*/**",
+    "recommendations/src/preset-contracts.json",
     "app/assets/**",
     "app/locales/**",
     "app/tools/**",

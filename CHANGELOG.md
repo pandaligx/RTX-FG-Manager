@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.11
+
+- Share applied preset parameters with player recommendations. Show only changed settings in a compact default-to-player comparison, with separate Install and apply, Install scheme only, and Apply parameters only actions. Validate patch compatibility and runtime dependencies before applying across game folders.
+- Visualize numeric changes with comparison bars and discrete settings with value chips. Share installed DLSS / XeSS versions and their sources; complete setup uses matching supported versions instead of silently substituting newer files. Explain unavailable versions while keeping scheme-only installation available.
+- Compact the standalone DLSS / XeSS runtime window and add interactive folder buttons. Keep downloads, failures and retry controls in the same window.
+- Improve safe shutdown while cancelled update requests or utility windows remain active. Preserve waits for game-file writes and settings saves.
+- Refresh administration with a responsive light blue list/detail layout for desktop and mobile, parameter comparisons and runtime inventories. Preserve moderation, game associations and older-client support.
+
 ## 4.3.10
 
 - Support MFG Unlocker 1.7.0 and RTX Encore 1.4.2, including their DLSS neural rendering, XeSS multi-frame generation and new settings. Preserve existing values, comments and unknown fields; gate settings by the installed patch version.
