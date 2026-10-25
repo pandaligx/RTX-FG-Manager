@@ -253,6 +253,26 @@ def complete_pending_bundle_index(root, review, entries, final):
     return {**entries, index: final[index]}
 
 
+def transient_unreferenced_bundle_indexes(root, review, baseline, final, history):
+    """Ignore abandoned candidate indexes in metadata transitions, not source review.
+
+    They must be absent from both published endpoints and never referenced by
+    any catalog in the entire pending history. Every original tree still passes
+    the source/content allowlist before this projection is used.
+    """
+    referenced = set()
+    candidates = set()
+    for entries in [baseline, *history, final]:
+        catalog = entries.get('cloud/bundles/catalog.json')
+        if catalog:
+            raw = review.git(root, 'cat-file', 'blob', catalog[2], binary=True)
+            revision = json.loads(raw).get('revision', '')
+            referenced.add(f'cloud/bundles/indexes/{revision}.json')
+        candidates.update(path for path in entries
+                          if re.fullmatch(r'cloud/bundles/indexes/bundles-[0-9a-f]{20}\.json', path))
+    return candidates - set(baseline) - set(final) - referenced
+
+
 def sync_source(root):
     spec = importlib.util.spec_from_file_location('review', root / '.github/scripts/mirror_gitee.py')
     review = importlib.util.module_from_spec(spec)
@@ -274,9 +294,12 @@ def sync_source(root):
         seen = set()
         before = review.tree_entries(root, previous)
         final = review.tree_entries(root, source)
-        for commit in review.git(root, 'rev-list', '--reverse', previous + '..' + source).splitlines():
-            entries = review.tree_entries(root, commit)
+        history = [review.tree_entries(root, commit) for commit in
+                   review.git(root, 'rev-list', '--reverse', previous + '..' + source).splitlines()]
+        abandoned = transient_unreferenced_bundle_indexes(root, review, before, final, history)
+        for entries in history:
             review.validate_tree(root, entries, seen)
+            entries = {path: value for path, value in entries.items() if path not in abandoned}
             update = entries.get('update.json')
             if update != before.get('update.json'):
                 if not update:

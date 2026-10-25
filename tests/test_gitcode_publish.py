@@ -14,6 +14,21 @@ spec.loader.exec_module(pub)
 
 
 class PublicationTests(unittest.TestCase):
+    def test_only_never_published_never_referenced_transient_indexes_are_ignored(self):
+        catalog = 'cloud/bundles/catalog.json'
+        active = 'cloud/bundles/indexes/bundles-' + 'a' * 20 + '.json'
+        candidate = 'cloud/bundles/indexes/bundles-' + 'b' * 20 + '.json'
+        baseline = {catalog: ('100644', 'blob', 'c'), active: ('100644', 'blob', 'a')}
+        pending = {**baseline, candidate: ('100644', 'blob', 'b')}
+        review = Mock()
+        review.git.return_value = json.dumps({'revision': 'bundles-' + 'a' * 20}).encode()
+        check = lambda before, final, history: pub.transient_unreferenced_bundle_indexes(Path('.'), review, before, final, history)
+        self.assertEqual(check(baseline, baseline, [pending, baseline]), {candidate})
+        self.assertEqual(check(pending, baseline, [baseline]), set())
+        self.assertEqual(check(baseline, pending, [pending]), set())
+        review.git.return_value = json.dumps({'revision': 'bundles-' + 'b' * 20}).encode()
+        self.assertEqual(check(baseline, baseline, [pending]), set())
+
     def test_large_resource_receipt_and_download_bound_keep_exe_limit(self):
         digest='a'*64;size=274667717
         url=pub.asset_url(pub.PAYLOAD_REPO,'payloads','encore-complete-'+digest[:12]+'.zip')
