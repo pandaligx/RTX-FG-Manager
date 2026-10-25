@@ -191,7 +191,7 @@ def upload_ticket(endpoint, headers, path):
             '--proto','=https','--connect-timeout','15','--max-time',str(seconds),
             '--speed-limit','1024','--speed-time','90',
             '--upload-file',str(path),'--output',os.devnull,'--write-out',stats],
-            input=config,text=True,capture_output=True,timeout=seconds+10)
+            input=config,text=True,encoding='utf-8',errors='replace',capture_output=True,timeout=seconds+10)
     except subprocess.TimeoutExpired:
         raise RuntimeError('GitCode upload exceeded its bounded timeout; delegation withheld') from None
     try:

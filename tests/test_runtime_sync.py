@@ -14,6 +14,14 @@ sync = importlib.import_module('sync_runtimes')
 
 
 class RuntimeSyncTests(unittest.TestCase):
+    def test_github_unicode_release_data_ignores_windows_codepage(self):
+        from types import SimpleNamespace
+        body = json.dumps({'body':'中文发行说明，保留原件', 'assets':[]}, ensure_ascii=False).encode('utf-8')
+        def windows_process(*args, **kwargs):
+            return SimpleNamespace(returncode=0, stdout=body.decode(kwargs.get('encoding', 'cp1252')))
+        with patch.object(sync.subprocess, 'run', side_effect=windows_process):
+            self.assertEqual(sync.gh_api('repos/example/repo/releases/tags/payloads')['body'], '中文发行说明，保留原件')
+
     def test_history_retention_and_immutable_versions(self):
         old = self.baseline(); old.pop('history', None)
         fallback = copy.deepcopy(old['packages'][0]); fallback['version'] = '310.9.1'

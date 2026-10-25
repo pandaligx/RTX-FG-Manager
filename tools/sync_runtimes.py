@@ -72,7 +72,7 @@ def gh_api(path, data=None, method=None):
     if data is not None:
         args += ['--input', '-']
     out = subprocess.run(args, input=None if data is None else json.dumps(data),
-                         text=True, capture_output=True, timeout=90)
+                         text=True, encoding='utf-8', capture_output=True, timeout=90)
     if out.returncode:
         raise RuntimeError('GitHub API failed; credential details withheld')
     return json.loads(out.stdout)
@@ -163,7 +163,7 @@ def verify_vendor(path, expected_version):
     env = dict(os.environ, RTXFG_VERIFY_PATH=str(path.resolve()))
     script = "$ErrorActionPreference='Stop'; $p=$env:RTXFG_VERIFY_PATH; $s=Get-AuthenticodeSignature -LiteralPath $p; $v=(Get-Item -LiteralPath $p).VersionInfo; @{status=[string]$s.Status;subject=$s.SignerCertificate.Subject;version=$v.FileVersion;company=$v.CompanyName} | ConvertTo-Json -Compress"
     result = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
-                            env=env, text=True, capture_output=True, timeout=90)
+                            env=env, text=True, encoding='utf-8', capture_output=True, timeout=90)
     if result.returncode:
         raise RuntimeError('Vendor signature verification failed')
     info = json.loads(result.stdout)
@@ -219,7 +219,7 @@ def publish_packages(items):
         assets = release.get('assets', [])
         if not any(a['name'] == path.name for a in assets):
             out = subprocess.run(['gh', 'release', 'upload', 'payloads', str(path), '--repo', pub.GH_REPO],
-                                 text=True, capture_output=True, timeout=600)
+                                 text=True, encoding='utf-8', capture_output=True, timeout=600)
             if out.returncode:
                 raise RuntimeError('GitHub resource upload failed; catalog unchanged')
         for url in p['urls']:
