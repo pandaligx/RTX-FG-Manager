@@ -2,6 +2,7 @@ import copy
 import importlib.util
 import json
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +58,33 @@ class CatalogTests(unittest.TestCase):
         self.assertIn('RELEASE_TAG: \'\'', workflow)
         self.assertIn('git add -- rust/assets/game-names.json cloud/game-names.json cloud/names', workflow)
         self.assertNotIn('--force', workflow)
+
+    def test_fetch_combines_all_platforms_and_gog_qualifiers(self):
+        batches = [[{'batch': i}] for i in range(6)]
+        with mock.patch.object(names, 'fetch_rows', side_effect=batches) as fetch:
+            rows = json.loads(names.fetch())['results']['bindings']
+        self.assertEqual(rows, [row for batch in batches for row in batch])
+        self.assertEqual(fetch.call_count, 6)
+        for prop, call in zip(names.PROPERTIES, fetch.call_args_list):
+            self.assertIn(f'?item wdt:{prop} ?id.', call.args[0])
+        self.assertIn('?statement pq:P12727 ?id.', fetch.call_args_list[-1].args[0])
+
+    def test_incomplete_platform_refresh_never_returns_partial_catalog(self):
+        with mock.patch.object(names, 'fetch_rows', side_effect=[[{'item': 'saved'}], TimeoutError('upstream')]):
+            with self.assertRaises(TimeoutError):
+                names.fetch()
+        with mock.patch.object(names, 'fetch_rows', return_value=[]):
+            with self.assertRaisesRegex(ValueError, 'Empty source'):
+                names.fetch()
+
+    def test_truncated_json_is_retried_without_relaxed_parsing(self):
+        bad = mock.MagicMock()
+        bad.__enter__.return_value.read.return_value = b'{"results":{"bindings":["bad\nvalue"]}}'
+        good = mock.MagicMock()
+        good.__enter__.return_value.read.return_value = b'{"results":{"bindings":[]}}'
+        with mock.patch.object(names.urllib.request, 'urlopen', side_effect=[bad, good]) as request, mock.patch.object(names.time, 'sleep'):
+            self.assertEqual(names.fetch_rows(names.QUERIES[0], names.time.monotonic() + 240), [])
+        self.assertEqual(request.call_count, 2)
 
 
 if __name__ == '__main__': unittest.main()

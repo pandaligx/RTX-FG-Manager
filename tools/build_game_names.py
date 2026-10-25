@@ -13,10 +13,9 @@ import datetime
 import time
 from pathlib import Path
 
-QUERY = '''SELECT ?item ?property ?id ?zh ?en WHERE {
+QUERY_TEMPLATE = '''SELECT ?item ?property ?id ?zh ?en WHERE {
  hint:Query hint:optimizer "None".
- { VALUES ?property { wdt:P1733 wdt:P5885 wdt:P2725 wdt:P6278 wdt:P12727 } ?item ?property ?id. }
- UNION { ?item p:P2725 ?statement. ?statement pq:P12727 ?id. BIND(wdt:P12727 AS ?property) }
+ IDENTITY_CLAUSE
  ?item rdfs:label ?zh.
  FILTER(LANG(?zh) IN ("zh-cn","zh-hans","zh"))
  OPTIONAL { ?item rdfs:label ?en FILTER(LANG(?en) IN ("en", "mul")) }
@@ -24,6 +23,8 @@ QUERY = '''SELECT ?item ?property ?id ?zh ?en WHERE {
 # Keep platform-ID selection before multilingual label joins. Blazegraph's
 # automatic reordering can turn this bounded query into a label-wide scan (504).
 PROPERTIES = {"P1733": "steam", "P5885": "xbox", "P2725": "gog_slug", "P6278": "epic_slug", "P12727": "gog"}
+QUERIES = [QUERY_TEMPLATE.replace("IDENTITY_CLAUSE", f"?item wdt:{prop} ?id. BIND(wdt:{prop} AS ?property)") for prop in PROPERTIES]
+QUERIES.append(QUERY_TEMPLATE.replace("IDENTITY_CLAUSE", "?item p:P2725 ?statement. ?statement pq:P12727 ?id. BIND(wdt:P12727 AS ?property)"))
 
 
 def valid_text(s):
@@ -145,23 +146,42 @@ def guard(previous, catalog):
             raise ValueError('Incomplete platform identity data')
 
 
-def fetch():
-    url = "https://query.wikidata.org/sparql?" + urllib.parse.urlencode({"format": "json", "query": QUERY})
-    req = urllib.request.Request(url, headers={"User-Agent": "RTX-FG-Manager (https://github.com/pandaligx/RTX-FG-Manager)", "Accept": "application/sparql-results+json"})
+def fetch_rows(query, deadline):
+    url = "https://query.wikidata.org/sparql?" + urllib.parse.urlencode({"format": "json", "query": query})
+    req = urllib.request.Request(url, headers={"User-Agent": "RTX-FG-Manager (https://github.com/pandaligx/RTX-FG-Manager)", "Accept": "application/sparql-results+json", "Cache-Control": "no-cache"})
     for attempt in range(3):
         try:
-            with urllib.request.urlopen(req, timeout=90) as response:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("Name source refresh deadline exceeded")
+            with urllib.request.urlopen(req, timeout=min(60, remaining)) as response:
                 data = response.read(32 * 1024 * 1024 + 1)
             if len(data) > 32 * 1024 * 1024:
                 raise ValueError("Source too large")
             rows = json.loads(data)['results']['bindings']
-            if not isinstance(rows, list) or not rows:
-                raise ValueError('Empty source')
-            return data
+            if not isinstance(rows, list):
+                raise ValueError('Invalid source rows')
+            return rows
         except (OSError, ValueError, KeyError):
-            if attempt == 2:
+            if attempt == 2 or time.monotonic() >= deadline:
                 raise
-            time.sleep(5 * (attempt + 1))
+            time.sleep(min(5 * (attempt + 1), max(0, deadline - time.monotonic())))
+
+
+def fetch():
+    # A failed or truncated platform response aborts the entire refresh. Never
+    # publish a partial catalog or remove validation to accommodate an outage.
+    rows = []
+    deadline = time.monotonic() + 240
+    for index, query in enumerate(QUERIES, 1):
+        rows.extend(fetch_rows(query, deadline))
+        print(f"Fetched name source {index}/{len(QUERIES)}", flush=True)
+    if not rows:
+        raise ValueError('Empty source')
+    data = json.dumps({"results": {"bindings": rows}}, ensure_ascii=False).encode("utf-8")
+    if len(data) > 32 * 1024 * 1024:
+        raise ValueError("Source too large")
+    return data
 
 
 def main():
