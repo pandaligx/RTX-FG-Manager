@@ -35,6 +35,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
           BACKFILL: ${{ inputs.backfill }}
+          RTXFG_UPLOAD_TIMEOUT: '900'
         run: |
           if ($env:BACKFILL) { python tools/sync_runtimes.py --publish --backfill $env:BACKFILL }
           else { python tools/sync_runtimes.py --publish }

@@ -182,13 +182,18 @@ def upload_ticket(endpoint, headers, path):
     config += ''.join('header = ' + quote(k + ': ' + v) + '\n' for k,v in headers.items())
     stats = '{"http_code":%{http_code},"uploaded_bytes":%{size_upload},"bytes_per_second":%{speed_upload},"seconds":%{time_total},"connect_seconds":%{time_connect}}'
     started = time.monotonic()
+    # Cross-region runners may need several minutes for a verified runtime ZIP.
+    # Keep an explicit upper bound and stop stalled transfers rather than retry
+    # indefinitely or expose the delegated upload URL in command-line arguments.
+    seconds = min(1800, max(180, int(os.environ.get('RTXFG_UPLOAD_TIMEOUT', '180'))))
     try:
         result = subprocess.run(['curl','--config','-','--ipv4','--silent','--show-error',
-            '--proto','=https','--connect-timeout','15','--max-time','180',
+            '--proto','=https','--connect-timeout','15','--max-time',str(seconds),
+            '--speed-limit','1024','--speed-time','90',
             '--upload-file',str(path),'--output',os.devnull,'--write-out',stats],
-            input=config,text=True,capture_output=True,timeout=190)
+            input=config,text=True,capture_output=True,timeout=seconds+10)
     except subprocess.TimeoutExpired:
-        raise RuntimeError('GitCode upload exceeded 190 seconds; delegation withheld') from None
+        raise RuntimeError('GitCode upload exceeded its bounded timeout; delegation withheld') from None
     try:
         report = json.loads(result.stdout)
         report = {k:report[k] for k in ('http_code','uploaded_bytes','bytes_per_second','seconds','connect_seconds')}
