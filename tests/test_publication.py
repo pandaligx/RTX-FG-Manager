@@ -20,7 +20,7 @@ def current_source_export_files():
     lists = re.findall(
         r'foreach \(\$name in @\((.*?)\)\) \{ Add-File \$name(?: \$false)? \}',
         script, re.S)
-    if len(lists) != 7:
+    if len(lists) != 8:
         raise AssertionError('Review the source exporter Add-File list structure')
     for group in lists:
         files.update(re.findall(r"'([^']+)'", group))
@@ -64,6 +64,9 @@ class SourceAllowlistTests(unittest.TestCase):
                          'tools/build_game_names.py', 'docs/game-names.md',
                          'tools/game-name-overrides.json', 'tests/test_game_names.py',
                          '.github/workflows/update-game-names.yml',
+                         'tools/sync_runtimes.py', 'tests/test_runtime_sync.py',
+                         '.github/workflows/sync-runtimes.yml',
+                         'docs/runtime-sync.md', 'cloud/runtime-catalog.json',
                          'tests/test_encore_cloud.py',
                          'tests/v429_encore_cloud.rs',
                          'recommendations/src/api.mjs', 'recommendations/Dockerfile',
