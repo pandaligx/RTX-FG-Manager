@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 1,
+  "revision": 1792907115,
   "min_manager_version": "4.3.10",
   "packages": [
     {
@@ -85,6 +85,112 @@
       "nvidia_commit": "9981c6350dc58c0ce21f024fd65e31e851c31689",
       "git_blob": "71b8070cdced79e8df3414060337c84d91e38422",
       "dll_sha256": "8d59d49b36410dd6b62fef2503a5871d347415bd85d943fa0848563a95dd50c7"
+    }
+  },
+  "history": [
+    {
+      "kind": "sr",
+      "version": "310.9.1",
+      "bytes": 31152394,
+      "sha256": "bcee05a3708293563718bf5bcf832c0909a6e82238bb1f18e6530d6441625e65",
+      "files": [
+        {
+          "name": "nvngx_dlss.dll",
+          "bytes": 58956912,
+          "sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983"
+        },
+        {
+          "name": "NVIDIA-LICENSE.txt",
+          "bytes": 26620,
+          "sha256": "d4216e39ebef5f9b50a6712ebb37beeb5379862a67733a9999c651f21592aaf0"
+        }
+      ],
+      "urls": [
+        "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/runtime-sr-310.9.1-bcee05a37082.zip",
+        "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/runtime-sr-310.9.1-bcee05a37082.zip"
+      ]
+    },
+    {
+      "kind": "rr",
+      "version": "310.9.1",
+      "bytes": 21672097,
+      "sha256": "cc40c4b4e15da500343f727cd353f280183517e138ee6f959932d9fc67c03aa7",
+      "files": [
+        {
+          "name": "nvngx_dlssd.dll",
+          "bytes": 48343664,
+          "sha256": "4bc7ea5fcb2f32cf86bc2cb072e8d2860914a0be511cbdcb2fc206c1d9d83b80"
+        },
+        {
+          "name": "NVIDIA-LICENSE.txt",
+          "bytes": 26620,
+          "sha256": "d4216e39ebef5f9b50a6712ebb37beeb5379862a67733a9999c651f21592aaf0"
+        }
+      ],
+      "urls": [
+        "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/runtime-rr-310.9.1-cc40c4b4e15d.zip",
+        "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/runtime-rr-310.9.1-cc40c4b4e15d.zip"
+      ]
+    },
+    {
+      "kind": "fg",
+      "version": "310.9.1",
+      "bytes": 3708170,
+      "sha256": "3e5aa2a6a150f0f35de4c30eb844a169779bda6ca94782a713e75f440792e7f7",
+      "files": [
+        {
+          "name": "nvngx_dlssg.dll",
+          "bytes": 7460976,
+          "sha256": "ff6e90eb78b827927dff5b4ecc6b1c870c2e9bca29ed9f48c7d348cc9e170b82"
+        },
+        {
+          "name": "NVIDIA-LICENSE.txt",
+          "bytes": 26620,
+          "sha256": "d4216e39ebef5f9b50a6712ebb37beeb5379862a67733a9999c651f21592aaf0"
+        }
+      ],
+      "urls": [
+        "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/runtime-fg-310.9.1-3e5aa2a6a150.zip",
+        "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/runtime-fg-310.9.1-3e5aa2a6a150.zip"
+      ]
+    }
+  ],
+  "history_origins": {
+    "sr:310.9.1": {
+      "source": "https://raw.githubusercontent.com/NVIDIA/DLSS/374959484e79a640feaba44c93ac8cfb0a03f5b5/lib/Windows_x86_64/rel/nvngx_dlss.dll",
+      "nvidia_commit": "374959484e79a640feaba44c93ac8cfb0a03f5b5",
+      "git_blob": "875981984f56e71b4fde6605484ef767dadf9910",
+      "dll_sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983",
+      "signature": {
+        "version": "310,9,1,0",
+        "status": "Valid",
+        "subject": "CN=NVIDIA Corporation, OU=1005bk6, O=NVIDIA Corporation, L=Santa Clara, S=California, C=US",
+        "company": "NVIDIA"
+      }
+    },
+    "rr:310.9.1": {
+      "source": "https://raw.githubusercontent.com/NVIDIA/DLSS/374959484e79a640feaba44c93ac8cfb0a03f5b5/lib/Windows_x86_64/rel/nvngx_dlssd.dll",
+      "nvidia_commit": "374959484e79a640feaba44c93ac8cfb0a03f5b5",
+      "git_blob": "a9c3c1cbe2ef1c78fd68db5a778d72382040e677",
+      "dll_sha256": "4bc7ea5fcb2f32cf86bc2cb072e8d2860914a0be511cbdcb2fc206c1d9d83b80",
+      "signature": {
+        "version": "310,9,1,0",
+        "subject": "CN=NVIDIA Corporation, OU=1005bk6, O=NVIDIA Corporation, L=Santa Clara, S=California, C=US",
+        "status": "Valid",
+        "company": "NVIDIA"
+      }
+    },
+    "fg:310.9.1": {
+      "source": "https://raw.githubusercontent.com/NVIDIA/DLSS/374959484e79a640feaba44c93ac8cfb0a03f5b5/lib/Windows_x86_64/rel/nvngx_dlssg.dll",
+      "nvidia_commit": "374959484e79a640feaba44c93ac8cfb0a03f5b5",
+      "git_blob": "f43cac176a0fc8168d2baf5b7ec4eff63cd12975",
+      "dll_sha256": "ff6e90eb78b827927dff5b4ecc6b1c870c2e9bca29ed9f48c7d348cc9e170b82",
+      "signature": {
+        "status": "Valid",
+        "subject": "CN=NVIDIA Corporation, OU=1005bk6, O=NVIDIA Corporation, L=Santa Clara, S=California, C=US",
+        "version": "310,9,1,0",
+        "company": "NVIDIA"
+      }
     }
   }
 }
