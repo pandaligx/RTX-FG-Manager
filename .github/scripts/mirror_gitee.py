@@ -30,6 +30,8 @@ ALLOWED = {
     'recommendations/NODEMAILER-LICENSE',
     'recommendations/src/game-directory.json',
     'tools/update_download_stats.py', 'tests/test_download_stats.py',
+    'tools/sync_runtimes.py', 'tests/test_runtime_sync.py', '.github/workflows/sync-runtimes.yml',
+    'docs/runtime-sync.md', 'cloud/runtime-catalog.json',
     '.github/workflows/update-download-stats.yml', 'docs/download-stats.json', 'docs/downloads-total.svg',
     'tools/game-name-overrides.json', 'tests/test_game_names.py', '.github/workflows/update-game-names.yml',
     'tools/build_game_names.py', 'docs/game-names.md', 'cloud/game-names.json',

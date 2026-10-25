@@ -1,0 +1,55 @@
+name: Sync official NVIDIA runtimes daily
+on:
+  schedule:
+    - cron: '43 1 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: rtxfg-gitcode-publish
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.repository == 'pandaligx/RTX-FG-Manager'
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test runtime synchronization boundaries
+        run: python -m unittest discover -s tests -p test_runtime_sync.py -v
+      - name: Discover, verify vendor signature, mirror files, then advance catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: python tools/sync_runtimes.py --publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-sync-report
+          path: .runtime-sync/report.json
+          retention-days: 14
+  mirror:
+    needs: sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # GITHUB_TOKEN commits do not trigger the normal push mirror workflow.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Mirror validated metadata to GitCode
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: python tools/gitcode_ci.py

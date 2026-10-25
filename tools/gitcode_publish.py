@@ -330,6 +330,22 @@ def verify_metadata_changes(root, review, before, after):
         if path not in after:
             raise RuntimeError('Missing referenced metadata: ' + path)
         return review.git(root, 'cat-file', 'blob', after[path][2], binary=True)
+    runtime_path = 'cloud/runtime-catalog.json'
+    if before.get(runtime_path) != after.get(runtime_path):
+        import sync_runtimes
+        raw = blob(runtime_path)
+        next_catalog = json.loads(raw)
+        sync_runtimes.validate_catalog(next_catalog)
+        prior_packages = []
+        if runtime_path in before:
+            prior = json.loads(review.git(root, 'cat-file', 'blob', before[runtime_path][2], binary=True))
+            sync_runtimes.validate_advance(prior, next_catalog)
+            prior_packages = prior['packages']
+        metadata_digest = hashlib.sha256(raw).hexdigest()
+        for p in next_catalog['packages']:
+            if p not in prior_packages:
+                for url in p['urls']:
+                    verify_metadata_artifact(url, p['bytes'], p['sha256'], metadata_digest)
     bundle_path = 'cloud/bundles/catalog.json'
     if before.get(bundle_path) != after.get(bundle_path):
         c = json.loads(blob(bundle_path))

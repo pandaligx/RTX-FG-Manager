@@ -5,6 +5,7 @@
 /payloads/
 /log/
 /development/
+/.runtime-sync/
 /本地归档/
 /正式发布/
 /待签名*/
