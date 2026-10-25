@@ -17,6 +17,11 @@ use std::{
 use zeroize::{Zeroize, Zeroizing};
 
 const ORIGIN: &str = "https://recommend.lgxng.cn";
+// Existing service origin, used only after normal read routes fail. Keep the
+// original HTTPS authority/SNI and certificate checks; never use an IP URL.
+// If hosting changes, update this fallback; primary routing always uses DNS.
+const ORIGIN_HOST: &str = "recommend.lgxng.cn";
+const ORIGIN_IPV4: std::net::Ipv4Addr = std::net::Ipv4Addr::new(111, 230, 186, 38);
 const RESPONSE_LIMIT: u64 = 512 * 1024;
 // Window instances share one on-disk session. Compare and replace it under the
 // same lock so a late response cannot delete a newer window's successful login.
@@ -528,11 +533,47 @@ pub struct Challenge {
 }
 #[derive(Clone)]
 pub struct Client {
-    http: Http,
+    network: Arc<Mutex<NetworkRoute>>,
     root: PathBuf,
     auth: Arc<Mutex<AuthState>>,
     #[cfg(test)]
     origin: String,
+    #[cfg(test)]
+    http_factory: Option<HttpFactory>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NetworkRoute {
+    System,
+    DirectIpv4,
+    OriginIpv4,
+}
+#[cfg(test)]
+type HttpFactory = Arc<dyn Fn(NetworkRoute) -> Result<Http> + Send + Sync>;
+fn preferred_network(root: &Path) -> NetworkRoute {
+    // Reuse only a recent successful route from our bounded diagnostic. The
+    // file cannot supply a URL, proxy or IP; failures always try other routes.
+    let read = || -> Option<NetworkRoute> {
+        let report = core::read_json(&root.join("connection-status.json"), 4096).ok()?;
+        let checked = chrono::DateTime::parse_from_rfc3339(report["checkedAt"].as_str()?).ok()?;
+        let age = chrono::Utc::now()
+            .signed_duration_since(checked)
+            .num_seconds();
+        if !(0..=7 * 86400).contains(&age) {
+            return None;
+        }
+        let attempt = report["attempts"]
+            .as_array()?
+            .iter()
+            .rev()
+            .find(|a| a["outcome"] == "ok")?;
+        match attempt["route"].as_str()? {
+            "system" => Some(NetworkRoute::System),
+            "direct_ipv4" => Some(NetworkRoute::DirectIpv4),
+            "origin_ipv4" => Some(NetworkRoute::OriginIpv4),
+            _ => None,
+        }
+    };
+    read().unwrap_or(NetworkRoute::System)
 }
 #[derive(Default)]
 struct AuthState {
@@ -543,6 +584,9 @@ struct AuthState {
 enum ServiceError {
     LoginExpired,
     Unavailable,
+    Connection,
+    TimedOut,
+    Gateway,
     Api(&'static str),
 }
 impl std::fmt::Display for ServiceError {
@@ -550,6 +594,9 @@ impl std::fmt::Display for ServiceError {
         f.write_str(match self {
             Self::LoginExpired => "登录已过期，请重新获取邮箱验证码",
             Self::Unavailable => "推荐服务暂时无法连接，请稍后刷新",
+            Self::Connection => "连接推荐服务失败，请稍后刷新",
+            Self::TimedOut => "连接推荐服务超时，请稍后刷新",
+            Self::Gateway => "推荐服务返回非数据页面，请稍后刷新或联系维护者",
             Self::Api(message) => message,
         })
     }
@@ -560,8 +607,40 @@ impl std::error::Error for ServiceError {}
 pub fn allows_offline_cache(error: &anyhow::Error) -> bool {
     matches!(
         error.downcast_ref::<ServiceError>(),
-        Some(ServiceError::Unavailable)
+        Some(
+            ServiceError::Unavailable
+                | ServiceError::Connection
+                | ServiceError::TimedOut
+                | ServiceError::Gateway
+        )
     )
+}
+pub fn offline_cache_notice(error: &anyhow::Error) -> &'static str {
+    match error.downcast_ref::<ServiceError>() {
+        Some(ServiceError::TimedOut) => "连接超时，暂显示缓存；请稍后刷新",
+        Some(ServiceError::Connection) => "连接失败，暂显示缓存；请稍后刷新",
+        Some(ServiceError::Gateway) => "服务响应异常，暂显示缓存；请稍后刷新或联系维护者",
+        _ => "推荐服务暂时不可用，当前显示缓存，请稍后刷新",
+    }
+}
+fn connection_attempt<T>(route: NetworkRoute, elapsed: Duration, result: &Result<T>) -> Value {
+    let outcome = match result {
+        Ok(_) => "ok",
+        Err(e) => match e.downcast_ref::<ServiceError>() {
+            Some(ServiceError::Connection) => "connection_failed",
+            Some(ServiceError::TimedOut) => "timeout",
+            Some(ServiceError::Gateway) => "non_json_response",
+            Some(ServiceError::Unavailable) => "server_unavailable",
+            Some(ServiceError::LoginExpired) => "login_expired",
+            Some(ServiceError::Api(_)) => "api_rejected",
+            None => "invalid_response",
+        },
+    };
+    json!({
+        "route": match route { NetworkRoute::System => "system", NetworkRoute::DirectIpv4 => "direct_ipv4", NetworkRoute::OriginIpv4 => "origin_ipv4" },
+        "elapsedMs": elapsed.as_millis() as u64,
+        "outcome": outcome,
+    })
 }
 impl Client {
     pub fn new(data: &Path) -> Result<Self> {
@@ -577,12 +656,7 @@ impl Client {
         }
         drop(session_file);
         Ok(Self {
-            http: Http::builder()
-                .connect_timeout(Duration::from_secs(5))
-                .timeout(Duration::from_secs(15))
-                .redirect(reqwest::redirect::Policy::none())
-                .user_agent(format!("RTXFG/{}", crate::VERSION))
-                .build()?,
+            network: Arc::new(Mutex::new(preferred_network(&root))),
             root,
             auth: Arc::new(Mutex::new(AuthState {
                 session: session.filter(|_| !expired),
@@ -590,6 +664,8 @@ impl Client {
             })),
             #[cfg(test)]
             origin: ORIGIN.to_string(),
+            #[cfg(test)]
+            http_factory: None,
         })
     }
     pub fn logged_in(&self) -> bool {
@@ -664,23 +740,148 @@ impl Client {
             route.starts_with("/v1/") && !route.contains(['\r', '\n', '#']),
             "推荐请求无效"
         );
-        let mut request = self
-            .http
-            .request(method, format!("{}{route}", self.origin()))
-            .header("X-RTXFG-Feedback", "7");
         let session = if authenticated {
             Some(self.active_session()?.ok_or(ServiceError::LoginExpired)?)
         } else {
             None
         };
+        // Re-read the current proxy configuration and resolve DNS for every logical
+        // request. A window must not retain a dead VPN proxy or pooled connection.
+        // Avoid paying the same failed-route timeouts on every refresh/window.
+        // Each route still rebuilds its transport and observes current settings.
+        let network = *self.network.lock().unwrap_or_else(|e| e.into_inner());
+        let started = std::time::Instant::now();
+        let mut result = self.request_once(
+            method.clone(),
+            route,
+            body.as_ref(),
+            session.as_ref(),
+            network,
+        );
+        let mut attempts = vec![connection_attempt(network, started.elapsed(), &result)];
+        for fallback in [
+            NetworkRoute::System,
+            NetworkRoute::DirectIpv4,
+            NetworkRoute::OriginIpv4,
+        ]
+        .into_iter()
+        .filter(|r| *r != network)
+        {
+            let retry = method == Method::GET
+                && result.as_ref().err().is_some_and(|error| {
+                    matches!(
+                        error.downcast_ref::<ServiceError>(),
+                        Some(
+                            ServiceError::Connection
+                                | ServiceError::TimedOut
+                                | ServiceError::Gateway
+                        )
+                    )
+                });
+            if !retry {
+                break;
+            }
+            let started = std::time::Instant::now();
+            result = self.request_once(
+                method.clone(),
+                route,
+                body.as_ref(),
+                session.as_ref(),
+                fallback,
+            );
+            attempts.push(connection_attempt(fallback, started.elapsed(), &result));
+        }
+        if method == Method::GET {
+            // Keep one bounded local connection report, with no URLs, game IDs,
+            // email addresses, tokens, proxy settings or server response bodies.
+            let _ = core::atomic_json(
+                &self.root.join("connection-status.json"),
+                &json!({
+                    "version": crate::VERSION,
+                    "checkedAt": chrono::Utc::now().to_rfc3339(),
+                    "attempts": attempts,
+                }),
+            );
+        }
+        result
+    }
+    fn http(&self, network: NetworkRoute) -> Result<Http> {
+        #[cfg(test)]
+        if let Some(factory) = &self.http_factory {
+            return factory(network);
+        }
+        let builder = Http::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(15))
+            .http1_only()
+            .retry(reqwest::retry::never())
+            .redirect(reqwest::redirect::Policy::none())
+            .user_agent(format!("RTXFG/{}", crate::VERSION));
+        // This only bypasses application proxies. A TUN VPN still owns OS routing.
+        let builder = match network {
+            NetworkRoute::System => builder,
+            NetworkRoute::DirectIpv4 => builder
+                .no_proxy()
+                .local_address(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
+            NetworkRoute::OriginIpv4 => builder
+                .no_proxy()
+                .local_address(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED))
+                .resolve(
+                    ORIGIN_HOST,
+                    std::net::SocketAddr::new(ORIGIN_IPV4.into(), 443),
+                ),
+        };
+        builder.build().map_err(|_| ServiceError::Connection.into())
+    }
+    fn request_once<T: DeserializeOwned>(
+        &self,
+        method: Method,
+        route: &str,
+        body: Option<&Value>,
+        session: Option<&Session>,
+        network: NetworkRoute,
+    ) -> Result<T> {
+        let mut request = self
+            .http(network)?
+            .request(method.clone(), format!("{}{route}", self.origin()))
+            .header("X-RTXFG-Feedback", "7")
+            .header("Accept", "application/json")
+            .header("Cache-Control", "no-cache");
+        if method == Method::GET {
+            // Three read routes remain bounded. Writes retain the former 15 s
+            // timeout for SMTP/API work and are never replayed automatically.
+            request = request.timeout(Duration::from_secs(8));
+        }
         if let Some(s) = &session {
             request = request.bearer_auth(&s.token);
         }
         if let Some(body) = body {
             request = request.json(&body);
         }
-        let response = request.send().map_err(|_| ServiceError::Unavailable)?;
+        let response = request.send().map_err(|e| {
+            if e.is_timeout() {
+                ServiceError::TimedOut
+            } else {
+                ServiceError::Connection
+            }
+        })?;
         let status = response.status();
+        let json_response = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|h| h.to_str().ok())
+            .is_some_and(|h| {
+                h.split(';')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .eq_ignore_ascii_case("application/json")
+            });
+        // A CDN challenge or error page is not an API authorization response.
+        // Never discard an existing login because an edge returned HTML.
+        if !json_response {
+            return Err(ServiceError::Gateway.into());
+        }
         if status == reqwest::StatusCode::UNAUTHORIZED
             && let Some(s) = &session
         {
@@ -691,7 +892,7 @@ impl Client {
         response
             .take(RESPONSE_LIMIT + 1)
             .read_to_end(&mut bytes)
-            .map_err(|_| ServiceError::Unavailable)?;
+            .map_err(|_| ServiceError::Connection)?;
         ensure!(
             bytes.len() <= RESPONSE_LIMIT as usize,
             "推荐服务返回内容过大"
@@ -706,7 +907,11 @@ impl Client {
             ))
             .into());
         }
-        serde_json::from_slice(&bytes).context("推荐服务返回格式无效")
+        let value = serde_json::from_slice(&bytes).context("推荐服务返回格式无效")?;
+        // Writes use the last route that actually returned valid service data,
+        // but are never replayed after an ambiguous failure (email/votes/shares).
+        *self.network.lock().unwrap_or_else(|e| e.into_inner()) = network;
+        Ok(value)
     }
     pub fn browse(
         &self,
@@ -1089,8 +1294,15 @@ mod tests {
                 let mut body_bytes = vec![0; length];
                 reader.read_exact(&mut body_bytes).unwrap();
                 requests.push(request);
-                let body = serde_json::to_vec(&body).unwrap();
-                write!(stream, "HTTP/1.1 {status} Mock\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).unwrap();
+                if status == 0 {
+                    // Server received the request but the response was lost.
+                    continue;
+                }
+                let (content_type, body) = match body.as_str() {
+                    Some(html) => ("text/html", html.as_bytes().to_vec()),
+                    None => ("application/json", serde_json::to_vec(&body).unwrap()),
+                };
+                write!(stream, "HTTP/1.1 {status} Mock\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).unwrap();
                 stream.write_all(&body).unwrap();
             }
             requests
@@ -1107,13 +1319,372 @@ mod tests {
     }
     fn online_test_client(data: &Path, origin: String) -> Client {
         let mut client = Client::new(data).unwrap();
-        client.http = Http::builder()
-            .no_proxy()
-            .timeout(Duration::from_secs(3))
-            .build()
-            .unwrap();
+        client.http_factory = Some(Arc::new(|_| {
+            Ok(Http::builder()
+                .no_proxy()
+                .retry(reqwest::retry::never())
+                .timeout(Duration::from_secs(3))
+                .build()?)
+        }));
         client.origin = origin;
         client
+    }
+    #[test]
+    fn recommendation_read_recovers_from_unreachable_proxy() {
+        let data = tempfile::tempdir().unwrap();
+        let game = card("RTX 3060", "581.80", 1).content.game;
+        let (origin, server) =
+            mock_service(vec![(200, json!({"items":[],"total":0,"nextOffset":null}))]);
+        let mut client = online_test_client(data.path(), origin);
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let proxy = format!("http://{}", closed.local_addr().unwrap());
+        drop(closed);
+        client.http_factory = Some(Arc::new(move |route| {
+            let builder = Http::builder()
+                .timeout(Duration::from_secs(2))
+                .retry(reqwest::retry::never());
+            Ok(match route {
+                NetworkRoute::System => builder.proxy(reqwest::Proxy::all(&proxy)?),
+                NetworkRoute::DirectIpv4 | NetworkRoute::OriginIpv4 => builder.no_proxy(),
+            }
+            .build()?)
+        }));
+        assert!(
+            client
+                .browse(&game, &cloud::bundled(), 0, false, false)
+                .is_ok()
+        );
+        assert_eq!(*client.network.lock().unwrap(), NetworkRoute::DirectIpv4);
+        assert_eq!(server.join().unwrap().len(), 1);
+    }
+    #[test]
+    fn edge_html_does_not_log_out_or_replace_cache_and_retry_is_bounded() {
+        for status in [200, 401, 403, 502] {
+            let data = tempfile::tempdir().unwrap();
+            let token = "s".repeat(43);
+            save_test_session(data.path(), &token, chrono::Utc::now().timestamp() + 86400);
+            let game = card("RTX 3060", "581.80", 1).content.game;
+            let (origin, server) = mock_service(vec![
+                (status, json!("<html>Challenge</html>")),
+                (status, json!("<html>Challenge</html>")),
+                (status, json!("<html>Challenge</html>")),
+                (200, json!({"items":[],"total":0,"nextOffset":null})),
+            ]);
+            let client = online_test_client(data.path(), origin);
+            let error = client
+                .browse(&game, &cloud::bundled(), 0, false, false)
+                .unwrap_err();
+            assert!(allows_offline_cache(&error));
+            assert!(client.logged_in());
+            assert!(client.cached(&game, &cloud::bundled()).is_none());
+            let report = fs::read_to_string(client.root.join("connection-status.json")).unwrap();
+            assert!(
+                !report.contains(&token)
+                    && !report.contains("Authorization")
+                    && !report.contains("Challenge")
+            );
+            let report: Value = serde_json::from_str(&report).unwrap();
+            assert_eq!(report["attempts"].as_array().unwrap().len(), 3);
+            assert_eq!(report["attempts"][1]["outcome"], "non_json_response");
+            assert!(
+                client
+                    .browse(&game, &cloud::bundled(), 0, false, false)
+                    .is_ok()
+            );
+            assert!(client.logged_in());
+            assert_eq!(server.join().unwrap().len(), 4);
+        }
+    }
+    #[test]
+    fn refresh_rebuilds_transport_and_recovers_with_439_anonymous_cache_retained() {
+        let data = tempfile::tempdir().unwrap();
+        let old = card("RTX 3060", "581.80", 1);
+        let game = old.content.game.clone();
+        let latest = card("RTX 5090", "581.80", 9);
+        let latest_id = latest.id.clone();
+        let (origin, server) = mock_service(vec![
+            (503, json!({"error":"unavailable"})),
+            (200, json!({"items":[latest],"total":1,"nextOffset":null})),
+        ]);
+        let mut client = online_test_client(data.path(), origin);
+        let old_path = client
+            .root
+            .join(format!("{:x}.json", Sha256::digest(game.id.as_bytes())));
+        let legacy =
+            serde_json::to_vec(&json!({"items":[old],"total":1,"nextOffset":null})).unwrap();
+        fs::write(&old_path, &legacy).unwrap();
+        let connections = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let count = connections.clone();
+        client.http_factory = Some(Arc::new(move |_| {
+            count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(Http::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(3))
+                .build()?)
+        }));
+        let error = client
+            .browse(&game, &cloud::bundled(), 0, false, false)
+            .unwrap_err();
+        assert!(allows_offline_cache(&error));
+        assert_eq!(
+            client.cached(&game, &cloud::bundled()).unwrap().items[0].id,
+            old.id
+        );
+        let page = client
+            .browse(&game, &cloud::bundled(), 0, false, false)
+            .unwrap();
+        assert_eq!(page.items[0].id, latest_id);
+        assert_eq!(
+            client.cached(&game, &cloud::bundled()).unwrap().items[0].id,
+            latest_id
+        );
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert_eq!(fs::read(old_path).unwrap(), legacy);
+        assert!(!client.logged_in() && !client.root.join("session.json").exists());
+        let requests = server.join().unwrap();
+        assert!(
+            requests
+                .iter()
+                .all(|r| !r.to_lowercase().contains("authorization:"))
+        );
+    }
+    #[test]
+    fn read_prefers_last_success_and_write_uses_it_without_replay() {
+        let data = tempfile::tempdir().unwrap();
+        let (origin, server) = mock_service(vec![
+            (200, json!({"ok":true})),
+            (0, json!({})),
+            (200, json!({"ok":true})),
+        ]);
+        let mut client = online_test_client(data.path(), origin);
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let proxy = format!("http://{}", closed.local_addr().unwrap());
+        drop(closed);
+        let routes = Arc::new(Mutex::new(Vec::new()));
+        let seen = routes.clone();
+        client.http_factory = Some(Arc::new(move |route| {
+            let mut seen = seen.lock().unwrap();
+            let first = seen.is_empty();
+            seen.push(route);
+            let builder = Http::builder()
+                .retry(reqwest::retry::never())
+                .timeout(Duration::from_secs(2));
+            Ok(if first {
+                builder.proxy(reqwest::Proxy::all(&proxy)?)
+            } else {
+                builder.no_proxy()
+            }
+            .build()?)
+        }));
+        client
+            .request::<Value>(Method::GET, "/v1/games", None, false)
+            .unwrap();
+        assert!(
+            client
+                .request::<Value>(Method::POST, "/v1/auth/code", Some(json!({})), false)
+                .is_err()
+        );
+        client
+            .request::<Value>(Method::GET, "/v1/games", None, false)
+            .unwrap();
+        assert_eq!(
+            *routes.lock().unwrap(),
+            vec![
+                NetworkRoute::System,
+                NetworkRoute::DirectIpv4,
+                NetworkRoute::DirectIpv4,
+                NetworkRoute::DirectIpv4
+            ]
+        );
+        assert_eq!(*client.network.lock().unwrap(), NetworkRoute::DirectIpv4);
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 3);
+        assert_eq!(requests.iter().filter(|r| r.starts_with("POST")).count(), 1);
+    }
+    #[test]
+    #[ignore = "read-only live recommendation API; no account, votes, email or DLL downloads"]
+    fn live_recommendation_connection() {
+        let data = tempfile::tempdir().unwrap();
+        let client = Client::new(data.path()).unwrap();
+        let game = card("RTX 3060", "581.80", 1).content.game;
+        let page = client
+            .browse(&game, &cloud::bundled(), 0, false, false)
+            .unwrap();
+        println!(
+            "Public recommendations read and validated: {} records",
+            page.total
+        );
+        let origin: Page = client
+            .request_once(
+                Method::GET,
+                "/v1/recipes?game=steam%3A292030&offset=0&mine=0&reported=0",
+                None,
+                None,
+                NetworkRoute::OriginIpv4,
+            )
+            .unwrap();
+        assert_eq!(origin.total, page.total);
+        println!(
+            "Origin fallback read with original HTTPS authority and certificate verification: {} records",
+            origin.total
+        );
+        core::atomic_json(
+            &client.root.join("connection-status.json"),
+            &json!({
+                "checkedAt":chrono::Utc::now().to_rfc3339(),
+                "attempts":[{"route":"origin_ipv4","elapsedMs":83,"outcome":"ok"}]
+            }),
+        )
+        .unwrap();
+        let reopened = Client::new(data.path()).unwrap();
+        let start = std::time::Instant::now();
+        reopened
+            .browse(&game, &cloud::bundled(), 0, false, false)
+            .unwrap();
+        println!(
+            "Reopened client preferred-route read: {} ms",
+            start.elapsed().as_millis()
+        );
+        let report = core::read_json(&client.root.join("connection-status.json"), 4096).unwrap();
+        assert_eq!(report["attempts"].as_array().unwrap().len(), 1);
+        assert_eq!(report["attempts"][0]["route"], "origin_ipv4");
+    }
+    #[test]
+    fn successful_route_survives_reopen_and_recovers_after_network_change() {
+        let data = tempfile::tempdir().unwrap();
+        let root = data.path().join("recommendations");
+        fs::create_dir_all(&root).unwrap();
+        core::atomic_json(
+            &root.join("connection-status.json"),
+            &json!({
+                "version":"4.3.12", "checkedAt":chrono::Utc::now().to_rfc3339(),
+                "attempts":[{"route":"system","elapsedMs":5014,"outcome":"timeout"},
+                    {"route":"direct_ipv4","elapsedMs":5010,"outcome":"timeout"},
+                    {"route":"origin_ipv4","elapsedMs":83,"outcome":"ok"}]
+            }),
+        )
+        .unwrap();
+        let (origin, server) =
+            mock_service(vec![(200, json!({"ok":true})), (200, json!({"ok":true}))]);
+        let routes = Arc::new(Mutex::new(Vec::new()));
+        let seen = routes.clone();
+        let mut client = online_test_client(data.path(), origin.clone());
+        client.http_factory = Some(Arc::new(move |route| {
+            seen.lock().unwrap().push(route);
+            assert_eq!(
+                route,
+                NetworkRoute::OriginIpv4,
+                "Must skip the two known timeouts"
+            );
+            Ok(Http::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(2))
+                .build()?)
+        }));
+        client
+            .request::<Value>(Method::GET, "/v1/games", None, false)
+            .unwrap();
+        drop(client);
+        let mut reopened = online_test_client(data.path(), origin);
+        let seen = routes.clone();
+        reopened.http_factory = Some(Arc::new(move |route| {
+            seen.lock().unwrap().push(route);
+            if route == NetworkRoute::OriginIpv4 {
+                return Err(ServiceError::Connection.into());
+            }
+            Ok(Http::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(2))
+                .build()?)
+        }));
+        reopened
+            .request::<Value>(Method::GET, "/v1/games", None, false)
+            .unwrap();
+        assert_eq!(
+            *routes.lock().unwrap(),
+            vec![
+                NetworkRoute::OriginIpv4,
+                NetworkRoute::OriginIpv4,
+                NetworkRoute::System
+            ]
+        );
+        assert_eq!(
+            *Client::new(data.path()).unwrap().network.lock().unwrap(),
+            NetworkRoute::System
+        );
+        assert_eq!(server.join().unwrap().len(), 2);
+    }
+    #[test]
+    fn saved_route_rejects_unknown_stale_future_failed_and_oversized_hints() {
+        let data = tempfile::tempdir().unwrap();
+        let root = data.path().join("recommendations");
+        fs::create_dir_all(&root).unwrap();
+        for (age, route, outcome) in [
+            (0, "https://other.invalid", "ok"),
+            (8 * 86400, "origin_ipv4", "ok"),
+            (-86400, "origin_ipv4", "ok"),
+            (0, "origin_ipv4", "timeout"),
+        ] {
+            core::atomic_json(
+                &root.join("connection-status.json"),
+                &json!({
+                    "checkedAt":(chrono::Utc::now()-chrono::Duration::seconds(age)).to_rfc3339(),
+                    "attempts":[{"route":route,"outcome":outcome}]
+                }),
+            )
+            .unwrap();
+            assert_eq!(
+                *Client::new(data.path()).unwrap().network.lock().unwrap(),
+                NetworkRoute::System
+            );
+        }
+        for invalid in ["not json".to_string(), " ".repeat(4097)] {
+            fs::write(root.join("connection-status.json"), invalid).unwrap();
+            assert_eq!(
+                *Client::new(data.path()).unwrap().network.lock().unwrap(),
+                NetworkRoute::System
+            );
+        }
+    }
+    #[test]
+    fn read_recovers_from_failed_dns_routes_and_does_not_replay_origin_write() {
+        let data = tempfile::tempdir().unwrap();
+        let (origin, server) = mock_service(vec![(200, json!({"ok":true})), (0, json!({}))]);
+        let mut client = online_test_client(data.path(), origin);
+        let routes = Arc::new(Mutex::new(Vec::new()));
+        let seen = routes.clone();
+        client.http_factory = Some(Arc::new(move |route| {
+            seen.lock().unwrap().push(route);
+            if route != NetworkRoute::OriginIpv4 {
+                return Err(ServiceError::Connection.into());
+            }
+            Ok(Http::builder()
+                .no_proxy()
+                .retry(reqwest::retry::never())
+                .timeout(Duration::from_secs(2))
+                .build()?)
+        }));
+        client
+            .request::<Value>(Method::GET, "/v1/games", None, false)
+            .unwrap();
+        assert_eq!(*client.network.lock().unwrap(), NetworkRoute::OriginIpv4);
+        assert!(
+            client
+                .request::<Value>(Method::POST, "/v1/auth/code", Some(json!({})), false)
+                .is_err()
+        );
+        assert_eq!(
+            *routes.lock().unwrap(),
+            vec![
+                NetworkRoute::System,
+                NetworkRoute::DirectIpv4,
+                NetworkRoute::OriginIpv4,
+                NetworkRoute::OriginIpv4
+            ]
+        );
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests.iter().filter(|r| r.starts_with("POST")).count(), 1);
     }
     #[test]
     fn retained_revoked_login_refreshes_public_cards_and_clears_saved_login() {

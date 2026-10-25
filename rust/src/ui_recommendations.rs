@@ -22,7 +22,7 @@ enum Mode {
 }
 enum Update {
     Init(rec::Client),
-    Page(rec::Page, bool, bool),
+    Page(rec::Page, bool, Option<&'static str>),
     Games(Vec<rec::GameCandidate>),
     Draft(rec::Recipe, bool),
     Code(rec::Challenge),
@@ -268,12 +268,12 @@ impl Recommendations {
                     rec::rank(&mut self.cards);
                     self.total = page.total;
                     self.next = page.next_offset;
-                    self.cached = cached;
+                    self.cached = cached.is_some();
                     if append {
                         self.visible += 12;
                     }
-                    if cached {
-                        self.message = self.t("当前显示离线缓存，联网后可刷新");
+                    if let Some(message) = cached {
+                        self.message = self.t(message);
                     }
                 }
                 Ok(Update::Games(games)) => {
@@ -379,7 +379,7 @@ impl Recommendations {
         self.refresh_at = Instant::now() + Duration::from_secs(45);
         self.job(
             move || match client.browse(&id, &catalog, offset, mine, reported) {
-                Ok(page) => Ok(Update::Page(page, append, false)),
+                Ok(page) => Ok(Update::Page(page, append, None)),
                 Err(e) => {
                     if rec::allows_offline_cache(&e)
                         && !append
@@ -387,7 +387,11 @@ impl Recommendations {
                         && !reported
                         && let Some(page) = client.cached(&id, &catalog)
                     {
-                        return Ok(Update::Page(page, false, true));
+                        return Ok(Update::Page(
+                            page,
+                            false,
+                            Some(rec::offline_cache_notice(&e)),
+                        ));
                     }
                     Err(e)
                 }
@@ -1128,7 +1132,9 @@ impl Recommendations {
                 .text_color(cx.theme().muted_foreground)
                 .child(self.t("按有用点赞数从高到低排序。查看完整信息后再选择方案。")),
         );
-        if self.cards.is_empty() && !self.busy {
+        // A failed request is not evidence that this game has no shared setups.
+        // Its actual connection error is already shown beside the refresh controls.
+        if self.cards.is_empty() && !self.busy && self.message.is_empty() {
             body = body.child(div().py_6().child(self.t(if self.reported {
                 "你还没有举报这款游戏的方案"
             } else if self.mine {

@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.11"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.12"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.11 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.12 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,20 +41,20 @@
 
 ## 下载
 
-**版本 4.3.11** · Windows 10 / 11 x64
+**版本 4.3.12** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.11 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.11) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.11 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.11) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.12 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.12) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.12 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.12) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
-下载 **`RTXManager-v4.3.11-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+下载 **`RTXManager-v4.3.12-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.11 更新亮点
+## 4.3.12 更新亮点
 
-- 玩家推荐可分享已应用参数和运行库版本，直观看到默认值与玩家值的差异；支持完整安装、仅安装方案或仅应用参数。
-- 推荐后台适配电脑和手机，精简运行库窗口，改进连续操作与安全退出。
+- 修复部分网络下玩家推荐无法刷新或长期显示离线缓存的问题。
+- 记住成功连接线路，减少重复超时等待；保留已有游戏库、缓存和登录状态。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 

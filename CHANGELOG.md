@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.12
+
+- Rebuild recommendation connections on refresh, honor Windows system proxies, and recover failed reads with IPv4 and an origin fallback that retains HTTPS hostname verification. Keep email, vote and share submissions from being automatically replayed.
+- Remember the last successful route across windows and restarts, avoiding repeated failed-route timeouts. Fall back again if that route stops working.
+- Distinguish connection timeouts and CDN web pages from API responses. Preserve old anonymous caches and login state, and replace cached recommendations after a successful refresh. Keep a small local connection report without account or game data.
+- Do not claim a game has no shared setups when loading failed.
+
 ## 4.3.11
 
 - Share applied preset parameters with player recommendations. Show only changed settings in a compact default-to-player comparison, with separate Install and apply, Install scheme only, and Apply parameters only actions. Validate patch compatibility and runtime dependencies before applying across game folders.
