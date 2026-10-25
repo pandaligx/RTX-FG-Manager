@@ -3,6 +3,12 @@ on:
   schedule:
     - cron: '43 1 * * *'
   workflow_dispatch:
+    inputs:
+      backfill:
+        description: 'Optionally mirror the reviewed NVIDIA stable fallback'
+        type: choice
+        options: ['', '310.9.1']
+        default: ''
 permissions:
   contents: write
 concurrency:
@@ -28,7 +34,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
-        run: python tools/sync_runtimes.py --publish
+          BACKFILL: ${{ inputs.backfill }}
+        run: |
+          if ($env:BACKFILL) { python tools/sync_runtimes.py --publish --backfill $env:BACKFILL }
+          else { python tools/sync_runtimes.py --publish }
       - uses: actions/upload-artifact@v4
         with:
           name: runtime-sync-report

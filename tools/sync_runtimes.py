@@ -82,12 +82,18 @@ def validate_catalog(c):
     if (c.get('schema') != 1 or type(c.get('revision')) is not int or c['revision'] < 1
             or c.get('min_manager_version') != '4.3.10' or len(c.get('packages', [])) != 3):
         raise RuntimeError('Invalid runtime catalog')
+    history = c.get('history', [])
+    if len(history) > 24 or {p['kind'] for p in c['packages']} != set(KINDS):
+        raise RuntimeError('Invalid runtime history or latest kinds')
     seen = set()
-    for p in c['packages']:
+    for p in c['packages'] + history:
         k = p['kind']
-        if k not in KINDS or k in seen or version(p['version'])[0] != 310:
+        identity = (k, p['version'])
+        if k not in KINDS or identity in seen or version(p['version'])[0] != 310:
             raise RuntimeError('Invalid automatic runtime scope')
-        seen.add(k)
+        seen.add(identity)
+        if p in history and version(p['version']) >= version(next(q for q in c['packages'] if q['kind'] == k)['version']):
+            raise RuntimeError('History must precede current recommendation')
         if (type(p['bytes']) is not int or not 0 < p['bytes'] <= LIMIT
                 or not re.fullmatch('[a-f0-9]{64}', p['sha256'])):
             raise RuntimeError('Invalid runtime archive identity')
@@ -109,6 +115,22 @@ def validate_advance(old, new):
         b = next(p for p in new['packages'] if p['kind'] == a['kind'])
         if version(b['version']) < version(a['version']) or (version(a['version']) == version(b['version']) and a != b):
             raise RuntimeError('Cannot replace or downgrade an existing runtime version')
+    prior = {(p['kind'], p['version']): p for p in old['packages'] + old.get('history', [])}
+    for p in new['packages'] + new.get('history', []):
+        if (p['kind'], p['version']) in prior and prior[p['kind'], p['version']] != p:
+            raise RuntimeError('Cannot replace a known historical runtime')
+
+
+def add_history(catalog, packages):
+    rows = {(p['kind'], p['version']): p for p in catalog.get('history', [])}
+    for p in packages:
+        key = (p['kind'], p['version'])
+        if key in rows and rows[key] != p:
+            raise RuntimeError('Historical package identity changed')
+        rows[key] = p
+    catalog['history'] = [p for kind in KINDS for p in sorted(
+        [p for p in rows.values() if p['kind'] == kind],
+        key=lambda p: version(p['version']), reverse=True)[:8]]
 
 
 def validate_pe(data):
@@ -208,13 +230,22 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--report', default='.runtime-sync/report.json')
+    parser.add_argument('--backfill', choices=['310.9.1'], help='Reviewed official stable fallback; never changes the recommended version')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     old_bytes = (root / CATALOG).read_bytes()
     current = json.loads(old_bytes)
     validate_catalog(current)
     report = []
-    release_version, tag = official_release(gh_api('repos/NVIDIA/DLSS/releases?per_page=100'))
+    releases = gh_api('repos/NVIDIA/DLSS/releases?per_page=100')
+    if args.backfill:
+        tag = 'v' + args.backfill
+        release = next((r for r in releases if r.get('tag_name') == tag), None)
+        if not release or release.get('draft') or release.get('prerelease'):
+            raise RuntimeError('Requested fallback is not an official stable release')
+        release_version = version(args.backfill)
+    else:
+        release_version, tag = official_release(releases)
     sdk_commit = gh_api('repos/NVIDIA/DLSS/commits/' + tag)['sha']
     if not re.fullmatch('[a-f0-9]{40}', sdk_commit):
         raise RuntimeError('Invalid SDK commit')
@@ -231,6 +262,9 @@ def main():
         items = []
         for prior in current['packages']:
             kind = prior['kind']
+            if args.backfill and any(p['kind'] == kind and p['version'] == args.backfill for p in current.get('history', [])):
+                report.append({'kind': kind, 'state': 'historical-version-already-mirrored'})
+                continue
             name = 'lib/Windows_x86_64/rel/' + KINDS[kind][1]
             entry = entries.get(name)
             if (not entry or entry.get('type') != 'blob' or entry.get('mode') != '100644'
@@ -241,7 +275,7 @@ def main():
             if entry['sha'] == origin.get('git_blob'):
                 report.append({'kind': kind, 'state': 'unchanged'})
                 continue
-            if release_version <= version(prior['version']) or release_version[0] != 310:
+            if (not args.backfill and release_version <= version(prior['version'])) or release_version[0] != 310:
                 report.append({'kind': kind, 'version': tag, 'state': 'review-version-or-build-change'})
                 continue
             item = package(kind, tag.removeprefix('v'), sdk_commit, entry, Path(temp))
@@ -253,8 +287,13 @@ def main():
             next_catalog['revision'] = max(int(time.time()), current['revision'] + 1)
             for p, _, evidence in items:
                 i = next(i for i, prior in enumerate(next_catalog['packages']) if prior['kind'] == p['kind'])
-                next_catalog['packages'][i] = p
-                next_catalog.setdefault('origins', {})[p['kind']] = evidence
+                if args.backfill:
+                    add_history(next_catalog, [p])
+                    next_catalog.setdefault('history_origins', {})[p['kind'] + ':' + p['version']] = evidence
+                else:
+                    add_history(next_catalog, [next_catalog['packages'][i]])
+                    next_catalog['packages'][i] = p
+                    next_catalog.setdefault('origins', {})[p['kind']] = evidence
             validate_advance(current, next_catalog)
             remote = gh_api(f'repos/{pub.GH_REPO}/contents/{CATALOG}?ref=main')
             if base64.b64decode(remote['content']) != old_bytes:

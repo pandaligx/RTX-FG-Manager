@@ -14,6 +14,26 @@ sync = importlib.import_module('sync_runtimes')
 
 
 class RuntimeSyncTests(unittest.TestCase):
+    def test_history_retention_and_immutable_versions(self):
+        old = self.baseline(); old.pop('history', None)
+        fallback = copy.deepcopy(old['packages'][0]); fallback['version'] = '310.9.1'
+        fallback['urls'] = sync.urls(f'runtime-sr-310.9.1-{fallback["sha256"][:12]}.zip')
+        new = copy.deepcopy(old); new['revision'] += 1
+        sync.add_history(new, [fallback]); sync.validate_advance(old, new)
+        changed = copy.deepcopy(new); changed['revision'] += 1; changed['history'][0]['bytes'] += 1
+        with self.assertRaises(RuntimeError): sync.validate_advance(new, changed)
+        duplicate = copy.deepcopy(new); duplicate['history'].append(fallback)
+        with self.assertRaises(RuntimeError): sync.validate_catalog(duplicate)
+
+    def test_history_keeps_only_eight_latest_per_kind(self):
+        c = self.baseline(); c['history'] = []
+        rows = []
+        for n in range(1, 13):
+            p = copy.deepcopy(c['packages'][0]); p['version'] = f'310.8.{n}'
+            p['urls'] = sync.urls(f'runtime-sr-{p["version"]}-{p["sha256"][:12]}.zip'); rows.append(p)
+        sync.add_history(c, rows); sync.validate_catalog(c)
+        self.assertEqual([p['version'] for p in c['history']], [f'310.8.{n}' for n in range(12, 4, -1)])
+
     def baseline(self):
         return json.loads((ROOT / 'cloud/runtime-catalog.json').read_text(encoding='utf-8'))
 

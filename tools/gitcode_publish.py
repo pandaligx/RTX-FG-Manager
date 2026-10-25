@@ -340,9 +340,9 @@ def verify_metadata_changes(root, review, before, after):
         if runtime_path in before:
             prior = json.loads(review.git(root, 'cat-file', 'blob', before[runtime_path][2], binary=True))
             sync_runtimes.validate_advance(prior, next_catalog)
-            prior_packages = prior['packages']
+            prior_packages = prior['packages'] + prior.get('history', [])
         metadata_digest = hashlib.sha256(raw).hexdigest()
-        for p in next_catalog['packages']:
+        for p in next_catalog['packages'] + next_catalog.get('history', []):
             if p not in prior_packages:
                 for url in p['urls']:
                     verify_metadata_artifact(url, p['bytes'], p['sha256'], metadata_digest)

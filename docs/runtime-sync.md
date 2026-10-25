@@ -8,6 +8,8 @@ The workflow uses existing `GITCODE_TOKEN` and the job's repository-scoped `GITH
 
 Manager 4.3.10 and later refresh the independent runtime catalog from the selected download source, with cache and bundled fallback. Refreshing a catalog does **not** change game files. Users explicitly choose **Back up and update** and can restore originals. Shared game DLL changes may affect every patch using those files; a valid signature does not prove game compatibility.
 
+The movable runtime window keeps downloads and results visible for consecutive operations. SR/RR/FG offer explicitly selected versions: the current recommendation and up to eight mirrored older builds per component. The reviewed 310.9.1 official stable release can be backfilled manually; daily updates retain the previous recommendation in history. History never changes the default recommendation and known version identities cannot be replaced. Original game files remain separately restorable. NR and Intel choices stay constrained by patch compatibility.
+
 ## Patch-private dependencies
 
 | Component | Update policy |
@@ -24,5 +26,7 @@ The scanner excludes known private directories and backups. Deployment ownership
 每天北京时间约 09:43 检查 NVIDIA 官方正式 SDK，核验原件后同步 GitCode、GitHub，最后更新独立运行库清单。只同步 x64 正式版 SR、RR、FG，不使用 DLSS Swapper、游戏提取或未知来源文件。未变更的 DLL 不重复下载。
 
 Intel 保留官方 SDK 3.0.2 配套版本；NR 保留现有兼容版本，因为 NVIDIA 当前公开目录中未提供该文件。补丁私有目录不会被通用 DLSS 更新覆盖。客户端更新清单不等于自动修改游戏：由用户点击安装，保留恢复原件入口。不同游戏的实际兼容性仍需游戏验证。
+
+运行库使用可移动独立窗口，下载和结果留在窗口内，可连续操作。SR/RR/FG 支持选择已镜像的官方历史版本，首次补充 310.9.1；每日更新保留每项最近八个历史版本。默认仍推荐最新版本，历史版本只在用户明确选择时安装，原游戏文件可单独恢复。
 
 Sources: [NVIDIA DLSS](https://github.com/NVIDIA/DLSS/releases), [Intel XeSS SDK](https://github.com/intel/xess/releases), [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [MFG 1.7](https://github.com/dashdogy/MFG-Unlocker/tree/v1.7.0), [Encore Intel engines](https://github.com/SilyNoMeta/rtx-encore/blob/v1.4.1/docs/INTEL-ENGINES.md).
