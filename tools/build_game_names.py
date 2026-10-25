@@ -14,12 +14,15 @@ import time
 from pathlib import Path
 
 QUERY = '''SELECT ?item ?property ?id ?zh ?en WHERE {
+ hint:Query hint:optimizer "None".
  { VALUES ?property { wdt:P1733 wdt:P5885 wdt:P2725 wdt:P6278 wdt:P12727 } ?item ?property ?id. }
  UNION { ?item p:P2725 ?statement. ?statement pq:P12727 ?id. BIND(wdt:P12727 AS ?property) }
  ?item rdfs:label ?zh.
  FILTER(LANG(?zh) IN ("zh-cn","zh-hans","zh"))
  OPTIONAL { ?item rdfs:label ?en FILTER(LANG(?en) IN ("en", "mul")) }
 }'''
+# Keep platform-ID selection before multilingual label joins. Blazegraph's
+# automatic reordering can turn this bounded query into a label-wide scan (504).
 PROPERTIES = {"P1733": "steam", "P5885": "xbox", "P2725": "gog_slug", "P6278": "epic_slug", "P12727": "gog"}
 
 
