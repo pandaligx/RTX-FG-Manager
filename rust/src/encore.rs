@@ -366,6 +366,7 @@ fn supported_container(path: &[String]) -> bool {
                 "appearance",
                 "passStyles",
                 "passTuning",
+                "passModels",
                 "optimizations",
                 "experimental",
                 "openExperimental",

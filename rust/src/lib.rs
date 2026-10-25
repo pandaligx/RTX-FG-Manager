@@ -42,3 +42,5 @@ pub mod win;
 pub mod xbox;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod neural_runtime;
+pub mod runtime_catalog;
+pub mod runtime_files;

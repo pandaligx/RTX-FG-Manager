@@ -1,4 +1,5 @@
 {
+  "运行库默认": ["Runtime default", "По умолчанию в библиотеке", "ランタイム既定", "런타임 기본값"],
   "平滑 X3 / X4": [
     "Smooth out X3 / X4",
     "Плавность X3 / X4",
@@ -2464,5 +2465,89 @@
     "Сначала включите нужную функцию и выполните условия этого параметра.",
     "先に必要な機能を有効にし、この設定の使用条件を満たしてください。",
     "먼저 필요한 기능을 켜고 이 설정의 사용 조건을 충족하세요."
+  ],
+  "NR 处理位置": [
+    "NR placement",
+    "Положение NR",
+    "NR 処理位置",
+    "NR 처리 위치"
+  ],
+  "Post-SR（默认）": [
+    "Post-SR (default)",
+    "После SR (по умолчанию)",
+    "Post-SR（既定）",
+    "Post-SR (기본값)"
+  ],
+  "Pre-SR（实验）": [
+    "Pre-SR (experimental)",
+    "Перед SR (экспериментально)",
+    "Pre-SR（実験的）",
+    "Pre-SR (실험적)"
+  ],
+  "Pre-SR 仅支持普通 DLSS SR、均匀渲染尺寸；不支持 RR、DLAA、中央优先、避开填充和抖动运动输入。不满足条件时保留原始超分画面。": [
+    "Pre-SR requires ordinary DLSS SR and uniform inputs. RR, DLAA, foveation, padding avoidance and jittered motion inputs are unsupported; incompatible inputs keep the original SR output.",
+    "Pre-SR требует обычный DLSS SR и равномерные входные данные. RR, DLAA, фовеация, обход заполнения и дрожащие векторы движения не поддерживаются. При несовместимости сохраняется исходный SR.",
+    "Pre-SR は通常の DLSS SR と均一な入力が必要です。RR、DLAA、中心優先、パディング回避、ジッター付き動き入力は非対応。条件を満たさない場合は元の SR 出力を保持します。",
+    "Pre-SR은 일반 DLSS SR과 균일한 입력이 필요합니다. RR, DLAA, 중심 우선, 패딩 회피, 지터 모션 입력은 지원하지 않습니다. 조건 미충족 시 원래 SR 출력을 유지합니다."
+  ],
+  "仅 Pre-SR；与艺术风格独立。未启用的遍仍保留设置。": [
+    "Pre-SR only; independent of artistic style. Inactive passes retain their settings.",
+    "Только Pre-SR; независимо от стиля. Настройки неактивных проходов сохраняются.",
+    "Pre-SR 専用。画風とは独立しています。無効なパスの設定も保持されます。",
+    "Pre-SR 전용이며 표현 스타일과 독립적입니다. 비활성 패스의 설정도 유지됩니다."
+  ],
+  "游戏内菜单语言": [
+    "In-game menu language",
+    "Язык игрового меню",
+    "ゲーム内メニューの言語",
+    "게임 내 메뉴 언어"
+  ],
+  "Encore Insert 菜单语言；不更改管理器语言。": [
+    "Language of the Encore Insert menu; does not change the manager language.",
+    "Язык меню Encore (Insert); язык менеджера не меняется.",
+    "Encore の Insert メニューの言語。管理ツールの言語は変えません。",
+    "Encore Insert 메뉴 언어입니다. 관리자의 언어는 변경하지 않습니다."
+  ],
+  "Français": [
+    "Français",
+    "Français",
+    "Français",
+    "Français"
+  ],
+  "English": [
+    "English",
+    "English",
+    "English",
+    "English"
+  ],
+  "简体中文": [
+    "Simplified Chinese",
+    "Китайский (упрощённый)",
+    "簡体字中国語",
+    "중국어 간체"
+  ],
+  "NR 第 1 遍模型": [
+    "NR pass 1 model",
+    "Модель прохода NR 1",
+    "NR パス 1 のモデル",
+    "NR 1차 패스 모델"
+  ],
+  "NR 第 2 遍模型": [
+    "NR pass 2 model",
+    "Модель прохода NR 2",
+    "NR パス 2 のモデル",
+    "NR 2차 패스 모델"
+  ],
+  "NR 第 3 遍模型": [
+    "NR pass 3 model",
+    "Модель прохода NR 3",
+    "NR パス 3 のモデル",
+    "NR 3차 패스 모델"
+  ],
+  "NR 第 4 遍模型": [
+    "NR pass 4 model",
+    "Модель прохода NR 4",
+    "NR パス 4 のモデル",
+    "NR 4차 패스 모델"
   ]
 }

@@ -99,6 +99,9 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
     assert_eq!(unchanged.len(), 6);
     for old in unchanged {
         let new = current.packages.iter().find(|p| p.id == old.id).unwrap();
+        if new.scheme_id == SCHEME {
+            assert_eq!(new.label, "Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan");
+        }
         let sorted = |p: &cloud::Package| -> Result<serde_json::Value> {
             let mut p = p.clone();
             p.files.sort_by(|a, b| a.name.cmp(&b.name));
@@ -110,6 +113,11 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
             p.archive_prefix.clear();
             p.bytes = 0;
             p.sha256.clear();
+            // 4.3.10 corrects the public upstream label, not the legacy binary.
+            if p.scheme_id == SCHEME {
+                p.label.clear();
+                p.labels.clear();
+            }
             Ok(serde_json::to_value(p)?)
         };
         assert_eq!(sorted(new)?, sorted(old)?);

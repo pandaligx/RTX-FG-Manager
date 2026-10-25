@@ -75,6 +75,7 @@ pub struct Snapshot {
     pub cleanup_details: Vec<String>,
     pub cleanup_paths: Vec<std::path::PathBuf>,
     pub neural: Vec<crate::neural_runtime::Status>,
+    pub runtimes: Vec<crate::runtime_files::Status>,
     pub total: usize,
     pub installed: usize,
     pub schemes: BTreeSet<String>,
@@ -183,18 +184,29 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
         let mut nr = crate::neural_runtime::inspect(&target);
         if status.starts_with("已部署")
             && let Some(r) = record.as_ref()
-            && r.backend == crate::encore::BACKEND
+            && matches!(
+                r.backend.as_str(),
+                crate::encore::BACKEND | crate::rtxmfg::BACKEND
+            )
             && target.validate_record(r).is_ok()
         {
-            nr.encore_version = Some(
+            let version = Some(
                 r.upstream_version
                     .as_deref()
                     .or(r.payload_version.as_deref())
                     .unwrap_or("0.0.0")
                     .into(),
             );
+            if r.backend == crate::rtxmfg::BACKEND {
+                nr.mfg_version = version;
+            } else {
+                nr.encore_version = version;
+            }
         }
         snapshot.neural.push(nr);
+        snapshot
+            .runtimes
+            .extend(crate::runtime_files::inspect_all(&target));
         if status.starts_with("已部署")
             && let Some(r) = record
         {

@@ -118,6 +118,16 @@ pub fn parameter_enabled(profile: &str, key: &str, values: &Values) -> bool {
     if profile == crate::rtxmfg::PROFILE {
         let dynamic = values.get("rtx_mode").map(String::as_str) == Some("dynamic");
         return match key {
+            "rtx_nr_scale" => {
+                values.get("rtx_nr").is_some_and(|v| v == "1")
+                    && !values.get("rtx_nr_scale_auto").is_some_and(|v| v == "1")
+            }
+            "rtx_xemfg_target" | "rtx_xemfg_rounding" | "rtx_xemfg_allow1x" | "rtx_xemfg_cap" => {
+                values.get("rtx_xemfg").is_some_and(|v| v == "1")
+                    && values.get("rtx_xemfg_dynamic").is_some_and(|v| v == "1")
+            }
+            k if k.starts_with("rtx_nr_") => values.get("rtx_nr").is_some_and(|v| v == "1"),
+            k if k.starts_with("rtx_xemfg_") => values.get("rtx_xemfg").is_some_and(|v| v == "1"),
             "rtx_target" => dynamic,
             "rtx_reflex_limit" => !dynamic,
             _ => true,

@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.3.10
+
+- Support MFG Unlocker 1.7.0 and RTX Encore 1.4.2, including their DLSS neural rendering, XeSS multi-frame generation and new settings. Preserve existing values, comments and unknown fields; gate settings by the installed patch version.
+- Move DLSS / XeSS runtime management into a movable standalone window that retains progress and results for consecutive operations. SR/RR/FG support current → target version comparison, historical versions, backup/update and restore.
+- Synchronize official NVIDIA SR/RR/FG catalogs to GitHub/GitCode daily. Recommend 310.9.16 and offer verified 310.9.1 history; keep Intel 3.0.2 and DLSSNR 310.9.16 tied to patch compatibility.
+- Fix stale caches leaving version selectors disabled after a successful refresh. Load catalogs asynchronously with retry and cache fallback, and improve cleanup when the utility window closes.
+- Manage DLSSNR installation/removal in the runtime window; unify Installed / Not installed and DLSSNR / XeSS labels. Preserve private patch directories, per-folder settings and recovery records.
+- Fix the old configuration-size limit for Encore snapshots after new settings were added; display the actual sm86-7 Vulkan package. Retain the native UI and combined download statistics.
+
 ## 4.3.9
 
 - Support RTX Encore 1.3.0: opt-in foveated NR with four custom controls, and the experimental RTX 20 Smooth Motion V1/V2 selector (NVIDIA 621.01, DX12; restart required). Show controls only for supported patch versions.

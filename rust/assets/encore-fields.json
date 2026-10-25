@@ -493,7 +493,8 @@
     ],
     "restart": false,
     "dependencies": [
-      "nrEnabled=1"
+      "nrEnabled=1",
+      "nrPlacement=after-sr"
     ],
     "help": "神经渲染处理尺寸独立于DLSS超分辨率的渲染比例。",
     "optional": false,
@@ -921,7 +922,8 @@
     "choices": [],
     "restart": false,
     "dependencies": [
-      "nrEnabled=1"
+      "nrEnabled=1",
+      "nrPlacement=after-sr"
     ],
     "help": "中央保持完整 NR，边缘效果较柔和以降低开销；不支持时使用普通 NR。默认关闭，效果因游戏而异。",
     "optional": true,
@@ -1079,7 +1081,8 @@
     "choices": [],
     "restart": false,
     "dependencies": [
-      "nrEnabled=1"
+      "nrEnabled=1",
+      "nrPlacement=after-sr"
     ],
     "help": "最多缩小每轴2%来减少填充开销，可能改变画面。",
     "optional": false,
@@ -3682,5 +3685,232 @@
     "help": "继承全局人物遮罩，或为此遍单独设置。",
     "optional": true,
     "since": "1.2.0-beta.1"
+  },
+  {
+    "key": "nrPlacement",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrPlacement"
+    ],
+    "label": "NR 处理位置",
+    "group": "image",
+    "kind": "choice",
+    "default": "after-sr",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "after-sr",
+        "label": "Post-SR（默认）"
+      },
+      {
+        "value": "before-sr",
+        "label": "Pre-SR（实验）"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "Pre-SR 仅支持普通 DLSS SR、均匀渲染尺寸；不支持 RR、DLAA、中央优先、避开填充和抖动运动输入。不满足条件时保留原始超分画面。",
+    "optional": true,
+    "since": "1.4.0"
+  },
+  {
+    "key": "nrPass1Preset",
+    "path": [
+      "neuralRendering",
+      "passModels",
+      "nrPass1Preset"
+    ],
+    "label": "NR 第 1 遍模型",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "auto",
+        "label": "运行库默认"
+      },
+      {
+        "value": "a",
+        "label": "A"
+      },
+      {
+        "value": "b",
+        "label": "B"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPlacement=before-sr",
+      "nrPasses>=1"
+    ],
+    "help": "仅 Pre-SR；与艺术风格独立。未启用的遍仍保留设置。",
+    "optional": true,
+    "since": "1.4.0"
+  },
+  {
+    "key": "nrPass2Preset",
+    "path": [
+      "neuralRendering",
+      "passModels",
+      "nrPass2Preset"
+    ],
+    "label": "NR 第 2 遍模型",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "auto",
+        "label": "运行库默认"
+      },
+      {
+        "value": "a",
+        "label": "A"
+      },
+      {
+        "value": "b",
+        "label": "B"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPlacement=before-sr",
+      "nrPasses>=2"
+    ],
+    "help": "仅 Pre-SR；与艺术风格独立。未启用的遍仍保留设置。",
+    "optional": true,
+    "since": "1.4.0"
+  },
+  {
+    "key": "nrPass3Preset",
+    "path": [
+      "neuralRendering",
+      "passModels",
+      "nrPass3Preset"
+    ],
+    "label": "NR 第 3 遍模型",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "auto",
+        "label": "运行库默认"
+      },
+      {
+        "value": "a",
+        "label": "A"
+      },
+      {
+        "value": "b",
+        "label": "B"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPlacement=before-sr",
+      "nrPasses>=3"
+    ],
+    "help": "仅 Pre-SR；与艺术风格独立。未启用的遍仍保留设置。",
+    "optional": true,
+    "since": "1.4.0"
+  },
+  {
+    "key": "nrPass4Preset",
+    "path": [
+      "neuralRendering",
+      "passModels",
+      "nrPass4Preset"
+    ],
+    "label": "NR 第 4 遍模型",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "auto",
+        "label": "运行库默认"
+      },
+      {
+        "value": "a",
+        "label": "A"
+      },
+      {
+        "value": "b",
+        "label": "B"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPlacement=before-sr",
+      "nrPasses>=4"
+    ],
+    "help": "仅 Pre-SR；与艺术风格独立。未启用的遍仍保留设置。",
+    "optional": true,
+    "since": "1.4.0"
+  },
+  {
+    "key": "menuLanguage",
+    "path": [
+      "menuState",
+      "menuLanguage"
+    ],
+    "label": "游戏内菜单语言",
+    "group": "system",
+    "kind": "choice",
+    "default": "en",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "en",
+        "label": "English"
+      },
+      {
+        "value": "fr",
+        "label": "Français"
+      },
+      {
+        "value": "zh-CN",
+        "label": "简体中文"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "Encore Insert 菜单语言；不更改管理器语言。",
+    "optional": true,
+    "since": "1.4.0"
   }
 ]

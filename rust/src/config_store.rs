@@ -94,7 +94,9 @@ pub fn accepted(
         .and_then(|p| p.get(protocol))
         .and_then(|p| p.as_object())
         .context("当前补丁配置协议不支持社区导入")?;
-    ensure!(values.len() <= 128, "配置参数过多");
+    // Encore 1.4 adds fields to a full local snapshot. The protocol allowlist
+    // below still rejects private/unknown settings individually.
+    ensure!(values.len() <= 256, "配置参数过多");
     let mut allowed = Values::new();
     let mut rejected = BTreeMap::new();
     let number = NUMBER.get_or_init(|| regex::Regex::new(r"^-?(?:0|[1-9]\d*)(?:\.\d+)?$").unwrap());

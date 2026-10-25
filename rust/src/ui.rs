@@ -38,6 +38,8 @@ mod encore_editor;
 mod game_name_editor;
 #[path = "ui_recommendations.rs"]
 mod recommendations;
+#[path = "ui_runtime_files.rs"]
+mod runtime_files;
 
 #[derive(Clone, PartialEq)]
 enum Command {
@@ -61,6 +63,10 @@ enum Command {
     NeuralVersion(&'static str),
     InstallNeural(&'static str),
     RemoveNeural,
+    RuntimeFiles,
+    RefreshRuntimeFiles,
+    RuntimeOperation(&'static str, bool),
+    RuntimeVersion(&'static str, String),
     RetryCleanup,
     CleanupDetails,
     ReviewGame(String),
@@ -180,6 +186,9 @@ pub struct Manager {
     smoke_step: u8,
     update_ready_sent: bool,
     dialog_active: bool,
+    runtime_window: Option<AnyWindowHandle>,
+    runtime_versions: HashMap<&'static str, String>,
+    runtime_feedback: Option<(bool, String)>,
     editor_open: bool,
     preset_close: Option<bool>, // true: app exit; false: editor dismissal
     theme_preview: Option<u64>,
@@ -330,6 +339,9 @@ impl Manager {
             smoke_step: 0,
             update_ready_sent: false,
             dialog_active: false,
+            runtime_window: None,
+            runtime_versions: HashMap::new(),
+            runtime_feedback: None,
             drag_gap: None,
             editor_open: false,
             preset_close: None,
@@ -340,6 +352,20 @@ impl Manager {
         };
         view.filter();
         view.theme(window, cx);
+        let owner = cx.entity().downgrade();
+        cx.on_window_closed(move |cx, closed| {
+            let owner = owner.clone();
+            // Native close notifications can arrive inside another entity's
+            // update. Release that lease before touching the owning view.
+            cx.defer(move |cx| {
+                let _ = owner.update(cx, |this, cx| {
+                    if this.runtime_window.is_some_and(|w| w.window_id() == closed) {
+                        this.clear_runtime_window(cx);
+                    }
+                });
+            });
+        })
+        .detach();
         cx.spawn_in(window, async move |this, cx| {
             loop {
                 smol::Timer::after(Duration::from_millis(20)).await;
@@ -440,6 +466,17 @@ impl Manager {
         if self.c.closing {
             return;
         }
+        self.reconcile_runtime_window(cx);
+        // The utility owns the selected game until it closes. Main-window
+        // commands cannot silently retarget an operation or a process retry.
+        if let Some(runtime) = self.runtime_window
+            && runtime.window_id() != window.window_handle().window_id()
+        {
+            cx.defer(move |cx| {
+                let _ = runtime.update(cx, |_, window, _| window.activate_window());
+            });
+            return;
+        }
         if self.encore_invalid.get()
             && self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE
             && self
@@ -509,13 +546,46 @@ impl Manager {
                     self.c.neural_versions.insert(exe, version);
                 }
             }
-            Command::InstallNeural(version) => self.c.install_neural_runtime(version),
+            Command::InstallNeural(version) => {
+                self.runtime_feedback = None;
+                self.c.install_neural_runtime(version);
+            }
+            Command::RuntimeFiles => self.runtime_dialog(window, cx),
+            Command::RefreshRuntimeFiles => {
+                if !self.c.busy {
+                    self.c.refresh_runtime_catalog();
+                    if let Some(exe) = self.c.focus.clone() {
+                        self.c.evidence.remove(&exe);
+                    }
+                    self.c.refresh();
+                }
+            }
+            Command::RuntimeVersion(kind, version) => {
+                if !self.c.busy {
+                    self.runtime_versions.insert(kind, version);
+                }
+            }
+            Command::RuntimeOperation(kind, remove) => {
+                self.runtime_feedback = None;
+                let version = self
+                    .runtime_versions
+                    .get(kind)
+                    .filter(|version| {
+                        rtx_fg_manager::runtime_files::versions(kind).contains(version)
+                    })
+                    .cloned()
+                    .unwrap_or_else(|| rtx_fg_manager::runtime_files::recommended(kind));
+                self.c.runtime_operation(kind, remove, version);
+            }
             Command::RecheckBlocked => {
                 self.dialog_active = false;
                 window.close_dialog(cx);
                 self.c.recheck_blocked();
             }
-            Command::RemoveNeural => self.c.confirm = Some("remove_nr".into()),
+            Command::RemoveNeural => {
+                self.runtime_feedback = None;
+                self.c.confirm = Some("remove_nr".into());
+            }
             Command::RetryCleanup => {
                 if self.dialog_active {
                     self.dialog_active = false;
@@ -1519,9 +1589,9 @@ impl Manager {
             label = format!(
                 "{} · {} · {}",
                 self.c.text(if d.installed == d.total {
-                    "已部署"
+                    "已安装"
                 } else {
-                    "部分部署"
+                    "部分安装"
                 }),
                 names.join(" / "),
                 d.proxies.iter().cloned().collect::<Vec<_>>().join(", ")
@@ -1558,20 +1628,32 @@ impl Manager {
             let count = snapshot.neural.iter().filter(|n| n.present).count();
             let missing = snapshot.neural.iter().any(|n| n.managed && !n.present);
             let warning = snapshot.neural.iter().any(|n| n.warning.is_some());
-            let nr = if missing {
-                Some(self.c.text("NR 文件缺失"))
-            } else if warning {
-                Some(format!("NR · {}", self.c.text("需检查")))
-            } else if count > 0 && count < snapshot.neural.len() {
-                Some(format!("NR {count}/{}", snapshot.neural.len()))
-            } else if count > 0 {
-                Some(self.c.text("NR 已安装"))
-            } else {
-                None
-            };
-            if let Some(nr) = nr {
-                label.push_str(&format!(" · {nr}"));
-                if warning || missing || count < snapshot.neural.len() {
+            let nr = component_installation_label(
+                "DLSSNR",
+                count,
+                snapshot.neural.len(),
+                missing,
+                warning,
+                &self.c.tr,
+            );
+            let xess: Vec<_> = snapshot
+                .runtimes
+                .iter()
+                .filter(|s| s.kind == "xemfg")
+                .collect();
+            let xess_relevant = xess.iter().any(|s| s.managed || !s.versions.is_empty());
+            let xe = component_installation_label(
+                "XeSS",
+                xess.iter().filter(|s| s.present).count(),
+                xess.len(),
+                xess.iter()
+                    .any(|s| (s.managed || !s.versions.is_empty()) && !s.present),
+                xess_relevant && xess.iter().any(|s| s.warning.is_some()),
+                &self.c.tr,
+            );
+            for (component, needs_check) in [nr, xe].into_iter().flatten() {
+                label.push_str(&format!(" · {component}"));
+                if needs_check {
                     variant = TagVariant::Warning;
                 }
             }
@@ -1634,7 +1716,7 @@ impl Manager {
         let view = cx.entity().downgrade();
         let remove_label = self.t("从游戏库移除");
         let rename_label = self.t("修改游戏名称");
-        let menu_disabled = self.c.busy;
+        let menu_disabled = self.c.busy || self.runtime_window.is_some();
         let game_icon = self
             .c
             .icons
@@ -1873,6 +1955,9 @@ impl Manager {
                         .disabled(menu_disabled)
                         .on_click(move |_, window, cx| {
                             let _ = view.update(cx, |this, cx| {
+                                if this.runtime_window.is_some() {
+                                    return;
+                                }
                                 this.c.focus = Some(exe.clone());
                                 this.act(Command::Confirm("remove".into()), window, cx);
                             });
@@ -1908,6 +1993,19 @@ impl Manager {
         let mut fields = div().v_flex().gap_3().w_full().min_w_0();
         let mut common = div().v_flex().gap_3().w_full().min_w_0();
         if let Some(options) = options {
+            let mfg_version = self
+                .c
+                .focus
+                .as_ref()
+                .and_then(|e| self.c.deployments.get(e))
+                .filter(|s| s.installed > 0)
+                .and_then(|s| {
+                    s.neural
+                        .iter()
+                        .filter_map(|n| n.mfg_version.as_deref())
+                        .filter_map(|v| semver::Version::parse(v).ok())
+                        .min()
+                });
             if context.profile == rtx_fg_manager::presets::MFG_VULKAN {
                 fields = fields.child(
                     div()
@@ -1940,7 +2038,14 @@ impl Manager {
                     .find(|(v, _)| *v == value)
                     .map(|(_, l)| *l)
                     .unwrap_or(value);
+                let old_mfg = context.profile == rtx_fg_manager::rtxmfg::PROFILE
+                    && mfg_version
+                        .as_ref()
+                        .is_some_and(|v| *v < semver::Version::new(1, 7, 0))
+                    && rtx_fg_manager::rtxmfg::is_170_key(param.key);
                 let disabled = self.c.busy
+                    || self.c.read_only
+                    || old_mfg
                     || !context.parameter_enabled(param.key, &options)
                     || self.c.focus.as_ref().is_some_and(|e| {
                         self.c.running_games.contains(e) || self.c.preset_reads.contains(e)
@@ -1979,6 +2084,14 @@ impl Manager {
                     .gap_1()
                     .child(div().text_xs().child(self.t(param.label)))
                     .child(self.menu(param.key, self.t(selected), choices, disabled, window, cx))
+                    .when(old_mfg, |d| {
+                        d.child(
+                            div()
+                                .text_xs()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(self.t("需要先升级 MFG Unlocker 至 1.7.0。")),
+                        )
+                    })
                     .when(context.profile == rtx_fg_manager::rtxmfg::PROFILE, |d| {
                         d.when_some(rtx_fg_manager::rtxmfg::help(param.key), |d, help| {
                             d.child(
@@ -2033,7 +2146,7 @@ impl Manager {
             .flex_shrink_0()
             .child(title)
             .when(self.c.boolean("preset_help_open", false), |d| d.child(Alert::info("preset-inline-help", self.t(if context.profile == rtx_fg_manager::rtxmfg::PROFILE {
-                "MFG 1.6+：Backspace 打开独立菜单，插件模式使用 OptiScaler 菜单。支持 RTX 20（实验）/30/40/50；功能由游戏、驱动与运行库决定。退出游戏后应用参数，Vulkan 不支持动态倍率。"
+                "MFG 1.7：Backspace 打开菜单；插件可使用 OptiScaler 菜单。NR 与独立 XeSS 多帧生成需另装运行库。Vulkan 的 DLSS 动态倍率不可用，独立 XeMFG 动态倍率另行支持。"
             } else if context.profile == rtx_fg_manager::transfusion::PROFILE {
                 "默认跟随游戏；固定倍率可选2X—6X，5X/6X可能增加显存与延迟。Ctrl+Alt+2/3/4切换倍率，Ctrl+Alt+G跟随游戏，Ctrl+Alt+D切换动态。RTX20及旧显卡Vulkan仍需实机验证。"
             } else if context.delta {
@@ -2628,13 +2741,6 @@ impl Manager {
         };
         let snapshot = self.c.deployments.get(exe);
         let statuses = snapshot.map(|d| d.neural.as_slice()).unwrap_or_default();
-        if self.c.parameter_profile() != rtx_fg_manager::encore::PROFILE
-            && !statuses
-                .iter()
-                .any(|n| n.present || n.managed || n.encore_version.is_some())
-        {
-            return div().into_any_element();
-        }
         let version = self
             .c
             .neural_versions
@@ -2644,18 +2750,21 @@ impl Manager {
         let evidence = self.c.evidence.get(exe).and_then(Option::as_ref);
         let reason = if statuses.is_empty() {
             "正在检测…"
-        } else if statuses.iter().any(|n| n.encore_version.is_none()) {
-            "请先在所有部署目录安装 RTX Encore。"
+        } else if statuses
+            .iter()
+            .any(|n| n.encore_version.is_none() && n.mfg_version.is_none())
+        {
+            "请先在所有部署目录安装 Encore 或 MFG 1.7+。"
         } else if statuses.iter().any(|n| !n.supports(version)) {
-            "NR 310.9.16 需要 RTX Encore 1.1.0 或更新版本"
+            "NR 需要 Encore 1.1.0+ 或 MFG 1.7.0+；MFG 使用 310.9.16 运行库"
         } else if evidence.is_none() {
             "正在检测…"
-        } else if evidence.is_some_and(|e| !e.super_resolution && e.limited) {
+        } else if evidence.is_some_and(|e| !e.neural_input() && e.limited) {
             "DLSS 检测未完成，请刷新后重试。"
-        } else if evidence.is_some_and(|e| !e.super_resolution && e.super_resolution_plugin) {
+        } else if evidence.is_some_and(|e| !e.neural_input() && e.super_resolution_plugin) {
             "仅发现 DLSS 插件，尚未找到超分运行库。"
-        } else if evidence.is_some_and(|e| !e.super_resolution) {
-            "当前游戏目录未发现 DLSS 超分组件。"
+        } else if evidence.is_some_and(|e| !e.neural_input()) {
+            "当前游戏目录未发现 DLSS 超分或光线重建组件。"
         } else {
             ""
         };
@@ -2699,7 +2808,7 @@ impl Manager {
                 .collect::<Vec<_>>()
                 .join("\n\n"),
             self.c
-                .text("仅安装运行库；游戏内开启 DLSS/DLAA 后，按 Insert 设置 NR。")
+                .text("仅安装运行库；游戏内开启 DLSS/DLAA 后，Encore 按 Insert，MFG 按 Backspace 设置 NR。")
         );
         let runtime_items = [
             ("310.9.16", self.t("310.9.16 · 推荐 · A/B 模型")),
@@ -2753,12 +2862,7 @@ impl Manager {
                             .font_weight(FontWeight::MEDIUM)
                             .child(self.t("DLSS神经渲染")),
                     )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(status),
-                    ),
+                    .child(runtime_version_indicator(status, version, cx)),
             )
             .child(runtime_picker)
             .child(
@@ -2800,7 +2904,7 @@ impl Manager {
                     .id("nr-reason")
                     .text_xs()
                     .min_w_0()
-                    .truncate()
+                    .whitespace_normal()
                     .text_color(cx.theme().muted_foreground)
                     .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
                     .child(self.t(hint)),
@@ -2968,7 +3072,17 @@ impl Manager {
             );
         }
         panel = panel
-            .child(self.neural_panel(window, cx))
+            .child(
+                self.button(
+                    "runtime-files",
+                    "DLSS / XeSS 运行库…",
+                    Command::RuntimeFiles,
+                    cx,
+                )
+                .small()
+                .w_full()
+                .disabled(self.c.busy || self.c.focus.is_none()),
+            )
             .child(self.proxy_panel(window, cx));
         if self.c.cloud_scheme().starts_with("upstream") {
             panel = panel
@@ -3954,7 +4068,7 @@ impl Manager {
         } else if profile == rtx_fg_manager::rtxmfg::PROFILE {
             sections = vec![
                 (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
-                (self.t("使用说明"), self.t("MFG 1.6.1 新增 SR/RR 预设；独立菜单支持中文。DX12 的部分预设可在游戏内实时切换；管理器参数仍需退出游戏后应用。Vulkan 预设需重启游戏，不支持动态倍率。")),
+                (self.t("使用说明"), self.t("MFG 1.7 支持 NR 与独立 XeSS 多帧生成。运行库可在右侧单独安装；管理器参数需退出游戏后应用。独立 XeMFG 使用时请关闭游戏原生 FSR/XeSS 帧生成。")),
                 (self.t("兼容性"), self.t("MFG Unlocker 使用独立 JSON。独立代理按 Backspace；OptiScaler 10 插件使用 OptiScaler 菜单。两种入口只能选择一种，管理器不会安装 OptiScaler。实际可用功能由显卡、驱动和游戏决定。")),
             ];
         } else if profile == rtx_fg_manager::presets::MFG_VULKAN {
@@ -4425,6 +4539,7 @@ impl Manager {
         });
     }
     fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.reconcile_runtime_window(cx);
         if self
             .folder_feedback
             .as_ref()
@@ -4475,7 +4590,7 @@ impl Manager {
                 cx.notify();
             }
         }
-        if !self.c.closing {
+        if !self.c.closing && self.runtime_window.is_none() {
             if self.dialog_active && self.c.confirm.as_deref() == Some("end_processes") {
                 window.close_dialog(cx);
                 self.dialog_active = false;
@@ -4774,6 +4889,19 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
                 window.on_window_should_close(cx, move |window, cx| {
                     close
                         .update(cx, |this, cx| {
+                            this.reconcile_runtime_window(cx);
+                            if let Some(runtime) = this.runtime_window
+                                && this.any_preset_pending()
+                            {
+                                // Resolve the utility first before retargeting a
+                                // pending parameter editor to another game.
+                                cx.defer(move |cx| {
+                                    let _ = runtime.update(cx, |_, window, _| {
+                                        window.activate_window();
+                                    });
+                                });
+                                return false;
+                            }
                             if this.any_preset_pending() {
                                 if !this.editor_open {
                                     if let Some((exe, scheme)) = this.c.first_pending_preset() {
@@ -4813,6 +4941,45 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+fn runtime_version_indicator(current: String, selected: &str, cx: &App) -> AnyElement {
+    div()
+        .h_flex()
+        .flex_wrap()
+        .gap_1p5()
+        .text_xs()
+        .text_color(cx.theme().muted_foreground)
+        .child(current)
+        .child("→")
+        .child(
+            div()
+                .text_color(cx.theme().foreground)
+                .child(selected.to_owned()),
+        )
+        .into_any_element()
+}
+
+fn component_installation_label(
+    name: &str,
+    present: usize,
+    total: usize,
+    missing: bool,
+    warning: bool,
+    tr: &rtx_fg_manager::i18n::Translator,
+) -> Option<(String, bool)> {
+    let (status, needs_check) = if missing {
+        (tr.t("文件缺失"), true)
+    } else if warning {
+        (tr.t("需检查"), true)
+    } else if present == 0 {
+        return None;
+    } else if present < total {
+        (format!("{} {present}/{total}", tr.t("部分安装")), true)
+    } else {
+        (tr.t("已安装"), false)
+    };
+    Some((format!("{name} {status}"), needs_check))
+}
+
 fn deployment_label(status: &str) -> (String, TagVariant) {
     if let Some(rest) = status.strip_prefix("已部署 ") {
         let mut parts = rest.split(" / ");
@@ -4829,14 +4996,14 @@ fn deployment_label(status: &str) -> (String, TagVariant) {
         };
         (
             format!(
-                "已部署 · {} · {}",
+                "已安装 · {} · {}",
                 version,
                 parts.next().unwrap_or_default()
             ),
             TagVariant::Success,
         )
     } else if status == "未部署" {
-        (status.into(), TagVariant::Secondary)
+        ("未安装".into(), TagVariant::Secondary)
     } else if status.starts_with("补丁已移除，缓存待清理") {
         ("残留文件待清理".into(), TagVariant::Warning)
     } else if status.starts_with("正在") {
@@ -5124,20 +5291,20 @@ mod layout_tests {
         for (s, label) in [
             (
                 "已部署 NATIVE_SM86 / version.dll",
-                "已部署 · 0.2.5 · version.dll",
+                "已安装 · 0.2.5 · version.dll",
             ),
             (
                 "已部署 NATIVE_X6_SM75 / winmm.dll, dxgi.dll",
-                "已部署 · 0.2.4 5X/6X · winmm.dll, dxgi.dll",
+                "已安装 · 0.2.4 5X/6X · winmm.dll, dxgi.dll",
             ),
-            ("已部署 SM75_R2 / version.dll", "已部署 · R2 · version.dll"),
+            ("已部署 SM75_R2 / version.dll", "已安装 · R2 · version.dll"),
             (
                 "已部署 NATIVE30 @0.2.6 / version.dll",
-                "已部署 · 0.2.6 · version.dll",
+                "已安装 · 0.2.6 · version.dll",
             ),
             (
                 "已部署 NATIVE_X6_20 @0.2.6 / winmm.dll",
-                "已部署 · 0.2.6 5X/6X · winmm.dll",
+                "已安装 · 0.2.6 5X/6X · winmm.dll",
             ),
         ] {
             let (text, tag) = deployment_label(s);
@@ -5153,5 +5320,34 @@ mod layout_tests {
             deployment_label("未部署").1,
             TagVariant::Secondary
         ));
+        assert_eq!(deployment_label("未部署").0, "未安装");
+    }
+
+    #[test]
+    fn component_labels_distinguish_partial_missing_and_uninstalled() {
+        let tr = rtx_fg_manager::i18n::Translator::new("zh-CN");
+        for name in ["DLSSNR", "XeSS"] {
+            assert_eq!(
+                super::component_installation_label(name, 0, 2, false, false, &tr),
+                None
+            );
+            for (count, missing, warning, status, needs_check) in [
+                (2, false, false, "已安装", false),
+                (1, false, false, "部分安装 1/2", true),
+                (1, true, false, "文件缺失", true),
+                (0, true, true, "文件缺失", true),
+                (2, false, true, "需检查", true),
+            ] {
+                assert_eq!(
+                    super::component_installation_label(name, count, 2, missing, warning, &tr),
+                    Some((format!("{name} {status}"), needs_check))
+                );
+            }
+        }
+        let en = rtx_fg_manager::i18n::Translator::new("en");
+        assert_eq!(
+            super::component_installation_label("XeSS", 0, 1, true, false, &en),
+            Some(("XeSS Files missing".into(), true))
+        );
     }
 }

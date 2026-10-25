@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 55309,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-f206772ef1230b338737.json",
-    "sha256": "46110e8de41446931f3216d332a421799c2c8859a23c778cf342441aa1c61f8b",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-f206772ef1230b338737.json"
+    "bytes": 55220,
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-4a9f98cbf9433621c1e6.json",
+    "sha256": "3443ecfddd8177c2f745888fb698b14905bd92311991b102839ba4fd7886da58",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-4a9f98cbf9433621c1e6.json"
   },
-  "revision": "bundles-f206772ef1230b338737",
+  "revision": "bundles-4a9f98cbf9433621c1e6",
   "schema": 3,
   "schemes": [
     {
@@ -42,7 +42,8 @@
       "defaults": {},
       "id": "pipotoufik-mfg-vulkan-sm86-7",
       "min_manager_version": "4.3.1",
-      "name": "Dlssg-MFG-Vulkan",
+      "name": "Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan",
+      "names": {},
       "profile": "mfg_vulkan_sm86_7"
     },
     {
@@ -86,26 +87,26 @@
     },
     {
       "archives": [
-        "mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip"
+        "mfg-unlocker-1.7.0-complete-9488d046ae1a.zip"
       ],
       "capabilities": [],
       "defaults": {},
       "id": "rtx40mfg-1.3.3-hf2",
-      "min_manager_version": "4.3.5",
-      "name": "MFG Unlocker · 1.6.1",
+      "min_manager_version": "4.3.10",
+      "name": "MFG Unlocker · 1.7.0",
       "names": {
-        "en": "MFG Unlocker · 1.6.1",
-        "ja": "MFG Unlocker · 1.6.1",
-        "ko": "MFG Unlocker · 1.6.1",
-        "ru": "MFG Unlocker · 1.6.1",
-        "zh": "MFG Unlocker · 1.6.1"
+        "en": "MFG Unlocker · 1.7.0",
+        "ja": "MFG Unlocker · 1.7.0",
+        "ko": "MFG Unlocker · 1.7.0",
+        "ru": "MFG Unlocker · 1.7.0",
+        "zh": "MFG Unlocker · 1.7.0"
       },
       "profile": "rtxmfg_universal_133",
       "source_url": "https://github.com/dashdogy/RTX40MFG-Unlock"
     },
     {
       "archives": [
-        "rtx-encore-1.3.0-complete-f32265c8bb61.zip"
+        "rtx-encore-1.4.2-complete-a261fcbe9ef1.zip"
       ],
       "capabilities": [
         "encore_dedicated_entries"
@@ -177,27 +178,32 @@
         "nrPass1Intensity": "inherit",
         "nrPass1LocalStructure": "inherit",
         "nrPass1LocalTone": "inherit",
+        "nrPass1Preset": "inherit",
         "nrPass1SkinStructure": "inherit",
         "nrPass1Style": "inherit",
         "nrPass2AutoMask": "inherit",
         "nrPass2Intensity": "inherit",
         "nrPass2LocalStructure": "inherit",
         "nrPass2LocalTone": "inherit",
+        "nrPass2Preset": "inherit",
         "nrPass2SkinStructure": "inherit",
         "nrPass2Style": "inherit",
         "nrPass3AutoMask": "inherit",
         "nrPass3Intensity": "inherit",
         "nrPass3LocalStructure": "inherit",
         "nrPass3LocalTone": "inherit",
+        "nrPass3Preset": "inherit",
         "nrPass3SkinStructure": "inherit",
         "nrPass3Style": "inherit",
         "nrPass4AutoMask": "inherit",
         "nrPass4Intensity": "inherit",
         "nrPass4LocalStructure": "inherit",
         "nrPass4LocalTone": "inherit",
+        "nrPass4Preset": "inherit",
         "nrPass4SkinStructure": "inherit",
         "nrPass4Style": "inherit",
         "nrPasses": "1",
+        "nrPlacement": "after-sr",
         "nrPrecision": "exact",
         "nrResolution": "render",
         "nrResolutionScale": "67",
@@ -237,14 +243,14 @@
         "xefgUiHandling": "interpolate"
       },
       "id": "dlssg-transfusion-1.4.5.3",
-      "min_manager_version": "4.3.9",
-      "name": "RTX Encore · 1.3.0",
+      "min_manager_version": "4.3.10",
+      "name": "RTX Encore · 1.4.2",
       "names": {
-        "en": "RTX Encore · 1.3.0",
-        "ja": "RTX Encore · 1.3.0",
-        "ko": "RTX Encore · 1.3.0",
-        "ru": "RTX Encore · 1.3.0",
-        "zh": "RTX Encore · 1.3.0"
+        "en": "RTX Encore · 1.4.2",
+        "ja": "RTX Encore · 1.4.2",
+        "ko": "RTX Encore · 1.4.2",
+        "ru": "RTX Encore · 1.4.2",
+        "zh": "RTX Encore · 1.4.2"
       },
       "profile": "rtx_encore_json_v4",
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"

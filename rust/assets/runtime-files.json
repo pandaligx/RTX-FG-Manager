@@ -1,0 +1,95 @@
+[
+  {
+    "kind": "sr",
+    "version": "310.9.16",
+    "bytes": 31152410,
+    "sha256": "a092daef889eea63aa9b76f58db69b68bb2ecbf47acdc76831a7f152d7f95644",
+    "files": [
+      {
+        "name": "nvngx_dlss.dll",
+        "bytes": 58956912,
+        "sha256": "d00b5b0ab29c3ca101b70c3a5ecb3a01b7ef33766a3383a28a18623083e6123e"
+      },
+      {
+        "name": "NVIDIA-LICENSE.txt",
+        "bytes": 26620,
+        "sha256": "d4216e39ebef5f9b50a6712ebb37beeb5379862a67733a9999c651f21592aaf0"
+      }
+    ],
+    "urls": [
+      "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/runtime-sr-310.9.16-a092daef889e.zip",
+      "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/runtime-sr-310.9.16-a092daef889e.zip"
+    ]
+  },
+  {
+    "kind": "rr",
+    "version": "310.9.16",
+    "bytes": 21672111,
+    "sha256": "7185dfba013590d508d5cef81fcdc8075a2309b18e8c20ddb11f3df1f48a750a",
+    "files": [
+      {
+        "name": "nvngx_dlssd.dll",
+        "bytes": 48343664,
+        "sha256": "b49435ae346f227feafe7bbe937d88277ea0ee7323975ec06488f377fdb46cee"
+      },
+      {
+        "name": "NVIDIA-LICENSE.txt",
+        "bytes": 26620,
+        "sha256": "d4216e39ebef5f9b50a6712ebb37beeb5379862a67733a9999c651f21592aaf0"
+      }
+    ],
+    "urls": [
+      "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/runtime-rr-310.9.16-7185dfba0135.zip",
+      "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/runtime-rr-310.9.16-7185dfba0135.zip"
+    ]
+  },
+  {
+    "kind": "fg",
+    "version": "310.9.16",
+    "bytes": 3731953,
+    "sha256": "c5a205a6e9e7fd75732a894c8e3ec5ba9cbc10a6a23f2849f0c315aa51c27567",
+    "files": [
+      {
+        "name": "nvngx_dlssg.dll",
+        "bytes": 7506544,
+        "sha256": "8d59d49b36410dd6b62fef2503a5871d347415bd85d943fa0848563a95dd50c7"
+      },
+      {
+        "name": "NVIDIA-LICENSE.txt",
+        "bytes": 26620,
+        "sha256": "d4216e39ebef5f9b50a6712ebb37beeb5379862a67733a9999c651f21592aaf0"
+      }
+    ],
+    "urls": [
+      "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/runtime-fg-310.9.16-c5a205a6e9e7.zip",
+      "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/runtime-fg-310.9.16-c5a205a6e9e7.zip"
+    ]
+  },
+  {
+    "kind": "xemfg",
+    "version": "3.0.2",
+    "bytes": 13458316,
+    "sha256": "9ddb6aaad99b88f64e4d22a2458dba91f8b27a24057dbf6d13225e994fc9333c",
+    "files": [
+      {
+        "name": "libxess_fg.dll",
+        "bytes": 22957432,
+        "sha256": "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
+      },
+      {
+        "name": "libxell.dll",
+        "bytes": 415368,
+        "sha256": "d2030dcd694fda8f2ec7e044b13e6db8f0b56d4ba9113a5efad334e3f3ded8c7"
+      },
+      {
+        "name": "LICENSE.txt",
+        "bytes": 4194,
+        "sha256": "784be42c39a4a4d03cf85d88e15e59d75828fca773ce45b8dbfffbd7eaf208df"
+      }
+    ],
+    "urls": [
+      "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/runtime-xemfg-3.0.2-9ddb6aaad99b.zip",
+      "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/runtime-xemfg-3.0.2-9ddb6aaad99b.zip"
+    ]
+  }
+]

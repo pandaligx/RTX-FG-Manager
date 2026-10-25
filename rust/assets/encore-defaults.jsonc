@@ -47,6 +47,7 @@
     "hairEnabled": true                      // Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change.
   },
   "neuralRendering": {
+    "passModels": {"nrPass1Preset":"inherit","nrPass2Preset":"inherit","nrPass3Preset":"inherit","nrPass4Preset":"inherit"},
     "passTuning": {
       "nrPass1Intensity": "inherit",
       "nrPass1LocalStructure": "inherit",
@@ -70,6 +71,7 @@
       "nrPass4AutoMask": "inherit"
     },
     "core": {                                // Activation, engine and NR scaler: the main quality/performance controls.
+      "nrPlacement": "after-sr", // Encore 1.4: before-sr is experimental; default remains Post-SR.
       "nrEnabled": false,                    // DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0 or 310.9.16. The first launch prepares it in the background.
       "nrPasses": 1,                         // Independent temporal NR passes, 1 to 4. Cost and VRAM grow. Only a complete chain is published; unsupported chain routes preserve SR.
       "nrLaterPassLocalTone": 0,             // Tone applied after pass one, 0 to 2. Default zero avoids repeated tone accumulation.

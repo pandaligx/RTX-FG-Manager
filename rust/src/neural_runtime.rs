@@ -137,9 +137,14 @@ pub struct Status {
     pub managed: bool,
     pub warning: Option<String>,
     pub encore_version: Option<String>,
+    pub mfg_version: Option<String>,
 }
 impl Status {
     pub fn supports(&self, version: &str) -> bool {
+        if let Some(mfg) = &self.mfg_version {
+            return version == RECOMMENDED
+                && semver::Version::parse(mfg).is_ok_and(|v| v >= semver::Version::new(1, 7, 0));
+        }
         self.encore_version.as_deref().is_some_and(|encore| {
             version != RECOMMENDED
                 || semver::Version::parse(encore).is_ok_and(|v| v >= semver::Version::new(1, 1, 0))
@@ -304,27 +309,40 @@ fn install_many_with(
 
 fn preflight_install(target: &core::DeploymentTarget, version: &str) -> Result<()> {
     core::assert_target_stopped(target)?;
-    let record = core::record(&target.directory)?.context("请先安装 RTX Encore")?;
+    let record =
+        core::record(&target.directory)?.context("请先安装 RTX Encore 或 MFG Unlocker 1.7+")?;
     target.validate_record(&record)?;
-    ensure!(record.backend == encore::BACKEND, "请先安装 RTX Encore");
+    let mfg = record.backend == crate::rtxmfg::BACKEND;
     ensure!(
-        !record.cache_pending && !crate::encore_upgrade::has_pending(&target.directory)?,
+        record.backend == encore::BACKEND || mfg,
+        "请先安装 RTX Encore 或 MFG Unlocker 1.7+"
+    );
+    ensure!(
+        !record.cache_pending
+            && !crate::encore_upgrade::has_pending(&target.directory)?
+            && !crate::rtxmfg_upgrade::has_pending(&target.directory)?,
         "请先完成补丁安装或恢复，再添加 NR 运行库"
     );
-    if version == RECOMMENDED {
+    if version == RECOMMENDED || mfg {
         ensure!(
             record
                 .upstream_version
                 .as_deref()
                 .or(record.payload_version.as_deref())
                 .and_then(|v| semver::Version::parse(v).ok())
-                .is_some_and(|v| v >= semver::Version::new(1, 1, 0)),
-            "NR 310.9.16 需要 RTX Encore 1.1.0 或更新版本"
+                .is_some_and(|v| v
+                    >= if mfg {
+                        semver::Version::new(1, 7, 0)
+                    } else {
+                        semver::Version::new(1, 1, 0)
+                    })
+                && (!mfg || version == RECOMMENDED),
+            "NR 需要 Encore 1.1.0+ 或 MFG 1.7.0+；MFG 使用 310.9.16 运行库"
         );
     }
     ensure!(
-        scanner::inspect(&target.game_exe).super_resolution,
-        "未发现游戏的 DLSS 超分组件；不会添加 NR 运行库"
+        scanner::inspect(&target.game_exe).neural_input(),
+        "未发现游戏的 DLSS 超分或光线重建组件；不会添加 NR 运行库"
     );
     let root = core::no_links(&target.directory.join(OWN))?;
     let dest = core::no_links(&target.directory.join(FILE))?;
@@ -603,6 +621,52 @@ mod tests {
             );
         }
         assert!(!dir.path().join("old").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn mfg_170_nr_accepts_rr_inputs_and_rejects_old_patch_before_preparation() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let game = multi_game(dir.path(), 1)?;
+        let target = game.deployment_targets().remove(0).validate(true)?;
+        fs::remove_file(target.directory.join("nvngx_dlss.dll"))?;
+        fs::write(target.directory.join("nvngx_dlssd.dll"), b"synthetic RR")?;
+        let mut hashes = std::collections::BTreeMap::new();
+        for name in core::deployment_names(crate::rtxmfg::BACKEND, &["version.dll".into()])? {
+            let p = target.directory.join(&name);
+            fs::write(&p, b"synthetic MFG")?;
+            hashes.insert(name, core::digest(&p)?);
+        }
+        let marker = target.directory.join(core::OWN).join(core::MARKER);
+        let mut record = serde_json::json!({"schema":3,"backend":crate::rtxmfg::BACKEND,"scheme_id":crate::rtxmfg_upgrade::SCHEME,"payload_version":"1.6.1","proxy":"version.dll","hashes":hashes});
+        core::atomic_json(&marker, &record)?;
+        assert!(
+            install_many_with(
+                std::slice::from_ref(&target),
+                RECOMMENDED,
+                &AtomicBool::new(false),
+                &mut |_| {},
+                |_, _| panic!("old MFG must not download NR")
+            )
+            .is_err()
+        );
+        record["payload_version"] = serde_json::json!("1.7.0");
+        core::atomic_json(&marker, &record)?;
+        let source = dir.path().join("nr-source.dll");
+        fs::write(&source, b"synthetic NR")?;
+        install_many_with(
+            std::slice::from_ref(&target),
+            RECOMMENDED,
+            &AtomicBool::new(false),
+            &mut |_| {},
+            |_, _| Ok(source),
+        )?;
+        let status = crate::deployment::inspect(&game, &crate::cloud::bundled());
+        assert_eq!(status.neural[0].mfg_version.as_deref(), Some("1.7.0"));
+        assert!(status.neural[0].managed && status.neural[0].supports(RECOMMENDED));
+        remove_many(std::slice::from_ref(&target))?;
+        assert!(!target.directory.join(FILE).exists());
+        assert!(target.directory.join("nvngx_dlssd.dll").is_file());
         Ok(())
     }
 

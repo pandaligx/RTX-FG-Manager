@@ -105,6 +105,43 @@ pub fn clean_scoped(runtime: &Path, data: &Path) -> Result<Report> {
         }
     }
     let _ = fs::remove_dir(nr);
+    // Optional runtime downloads only; original game backups live elsewhere.
+    let optional = core::no_links(&runtime.join("optional-runtimes"))?;
+    if let Ok(entries) = fs::read_dir(&optional) {
+        for entry in entries.flatten().take(100_000) {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.len() != 64 || !name.bytes().all(|b| b.is_ascii_hexdigit()) {
+                report.skipped += 1;
+                continue;
+            }
+            let p = core::no_links(&entry.path())?;
+            if let Ok(files) = fs::read_dir(&p) {
+                for file in files.flatten().take(100) {
+                    let name = file.file_name().to_string_lossy().into_owned();
+                    if [
+                        "runtime.zip",
+                        "runtime.zip.aria2",
+                        "nvngx_dlss.dll",
+                        "nvngx_dlssd.dll",
+                        "nvngx_dlssg.dll",
+                        "libxess_fg.dll",
+                        "libxell.dll",
+                        "LICENSE.txt",
+                        "NVIDIA-LICENSE.txt",
+                    ]
+                    .contains(&name.as_str())
+                        && file.path().is_file()
+                    {
+                        tree(&file.path(), 0, &mut report);
+                    } else {
+                        report.skipped += 1;
+                    }
+                }
+            }
+            let _ = fs::remove_dir(p);
+        }
+    }
+    let _ = fs::remove_dir(optional);
     Ok(report)
 }
 pub fn operation_lock() -> Result<win::GameLock> {

@@ -41,6 +41,12 @@ impl Translator {
             }
         }
         if language != "zh-CN" {
+            let runtime: BTreeMap<String, String> =
+                serde_json::from_str(include_str!("../assets/runtime-translations-en.json"))
+                    .expect("runtime English fallback");
+            for (key, value) in runtime {
+                catalog.entry(key).or_insert(value);
+            }
             let recipes: BTreeMap<String, String> = serde_json::from_str(include_str!(
                 "../assets/recommendations-translations-en.json"
             ))

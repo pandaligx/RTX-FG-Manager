@@ -507,7 +507,30 @@ pub struct Evidence {
     pub anti_cheat: bool,
     pub limited: bool,
 }
+impl Evidence {
+    pub fn neural_input(&self) -> bool {
+        self.super_resolution
+            || self.component_paths.iter().any(|p| {
+                p.file_name()
+                    .is_some_and(|n| n.eq_ignore_ascii_case("nvngx_dlssd.dll"))
+            })
+    }
+}
 /// Bounded, read-only component discovery, called only in a background worker.
+pub(crate) fn patch_runtime_directory(name: &str) -> bool {
+    [
+        "dlssg_sm86",
+        "rtx-encore-runtimes",
+        "rtxmfg-xess",
+        "optiscaler",
+        ".rtx-fg-nr",
+        ".rtx-fg-runtimes",
+        ".rtx-fg-v3",
+        "backup",
+        "backups",
+    ]
+    .contains(&name.to_ascii_lowercase().as_str())
+}
 pub fn inspect(exe: &Path) -> Evidence {
     use std::{
         cmp::Reverse,
@@ -575,12 +598,14 @@ pub fn inspect(exe: &Path) -> Evidence {
                 result.frame_generation |= fg;
                 result.super_resolution |= sr;
                 result.super_resolution_plugin |= plugin;
-                if (fg || sr || plugin) && result.component_paths.len() < 32 {
+                if (fg || sr || plugin || name == "nvngx_dlssd.dll")
+                    && result.component_paths.len() < 32
+                {
                     result.component_paths.push(row.path());
                 }
             } else if meta.is_dir()
                 && (name == "thirdparty" || !SKIP.contains(&name.as_str()))
-                && ![".rtx-fg-nr", "backup", "backups"].contains(&name.as_str())
+                && !patch_runtime_directory(&name)
             {
                 if depth < 16 {
                     let priority = if [

@@ -21,7 +21,7 @@
         }
       ],
       "id": "pipotoufik-mfg-vulkan-sm86-7-version",
-      "label": "Dlssg-MFG-Vulkan",
+      "label": "Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan",
       "labels": {},
       "proxy": "version.dll",
       "scheme_id": "pipotoufik-mfg-vulkan-sm86-7",
@@ -911,73 +911,72 @@
       "version": "0.4.0"
     },
     {
-      "archive": "mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip",
-      "archive_prefix": "mfg-unlocker-1.6.1-1785752d3c34",
+      "archive": "mfg-unlocker-1.7.0-complete-9488d046ae1a.zip",
+      "archive_prefix": "mfg-unlocker-1.7.0-version-dll-e476ce87b215",
       "backends": [
         "rtx40mfg"
       ],
-      "bytes": 2790045,
+      "bytes": 4982969,
       "component": false,
       "files": [
         {
-          "bytes": 2923,
+          "bytes": 6380,
           "name": "MFG-Unlocker-NOTICES.txt",
-          "sha256": "68167fca07d1366a34ea12f24afd9fccef438c41ad402681091e2bd99bf79665"
+          "sha256": "2b07b046d192a324cc1ab7831dd72c79eb324712ca9de2adeb9d121f150fd9f4"
         },
         {
-          "bytes": 203,
+          "bytes": 161,
           "name": "RTXMFG-Universal.json",
-          "sha256": "c5333d249dbb5850da94902d6610ad50e67f9aa129a0c06705823bcd99a4e03f"
+          "sha256": "978882875fe0715e81cec40060de367e25637cb81bff0f25b14d63fc7a6a990d"
         },
         {
-          "bytes": 7433480,
+          "bytes": 14588104,
           "name": "version.dll",
-          "sha256": "1785752d3c34e7fd758b6d0ad79999c3e17aa5d9412007c696339dabe2437e16"
+          "sha256": "e476ce87b215bc987c5ca0dddcd5b4e3ca4fd05c764a6c446863e04fceba8e83"
         }
       ],
-      "id": "mfg-unlocker-1.6.1-1785752d3c34",
-      "label": "MFG Unlocker · 1.6.1",
+      "id": "mfg-unlocker-1.7.0-version-dll-e476ce87b215",
+      "label": "MFG Unlocker · 1.7.0",
       "labels": {
-        "en": "MFG Unlocker · 1.6.1",
-        "ja": "MFG Unlocker · 1.6.1",
-        "ko": "MFG Unlocker · 1.6.1",
-        "ru": "MFG Unlocker · 1.6.1",
-        "zh": "MFG Unlocker · 1.6.1"
+        "en": "MFG Unlocker · 1.7.0",
+        "ja": "MFG Unlocker · 1.7.0",
+        "ko": "MFG Unlocker · 1.7.0",
+        "ru": "MFG Unlocker · 1.7.0",
+        "zh": "MFG Unlocker · 1.7.0"
       },
       "proxy": "version.dll",
       "scheme_id": "rtx40mfg-1.3.3-hf2",
-      "sha256": "5c17c0d90b070a633ccf2da1f602792bfcb62330bb37cad38e46342fa2eb33db",
-      "upstream_version": "1.6.1",
+      "sha256": "9488d046ae1a9d160c7bca7bef8e94de9e2c1ec939bd0731fae04658e2b129a0",
+      "upstream_version": "1.7.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip",
-        "gitee": "https://gitee.com/pandaligx/RTX-FG-Manager-payloads/releases/download/payloads/mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/mfg-unlocker-1.7.0-complete-9488d046ae1a.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/mfg-unlocker-1.7.0-complete-9488d046ae1a.zip"
       },
-      "version": "1.6.1"
+      "version": "1.7.0"
     },
     {
-      "archive": "rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-      "archive_prefix": "rtx-encore-1.3.0-winhttp-dll-ad197c0754c6",
+      "archive": "rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+      "archive_prefix": "rtx-encore-1.4.2-winhttp-dll-52e6d75b8a86",
       "backends": [
         "encore"
       ],
-      "bytes": 246060248,
+      "bytes": 248636402,
       "component": false,
       "files": [
         {
-          "bytes": 12995,
+          "bytes": 17689,
           "name": "rtx-encore-THIRD-PARTY-NOTICES.md",
-          "sha256": "bc0414dd025d5c8164d74d7513ca63d3c63521a65c156f8a5266b65900326cd5"
+          "sha256": "4837b38dad40d70d1305f19a9f72bfc62fa0f194b54ec5069d37a5ad6f0af9fd"
         },
         {
-          "bytes": 16230,
+          "bytes": 16457,
           "name": "rtx-encore.jsonc",
-          "sha256": "663ed8d7858cf0eae1696731a093c4648a619b42332abe0f45913161678a6436"
+          "sha256": "96b1198243ad64bd65e243846edf09d6de8891bb9c1b739cd0b123573690086e"
         },
         {
-          "bytes": 35852032,
+          "bytes": 36776504,
           "name": "winhttp.dll",
-          "sha256": "ad197c0754c6cf8dae07a88964b4d2f14de148b245e521d315f6c66e2d77469f"
+          "sha256": "52e6d75b8a86916b8f889e96ac792eddbd022cdaada86699e1de55c95da005d1"
         },
         {
           "archive_path": "shared/rtx-encore-runtimes/intel/LICENSE.txt",
@@ -1004,48 +1003,48 @@
           "sha256": "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
         }
       ],
-      "id": "rtx-encore-1.3.0-winhttp-dll-ad197c0754c6",
-      "label": "RTX Encore · 1.3.0",
+      "id": "rtx-encore-1.4.2-winhttp-dll-52e6d75b8a86",
+      "label": "RTX Encore · 1.4.2",
       "labels": {
-        "en": "RTX Encore · 1.3.0",
-        "ja": "RTX Encore · 1.3.0",
-        "ko": "RTX Encore · 1.3.0",
-        "ru": "RTX Encore · 1.3.0",
-        "zh": "RTX Encore · 1.3.0"
+        "en": "RTX Encore · 1.4.2",
+        "ja": "RTX Encore · 1.4.2",
+        "ko": "RTX Encore · 1.4.2",
+        "ru": "RTX Encore · 1.4.2",
+        "zh": "RTX Encore · 1.4.2"
       },
       "proxy": "winhttp.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f32265c8bb619277df8fb71ce3fcb8db463bb4ca79498fb04f7d4407219c6bcf",
-      "upstream_version": "1.3.0",
+      "sha256": "a261fcbe9ef12484ba3e979351c2c0fadd71c0fa55f84c9aa3173ae12f0c144a",
+      "upstream_version": "1.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip"
       },
-      "version": "1.3.0"
+      "version": "1.4.2"
     },
     {
-      "archive": "rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-      "archive_prefix": "rtx-encore-1.3.0-version-dll-8bccdbe78573",
+      "archive": "rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+      "archive_prefix": "rtx-encore-1.4.2-version-dll-1bcb38157a18",
       "backends": [
         "encore"
       ],
-      "bytes": 246060248,
+      "bytes": 248636402,
       "component": false,
       "files": [
         {
-          "bytes": 12995,
+          "bytes": 17689,
           "name": "rtx-encore-THIRD-PARTY-NOTICES.md",
-          "sha256": "bc0414dd025d5c8164d74d7513ca63d3c63521a65c156f8a5266b65900326cd5"
+          "sha256": "4837b38dad40d70d1305f19a9f72bfc62fa0f194b54ec5069d37a5ad6f0af9fd"
         },
         {
-          "bytes": 16230,
+          "bytes": 16457,
           "name": "rtx-encore.jsonc",
-          "sha256": "663ed8d7858cf0eae1696731a093c4648a619b42332abe0f45913161678a6436"
+          "sha256": "96b1198243ad64bd65e243846edf09d6de8891bb9c1b739cd0b123573690086e"
         },
         {
-          "bytes": 35606640,
+          "bytes": 36530672,
           "name": "version.dll",
-          "sha256": "8bccdbe78573231b17bb36cfd311a1ce5dc8dd5cbc39f9720bdb5ab4106de385"
+          "sha256": "1bcb38157a1895f9c0c7a8026b481b671a943aaa81f90e402b6a3e69aec95219"
         },
         {
           "archive_path": "shared/rtx-encore-runtimes/intel/LICENSE.txt",
@@ -1072,48 +1071,48 @@
           "sha256": "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
         }
       ],
-      "id": "rtx-encore-1.3.0-version-dll-8bccdbe78573",
-      "label": "RTX Encore · 1.3.0",
+      "id": "rtx-encore-1.4.2-version-dll-1bcb38157a18",
+      "label": "RTX Encore · 1.4.2",
       "labels": {
-        "en": "RTX Encore · 1.3.0",
-        "ja": "RTX Encore · 1.3.0",
-        "ko": "RTX Encore · 1.3.0",
-        "ru": "RTX Encore · 1.3.0",
-        "zh": "RTX Encore · 1.3.0"
+        "en": "RTX Encore · 1.4.2",
+        "ja": "RTX Encore · 1.4.2",
+        "ko": "RTX Encore · 1.4.2",
+        "ru": "RTX Encore · 1.4.2",
+        "zh": "RTX Encore · 1.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f32265c8bb619277df8fb71ce3fcb8db463bb4ca79498fb04f7d4407219c6bcf",
-      "upstream_version": "1.3.0",
+      "sha256": "a261fcbe9ef12484ba3e979351c2c0fadd71c0fa55f84c9aa3173ae12f0c144a",
+      "upstream_version": "1.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip"
       },
-      "version": "1.3.0"
+      "version": "1.4.2"
     },
     {
-      "archive": "rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-      "archive_prefix": "rtx-encore-1.3.0-winmm-dll-ca01f8b7e7fe",
+      "archive": "rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+      "archive_prefix": "rtx-encore-1.4.2-winmm-dll-eb53425d1557",
       "backends": [
         "encore"
       ],
-      "bytes": 246060248,
+      "bytes": 248636402,
       "component": false,
       "files": [
         {
-          "bytes": 12995,
+          "bytes": 17689,
           "name": "rtx-encore-THIRD-PARTY-NOTICES.md",
-          "sha256": "bc0414dd025d5c8164d74d7513ca63d3c63521a65c156f8a5266b65900326cd5"
+          "sha256": "4837b38dad40d70d1305f19a9f72bfc62fa0f194b54ec5069d37a5ad6f0af9fd"
         },
         {
-          "bytes": 16230,
+          "bytes": 16457,
           "name": "rtx-encore.jsonc",
-          "sha256": "663ed8d7858cf0eae1696731a093c4648a619b42332abe0f45913161678a6436"
+          "sha256": "96b1198243ad64bd65e243846edf09d6de8891bb9c1b739cd0b123573690086e"
         },
         {
-          "bytes": 35610768,
+          "bytes": 36534800,
           "name": "winmm.dll",
-          "sha256": "ca01f8b7e7fed22218305fa1ea1648901c4838276e9399f46108be70b49a2207"
+          "sha256": "eb53425d1557016ec4691f9bbb0b28f53936b572ffecd3533c6bf0815430a666"
         },
         {
           "archive_path": "shared/rtx-encore-runtimes/intel/LICENSE.txt",
@@ -1140,48 +1139,48 @@
           "sha256": "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
         }
       ],
-      "id": "rtx-encore-1.3.0-winmm-dll-ca01f8b7e7fe",
-      "label": "RTX Encore · 1.3.0",
+      "id": "rtx-encore-1.4.2-winmm-dll-eb53425d1557",
+      "label": "RTX Encore · 1.4.2",
       "labels": {
-        "en": "RTX Encore · 1.3.0",
-        "ja": "RTX Encore · 1.3.0",
-        "ko": "RTX Encore · 1.3.0",
-        "ru": "RTX Encore · 1.3.0",
-        "zh": "RTX Encore · 1.3.0"
+        "en": "RTX Encore · 1.4.2",
+        "ja": "RTX Encore · 1.4.2",
+        "ko": "RTX Encore · 1.4.2",
+        "ru": "RTX Encore · 1.4.2",
+        "zh": "RTX Encore · 1.4.2"
       },
       "proxy": "winmm.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f32265c8bb619277df8fb71ce3fcb8db463bb4ca79498fb04f7d4407219c6bcf",
-      "upstream_version": "1.3.0",
+      "sha256": "a261fcbe9ef12484ba3e979351c2c0fadd71c0fa55f84c9aa3173ae12f0c144a",
+      "upstream_version": "1.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip"
       },
-      "version": "1.3.0"
+      "version": "1.4.2"
     },
     {
-      "archive": "rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-      "archive_prefix": "rtx-encore-1.3.0-dxgi-dll-065f947d5918",
+      "archive": "rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+      "archive_prefix": "rtx-encore-1.4.2-dxgi-dll-3735adcf709d",
       "backends": [
         "encore"
       ],
-      "bytes": 246060248,
+      "bytes": 248636402,
       "component": false,
       "files": [
         {
-          "bytes": 35606640,
+          "bytes": 36530672,
           "name": "dxgi.dll",
-          "sha256": "065f947d5918857bf227ff2a85f1220896279cdbfd6964fdb0ecdfd88d42fd2c"
+          "sha256": "3735adcf709d26c539025cdb220327dea0b51b9dea679d526132a64d1d4f97f1"
         },
         {
-          "bytes": 12995,
+          "bytes": 17689,
           "name": "rtx-encore-THIRD-PARTY-NOTICES.md",
-          "sha256": "bc0414dd025d5c8164d74d7513ca63d3c63521a65c156f8a5266b65900326cd5"
+          "sha256": "4837b38dad40d70d1305f19a9f72bfc62fa0f194b54ec5069d37a5ad6f0af9fd"
         },
         {
-          "bytes": 16230,
+          "bytes": 16457,
           "name": "rtx-encore.jsonc",
-          "sha256": "663ed8d7858cf0eae1696731a093c4648a619b42332abe0f45913161678a6436"
+          "sha256": "96b1198243ad64bd65e243846edf09d6de8891bb9c1b739cd0b123573690086e"
         },
         {
           "archive_path": "shared/rtx-encore-runtimes/intel/LICENSE.txt",
@@ -1208,48 +1207,48 @@
           "sha256": "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
         }
       ],
-      "id": "rtx-encore-1.3.0-dxgi-dll-065f947d5918",
-      "label": "RTX Encore · 1.3.0",
+      "id": "rtx-encore-1.4.2-dxgi-dll-3735adcf709d",
+      "label": "RTX Encore · 1.4.2",
       "labels": {
-        "en": "RTX Encore · 1.3.0",
-        "ja": "RTX Encore · 1.3.0",
-        "ko": "RTX Encore · 1.3.0",
-        "ru": "RTX Encore · 1.3.0",
-        "zh": "RTX Encore · 1.3.0"
+        "en": "RTX Encore · 1.4.2",
+        "ja": "RTX Encore · 1.4.2",
+        "ko": "RTX Encore · 1.4.2",
+        "ru": "RTX Encore · 1.4.2",
+        "zh": "RTX Encore · 1.4.2"
       },
       "proxy": "dxgi.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f32265c8bb619277df8fb71ce3fcb8db463bb4ca79498fb04f7d4407219c6bcf",
-      "upstream_version": "1.3.0",
+      "sha256": "a261fcbe9ef12484ba3e979351c2c0fadd71c0fa55f84c9aa3173ae12f0c144a",
+      "upstream_version": "1.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip"
       },
-      "version": "1.3.0"
+      "version": "1.4.2"
     },
     {
-      "archive": "rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-      "archive_prefix": "rtx-encore-1.3.0-dinput8-dll-22f11ae7206b",
+      "archive": "rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+      "archive_prefix": "rtx-encore-1.4.2-dinput8-dll-5b3412c7bb91",
       "backends": [
         "encore"
       ],
-      "bytes": 246060248,
+      "bytes": 248636402,
       "component": false,
       "files": [
         {
-          "bytes": 35606128,
+          "bytes": 36530160,
           "name": "dinput8.dll",
-          "sha256": "22f11ae7206b3b92868ddf1108f7560a538fdd1314d8f7f09292ae43d3f13a2d"
+          "sha256": "5b3412c7bb910f83ece6afc32950108963aa8d749164b5721a4e57f6d1c5079c"
         },
         {
-          "bytes": 12995,
+          "bytes": 17689,
           "name": "rtx-encore-THIRD-PARTY-NOTICES.md",
-          "sha256": "bc0414dd025d5c8164d74d7513ca63d3c63521a65c156f8a5266b65900326cd5"
+          "sha256": "4837b38dad40d70d1305f19a9f72bfc62fa0f194b54ec5069d37a5ad6f0af9fd"
         },
         {
-          "bytes": 16230,
+          "bytes": 16457,
           "name": "rtx-encore.jsonc",
-          "sha256": "663ed8d7858cf0eae1696731a093c4648a619b42332abe0f45913161678a6436"
+          "sha256": "96b1198243ad64bd65e243846edf09d6de8891bb9c1b739cd0b123573690086e"
         },
         {
           "archive_path": "shared/rtx-encore-runtimes/intel/LICENSE.txt",
@@ -1276,48 +1275,48 @@
           "sha256": "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
         }
       ],
-      "id": "rtx-encore-1.3.0-dinput8-dll-22f11ae7206b",
-      "label": "RTX Encore · 1.3.0",
+      "id": "rtx-encore-1.4.2-dinput8-dll-5b3412c7bb91",
+      "label": "RTX Encore · 1.4.2",
       "labels": {
-        "en": "RTX Encore · 1.3.0",
-        "ja": "RTX Encore · 1.3.0",
-        "ko": "RTX Encore · 1.3.0",
-        "ru": "RTX Encore · 1.3.0",
-        "zh": "RTX Encore · 1.3.0"
+        "en": "RTX Encore · 1.4.2",
+        "ja": "RTX Encore · 1.4.2",
+        "ko": "RTX Encore · 1.4.2",
+        "ru": "RTX Encore · 1.4.2",
+        "zh": "RTX Encore · 1.4.2"
       },
       "proxy": "dinput8.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f32265c8bb619277df8fb71ce3fcb8db463bb4ca79498fb04f7d4407219c6bcf",
-      "upstream_version": "1.3.0",
+      "sha256": "a261fcbe9ef12484ba3e979351c2c0fadd71c0fa55f84c9aa3173ae12f0c144a",
+      "upstream_version": "1.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip"
       },
-      "version": "1.3.0"
+      "version": "1.4.2"
     },
     {
-      "archive": "rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-      "archive_prefix": "rtx-encore-1.3.0-rtx-encore-asi-17aee31f77db",
+      "archive": "rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+      "archive_prefix": "rtx-encore-1.4.2-rtx-encore-asi-c37100817934",
       "backends": [
         "encore"
       ],
-      "bytes": 246060248,
+      "bytes": 248636402,
       "component": false,
       "files": [
         {
-          "bytes": 12995,
+          "bytes": 17689,
           "name": "rtx-encore-THIRD-PARTY-NOTICES.md",
-          "sha256": "bc0414dd025d5c8164d74d7513ca63d3c63521a65c156f8a5266b65900326cd5"
+          "sha256": "4837b38dad40d70d1305f19a9f72bfc62fa0f194b54ec5069d37a5ad6f0af9fd"
         },
         {
-          "bytes": 35280384,
+          "bytes": 36196352,
           "name": "rtx-encore.asi",
-          "sha256": "17aee31f77db8f0e80a29287ea20bdbb46509f07792ab2180d9d3bed98990b08"
+          "sha256": "c37100817934571d330464e9bfd0e2251a0ee39fc1f06862eabbc8d3d7c9f69f"
         },
         {
-          "bytes": 16230,
+          "bytes": 16457,
           "name": "rtx-encore.jsonc",
-          "sha256": "663ed8d7858cf0eae1696731a093c4648a619b42332abe0f45913161678a6436"
+          "sha256": "96b1198243ad64bd65e243846edf09d6de8891bb9c1b739cd0b123573690086e"
         },
         {
           "archive_path": "shared/rtx-encore-runtimes/intel/LICENSE.txt",
@@ -1344,27 +1343,27 @@
           "sha256": "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
         }
       ],
-      "id": "rtx-encore-1.3.0-rtx-encore-asi-17aee31f77db",
-      "label": "RTX Encore · 1.3.0",
+      "id": "rtx-encore-1.4.2-rtx-encore-asi-c37100817934",
+      "label": "RTX Encore · 1.4.2",
       "labels": {
-        "en": "RTX Encore · 1.3.0",
-        "ja": "RTX Encore · 1.3.0",
-        "ko": "RTX Encore · 1.3.0",
-        "ru": "RTX Encore · 1.3.0",
-        "zh": "RTX Encore · 1.3.0"
+        "en": "RTX Encore · 1.4.2",
+        "ja": "RTX Encore · 1.4.2",
+        "ko": "RTX Encore · 1.4.2",
+        "ru": "RTX Encore · 1.4.2",
+        "zh": "RTX Encore · 1.4.2"
       },
       "proxy": "rtx-encore.asi",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f32265c8bb619277df8fb71ce3fcb8db463bb4ca79498fb04f7d4407219c6bcf",
-      "upstream_version": "1.3.0",
+      "sha256": "a261fcbe9ef12484ba3e979351c2c0fadd71c0fa55f84c9aa3173ae12f0c144a",
+      "upstream_version": "1.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.3.0-complete-f32265c8bb61.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.4.2-complete-a261fcbe9ef1.zip"
       },
-      "version": "1.3.0"
+      "version": "1.4.2"
     }
   ],
-  "revision": "bundles-f206772ef1230b338737",
+  "revision": "bundles-4a9f98cbf9433621c1e6",
   "schema": 3,
   "scheme_policies": {
     "dlssg-transfusion-1.4.5.3": {
@@ -1438,27 +1437,32 @@
         "nrPass1Intensity": "inherit",
         "nrPass1LocalStructure": "inherit",
         "nrPass1LocalTone": "inherit",
+        "nrPass1Preset": "inherit",
         "nrPass1SkinStructure": "inherit",
         "nrPass1Style": "inherit",
         "nrPass2AutoMask": "inherit",
         "nrPass2Intensity": "inherit",
         "nrPass2LocalStructure": "inherit",
         "nrPass2LocalTone": "inherit",
+        "nrPass2Preset": "inherit",
         "nrPass2SkinStructure": "inherit",
         "nrPass2Style": "inherit",
         "nrPass3AutoMask": "inherit",
         "nrPass3Intensity": "inherit",
         "nrPass3LocalStructure": "inherit",
         "nrPass3LocalTone": "inherit",
+        "nrPass3Preset": "inherit",
         "nrPass3SkinStructure": "inherit",
         "nrPass3Style": "inherit",
         "nrPass4AutoMask": "inherit",
         "nrPass4Intensity": "inherit",
         "nrPass4LocalStructure": "inherit",
         "nrPass4LocalTone": "inherit",
+        "nrPass4Preset": "inherit",
         "nrPass4SkinStructure": "inherit",
         "nrPass4Style": "inherit",
         "nrPasses": "1",
+        "nrPlacement": "after-sr",
         "nrPrecision": "exact",
         "nrResolution": "render",
         "nrResolutionScale": "67",

@@ -20,6 +20,8 @@ pub enum Event {
     GameIdentities(u64, Vec<(String, String, Value)>),
     GameNames(Result<game_names::Catalog>, bool),
     Catalog(cloud::Catalog),
+    RuntimeCatalogCached(u64, rtx_fg_manager::runtime_catalog::Catalog),
+    RuntimeCatalog(u64, Result<rtx_fg_manager::runtime_catalog::Catalog>),
     Deployments(u64, String, rtx_fg_manager::deployment::Snapshot),
     CleanupPreview(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>),
     Scan(scanner::Report),
@@ -108,6 +110,7 @@ pub enum RetryAction {
     Patch(bool, BTreeSet<String>),
     InstallNr(&'static str),
     RemoveNr,
+    Runtime(&'static str, bool, String),
     Apply,
     DeleteCleanup(Vec<rtx_fg_manager::cleanup_pending::Plan>),
     CleanupResiduals(Vec<core::DeploymentTarget>),
@@ -280,6 +283,10 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
         [
             "nvngx_dlssnr.dll",
             ".rtx-fg-nr/ownership.json",
+            ".rtx-fg-runtimes/sr/ownership.json",
+            ".rtx-fg-runtimes/rr/ownership.json",
+            ".rtx-fg-runtimes/fg/ownership.json",
+            ".rtx-fg-runtimes/xemfg/ownership.json",
             core::INI,
             rtx_fg_manager::rtxmfg::CONFIG,
             rtx_fg_manager::transfusion::CONFIG,
@@ -307,6 +314,57 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
         })
         .collect()
 }
+#[derive(Default)]
+pub struct RuntimeCatalogLoad {
+    loading: bool,
+    usable: bool,
+    online: bool,
+    pending: bool,
+    error: Option<String>,
+}
+impl RuntimeCatalogLoad {
+    pub fn loading(&self) -> bool {
+        self.loading
+    }
+    pub fn failed(&self) -> bool {
+        self.error.is_some()
+    }
+    pub fn message(&self) -> &'static str {
+        if self.loading {
+            if self.usable {
+                "正在刷新版本清单，现有版本仍可使用…"
+            } else {
+                "正在加载版本清单…"
+            }
+        } else if self.failed() {
+            if self.usable {
+                "版本清单加载失败，继续使用缓存版本。点击“刷新”重试。"
+            } else {
+                "版本清单加载失败，当前使用内置版本。点击“刷新”重试。"
+            }
+        } else if self.pending {
+            "清单已获取，当前操作完成后更新。"
+        } else if self.online {
+            "版本清单已更新"
+        } else if self.usable {
+            "正在使用缓存版本，可点击“刷新”获取最新清单。"
+        } else {
+            "历史版本尚未加载，点击“刷新”获取。"
+        }
+    }
+    pub fn single_version_hint(&self, kind: &str) -> &'static str {
+        if kind == "xemfg" {
+            "此组件当前仅提供一个版本"
+        } else if self.loading {
+            "正在获取其他版本…"
+        } else if self.failed() || !self.online {
+            "历史版本暂不可用，可点击顶部“刷新”重试"
+        } else {
+            "此组件当前仅提供一个版本"
+        }
+    }
+}
+
 pub struct Controller {
     pub game_names: Arc<game_names::Catalog>,
     pub names_busy: bool,
@@ -315,6 +373,10 @@ pub struct Controller {
     names_cancel: Arc<AtomicBool>,
     pub catalog: cloud::Catalog,
     pending_catalog: Option<cloud::Catalog>,
+    pending_runtime_catalog: Option<(rtx_fg_manager::runtime_catalog::Catalog, bool)>,
+    pub runtime_catalog_load: RuntimeCatalogLoad,
+    runtime_catalog_generation: u64,
+    runtime_catalog_cancel: Arc<AtomicBool>,
     pub data: PathBuf,
     pub state: Value,
     pub store: Option<preferences::Store>,
@@ -423,6 +485,10 @@ impl Controller {
             names_cancel: Arc::new(AtomicBool::new(false)),
             catalog: cloud::bundled(),
             pending_catalog: None,
+            pending_runtime_catalog: None,
+            runtime_catalog_load: RuntimeCatalogLoad::default(),
+            runtime_catalog_generation: 0,
+            runtime_catalog_cancel: Arc::new(AtomicBool::new(false)),
             data: data.clone(),
             state,
             store: (!read_only).then(|| preferences::Store::new(data)),
@@ -546,6 +612,7 @@ impl Controller {
         app.refresh_hags();
         if app.smoke.is_none() {
             let prefer_github = app.choice("download_source", "domestic") == "github";
+            app.refresh_runtime_catalog();
             let cancel = app.cancel.clone();
             app.channel.job(move |c| {
                 c.send(Event::Catalog(cloud::cached()));
@@ -609,7 +676,7 @@ impl Controller {
             "rtxfg-0.3.5-dx12-vulkan" => {
                 Some("Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan")
             }
-            "pipotoufik-mfg-vulkan-sm86-7" => Some("Dlssg_for_sm86-MFG-version · Vulkan"),
+            "pipotoufik-mfg-vulkan-sm86-7" => Some("Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan"),
             "rtx40mfg-1.3.3-hf2" => {
                 return format!(
                     "MFG-Unlocker · {}",
@@ -1970,6 +2037,9 @@ impl Controller {
             RetryAction::Patch(clean, paths) => self.perform(clean, paths),
             RetryAction::InstallNr(version) => self.install_neural_runtime(version),
             RetryAction::RemoveNr => self.remove_neural_runtime(),
+            RetryAction::Runtime(kind, remove, version) => {
+                self.runtime_operation(kind, remove, version)
+            }
             RetryAction::Apply => self.apply_focused_parameters(),
             RetryAction::DeleteCleanup(plans) => self.delete_cleanup_plans(plans),
             RetryAction::CleanupResiduals(targets) => self.cleanup_residual_targets(targets),
@@ -2017,6 +2087,36 @@ impl Controller {
             Ok(())
         });
     }
+    pub fn runtime_operation(&mut self, kind: &'static str, remove: bool, version: String) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned()
+        else {
+            return;
+        };
+        let targets = game.deployment_targets();
+        self.status_epoch += 1;
+        let data = self.data.clone();
+        self.busy = true;
+        self.critical = true;
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancel = self.cancel.clone();
+        let retry = self.retry_request(RetryAction::Runtime(kind, remove, version.clone()));
+        let github = self.choice("download_source", "domestic") == "github";
+        self.channel.operation(move |c| {
+            if defer_if_running(c, &targets, retry)? { return Ok(()); }
+            for t in &targets { ensure_directory_outside_data(&t.directory, &data)?; }
+            if remove { rtx_fg_manager::runtime_files::remove_many(&targets, kind)?; }
+            else { rtx_fg_manager::runtime_files::install_version(&targets, kind, &version, github, &cancel, &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress { transfer, proxy: kind.into(), package_index:1, package_count:1 })))?; }
+            c.send(Event::Notice(if remove { "运行库已恢复原件；管理器添加的文件已移除。" } else if kind == "xemfg" { "XeSS 运行库已安装。请在参数设置中启用独立 XeSS 多帧生成，再启动游戏；也可按 Backspace 设置。" } else { "DLSS 运行库已更新并保留原件备份。若游戏出现兼容问题，可在运行库窗口恢复。" }.into()));
+            Ok(())
+        });
+    }
     pub fn install_neural_runtime(&mut self, version: &'static str) {
         if self.busy || self.closing || self.read_only {
             return;
@@ -2060,7 +2160,7 @@ impl Controller {
                 },
             )?;
             c.send(Event::Notice(
-                "NR 运行库已安装。请在游戏中开启 DLSS/DLAA，再按 Insert 开启神经渲染。".into(),
+                "NR 运行库已安装。请在游戏中开启 DLSS/DLAA；Encore 按 Insert，MFG 按 Backspace 开启神经渲染。".into(),
             ));
             Ok(())
         });
@@ -2091,7 +2191,7 @@ impl Controller {
             }
             rtx_fg_manager::neural_runtime::remove_many(&targets)?;
             c.send(Event::Notice(
-                "NR 安装已撤销；若原先已有运行库，已恢复原件。Encore 和其他补丁保持不变。".into(),
+                "NR 安装已撤销；若原先已有运行库，已恢复原件。其他补丁保持不变。".into(),
             ));
             Ok(())
         });
@@ -2845,13 +2945,58 @@ impl Controller {
             Ok(())
         });
     }
+    fn begin_runtime_catalog_refresh(&mut self) -> Option<u64> {
+        if self.closing || self.busy || self.runtime_catalog_load.loading {
+            return None;
+        }
+        self.runtime_catalog_generation += 1;
+        self.runtime_catalog_load.loading = true;
+        self.runtime_catalog_load.error = None;
+        self.runtime_catalog_cancel = Arc::new(AtomicBool::new(false));
+        Some(self.runtime_catalog_generation)
+    }
+    pub fn refresh_runtime_catalog(&mut self) {
+        let Some(generation) = self.begin_runtime_catalog_refresh() else {
+            return;
+        };
+        let github = self.choice("download_source", "domestic") == "github";
+        let cancel = self.runtime_catalog_cancel.clone();
+        self.channel.job(move |c| {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if let Some(catalog) = rtx_fg_manager::runtime_catalog::cached() {
+                    c.send(Event::RuntimeCatalogCached(generation, catalog));
+                }
+                rtx_fg_manager::runtime_catalog::refresh(github, &cancel)
+            }))
+            .unwrap_or_else(|_| Err(anyhow::anyhow!("版本清单任务异常，请重试")));
+            c.send(Event::RuntimeCatalog(generation, result));
+            Ok(())
+        });
+    }
     fn apply_pending_catalog(&mut self) {
         if self.closing {
             self.pending_catalog = None;
+            self.pending_runtime_catalog = None;
             return;
         }
         if self.busy {
             return;
+        }
+        if let Some((catalog, online)) = self.pending_runtime_catalog.take() {
+            match rtx_fg_manager::runtime_catalog::activate(catalog) {
+                Ok(()) => {
+                    self.runtime_catalog_load.usable = true;
+                    if online {
+                        self.runtime_catalog_load.online = true;
+                        self.runtime_catalog_load.error = None;
+                    }
+                }
+                Err(e) => {
+                    self.log(&format!("运行库清单未应用：{e}"));
+                    self.runtime_catalog_load.error = Some(format!("{e:#}"));
+                }
+            }
+            self.runtime_catalog_load.pending = false;
         }
         if let Some(mut catalog) = self.pending_catalog.take() {
             catalog.retain_bundled_versions();
@@ -3214,6 +3359,30 @@ impl Controller {
                     self.pending_catalog = Some(catalog);
                     self.apply_pending_catalog();
                 }
+                Event::RuntimeCatalogCached(generation, catalog) => {
+                    if self.closing || generation != self.runtime_catalog_generation {
+                        continue;
+                    }
+                    self.pending_runtime_catalog = Some((catalog, false));
+                    self.apply_pending_catalog();
+                }
+                Event::RuntimeCatalog(generation, result) => {
+                    if self.closing || generation != self.runtime_catalog_generation {
+                        continue;
+                    }
+                    self.runtime_catalog_load.loading = false;
+                    match result {
+                        Ok(catalog) => {
+                            self.runtime_catalog_load.pending = true;
+                            self.pending_runtime_catalog = Some((catalog, true));
+                            self.apply_pending_catalog();
+                        }
+                        Err(e) => {
+                            self.log(&format!("运行库清单更新失败，继续使用已验证版本：{e:#}"));
+                            self.runtime_catalog_load.error = Some(format!("{e:#}"));
+                        }
+                    }
+                }
                 Event::Deployments(epoch, exe, snapshot) => {
                     if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
                         self.deployments.insert(exe, snapshot);
@@ -3399,6 +3568,11 @@ impl Controller {
         self.update_cancel.store(true, Ordering::Relaxed);
         self.hags_cancel.store(true, Ordering::Relaxed);
         self.names_cancel.store(true, Ordering::Relaxed);
+        self.runtime_catalog_cancel.store(true, Ordering::Relaxed);
+        self.runtime_catalog_generation += 1;
+        self.runtime_catalog_load.loading = false;
+        self.runtime_catalog_load.pending = false;
+        self.pending_runtime_catalog = None;
     }
     pub fn tick_close(&mut self) {
         if self.closing
@@ -3422,6 +3596,117 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn runtime_catalog_fixture() -> rtx_fg_manager::runtime_catalog::Catalog {
+        serde_json::from_str(include_str!("../../cloud/runtime-catalog.json")).unwrap()
+    }
+    #[test]
+    fn runtime_catalog_failure_is_visible_and_refresh_can_retry_without_duplicates() {
+        let (_dir, mut c) = controller();
+        let first = c.begin_runtime_catalog_refresh().unwrap();
+        assert!(c.runtime_catalog_load.loading());
+        assert_eq!(c.begin_runtime_catalog_refresh(), None);
+        assert_eq!(c.runtime_catalog_load.message(), "正在加载版本清单…");
+        c.channel.send(Event::RuntimeCatalog(
+            first,
+            Err(anyhow::anyhow!("offline")),
+        ));
+        c.events();
+        assert!(!c.runtime_catalog_load.loading());
+        assert!(c.runtime_catalog_load.failed());
+        assert!(c.runtime_catalog_load.message().contains("内置版本"));
+        assert!(
+            c.runtime_catalog_load
+                .single_version_hint("sr")
+                .contains("重试")
+        );
+        assert_eq!(
+            c.runtime_catalog_load.single_version_hint("xemfg"),
+            "此组件当前仅提供一个版本"
+        );
+        let retry = c.begin_runtime_catalog_refresh().unwrap();
+        assert!(retry > first);
+        assert!(!c.runtime_catalog_load.failed());
+        c.channel.send(Event::RuntimeCatalog(
+            first,
+            Err(anyhow::anyhow!("stale failure")),
+        ));
+        c.events();
+        assert!(c.runtime_catalog_load.loading());
+        assert!(!c.runtime_catalog_load.failed());
+        c.channel
+            .send(Event::RuntimeCatalog(retry, Ok(runtime_catalog_fixture())));
+        c.events();
+        assert!(!c.runtime_catalog_load.loading());
+        assert!(!c.runtime_catalog_load.failed());
+        assert_eq!(c.runtime_catalog_load.message(), "版本清单已更新");
+        assert!(rtx_fg_manager::runtime_files::versions("sr").contains(&"310.9.1".into()));
+    }
+    #[test]
+    fn runtime_catalog_refresh_keeps_cached_versions_and_defers_during_installation() {
+        let (_dir, mut c) = controller();
+        let generation = c.begin_runtime_catalog_refresh().unwrap();
+        c.channel.send(Event::RuntimeCatalogCached(
+            generation,
+            runtime_catalog_fixture(),
+        ));
+        c.events();
+        assert!(c.runtime_catalog_load.usable);
+        assert!(c.runtime_catalog_load.loading());
+        assert!(
+            c.runtime_catalog_load
+                .message()
+                .contains("现有版本仍可使用")
+        );
+        let versions = rtx_fg_manager::runtime_files::versions("sr");
+        c.channel.send(Event::RuntimeCatalog(
+            generation,
+            Err(anyhow::anyhow!("offline")),
+        ));
+        c.events();
+        assert!(c.runtime_catalog_load.message().contains("缓存版本"));
+        assert_eq!(versions, rtx_fg_manager::runtime_files::versions("sr"));
+        let retry = c.begin_runtime_catalog_refresh().unwrap();
+        c.busy = true;
+        c.channel
+            .send(Event::RuntimeCatalog(retry, Ok(runtime_catalog_fixture())));
+        c.events();
+        assert!(c.pending_runtime_catalog.is_some());
+        assert!(c.runtime_catalog_load.message().contains("当前操作完成后"));
+        assert!(c.begin_runtime_catalog_refresh().is_none());
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(c.pending_runtime_catalog.is_none());
+        assert_eq!(c.runtime_catalog_load.message(), "版本清单已更新");
+    }
+    #[test]
+    fn runtime_catalog_closing_cancels_metadata_only_and_ignores_late_results() {
+        let (_dir, mut c) = controller();
+        let generation = c.begin_runtime_catalog_refresh().unwrap();
+        c.cancel.store(true, Ordering::Relaxed);
+        assert!(!c.runtime_catalog_cancel.load(Ordering::Relaxed));
+        c.close();
+        assert!(c.runtime_catalog_cancel.load(Ordering::Relaxed));
+        assert!(!c.runtime_catalog_load.loading());
+        c.channel.send(Event::RuntimeCatalogCached(
+            generation,
+            runtime_catalog_fixture(),
+        ));
+        c.channel.send(Event::RuntimeCatalog(
+            generation,
+            Ok(runtime_catalog_fixture()),
+        ));
+        c.events();
+        assert!(c.pending_runtime_catalog.is_none());
+        assert!(!c.runtime_catalog_load.online);
+        assert!(c.begin_runtime_catalog_refresh().is_none());
+        // If saving preferences prevents closing, a new request must not revive
+        // the cancelled request or leave the refresh button stuck.
+        let cancelled = c.runtime_catalog_cancel.clone();
+        c.closing = false;
+        assert!(c.begin_runtime_catalog_refresh().is_some());
+        assert!(cancelled.load(Ordering::Relaxed));
+        assert!(!c.runtime_catalog_cancel.load(Ordering::Relaxed));
+    }
     #[test]
     fn hags_results_are_independent_of_game_preferences_and_failures_are_visible() {
         let (_dir, mut c) = controller();

@@ -546,6 +546,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
         // NR is independent and may have been installed after the FG uninstall.
     } else {
         crate::neural_runtime::remove_locked(&target)?;
+        crate::runtime_files::remove_locked(&target, "xemfg")?;
         crate::encore_upgrade::recover_locked(&target)?;
         crate::rtxmfg_upgrade::recover_locked(&target)?;
         crate::rtxmfg_settings::recover_locked(&target)?;
