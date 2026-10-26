@@ -13,6 +13,32 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
   scheme:'dlssg-transfusion-1.4.5.3',patchVersion:'1.1.4',entries:['dxgi.dll'],renderer:'dx12',gpuModel:'NVIDIA GeForce RTX 3060',driver:'581.80',gpuAlias:'unchanged',neuralRuntime:'none'});
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
+
+test('Long notes are Unicode bounded, old readers get a safe excerpt and cannot erase the rest',async t=>{
+  const f=fixture(t),u=await f.login();
+  const full={...complete(),notes:'游戏🙂'.repeat(1666)+'完成'};
+  assert.equal([...full.notes].length,5000);
+  assert.throws(()=>recipe({...full,notes:full.notes+'多'}));
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:full},u.token,'test-ip',8);
+  assert.equal(posted.content.notes,full.notes);
+  assert.deepEqual(posted.content.presets,full.presets);
+  assert.deepEqual(posted.content.runtimes,recipe(full).runtimes);
+  const path='/v1/recipes/'+posted.id;
+  for(const protocol of [false,2,3,4,5,6,7]) {
+    const old=await f.call('GET',path,null,u.token,'test-ip',protocol);
+    assert.equal([...old.content.notes].length,500);
+    assert.ok(old.content.notes.endsWith('[完整备注请使用新版管理器查看]'));
+  }
+  const old=await f.call('GET',path,null,u.token,'test-ip',7);
+  old.content.title='旧版编辑标题';
+  await f.call('PUT',path,{revision:1,content:old.content},u.token,'test-ip',7);
+  const saved=await f.call('GET',path,null,u.token,'test-ip',8);
+  assert.equal(saved.content.notes,full.notes);
+  await reject(f.call('PUT',path,{revision:2,content:{...old.content,notes:'只有前半段'}},u.token,'test-ip',7),'long_notes_require_update');
+  const list=await f.call('GET','/v1/recipes?game=steam:292030',null,null,'test-ip',8);
+  assert.equal(list.items[0].content.notes,full.notes);
+  assert.equal((await f.call('GET','/v1/capabilities')).notesLimit,5000);
+});
 test('Complete setups keep exact runtime versions and protocol 6 cannot erase them',async t=>{
   const f=fixture(t),u=await f.login();
   const card=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:complete()},u.token,'test-ip',7);
@@ -246,7 +272,7 @@ test('HTTP rejects oversized bodies and foreign origins, does not leak backend e
   const f=fixture(t),server=httpServer(f.call?async args=>{if(args.url.pathname==='/v1/fail')throw Error('secret');return {ok:true};}:null,{origin:'https://recommend.example.com'});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>server.close());const base='http://127.0.0.1:'+server.address().port;
   assert.equal((await fetch(base+'/v1/health',{headers:{Origin:'https://evil.example'}})).status,403);
-  assert.equal((await fetch(base+'/v1/x',{method:'POST',headers:{'Content-Type':'application/json'},body:'x'.repeat(17000)})).status,413);
+  assert.equal((await fetch(base+'/v1/x',{method:'POST',headers:{'Content-Type':'application/json'},body:'x'.repeat(65537)})).status,413);
   assert.deepEqual(await (await fetch(base+'/v1/fail')).json(),{error:'internal_error'});
 });
 

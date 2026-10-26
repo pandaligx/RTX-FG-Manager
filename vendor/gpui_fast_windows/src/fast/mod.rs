@@ -10,12 +10,17 @@
 
 pub(crate) mod class_names;
 pub(crate) mod composition;
+pub(crate) mod device_wake;
 pub(crate) mod draw_state;
 pub(crate) mod frame;
+pub(crate) mod frame_schedule;
 pub(crate) mod globals;
 pub(crate) mod layers;
+#[cfg(test)]
+pub(crate) mod native_tests;
+pub(crate) mod rounded_clip;
+
 pub(crate) mod compat;
 pub(crate) mod color_glyphs;
 pub(crate) mod font_loader;
 pub(crate) mod startup;
-pub(crate) mod rounded_clip;

@@ -56,6 +56,7 @@ pub struct WindowsWindowState {
 
     pub callbacks: Callbacks,
     pub frame_signal: Arc<PlatformFrameSignal>,
+    pub(crate) fast_frame_request: Arc<crate::fast::frame_schedule::FrameRequest>,
     pub input_handler: Cell<Option<PlatformInputHandler>>,
     pub ime_enabled: Cell<bool>,
     pub pending_surrogate: Cell<Option<u16>>,
@@ -157,8 +158,10 @@ impl WindowsWindowState {
         let fullscreen = None;
         let initial_placement = None;
 
-        let direct_manipulation = DirectManipulationHandler::new(hwnd, scale_factor)
-            .context("initializing Direct Manipulation")?;
+        let fast_frame_request = crate::fast::frame_schedule::new_request(&draw_coordinator);
+        let direct_manipulation =
+            DirectManipulationHandler::new(hwnd, scale_factor, Arc::clone(&fast_frame_request))
+                .context("initializing Direct Manipulation")?;
 
         Ok(Self {
             origin: Cell::new(origin),
@@ -172,6 +175,7 @@ impl WindowsWindowState {
             min_size,
             callbacks,
             frame_signal: Arc::new(PlatformFrameSignal::new()),
+            fast_frame_request,
             input_handler: Cell::new(input_handler),
             ime_enabled: Cell::new(true),
             pending_surrogate: Cell::new(pending_surrogate),
@@ -969,13 +973,21 @@ impl PlatformWindow for WindowsWindow {
         self.state.is_fullscreen()
     }
 
+    fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
+        crate::fast::frame_schedule::frame_waker(self)
+    }
+
+    fn schedule_frame(&self) {
+        crate::fast::frame_schedule::schedule_frame(self)
+    }
+
     fn on_request_frame(&self, callback: Box<dyn FnMut(RequestFrameOptions)>) {
         self.state.callbacks.request_frame.set(Some(callback));
         crate::fast::startup::request_first_frame(self);
     }
 
     fn on_input(&self, callback: Box<dyn FnMut(PlatformInput) -> DispatchEventResult>) {
-        self.state.callbacks.input.set(Some(callback));
+        crate::fast::frame_schedule::on_input(self, callback)
     }
 
     fn on_active_status_change(&self, callback: Box<dyn FnMut(bool)>) {
@@ -1037,10 +1049,12 @@ impl PlatformWindow for WindowsWindow {
 
     fn draw(&self, scene: &Scene) {
         crate::fast::startup::draw(self, scene);
+        crate::fast::frame_schedule::schedule_frame(self);
     }
 
     fn draw_composed(&self, scene: ComposedScene<'_>) {
-        crate::fast::composition::draw_composed(self, scene)
+        crate::fast::composition::draw_composed(self, scene);
+        crate::fast::frame_schedule::schedule_frame(self);
     }
 
     fn enable_window_composition(&self) -> anyhow::Result<()> {

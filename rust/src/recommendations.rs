@@ -22,7 +22,8 @@ const ORIGIN: &str = "https://recommend.lgxng.cn";
 // If hosting changes, update this fallback; primary routing always uses DNS.
 const ORIGIN_HOST: &str = "recommend.lgxng.cn";
 const ORIGIN_IPV4: std::net::Ipv4Addr = std::net::Ipv4Addr::new(111, 230, 186, 38);
-const RESPONSE_LIMIT: u64 = 512 * 1024;
+pub const NOTES_LIMIT: usize = 5000;
+const RESPONSE_LIMIT: u64 = 2 * 1024 * 1024;
 // Window instances share one on-disk session. Compare and replace it under the
 // same lock so a late response cannot delete a newer window's successful login.
 static SESSION_FILE_LOCK: Mutex<()> = Mutex::new(());
@@ -282,7 +283,7 @@ impl Recipe {
         public_text(&self.edition, 80, true)?;
         for (text, max, empty) in [
             (&self.title, 80, false),
-            (&self.notes, 500, true),
+            (&self.notes, NOTES_LIMIT, true),
             (&self.gpu_model, 80, true),
             (&self.driver, 40, true),
         ] {
@@ -844,7 +845,7 @@ impl Client {
         let mut request = self
             .http(network)?
             .request(method.clone(), format!("{}{route}", self.origin()))
-            .header("X-RTXFG-Feedback", "7")
+            .header("X-RTXFG-Feedback", "8")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
         if method == Method::GET {
@@ -956,10 +957,16 @@ impl Client {
     }
     fn cache_path(&self, id: &str) -> PathBuf {
         self.root
-            .join(format!("{:x}.setup-v2.json", Sha256::digest(id.as_bytes())))
+            .join(format!("{:x}.setup-v3.json", Sha256::digest(id.as_bytes())))
     }
     pub fn cached(&self, game: &GameIdentity, catalog: &cloud::Catalog) -> Option<Page> {
         let b = fs::read(self.cache_path(&game.id))
+            .or_else(|_| {
+                fs::read(self.root.join(format!(
+                    "{:x}.setup-v2.json",
+                    Sha256::digest(game.id.as_bytes())
+                )))
+            })
             .or_else(|_| {
                 fs::read(self.root.join(format!(
                     "{:x}.presets-v1.json",
@@ -1878,6 +1885,17 @@ mod tests {
     fn card(gpu: &str, driver: &str, likes: u64) -> Card {
         serde_json::from_value(json!({"id":uuid::Uuid::new_v4().to_string(),"author":uuid::Uuid::new_v4().to_string(),"revision":1,"updatedAt":100,"likes":likes,"liked":false,"mine":false,"status":"visible",
           "content":{"schema":1,"game":{"id":"steam:292030","name":"The Witcher 3"},"title":"Working setup","notes":"DX12","scheme":crate::encore::SCHEME,"patchVersion":"1.1.4","entries":["dxgi.dll"],"renderer":"dx12","gpuModel":gpu,"driver":driver,"gpuAlias":"unchanged","neuralRuntime":"none"}})).unwrap()
+    }
+    #[test]
+    fn long_notes_count_unicode_and_remain_bounded() {
+        let mut c = card("RTX 3060", "581.80", 1);
+        c.content.notes = "游戏🙂".repeat(1666) + "完成";
+        assert_eq!(c.content.notes.chars().count(), NOTES_LIMIT);
+        c.content.validate_public().unwrap();
+        c.content.notes.push('多');
+        assert!(c.content.validate_public().is_err());
+        c.content.notes = "C:/Users/private/log.txt".into();
+        assert!(c.content.validate_public().is_err());
     }
     #[test]
     fn server_data_cannot_select_paths_plugins_or_other_games() {

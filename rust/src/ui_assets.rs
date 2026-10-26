@@ -1,9 +1,14 @@
 //! Official component icons plus the requested Bilibili brand exception, all offline.
 use gpui::{AssetSource, SharedString};
 use std::borrow::Cow;
+// The default component bundle excludes catalog-only icons.
+gpui::assets::icon_assets!(RecommendationAssets, [UsersRound]);
 pub struct Assets;
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
+        if let Some(bytes) = RecommendationAssets.load(path)? {
+            return Ok(Some(bytes));
+        }
         if path == "app/manager.png" {
             return Ok(Some(Cow::Borrowed(include_bytes!("../assets/manager.png"))));
         }
@@ -22,6 +27,7 @@ impl AssetSource for Assets {
     }
     fn list(&self, path: &str) -> anyhow::Result<Vec<SharedString>> {
         let mut files = gpui::assets::Assets.list(path)?;
+        files.extend(RecommendationAssets.list(path)?);
         for name in [
             "app/manager.png",
             "app/refresh.svg",
@@ -52,6 +58,7 @@ mod tests {
         }
         for path in [
             "icons/cpu.svg",
+            "icons/users-round.svg",
             "app/trash.svg",
             "icons/github.svg",
             "icons/layout-dashboard.svg",

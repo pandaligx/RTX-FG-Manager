@@ -12,7 +12,7 @@
 [package]
 edition = "2024"
 name = "gpui-fast-windows"
-version = "0.1.10"
+version = "0.1.12"
 authors = ["Longbridge"]
 build = "build.rs"
 include = [
@@ -32,7 +32,7 @@ autotests = false
 autobenches = false
 description = "gpui_windows: GPUI with gpui-fast rendering and layout optimizations"
 homepage = "https://github.com/longbridge/gpui-fast"
-documentation = "https://docs.rs/gpui-fast-windows/0.1.10/gpui_windows/"
+documentation = "https://docs.rs/gpui-fast-windows/0.1.12/gpui_windows/"
 readme = "README.md"
 license = "Apache-2.0"
 repository = "https://github.com/longbridge/gpui-fast"
@@ -52,7 +52,7 @@ path = "src/gpui_windows.rs"
 doctest = false
 
 [dependencies.gpui]
-version = "=0.1.10"
+version = "=0.1.12"
 default-features = false
 package = "gpui-fast"
 
@@ -67,7 +67,7 @@ version = "0.34"
 version = "1.0.86"
 
 [target.'cfg(target_os = "windows")'.dependencies.collections]
-version = "=0.3.9"
+version = "=0.3.10"
 package = "gpui-pre-collections"
 
 [target.'cfg(target_os = "windows")'.dependencies.dunce]
@@ -80,7 +80,7 @@ version = "0.2"
 version = "0.3.34"
 
 [target.'cfg(target_os = "windows")'.dependencies.gpui_util]
-version = "=0.3.9"
+version = "=0.3.10"
 package = "gpui-pre-util"
 
 [target.'cfg(target_os = "windows")'.dependencies.image]
@@ -134,7 +134,7 @@ default-features = false
 package = "zed-scap"
 
 [target.'cfg(target_os = "windows")'.dependencies.scheduler]
-version = "=0.3.9"
+version = "=0.3.10"
 package = "gpui-pre-scheduler"
 
 [target.'cfg(target_os = "windows")'.dependencies.smallvec]

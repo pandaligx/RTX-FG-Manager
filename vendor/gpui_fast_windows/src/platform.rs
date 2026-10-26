@@ -43,6 +43,7 @@ use gpui::*;
 struct TrackedWindow {
     handle: SafeHwnd,
     frame_signal: Arc<PlatformFrameSignal>,
+    fast_frame_request: Arc<crate::fast::frame_schedule::FrameRequest>,
 }
 
 impl TrackedWindow {
@@ -421,9 +422,7 @@ impl WindowsPlatform {
     /// Stops vsync and releases the DirectX devices. No window may be open.
     fn detach_gpu(&self) {
         if let Some(stop) = self.vsync_stop.borrow_mut().take() {
-            // Not joined: the thread can be sending this thread a message. It exits after its
-            // next vsync, and drops its reference to the devices then.
-            stop.store(true, Ordering::Release);
+            crate::fast::frame_schedule::stop_vsync(stop, &self.inner.state.draw_coordinator);
         }
         if let Some(text_system) = &self.direct_write_text_system {
             text_system.release_gpu();
@@ -446,12 +445,18 @@ impl WindowsPlatform {
         let all_windows = Arc::downgrade(&self.raw_window_handles);
         let text_system = Arc::downgrade(direct_write_text_system);
         let invalidate_devices = self.invalidate_devices.clone();
+        let fast_frame_wake =
+            crate::fast::frame_schedule::frame_wake(&self.inner.state.draw_coordinator);
 
         std::thread::Builder::new()
             .name("VSyncProvider".to_owned())
             .spawn(move || {
                 let vsync_provider = VSyncProvider::new();
-                loop {
+                let mut fast_worker = crate::fast::frame_schedule::Worker::new(
+                    fast_frame_wake,
+                    &directx_device.device,
+                );
+                while crate::fast::frame_schedule::Worker::wait(&fast_worker, &stop) {
                     let signal_source = vsync_provider.wait_for_vsync();
                     let signal_at = PlatformFrameSignal::capture(scheduler::Instant::now);
                     if stop.load(Ordering::Acquire) {
@@ -469,11 +474,21 @@ impl WindowsPlatform {
                         ) {
                             panic!("Device lost: {err}");
                         }
+                        crate::fast::frame_schedule::Worker::watch(
+                            &mut fast_worker,
+                            &directx_device.device,
+                        );
                     }
                     let Some(all_windows) = all_windows.upgrade() else {
                         break;
                     };
                     for hwnd in all_windows.read().iter() {
+                        if !crate::fast::frame_schedule::take_request(
+                            hwnd.as_raw(),
+                            &hwnd.fast_frame_request,
+                        ) {
+                            continue;
+                        }
                         unsafe {
                             if let Some(signal_at) = signal_at {
                                 if IsWindowVisible(hwnd.as_raw()).as_bool()
@@ -488,6 +503,8 @@ impl WindowsPlatform {
                             RedrawWindow(Some(hwnd.as_raw()), None, None, RDW_INVALIDATE)
                                 .ok()
                                 .log_err();
+                            #[cfg(test)]
+                            crate::fast::native_tests::paint_invalidated(hwnd.as_raw());
                         }
                     }
                 }
@@ -530,6 +547,13 @@ fn encode_restart_arguments(arguments: &[OsString]) -> OsString {
 }
 
 impl Platform for WindowsPlatform {
+    fn platform_info(&self) -> gpui::PlatformInfo {
+        gpui::PlatformInfo {
+            os: gpui::OperatingSystem::Windows,
+            target: gpui::PlatformTarget::Native,
+        }
+    }
+
     fn background_executor(&self) -> BackgroundExecutor {
         self.background_executor.clone()
     }
@@ -755,7 +779,9 @@ impl Platform for WindowsPlatform {
         self.raw_window_handles.write().push(TrackedWindow {
             handle: handle.into(),
             frame_signal: window.state.frame_signal.clone(),
+            fast_frame_request: Arc::clone(&window.state.fast_frame_request),
         });
+        crate::fast::frame_schedule::schedule_frame(&window);
 
         Ok(Box::new(window))
     }
@@ -1403,7 +1429,7 @@ impl WindowsPlatformInner {
 impl Drop for WindowsPlatform {
     fn drop(&mut self) {
         if let Some(stop) = self.vsync_stop.borrow_mut().take() {
-            stop.store(true, Ordering::Release);
+            crate::fast::frame_schedule::stop_vsync(stop, &self.inner.state.draw_coordinator);
         }
         unsafe {
             if let Some(notification) = self.suspend_resume_notification.borrow_mut().take() {
@@ -1656,6 +1682,8 @@ fn check_device_lost(device: &ID3D11Device) -> bool {
     match device_state {
         Ok(_) => false,
         Err(err) => {
+            #[cfg(test)]
+            crate::fast::native_tests::device_removed(err.code().0);
             log::error!("DirectX device lost detected: {:?}", err);
             true
         }
@@ -1712,6 +1740,8 @@ fn handle_gpu_device_lost(
     all_windows: &std::sync::Weak<RwLock<SmallVec<[TrackedWindow; 4]>>>,
     text_system: &std::sync::Weak<DirectWriteTextSystem>,
 ) -> Result<()> {
+    #[cfg(test)]
+    crate::fast::native_tests::recovery_started();
     // Here we wait a bit to ensure the system has time to recover from the device lost state.
     // If we don't wait, the final drawing result will be blank.
     std::thread::sleep(std::time::Duration::from_millis(350));
@@ -1736,6 +1766,8 @@ fn handle_gpu_device_lost(
     }
     if let Some(all_windows) = all_windows.upgrade() {
         for window in all_windows.read().iter() {
+            #[cfg(test)]
+            crate::fast::native_tests::recovery_locked();
             unsafe {
                 SendMessageW(
                     window.as_raw(),
@@ -1757,6 +1789,8 @@ fn handle_gpu_device_lost(
             }
         }
     }
+    #[cfg(test)]
+    crate::fast::native_tests::recovery_finished();
     Ok(())
 }
 

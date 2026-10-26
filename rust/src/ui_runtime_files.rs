@@ -142,6 +142,7 @@ impl Manager {
                 });
                 let editor = cx.new(|cx| {
                     cx.observe(&owner, |_, _, cx| cx.notify()).detach();
+                    cx.observe_global::<Theme>(|_, cx| cx.notify()).detach();
                     crate::ui_focus::observe(cx);
                     cx.spawn_in(window, async move |this, cx| {
                         loop {

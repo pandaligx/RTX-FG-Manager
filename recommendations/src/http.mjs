@@ -20,9 +20,9 @@ export function httpServer(api,{origin,trustProxy=false,assets=new Map()}={}) {
       if(req.method!=='GET') {
         need(/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || ''),'json_required',415);
         need(!req.headers['content-encoding'],'encoding_not_supported',415);
-        need(!req.headers['content-length'] || Number(req.headers['content-length'])<=16384,'request_too_large',413);
+        need(!req.headers['content-length'] || Number(req.headers['content-length'])<=65536,'request_too_large',413);
         const chunks=[]; let bytes=0;
-        for await(const chunk of req) { bytes+=chunk.length; need(bytes<=16384,'request_too_large',413); chunks.push(chunk); }
+        for await(const chunk of req) { bytes+=chunk.length; need(bytes<=65536,'request_too_large',413); chunks.push(chunk); }
         try { body=JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new ApiError('invalid_json'); }
       }
       let ip=req.socket.remoteAddress || 'unknown';

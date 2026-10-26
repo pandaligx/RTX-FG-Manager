@@ -1,10 +1,10 @@
 # Windows manager compatibility patch
 
-Baseline: the published `gpui-fast-windows` **0.1.10** crate from crates.io
-(`gpui-fast-windows-0.1.10.crate` SHA-256
-`f034e131f83ff84b67f009cde41e0cbecb3be09d7ebba7c548ea78fe0fdee5b0`).
+Baseline: the published `gpui-fast-windows` **0.1.12** crate from crates.io
+(`gpui-fast-windows-0.1.12.crate` SHA-256
+`6a1a193343ef7faaa18eb9ccc0aadf8ec9571f2791c4419c2ca23aa17198f970`).
 The crate's Apache-2.0 `LICENSE`, README and original manifest are retained.
-The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.10`
+The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.12`
 and sets `publish = false`.
 
 The manager previously applied equivalent compatibility changes to Zed commit
@@ -13,6 +13,9 @@ published Fast backend without replacing its rendering, composition, device
 recovery, scheduling or retained-layer implementations.
 For manager 4.3.6 they were rebased from the published 0.1.2 crate onto 0.1.10,
 retaining the newer rounded clipping, class names and foreign-message handling.
+For the unpublished 4.3.13 candidate they were rebased again onto 0.1.12.
+Both draw paths retain the new upstream frame scheduling after the local
+first-frame visibility hook; they must not be replaced by the older draw bodies.
 The unused upstream `HWND` import in `fast/composition.rs` is also removed.
 The shared `fast/rounded_clip_fixtures.rs` test input is copied from
 the matching published `gpui-fast` 0.1.10 crate (Apache-2.0). The Windows pixel

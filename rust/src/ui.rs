@@ -36,6 +36,8 @@ use std::{
 mod encore_editor;
 #[path = "ui_game_name.rs"]
 mod game_name_editor;
+#[path = "ui_recommendation_entry.rs"]
+mod recommendation_entry;
 #[path = "ui_recommendations.rs"]
 mod recommendations;
 #[path = "ui_runtime_files.rs"]
@@ -193,8 +195,6 @@ pub struct Manager {
     preset_close: Option<bool>, // true: app exit; false: editor dismissal
     theme_preview: Option<u64>,
     theme_generation: u64,
-    recommendation_motion_epoch: u64,
-    recommendation_hovered: bool,
 }
 /// Render after Manager::render has released its entity borrow. Building a
 /// live editor inside Root::render_dialog_layer would recursively borrow Manager.
@@ -264,6 +264,8 @@ impl Manager {
         cx: &mut Context<Self>,
     ) -> Self {
         crate::ui_focus::observe(cx);
+        cx.observe_window_activation(window, |_, _, cx| cx.notify())
+            .detach();
         cx.set_reduce_motion(preferred_reduce_motion(&state, win::reduced_motion()));
         let mut c = Controller::new(data, state, error, smoke);
         if !c.boolean("sidebar_compact_default_v3", false) {
@@ -347,8 +349,6 @@ impl Manager {
             preset_close: None,
             theme_preview: None,
             theme_generation: 0,
-            recommendation_motion_epoch: 0,
-            recommendation_hovered: false,
         };
         view.filter();
         view.theme(window, cx);
@@ -750,7 +750,6 @@ impl Manager {
                     &self.c.state,
                     win::reduced_motion(),
                 ));
-                self.recommendation_motion_epoch = self.recommendation_motion_epoch.wrapping_add(1);
                 self.c.save();
             }
             Command::ApplyPreset => self.c.apply_focused_parameters(),
@@ -900,6 +899,41 @@ impl Manager {
     }
     fn icon(name: IconName) -> Icon {
         Icon::new(name).size(px(20.))
+    }
+    fn recommendation_entry(&self, exe: String, cx: &Context<Self>) -> AnyElement {
+        let theme = cx.theme();
+        let animate = !self.dialog_active && !cx.reduce_motion();
+        let button = self
+            .button(
+                "game-recommendations",
+                "玩家推荐方案",
+                Command::Recommendations(exe),
+                cx,
+            )
+            .custom(
+                ButtonCustomVariant::new(cx)
+                    .color(theme.background)
+                    .foreground(theme.foreground)
+                    .hover(theme.secondary_hover)
+                    .active(theme.secondary_active),
+            )
+            .w_full();
+        // A single animation clock paints the border and icon together. Visible,
+        // unfocused windows keep moving without requiring mouse hover.
+        let entry = recommendation_entry::RecommendationEntry::new(button, animate);
+        if animate {
+            entry
+                .with_animation(
+                    "recommendation-entry-glow",
+                    Animation::new(Duration::from_millis(4800))
+                        .repeat_synced()
+                        .with_max_fps(30.),
+                    |entry, phase| entry.phase(phase),
+                )
+                .into_any_element()
+        } else {
+            entry.into_any_element()
+        }
     }
     // Keep Select entities and their subscriptions alive across renders. Only refresh
     // their data when translations, device enumeration or saved choices change.
@@ -3008,45 +3042,7 @@ impl Manager {
                     ),
             )
             .when_some(game, |panel, game| {
-                panel.child(
-                    self.button(
-                        "game-recommendations",
-                        "玩家推荐方案",
-                        Command::Recommendations(game.exe.clone()),
-                        cx,
-                    )
-                    .custom(crate::ui_themes::recommendation_button(cx))
-                    .bg(crate::ui_themes::recommendation_accent())
-                    .icon(Icon::new(gpui::assets::IconName::ThumbsUp))
-                    .w_full()
-                    .on_hover(cx.listener(|this, hovered, _, cx| {
-                        if *hovered && !this.recommendation_hovered {
-                            this.recommendation_motion_epoch =
-                                this.recommendation_motion_epoch.wrapping_add(1);
-                            cx.notify();
-                        }
-                        this.recommendation_hovered = *hovered;
-                    }))
-                    .with_animation(
-                        SharedString::from(format!(
-                            "recommendation-thumb-{}-{}",
-                            game.exe, self.recommendation_motion_epoch
-                        )),
-                        Animation::new(Duration::from_millis(700)),
-                        |button, progress| {
-                            // Animate the bundled Lucide SVG, preserving button geometry,
-                            // label contrast and GPUI's reduced-motion behavior.
-                            let lift = (std::f32::consts::PI * progress).sin().max(0.);
-                            let scale = 1. + 0.18 * lift;
-                            button.icon(
-                                Icon::new(gpui::assets::IconName::ThumbsUp).transform(
-                                    Transformation::scale(size(scale, scale))
-                                        .with_rotation(radians(-0.22 * lift)),
-                                ),
-                            )
-                        },
-                    ),
-                )
+                panel.child(self.recommendation_entry(game.exe.clone(), cx))
             })
             .child(
                 div()
@@ -4879,7 +4875,9 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
                     size(px(1280.), px(900.)),
                 ));
             let mut bounds = fitted_bounds(work);
-            if smoke.is_some() {
+            if smoke.is_some()
+                || (cfg!(debug_assertions) && std::env::var_os("RTXFG_RECIPE_PREVIEW").is_some())
+            {
                 let w = state["smoke_window_width"]
                     .as_f64()
                     .unwrap_or(f32::from(bounds.size.width) as f64) as f32;

@@ -226,10 +226,10 @@ fn paths(target: &core::DeploymentTarget, kind: &str) -> Result<Vec<PathBuf>> {
 // names even for manual installations, then consult journals for custom paths.
 fn protected(target: &core::DeploymentTarget, root: &Path, path: &Path) -> Result<bool> {
     let path = core::no_links(path)?;
-    ensure!(path.starts_with(root), "运行库路径超出游戏目录");
+    ensure!(core::within(&path, root), "运行库路径超出游戏目录");
     if path
-        .strip_prefix(root)?
         .components()
+        .skip(root.components().count())
         .any(|c| scanner::patch_runtime_directory(&c.as_os_str().to_string_lossy()))
     {
         return Ok(true);
@@ -237,7 +237,7 @@ fn protected(target: &core::DeploymentTarget, root: &Path, path: &Path) -> Resul
     let mut owners = path
         .ancestors()
         .skip(1)
-        .take_while(|p| p.starts_with(root))
+        .take_while(|p| core::within(p, root))
         .map(Path::to_path_buf)
         .collect::<Vec<_>>();
     owners.push(target.directory.clone());
@@ -291,7 +291,7 @@ fn paths_from(
         found.push(local);
     }
     found.retain(|p| {
-        p.starts_with(&root) && p.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name))
+        core::within(p, &root) && p.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name))
     });
     let mut eligible = Vec::new();
     for p in found {
@@ -331,6 +331,17 @@ struct Entry {
     previous: Option<String>,
     original: Option<String>,
 }
+// Windows addresses may come from launcher manifests with '/' separators or
+// different casing. Normalize identity without canonicalize(), which would
+// follow links and require a still-existing game EXE during recovery.
+fn same_record_path(recorded: &str, current: &Path) -> Result<bool> {
+    let recorded = Path::new(recorded);
+    Ok(recorded.is_absolute()
+        && core::key(&core::no_links(recorded)?) == core::key(&core::no_links(current)?))
+}
+fn record_path(path: &Path) -> Result<String> {
+    Ok(core::no_links(path)?.to_string_lossy().replace('/', "\\"))
+}
 fn destination(target: &core::DeploymentTarget, kind: &str, entry: &Entry) -> Result<PathBuf> {
     let p = core::no_links(Path::new(&entry.path))?;
     let valid_name = p.file_name().is_some_and(|n| {
@@ -345,11 +356,14 @@ fn destination(target: &core::DeploymentTarget, kind: &str, entry: &Entry) -> Re
     ensure!(
         valid_name
             && if kind == "xemfg" {
-                p.parent() == Some(target.directory.join("RTXMFG-XeSS").as_path())
+                p.parent().is_some_and(|parent| {
+                    core::key(parent) == core::key(&target.directory.join("RTXMFG-XeSS"))
+                })
             } else {
-                p.starts_with(core::no_links(&scanner::installation_root(
-                    &target.game_exe,
-                ))?)
+                core::within(
+                    &p,
+                    &core::no_links(&scanner::installation_root(&target.game_exe))?,
+                )
             },
         "运行库恢复路径超出当前游戏范围"
     );
@@ -364,8 +378,8 @@ fn read(target: &core::DeploymentTarget, kind: &str) -> Result<Option<Record>> {
     let r: Record = serde_json::from_slice(&fs::read(p)?)?;
     ensure!(
         r.schema == 1
-            && r.game == target.game_exe.to_string_lossy()
-            && r.directory == target.directory.to_string_lossy()
+            && same_record_path(&r.game, &target.game_exe)?
+            && same_record_path(&r.directory, &target.directory)?
             && r.kind == kind
             && !r.entries.is_empty()
             && r.entries.len() <= 32,
@@ -554,7 +568,7 @@ fn plan_entries(
             None
         };
         entries.push(Entry {
-            path: p.to_string_lossy().into(),
+            path: record_path(&p)?,
             installed: core::digest(source)?,
             previous: before.clone(),
             original: existing.map(|e| e.original.clone()).unwrap_or(before),
@@ -562,11 +576,12 @@ fn plan_entries(
     }
     // Keep prior paths if a game update changed which folder the scanner finds.
     if let Some(prior) = prior {
-        for e in prior.entries {
+        for mut e in prior.entries {
             if !entries
                 .iter()
                 .any(|n| core::key(Path::new(&n.path)) == core::key(Path::new(&e.path)))
             {
+                e.path = record_path(Path::new(&e.path))?;
                 entries.push(e);
             }
         }
@@ -607,8 +622,8 @@ fn install_locked_with(
     let mut record = Record {
         schema: 1,
         complete: false,
-        game: target.game_exe.to_string_lossy().into(),
-        directory: target.directory.to_string_lossy().into(),
+        game: record_path(&target.game_exe)?,
+        directory: record_path(&target.directory)?,
         kind: kind.into(),
         entries,
     };
@@ -932,6 +947,114 @@ mod tests {
                 Ok((n.into(), p))
             })
             .collect()
+    }
+    #[test]
+    fn mixed_separators_keep_legacy_ownership_and_restore_originals() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("The Witcher 3/bin/x64_dx12"))?;
+        let mixed = core::DeploymentTarget::custom(
+            &PathBuf::from(t.game_exe.to_string_lossy().replace("\\bin\\", "\\bin/")),
+            &PathBuf::from(t.directory.to_string_lossy().replace("\\bin\\", "\\bin/")),
+        );
+        assert_ne!(mixed.game_exe.as_os_str(), t.game_exe.as_os_str());
+        for kind in KINDS {
+            let s = sources(&tmp.path().join("sources").join(kind), kind)?;
+            let dir = if kind == "xemfg" {
+                t.directory.join("RTXMFG-XeSS")
+            } else {
+                t.directory.clone()
+            };
+            fs::create_dir_all(&dir)?;
+            let ps = s.keys().map(|n| dir.join(n)).collect::<Vec<_>>();
+            for p in &ps {
+                fs::write(p, b"original\0\xff")?;
+            }
+            install_locked(&t, kind, &ps, &s)?;
+            let journal = root(&t, kind)?.join("ownership.json");
+            let before = fs::read(&journal)?;
+            // This is the issue #15 mismatch: validated installation paths,
+            // followed by inspection using the game's mixed-separator address.
+            assert!(read(&mixed, kind)?.unwrap().complete);
+            assert_eq!(fs::read(&journal)?, before, "inspection must be read-only");
+            if kind != "xemfg" {
+                let status = inspect(&mixed, kind);
+                assert!(status.managed && status.present && status.available);
+                assert!(status.warning.is_none(), "{:?}", status.warning);
+            }
+            // Accept legacy records with mixed separators and case differences
+            // in all three path fields, not just the game EXE.
+            let mut legacy: Record = serde_json::from_slice(&before)?;
+            legacy.game = legacy.game.replace('\\', "/").to_uppercase();
+            legacy.directory = legacy.directory.replace('\\', "/").to_uppercase();
+            for e in &mut legacy.entries {
+                e.path = e.path.replace('\\', "/").to_uppercase();
+            }
+            fs::write(&journal, serde_json::to_vec(&legacy)?)?;
+            assert!(read(&mixed, kind)?.unwrap().complete);
+            for p in s.values() {
+                fs::write(p, b"second upgrade")?;
+            }
+            install_locked(&mixed, kind, &ps, &s)?;
+            let upgraded = read(&t, kind)?.unwrap();
+            assert!(!upgraded.game.contains('/') && !upgraded.directory.contains('/'));
+            assert!(upgraded.entries.iter().all(|e| !e.path.contains('/')));
+            remove_locked(&mixed, kind)?;
+            for p in &ps {
+                assert_eq!(fs::read(p)?, b"original\0\xff");
+            }
+            assert!(!journal.exists());
+        }
+        Ok(())
+    }
+    #[test]
+    fn normalized_ownership_still_rejects_foreign_paths_and_duplicate_files() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        let p = t.directory.join("nvngx_dlss.dll");
+        fs::write(&p, b"original")?;
+        let s = sources(&tmp.path().join("source"), "sr")?;
+        install_locked(&t, "sr", std::slice::from_ref(&p), &s)?;
+        let journal = root(&t, "sr")?.join("ownership.json");
+        let original = fs::read(&journal)?;
+        let dll = fs::read(&p)?;
+        let mut cases = Vec::new();
+        for (field, value) in [
+            ("game", t.directory.join("Other.exe").display().to_string()),
+            (
+                "directory",
+                tmp.path().join("Game-other").display().to_string(),
+            ),
+            ("game", "Game.exe".into()),
+        ] {
+            let mut r: serde_json::Value = serde_json::from_slice(&original)?;
+            r[field] = value.into();
+            cases.push(r);
+        }
+        let mut escaped: serde_json::Value = serde_json::from_slice(&original)?;
+        escaped["entries"][0]["path"] = tmp
+            .path()
+            .join("Game-other/nvngx_dlss.dll")
+            .display()
+            .to_string()
+            .into();
+        cases.push(escaped);
+        let mut duplicate: serde_json::Value = serde_json::from_slice(&original)?;
+        let mut entry = duplicate["entries"][0].clone();
+        entry["path"] = p.to_string_lossy().replace('\\', "/").to_uppercase().into();
+        duplicate["entries"].as_array_mut().unwrap().push(entry);
+        cases.push(duplicate);
+        for r in cases {
+            let bytes = serde_json::to_vec(&r)?;
+            fs::write(&journal, &bytes)?;
+            assert!(read(&t, "sr").is_err());
+            assert!(remove_locked(&t, "sr").is_err());
+            assert_eq!(fs::read(&p)?, dll);
+            assert_eq!(fs::read(&journal)?, bytes);
+        }
+        fs::write(&journal, original)?;
+        remove_locked(&t, "sr")?;
+        assert_eq!(fs::read(&p)?, b"original");
+        Ok(())
     }
     #[test]
     fn xess_status_requires_both_dlls_not_just_a_license_or_one_file() -> Result<()> {

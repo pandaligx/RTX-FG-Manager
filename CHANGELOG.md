@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.3.13
+
+- Fix runtime ownership checks for Windows paths with mixed separators or casing. Recognize existing DLSS/XeSS backups without editing old records; preserve game boundaries, link rejection and file-hash checks during updates and recovery (#15).
+- Upgrade GPUI Kit to 0.8.1 while retaining the manager's Windows startup, DPI and font compatibility patches.
+- Redesign complete player setups with game icon/title, compact parameter and runtime tables, and full-width notes. Stack the tables on narrow windows or larger font settings; keep actions accessible while scrolling.
+- Synchronize recommendation and DLSS/XeSS windows with the configured font size. Use a continuously breathing players icon and a fine animated gradient border; retain hover/pressed states and respect motion settings.
+- Raise sharing notes to 5,000 Unicode characters. Older clients retain a 500-character preview and cannot accidentally erase unseen long notes.
+- Integrate the Encore 1.4.4 resource catalog. No documented configuration migration is required; retain existing values, comments and unknown fields. Keep original game compiler and Streamline files.
+
 ## 4.3.12
 
 - Rebuild recommendation connections on refresh, honor Windows system proxies, and recover failed reads with IPv4 and an origin fallback that retains HTTPS hostname verification. Keep email, vote and share submissions from being automatically replayed.

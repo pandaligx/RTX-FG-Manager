@@ -1,6 +1,6 @@
 [package]
 name = "rtx-fg-manager"
-version = "4.3.12"
+version = "4.3.13"
 edition = "2024"
 publish = false
 build = "rust/build.rs"
@@ -45,7 +45,7 @@ base64 = "0.22"
 chrono = "0.4"
 # The Kit facade keeps the core, platform, components and assets on one backend.
 # Upgraded from the old Zed/Component snapshots; pin this reviewed source for reproducibility.
-gpui = { package = "gpui-kit", git = "https://github.com/longbridge/gpui-kit", rev = "1676826d9d49b90f4d7b6808b69924f58796f6f1", features = ["gpui-fast"] }
+gpui = { package = "gpui-kit", git = "https://github.com/longbridge/gpui-kit", rev = "99576db58ec8103417c41a092e891b4022d24e7e", features = ["gpui-fast"] }
 smol = "2"
 flate2 = "1.1"
 image = { version = "0.25", default-features = false, features = ["png", "ico"] }

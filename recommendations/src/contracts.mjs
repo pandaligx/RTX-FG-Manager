@@ -46,6 +46,11 @@ export const schemes = {
   'rtxfg-0.3.5-dx12-vulkan': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
   'pipotoufik-mfg-vulkan-sm86-7': ['version.dll'],
 };
+export const NOTES_LIMIT = 5000;
+export function legacyNotes(notes) {
+  const chars=[...notes], suffix='\n[完整备注请使用新版管理器查看]';
+  return chars.length<=500 ? notes : chars.slice(0,500-[...suffix].length).join('')+suffix;
+}
 export function recipe(input) {
   exact(input, ['schema','game','title','notes','scheme','patchVersion','entries','renderer','gpuModel','driver','gpuAlias','neuralRuntime','platform','edition','presets','runtimes']);
   need(input.schema === 1, 'unsupported_schema');
@@ -65,7 +70,7 @@ export function recipe(input) {
   need(['unchanged','rtx4060','rtx5090','unknown'].includes(input.gpuAlias), 'invalid_gpu_alias');
   need(['none','310.9.16','unknown'].includes(input.neuralRuntime), 'invalid_neural_runtime');
   need(input.platform===undefined || ['unknown','steam','epic','ea','gog','ubisoft','xbox','battlenet','wegame','hoyo','cube','sonkwo','standalone'].includes(input.platform),'invalid_platform');
-  return { schema: 1, game, title: text(input.title, 80), notes: text(input.notes || '', 500, true),
+  return { schema: 1, game, title: text(input.title, 80), notes: text(input.notes || '', NOTES_LIMIT, true),
     ...(input.presets===undefined?{}:{presets:presetSnapshot(input.presets,input.scheme,input.patchVersion)}),
     ...(input.runtimes===undefined?{}:{runtimes:runtimeSnapshot(input.runtimes)}),
     ...(input.platform?{platform:input.platform}:{}),...(input.edition?{edition:text(input.edition,80)}:{}),

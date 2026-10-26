@@ -53,7 +53,7 @@ cargo build --locked --features native-probes,fixture-tests
 
 ## Source and CI boundaries
 
-Keep `Cargo.lock`, `.cargo/config.toml`, Rust sources/assets, current JSON language resources, and `vendor/gpui_fast_windows` together. GPUI Kit 0.8.0 is pinned to commit `1676826d9d49b90f4d7b6808b69924f58796f6f1`; its `gpui-fast` feature selects the Fast backend, resolved to crates.io 0.1.10. Shared GPUI Pre support crates are pinned to 0.3.9. The Windows vendor patch starts from the published Fast 0.1.10 crate and retains the manager's first-frame, DPI and font compatibility changes. These retained changes do not establish a new Windows 10 or physical multi-monitor test result. The former Zed Windows and sum-tree patches are no longer build inputs or part of this source export.
+Keep `Cargo.lock`, `.cargo/config.toml`, Rust sources/assets, current JSON language resources, and `vendor/gpui_fast_windows` together. GPUI Kit 0.8.1 is pinned to commit `99576db58ec8103417c41a092e891b4022d24e7e`; its `gpui-fast` feature selects the Fast backend, resolved to crates.io 0.1.12. Shared GPUI Pre support crates are pinned to 0.3.10. The Windows vendor patch starts from the published Fast 0.1.12 crate and retains the manager's first-frame, DPI and font compatibility changes alongside the upstream frame scheduler. These retained changes do not establish a new Windows 10 or physical multi-monitor test result. The former Zed Windows and sum-tree patches are no longer build inputs or part of this source export.
 
 The GPUI Pre 0.3.9 sum-tree, ztracing and ztracing-macro packages are Apache-2.0. The former GPL-only tracing-chain workaround is therefore unnecessary. Preserve the actual upstream license files and local change notes.
 
