@@ -1348,9 +1348,54 @@
         "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-1.4.5-complete-75b366ac3005.zip"
       },
       "version": "1.4.5"
+    },
+    {
+      "archive": "mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip",
+      "archive_prefix": "mfg-unlocker-1.6.1-1785752d3c34",
+      "backends": [
+        "rtx40mfg"
+      ],
+      "bytes": 2790045,
+      "component": false,
+      "files": [
+        {
+          "bytes": 2923,
+          "name": "MFG-Unlocker-NOTICES.txt",
+          "sha256": "68167fca07d1366a34ea12f24afd9fccef438c41ad402681091e2bd99bf79665"
+        },
+        {
+          "bytes": 203,
+          "name": "RTXMFG-Universal.json",
+          "sha256": "c5333d249dbb5850da94902d6610ad50e67f9aa129a0c06705823bcd99a4e03f"
+        },
+        {
+          "bytes": 7433480,
+          "name": "version.dll",
+          "sha256": "1785752d3c34e7fd758b6d0ad79999c3e17aa5d9412007c696339dabe2437e16"
+        }
+      ],
+      "id": "mfg-unlocker-1.6.1-1785752d3c34",
+      "label": "MFG-Unlocker · 1.6.1（兼容备用）",
+      "labels": {
+        "en": "MFG-Unlocker · 1.6.1 (Compatibility)",
+        "ja": "MFG-Unlocker · 1.6.1（互換用）",
+        "ko": "MFG-Unlocker · 1.6.1 (호환용)",
+        "ru": "MFG-Unlocker · 1.6.1 (Совместимость)",
+        "zh": "MFG-Unlocker · 1.6.1（兼容备用）",
+        "zh-CN": "MFG-Unlocker · 1.6.1（兼容备用）"
+      },
+      "proxy": "version.dll",
+      "scheme_id": "mfg-unlocker-1.6.1-compat",
+      "sha256": "5c17c0d90b070a633ccf2da1f602792bfcb62330bb37cad38e46342fa2eb33db",
+      "upstream_version": "1.6.1",
+      "urls": {
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip"
+      },
+      "version": "1.6.1"
     }
   ],
-  "revision": "bundles-499ea69d561b253a8071",
+  "revision": "bundles-6d9a95a823e829f60899",
   "schema": 3,
   "scheme_policies": {
     "dlssg-transfusion-1.4.5.3": {
@@ -1496,6 +1541,16 @@
       "ini_policy": "encore_json",
       "max_selected_proxies": 1,
       "parameter_profile": "rtx_encore_json_v4"
+    },
+    "mfg-unlocker-1.6.1-compat": {
+      "capabilities": [],
+      "defaults": {},
+      "gpu_paths": [
+        "SM89"
+      ],
+      "ini_policy": "rtxmfg_json",
+      "max_selected_proxies": 1,
+      "parameter_profile": "rtxmfg_universal_133"
     },
     "native-0.2.6-stable": {
       "capabilities": [],

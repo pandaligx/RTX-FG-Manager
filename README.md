@@ -71,6 +71,8 @@ Download **`RTXManager-v4.3.14-x64.exe`** and run it. No separate Python, Rust, 
 | **MFG-Unlocker · 1.7.0** | Standalone DLL or an existing OptiScaler 10 plugin installation; these modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
 | **RTX Encore · 1.4.5** | SR/RR/FG presets, fixed/dynamic FG, NR, Smooth Motion and compatibility controls. | **Insert**, unless the menu is disabled or its key was changed |
 
+> MFG-Unlocker 1.6.1 is available as a compatibility option. Uninstall the current patch before switching versions. Sharing presets for this compatibility option is not supported yet.
+
 GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility. The initial scheme and 0.2.6 are retired from new installation choices; existing installations remain eligible for owned cleanup/recovery.
 
 ### RTX 20 / 30 / 40 reference

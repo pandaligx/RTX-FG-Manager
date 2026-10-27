@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 53447,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-499ea69d561b253a8071.json",
-    "sha256": "9bb34a9708d6bdfb9b90dba26a80fbfbf6e2966ecd612259db60c84fe67c0f2c",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-499ea69d561b253a8071.json"
+    "bytes": 55241,
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-6d9a95a823e829f60899.json",
+    "sha256": "a68d8388199cb0e292239cdc5684c5c8966be33de2f72d616805ef4640a2aead",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-6d9a95a823e829f60899.json"
   },
-  "revision": "bundles-499ea69d561b253a8071",
+  "revision": "bundles-6d9a95a823e829f60899",
   "schema": 3,
   "schemes": [
     {
@@ -246,6 +246,26 @@
       },
       "profile": "rtx_encore_json_v4",
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"
+    },
+    {
+      "archives": [
+        "mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip"
+      ],
+      "capabilities": [],
+      "defaults": {},
+      "id": "mfg-unlocker-1.6.1-compat",
+      "min_manager_version": "4.3.14",
+      "name": "MFG-Unlocker · 1.6.1（兼容备用）",
+      "names": {
+        "en": "MFG-Unlocker · 1.6.1 (Compatibility)",
+        "ja": "MFG-Unlocker · 1.6.1（互換用）",
+        "ko": "MFG-Unlocker · 1.6.1 (호환용)",
+        "ru": "MFG-Unlocker · 1.6.1 (Совместимость)",
+        "zh": "MFG-Unlocker · 1.6.1（兼容备用）",
+        "zh-CN": "MFG-Unlocker · 1.6.1（兼容备用）"
+      },
+      "profile": "rtxmfg_universal_133",
+      "source_url": "https://github.com/dashdogy/MFG-Unlocker/releases/tag/v1.6.1"
     }
   ],
   "sources": {
