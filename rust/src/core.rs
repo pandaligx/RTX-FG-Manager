@@ -431,7 +431,9 @@ pub fn config_name(backend: &str) -> &'static str {
 /// that protocol to a previously installed backend merely because its ID matches.
 pub fn backend_matches_profile(backend: &str, profile: &str) -> bool {
     match profile {
-        crate::upstream040::PROFILE => backend == crate::upstream040::BACKEND,
+        crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 => {
+            backend == crate::upstream040::BACKEND
+        }
         crate::encore::PROFILE => backend == crate::encore::BACKEND,
         crate::transfusion::PROFILE => backend == crate::transfusion::BACKEND,
         crate::rtxmfg::PROFILE => backend == crate::rtxmfg::BACKEND,
@@ -863,6 +865,18 @@ pub fn apply_parameters_at(
     crate::upstream040_upgrade::recover_locked(&target)?;
     let record = record(dir)?.context("请先安装当前方案再应用参数")?;
     target.validate_record(&record)?;
+    if record.backend == crate::upstream040::BACKEND {
+        ensure!(
+            context.profile
+                == crate::upstream040::profile_for_version(
+                    record
+                        .upstream_version
+                        .as_deref()
+                        .or(record.payload_version.as_deref())
+                ),
+            "已安装补丁的参数协议已变化，请刷新后再应用"
+        );
+    }
     ensure!(
         record.scheme_id.as_deref() == Some(context.scheme.as_str()),
         "已部署方案不同，请先安装当前方案"
@@ -1358,6 +1372,15 @@ pub fn deploy_prepared_context_at_with_overrides(
                     } else {
                         current.clone()
                     }
+                } else if backend == crate::upstream040::BACKEND {
+                    crate::upstream040::migrate_versions(
+                        &current,
+                        r.upstream_version
+                            .as_deref()
+                            .or(r.payload_version.as_deref()),
+                        upstream_version.or(payload_version),
+                        explicit_overrides,
+                    )?
                 } else {
                     crate::presets::merge_context(&current, &data[config], backend, context)?
                 };

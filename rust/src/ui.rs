@@ -2112,6 +2112,12 @@ impl Manager {
                     .choices
                     .iter()
                     .filter(|(v, _)| {
+                        if context.profile == rtx_fg_manager::upstream040::PROFILE_041
+                            && param.key == "max_generated_frames"
+                            && options.get("fg_engine").is_some_and(|s| s == "XeSS")
+                        {
+                            return !matches!(*v, "4" | "5");
+                        }
                         param.key != "force_multiplier"
                             || *v == "0"
                             || v.parse::<u32>().unwrap_or(0)
@@ -2149,6 +2155,19 @@ impl Manager {
                                 .child(self.t("需要先升级 MFG Unlocker 至 1.7.0。")),
                         )
                     })
+                    .when(
+                        context.profile == rtx_fg_manager::upstream040::PROFILE_041,
+                        |d| {
+                            d.when_some(rtx_fg_manager::upstream040::help(param.key), |d, help| {
+                                d.child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(self.t(help)),
+                                )
+                            })
+                        },
+                    )
                     .when(context.profile == rtx_fg_manager::rtxmfg::PROFILE, |d| {
                         d.when_some(rtx_fg_manager::rtxmfg::help(param.key), |d, help| {
                             d.child(
@@ -2279,8 +2298,8 @@ impl Manager {
             "此上游版本仅提供version.dll，请勿改名或混装其他方案的DLL。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {
             "Transfusion 每次只安装一个入口；优先 version.dll，冲突时可改选 dinput8、dxgi 或 winmm。保留其他 MOD，配置使用独立 JSON。"
-        } else if self.c.parameter_profile() == rtx_fg_manager::upstream040::PROFILE {
-            "0.4.0 各代理使用对应文件，组件共用完整包。允许多选；上游建议只放一个入口，多选兼容性需自行测试。"
+        } else if rtx_fg_manager::upstream040::is_profile(&self.c.parameter_profile()) {
+            "0.4.x 各代理使用对应文件，组件共用完整包。允许多选；上游建议只放一个入口，多选兼容性需自行测试。"
         } else if self.c.cloud_scheme().starts_with("upstream") {
             "上游支持多选入口；游戏先加载的 DLL 生效，其余仅转发。优先 version/winmm/dinput8/dbghelp；dxgi/d3d12 按需使用。"
         } else {
@@ -4096,6 +4115,13 @@ impl Manager {
             sections.insert(2, (self.t("动态多帧与优化"), self.t("动态多帧默认关闭，仅兼容的DX12路径支持；目标帧率0跟随游戏。四项优化按作者默认开启，可能影响画质或兼容性，出问题可逐项关闭。日志是开关，不是0—3级别。")));
             sections.insert(3, (self.t("保留作者配置"), self.t("RenderScale保持游戏控制；BlackwellScatter/BlackwellBlend默认关闭，作者记录过GPU挂起，不在此提供开关。其余高级设置和快捷键原样保留。Ctrl+F2—F6请求2X—6X，Ctrl+F11跟随游戏，Ctrl+F12恢复启动INI。")));
             sections.insert(1, (self.t("Vulkan 支持范围"), self.t("sm86-7发布说明新增Vulkan（含RTX Remix示例），不等于所有Vulkan游戏可用。作者仅有RTX3070，RTX20支持尚待实测。此方案独立于Smooth Motion和三角洲专项，只提供version.dll。")));
+        } else if profile == rtx_fg_manager::upstream040::PROFILE_041 {
+            sections = vec![
+                (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
+                (self.t("使用说明"), self.t("0.4.1 完整包包含 DLSS / XeSS 后端和超分组件。默认 Optimized=1、Preset=A，超分关闭；升级保留已有设置。")),
+                (self.t("兼容性"), self.t("帧生成需要 R580 或更新驱动；XeSS 最高4X，不需另装 Intel DLL。旧代仅2X的 DLSS-G 接口不受支持，游戏仍须自行兼容。")),
+                (self.t("超分辨率"), self.t("M/L 模式会覆盖全部画质档。旧版 On 无等价迁移，请先明确选择；严格无 HUD 模式可能使缺少输入的游戏退出，建议自动。")),
+            ];
         } else if profile == "upstream040" {
             sections = vec![
                 (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),

@@ -310,3 +310,21 @@ test('Mail health hides details publicly and does not test SMTP on read',async t
   await reject(f.call('GET','/v1/admin/mail-health'),'admin_required');
   const admin=await f.login('admin@example.com');assert.equal((await f.call('GET','/v1/admin/mail-health',null,admin.token)).checkedAt,1000);
 });
+
+
+test('dlssg 0.4.1 profiles are versioned and hidden from older clients without losing edits',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...content(),scheme:'upstream-0.3.5-310-9',patchVersion:'0.4.1',entries:['version.dll'],presets:{schema:1,profile:'upstream041',values:{fg_engine:'XeSS',xess_hudless:'Auto',max_generated_frames:'3'},defaults:{fg_engine:'DLSS',xess_hudless:'Auto',max_generated_frames:'3'}}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',9);
+  assert.equal(posted.content.presets.profile,'upstream041');
+  const path='/v1/recipes/'+posted.id;
+  for(const protocol of [false,5,6,7,8])assert.equal(Object.hasOwn((await f.call('GET',path,null,u.token,'test-ip',protocol)).content,'presets'),false);
+  const old=await f.call('GET',path,null,u.token,'test-ip',8);old.content.notes='Old client keeps unseen parameters';
+  await f.call('PUT',path,{revision:1,content:old.content},u.token,'test-ip',8);
+  assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',9)).content.presets,posted.content.presets);
+  const bad=structuredClone(c);bad.presets.values.max_generated_frames='5';assert.throws(()=>recipe(bad));
+  bad.presets.values.max_generated_frames='3';bad.presets.values.sr_mode='On';bad.presets.defaults.sr_mode='Off';assert.throws(()=>recipe(bad));
+  assert.throws(()=>recipe({...c,patchVersion:'0.4.0'}));
+  assert.throws(()=>recipe({...c,presets:{...c.presets,profile:'upstream040'}}));
+  assert.equal((await f.call('GET','/v1/capabilities')).dlssg041,1);
+});

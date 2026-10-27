@@ -1777,6 +1777,151 @@
           "1": "开启"
         }
       }
+    },
+    "from_041": {
+      "profile": "upstream041",
+      "fields": {
+        "enabled": {
+          "values": [
+            "1",
+            "0"
+          ],
+          "label": "补丁开关",
+          "labels": {
+            "1": "开启",
+            "0": "关闭"
+          }
+        },
+        "optimized": {
+          "values": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "label": "内核模式",
+          "labels": {
+            "0": "0 · 原厂数值",
+            "1": "1 · 逐位一致（默认）",
+            "2": "2 · 有损加速",
+            "3": "3 · 最快（有损）"
+          }
+        },
+        "max_generated_frames": {
+          "values": [
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ],
+          "label": "可用帧生成倍率",
+          "labels": {
+            "0": "运行库默认",
+            "1": "2X",
+            "2": "3X",
+            "3": "4X（推荐）",
+            "4": "5X",
+            "5": "6X"
+          }
+        },
+        "preset": {
+          "values": [
+            "A",
+            "B",
+            "C"
+          ],
+          "label": "DLSS 帧生成预设",
+          "labels": {
+            "A": "A · 关闭 UI 重组",
+            "B": "B · 开启 UI 重组",
+            "C": "C · 性能模式"
+          }
+        },
+        "logging_level": {
+          "values": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "label": "日志级别",
+          "labels": {
+            "0": "0 · 关闭",
+            "1": "1 · 仅错误（推荐）",
+            "2": "2 · 诊断",
+            "3": "3 · 详细"
+          }
+        },
+        "fg_engine": {
+          "values": [
+            "DLSS",
+            "XeSS"
+          ],
+          "label": "帧生成引擎",
+          "labels": {
+            "DLSS": "DLSS · 2X–6X",
+            "XeSS": "XeSS · 2X–4X"
+          }
+        },
+        "sr_mode": {
+          "values": [
+            "Off",
+            "M-INT8",
+            "L-INT8",
+            "M-FP16",
+            "L-FP16"
+          ],
+          "label": "超分模式",
+          "labels": {
+            "Off": "关闭",
+            "M-INT8": "强制 M · INT8",
+            "L-INT8": "强制 L · INT8",
+            "M-FP16": "强制 M · FP16 对照",
+            "L-FP16": "强制 L · FP16 对照"
+          }
+        },
+        "xess_flow": {
+          "values": [
+            "Coarse",
+            "Middle",
+            "Fine",
+            "CoarseAt4K"
+          ],
+          "label": "XeSS 光流分辨率",
+          "labels": {
+            "Coarse": "粗",
+            "Middle": "中",
+            "Fine": "细",
+            "CoarseAt4K": "4K 起使用粗光流"
+          }
+        },
+        "xess_hudless": {
+          "values": [
+            "Auto",
+            "1",
+            "0"
+          ],
+          "label": "XeSS 使用无 HUD 输入",
+          "labels": {
+            "Auto": "自动（推荐）",
+            "1": "严格要求无 HUD 输入",
+            "0": "关闭"
+          }
+        },
+        "frame_timing": {
+          "values": [
+            "0",
+            "1"
+          ],
+          "label": "帧时间日志",
+          "labels": {
+            "0": "关闭",
+            "1": "开启"
+          }
+        }
+      }
     }
   },
   "rtxfg-0.3.5-dx12-vulkan": {

@@ -104,9 +104,9 @@
     "choices": [],
     "restart": true,
     "dependencies": [],
-    "help": "RTX 30 需受支持驱动；Encore 1.3 起实验支持 RTX 20，要求 621.01 驱动及 DX12。与 DLSS 帧生成不同。",
+    "help": "RTX 40/50 原生路径需要 Encore 1.4.5 起；RTX 30 需受支持驱动，RTX 20 实验功能仅 621.01 + DX12。支持驱动：621.01、620.12、617.42、617.14、616.92、616.64、591.86；更改后重启游戏。计数为估算。",
     "optional": false,
-    "source_help": "Driver Smooth Motion for RTX 30, with the NVIDIA 620.12, 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply."
+    "source_help": "Native RTX 40/50 requires Encore 1.4.5+. Use a supported driver and the actual graphics API, then restart. The 2x counter is an estimate, not a measured displayed-frame count."
   },
   {
     "key": "smoothMotionApi",

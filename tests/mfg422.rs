@@ -84,7 +84,7 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
         let new = &current.scheme_policies[id];
         assert_eq!(new.gpu_paths, old.gpu_paths, "{id}");
         if id == &current.default_scheme {
-            assert_eq!(new.parameter_profile, "upstream040");
+            assert_eq!(new.parameter_profile, "upstream041");
             assert_eq!(new.max_selected_proxies, 1);
         } else {
             assert_eq!(new.parameter_profile, old.parameter_profile, "{id}");

@@ -86,6 +86,7 @@ pub struct Snapshot {
     pub details: Vec<String>,
     pub common: Option<(String, Vec<String>, Option<usize>)>,
     pub incompatible_protocol: bool,
+    pub parameter_profiles: std::collections::BTreeMap<String, BTreeSet<String>>,
     issues: Vec<Issue>,
 }
 pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
@@ -275,6 +276,21 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
                 catalog.scheme_policies.get(&scheme).is_none_or(|policy| {
                     !core::backend_matches_profile(&r.backend, &policy.parameter_profile)
                 });
+            if r.backend == crate::upstream040::BACKEND {
+                let profiles = snapshot
+                    .parameter_profiles
+                    .entry(scheme.clone())
+                    .or_default();
+                profiles.insert(
+                    crate::upstream040::profile_for_version(
+                        r.upstream_version
+                            .as_deref()
+                            .or(r.payload_version.as_deref()),
+                    )
+                    .into(),
+                );
+                snapshot.incompatible_protocol |= profiles.len() > 1;
+            }
             snapshot.schemes.insert(scheme.clone());
             snapshot.installed_labels.insert(label.clone());
             let proxies = r.selected();

@@ -23,6 +23,7 @@ pub const PROFILES: &[(&str, &str)] = &[
     ("dlssg-transfusion-1.4.5.3", encore::PROFILE),
     ("rtx40mfg-1.3.3-hf2", rtxmfg::PROFILE),
     ("upstream-0.3.5-310-9", crate::upstream040::PROFILE),
+    ("upstream-0.3.5-310-9", crate::upstream040::PROFILE_041),
     ("rtxfg-0.3.5-dx12-vulkan", "upstream035"),
     ("pipotoufik-mfg-vulkan-sm86-7", presets::MFG_VULKAN),
 ];
@@ -62,13 +63,14 @@ pub fn execute(
 ) -> Result<()> {
     use std::sync::atomic::Ordering;
     let version = recipe.available_version(catalog)?;
+    let converted;
     let settings = if action.parameters() {
         let settings = recipe
             .presets
             .as_ref()
             .context("此分享未附带参数，请选择仅安装方案")?;
-        settings.validate(&recipe.scheme, &version)?;
-        Some(settings)
+        converted = settings.for_version(&recipe.scheme, &recipe.patch_version, &version)?;
+        Some(&converted)
     } else {
         None
     };
@@ -109,6 +111,10 @@ pub fn execute(
                 .as_deref()
                 .or(record.payload_version.as_deref())
                 .context("无法确认已安装补丁版本")?;
+            ensure!(
+                installed == version || !crate::upstream040::is_profile(&policy.parameter_profile),
+                "已安装的 dlssg 版本不同，请先安装当前版本，或在参数窗口编辑原版本"
+            );
             settings.unwrap().validate(&recipe.scheme, installed)?;
             ensure!(
                 core::status_at(target).starts_with("已部署"),
@@ -260,11 +266,44 @@ pub fn supported(profile: &str, key: &str, version: &str) -> bool {
 }
 
 impl Snapshot {
+    /// Return an explicit semantic conversion for an old card. Unsupported
+    /// modes remain a visible error; they are never silently dropped.
+    pub fn for_version(&self, scheme: &str, from: &str, to: &str) -> Result<Self> {
+        self.validate(scheme, from)?;
+        if self.profile == crate::upstream040::PROFILE
+            && crate::upstream040::profile_for_version(Some(to)) == crate::upstream040::PROFILE_041
+        {
+            let convert = |values: &Values| -> Result<Values> {
+                let source = crate::upstream040::configure(b"", values)?;
+                let migrated =
+                    crate::upstream040::migrate_versions(&source, Some(from), Some(to), None)?;
+                let mut out = crate::upstream040::read_041(&migrated)?;
+                out.retain(|key, _| values.contains_key(key));
+                Ok(out)
+            };
+            let result = Self {
+                schema: self.schema,
+                profile: crate::upstream040::PROFILE_041.into(),
+                values: convert(&self.values)?,
+                defaults: convert(&self.defaults)?,
+            };
+            result.validate(scheme, to)?;
+            return Ok(result);
+        }
+        self.validate(scheme, to)?;
+        Ok(self.clone())
+    }
     pub fn validate(&self, scheme: &str, version: &str) -> Result<()> {
         ensure!(
             self.schema == 1 && PROFILES.contains(&(scheme, self.profile.as_str())),
             "分享参数属于其他方案或不支持的配置协议"
         );
+        if crate::upstream040::is_profile(&self.profile) {
+            ensure!(
+                self.profile == crate::upstream040::profile_for_version(Some(version)),
+                "分享参数属于旧版 dlssg，请先转换参数或仅安装方案"
+            );
+        }
         ensure!(
             !self.values.is_empty()
                 && self.values.len() <= 192
@@ -328,7 +367,8 @@ pub fn capture(
         .context("无法读取已安装方案的参数，请先应用参数再分享")?;
     ensure!(installed == scheme, "当前安装方案已变化，请重新读取");
     let policy = catalog.scheme_policies.get(scheme).context("未知方案")?;
-    let context = presets::Context::new(scheme, policy, &target.game_exe);
+    let policy = presets::policy_for_version(policy, Some(version));
+    let context = presets::Context::new(scheme, &policy, &target.game_exe);
     let mut defaults = presets::defaults(&context.profile, &policy.defaults);
     context.normalize(&mut defaults);
     defaults.retain(|key, _| supported(&context.profile, key, version));
@@ -438,7 +478,12 @@ pub fn contracts() -> Value {
             rule["labels"] = json!(labels);
             fields.insert(p.key.into(), rule);
         }
-        result.insert(scheme.into(), json!({"profile":profile,"fields":fields}));
+        let contract = json!({"profile":profile,"fields":fields});
+        if profile == crate::upstream040::PROFILE_041 {
+            result.get_mut(scheme).expect("legacy contract comes first")["from_041"] = contract;
+        } else {
+            result.insert(scheme.into(), contract);
+        }
     }
     Value::Object(result)
 }
@@ -446,6 +491,40 @@ pub fn contracts() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn legacy_dlssg_cards_convert_semantics_and_reject_ambiguous_modes() {
+        let scheme = crate::upstream040::SCHEME;
+        let old = Values::from([
+            ("xess_hudless".into(), "1".into()),
+            ("preset".into(), "Auto".into()),
+            ("sr_mode".into(), "Off".into()),
+            ("sr_tier".into(), "Auto".into()),
+        ]);
+        let mut card = Snapshot {
+            schema: 1,
+            profile: crate::upstream040::PROFILE.into(),
+            values: old.clone(),
+            defaults: old,
+        };
+        let converted = card.for_version(scheme, "0.4.0", "0.4.1").unwrap();
+        assert_eq!(converted.values["xess_hudless"], "Auto");
+        assert_eq!(converted.values["preset"], "A");
+        assert!(!converted.values.contains_key("sr_tier"));
+        assert_eq!(card.values["xess_hudless"], "1");
+        assert!(converted.validate(scheme, "0.4.0").is_err());
+        assert!(card.validate(scheme, "0.4.1").is_err());
+        card.values.insert("sr_mode".into(), "On".into());
+        assert!(card.for_version(scheme, "0.4.0", "0.4.1").is_err());
+        let mut current = converted;
+        current.values.insert("xess_hudless".into(), "1".into());
+        assert_eq!(
+            current
+                .for_version(scheme, "0.4.1", "0.4.2")
+                .unwrap()
+                .values["xess_hudless"],
+            "1"
+        );
+    }
     #[test]
     fn private_fields_and_other_protocols_are_rejected() {
         let mut s = Snapshot {

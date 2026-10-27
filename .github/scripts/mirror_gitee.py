@@ -87,6 +87,7 @@ TREES = (
     (r'vendor/gpui_fast_windows/resources/.+', {'.rc', '.xml', '.manifest', '.ico'}),
     (r'tests/[^/]+', {'.rs'}),
     (r'tests/fixtures/catalog(?:420|421|422|425|429)/.+', {'.json'}),
+    (r'tests/fixtures/catalog041/dlssg_sm86\.ini', {'.ini'}),
     (r'cloud/indexes/.+', {'.json'}),
 )
 FORBIDDEN = re.compile(

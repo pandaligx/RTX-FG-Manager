@@ -26,7 +26,7 @@ def current_source_export_files():
         files.update(re.findall(r"'([^']+)'", group))
     files.update(re.findall(r"Add-File '([^']+)'", script))
     trees = re.findall(r"Add-Tree '([^']+)' @\(([^)]*)\)", script)
-    if len(trees) != 17:
+    if len(trees) != 18:
         raise AssertionError('Review the source exporter Add-Tree structure')
     for directory, group in trees:
         extensions = set(re.findall(r"'([^']+)'", group))

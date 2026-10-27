@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.14
+
+- Support the complete Dlssg_for_sm86 0.4.1 bundle, with XeSS 2X–4X, coarse flow from 4K and strict/automatic HUD-less input. Fresh installs default to Optimized=1, preset A and SR off. XeSS uses the bundled backend without extra Intel DLLs.
+- Keep installed 0.4.0 and 0.4.1 parameter contracts separate. Preserve configuration, comments and unknown fields during upgrades, migrate legacy HUD-less semantics once, and require a choice for SR modes without an equivalent. Retain transaction recovery.
+- Version shared 0.4.1 presets, explain legacy conversions and preserve parameters unseen by older clients. Clean the game's new logs and frame timings while retaining shared JIT caches, other mods and manual captures.
+- Integrate RTX Encore 1.4.5 and clarify Smooth Motion GPU/driver requirements, restart behavior and estimated counters without resetting JSONC settings. Prevent stale catalogs from downgrading the bundled baseline.
+
 ## 4.3.13
 
 - Fix runtime ownership checks for Windows paths with mixed separators or casing. Recognize existing DLSS/XeSS backups without editing old records; preserve game boundaries, link rejection and file-hash checks during updates and recovery (#15).

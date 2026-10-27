@@ -1,4 +1,4 @@
-//! Journaled same-entry version upgrade of one owned dlssg 0.4.0 installation.
+//! Journaled same-entry version upgrade of one owned dlssg 0.4.x installation.
 //! Call mutation helpers only with the deployment directory lock held. Recovery
 //! never loads a DLL and never obtains paths from a configuration document.
 use crate::{core, presets, upstream040, win};
@@ -74,7 +74,7 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
                 .iter()
                 .all(|n| j.old.selected().contains(n))
         },
-        "dlssg 0.4.0 更新须保留原 DLL 入口；换入口前请先卸载"
+        "dlssg 0.4.x 更新须保留原 DLL 入口；换入口前请先卸载"
     );
     let old_version = j
         .old
@@ -88,14 +88,14 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
         .context("新版缺少版本记录")?;
     ensure!(
         crate::updater::version(new_version)? > crate::updater::version(old_version)?,
-        "dlssg 0.4.0 只允许升级到更高版本；已有文件未覆盖"
+        "dlssg 0.4.x 只允许升级到更高版本；已有文件未覆盖"
     );
     ensure!(
         j.new
             .selected()
             .iter()
             .any(|n| j.old.hashes.get(n) != j.new.hashes.get(n)),
-        "dlssg 0.4.0 DLL 内容未变化"
+        "dlssg 0.4.x DLL 内容未变化"
     );
     ensure!(
         j.old.cleanup_dirs.is_empty()
@@ -260,7 +260,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
     Ok(true)
 }
 
-/// Upgrade only a valid, same-entry dlssg 0.4.0 record. The package configuration
+/// Upgrade only a valid, same-entry dlssg 0.4.x record. The package configuration
 /// is for fresh installs; upgrades keep the latest disk bytes and apply only
 /// explicitly edited fields. The caller already holds the directory lock.
 pub fn upgrade_locked(
@@ -280,7 +280,7 @@ pub fn upgrade_locked(
             && new.backend == upstream040::BACKEND
             && old.scheme_id.as_deref() == Some(SCHEME)
             && new.scheme_id.as_deref() == Some(SCHEME),
-        "只有本管理器记录的 dlssg 0.4.0 安装可以原位升级"
+        "只有本管理器记录的 dlssg 0.4.x 安装可以原位升级"
     );
     let dir = &target.directory;
     let root = core::no_links(&dir.join(core::OWN))?;
@@ -307,11 +307,16 @@ pub fn upgrade_locked(
         originals.insert(name.clone(), bytes);
     }
     let original_config = originals.get(core::INI).context("旧配置文件缺失")?;
-    let updated = if let Some(values) = explicit_overrides.filter(|v| !v.is_empty()) {
-        upstream040::configure(original_config, values)?
-    } else {
-        upstream040::migrate(original_config)?
-    };
+    let updated = upstream040::migrate_versions(
+        original_config,
+        old.upstream_version
+            .as_deref()
+            .or(old.payload_version.as_deref()),
+        new.upstream_version
+            .as_deref()
+            .or(new.payload_version.as_deref()),
+        explicit_overrides,
+    )?;
     ensure!(updated.len() <= 1024 * 1024, "更新后配置超过大小限制");
     files.insert(core::INI.into(), updated);
     ensure!(
@@ -451,14 +456,14 @@ pub fn upgrade_locked(
     if let Err(error) = operation {
         let committed = matches(&marker, &j.new_marker_hash).unwrap_or(false);
         return match recover_locked(target) {
-            Ok(_) if committed => Ok("dlssg 0.4.0 升级已提交并完成恢复；已保留原配置".into()),
-            Ok(_) => Err(error.context("升级失败，已恢复原 dlssg 0.4.0 文件和配置")),
+            Ok(_) if committed => Ok("dlssg 0.4.x 升级已提交并完成恢复；已保留原配置".into()),
+            Ok(_) => Err(error.context("升级失败，已恢复原 dlssg 0.4.x 文件和配置")),
             Err(recovery) => {
                 bail!("升级未完成：{error}；自动恢复未完成，原件备份已保留：{recovery}")
             }
         };
     }
-    Ok("dlssg 0.4.0 已升级；已保留原配置，重新启动游戏后生效".into())
+    Ok("dlssg 0.4.x 已升级；已保留原配置，重新启动游戏后生效".into())
 }
 
 fn checkpoint(_name: &str) -> Result<()> {
@@ -590,6 +595,97 @@ mod tests {
             );
         }
         files
+    }
+
+    fn install041(target: &core::DeploymentTarget) -> Result<String> {
+        let mut files = bundle();
+        for (name, bytes) in &mut files {
+            if name.ends_with(".dll") {
+                *bytes = pe(true, 4);
+            }
+        }
+        files.insert(
+            core::INI.into(),
+            include_bytes!("../../tests/fixtures/catalog041/dlssg_sm86.ini").to_vec(),
+        );
+        let mut context = context();
+        context.profile = upstream040::PROFILE_041.into();
+        core::deploy_prepared_context_at_with_overrides(
+            target,
+            upstream040::BACKEND,
+            &["version.dll".into()],
+            None,
+            files,
+            Some("0.4.1"),
+            Some(&context),
+            None,
+            Some("0.4.1"),
+        )
+    }
+    #[test]
+    fn upgrade041_is_transactional_and_uninstall_cleans_new_logs_only() -> Result<()> {
+        let (_temp, target) = fixture()?;
+        install(&target, false)?;
+        let ini = target.directory.join(core::INI);
+        let original=b"; original\n[DLSSG]\nOptimized=2\nPreset=Auto\n[XeSSFG]\nUseHudless=1\n[Other]\nKeep=custom\n";
+        fs::write(&ini, original)?;
+        let before = snapshot(&target.directory)?;
+        for point in [
+            "journal",
+            "marker-backup",
+            "publish:version.dll",
+            "publish:dlssg_sm86/sr/sr_kernels.dll",
+        ] {
+            for crash in [false, true] {
+                fault(point, crash);
+                let result =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| install041(&target)));
+                clear_fault();
+                if crash {
+                    assert!(result.is_err());
+                    recover(&target)?;
+                } else {
+                    assert!(result.unwrap().is_err());
+                }
+                assert_eq!(snapshot(&target.directory)?, before, "{point}");
+            }
+        }
+        install041(&target)?;
+        let values = upstream040::read_041(&fs::read(&ini)?)?;
+        assert_eq!(values["xess_hudless"], "Auto");
+        assert_eq!(values["optimized"], "2");
+        assert!(fs::read_to_string(&ini)?.contains("Keep=custom"));
+        let logs = target.directory.join("dlssg_sm86/logs");
+        fs::create_dir_all(&logs)?;
+        for name in [
+            "dlssg_sm86.log",
+            "frame_timing.txt",
+            "frames_123.jsonl",
+            "manual-capture.csv",
+        ] {
+            fs::write(logs.join(name), name)?;
+        }
+        let outcome = crate::cleanup::clean_outcome_at(&target)?;
+        assert!(outcome.complete);
+        for name in ["dlssg_sm86.log", "frame_timing.txt", "frames_123.jsonl"] {
+            assert!(!logs.join(name).exists());
+        }
+        assert!(logs.join("manual-capture.csv").exists());
+        assert!(target.directory.join("unrelated-mod.json").exists());
+        Ok(())
+    }
+    #[test]
+    fn unsupported_sr_upgrade_makes_no_changes() -> Result<()> {
+        let (_temp, target) = fixture()?;
+        install(&target, false)?;
+        fs::write(
+            target.directory.join(core::INI),
+            b"[SuperResolution]\nMode=On\n",
+        )?;
+        let before = snapshot(&target.directory)?;
+        assert!(install041(&target).unwrap_err().to_string().contains("On"));
+        assert_eq!(snapshot(&target.directory)?, before);
+        Ok(())
     }
 
     #[test]

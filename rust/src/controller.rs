@@ -22,7 +22,7 @@ pub enum Event {
     Catalog(cloud::Catalog),
     RuntimeCatalogCached(u64, rtx_fg_manager::runtime_catalog::Catalog),
     RuntimeCatalog(u64, Result<rtx_fg_manager::runtime_catalog::Catalog>),
-    Deployments(u64, String, rtx_fg_manager::deployment::Snapshot),
+    Deployments(u64, String, Box<rtx_fg_manager::deployment::Snapshot>),
     CleanupPreview(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>),
     Scan(scanner::Report),
     Progress(String),
@@ -37,6 +37,7 @@ pub enum Event {
     PresetRead {
         exe: String,
         values: Option<(String, rtx_fg_manager::presets::Values)>,
+        profile: Option<String>,
         running: bool,
         epoch: u64,
         consistent: bool,
@@ -224,12 +225,24 @@ fn inspect_game_parameters(
                      value: Option<(String, rtx_fg_manager::presets::Values)>| {
         value.and_then(|(scheme, values)| {
             let policy = catalog.scheme_policies.get(&scheme)?;
+            let record = core::record(&target.directory).ok().flatten();
+            let policy = record
+                .as_ref()
+                .map(|r| {
+                    rtx_fg_manager::presets::policy_for_version(
+                        policy,
+                        r.upstream_version
+                            .as_deref()
+                            .or(r.payload_version.as_deref()),
+                    )
+                })
+                .unwrap_or_else(|| policy.clone());
             let mut normalized =
                 rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
             normalized.extend(values);
-            rtx_fg_manager::presets::Context::new(&scheme, policy, &target.game_exe)
+            rtx_fg_manager::presets::Context::new(&scheme, &policy, &target.game_exe)
                 .normalize(&mut normalized);
-            Some((scheme, normalized))
+            Some((scheme, policy.parameter_profile, normalized))
         })
     };
     let baseline = normalize(&first, values.clone());
@@ -246,7 +259,10 @@ fn inspect_game_parameters(
 fn uses_explicit_edits(profile: &str) -> bool {
     matches!(
         profile,
-        rtx_fg_manager::encore::PROFILE | rtx_fg_manager::rtxmfg::PROFILE
+        rtx_fg_manager::encore::PROFILE
+            | rtx_fg_manager::rtxmfg::PROFILE
+            | rtx_fg_manager::upstream040::PROFILE
+            | rtx_fg_manager::upstream040::PROFILE_041
     )
 }
 
@@ -257,6 +273,9 @@ fn read_json_preset_values(
     let config = match profile {
         rtx_fg_manager::encore::PROFILE => rtx_fg_manager::encore::CONFIG,
         rtx_fg_manager::rtxmfg::PROFILE => rtx_fg_manager::rtxmfg::CONFIG,
+        rtx_fg_manager::upstream040::PROFILE | rtx_fg_manager::upstream040::PROFILE_041 => {
+            core::INI
+        }
         _ => anyhow::bail!("不支持的配置协议"),
     };
     let path = core::no_links(&target.directory.join(config))?;
@@ -270,6 +289,15 @@ fn read_json_preset_values(
                 .or(r.payload_version.as_deref())
         });
         rtx_fg_manager::encore::read_for_version(&bytes, version)
+    } else if rtx_fg_manager::upstream040::is_profile(profile) {
+        let record = core::record(&target.directory)?;
+        let actual =
+            rtx_fg_manager::upstream040::profile_for_version(record.as_ref().and_then(|r| {
+                r.upstream_version
+                    .as_deref()
+                    .or(r.payload_version.as_deref())
+            }));
+        rtx_fg_manager::presets::read_values(&bytes, actual)
     } else {
         let mut values = rtx_fg_manager::rtxmfg::read(&bytes)?;
         values.extend(rtx_fg_manager::rtxmfg_settings::read_ui_at(target)?);
@@ -397,6 +425,7 @@ pub struct Controller {
     pub deployments: BTreeMap<String, rtx_fg_manager::deployment::Snapshot>,
     pub evidence: BTreeMap<String, Option<scanner::Evidence>>,
     pub disk_presets: BTreeMap<(String, String), rtx_fg_manager::presets::Values>,
+    disk_profiles: BTreeMap<(String, String), (u64, String)>,
     preset_baselines: BTreeMap<(String, String), rtx_fg_manager::presets::Values>,
     pub running_games: BTreeSet<String>,
     pub preset_reads: BTreeSet<String>,
@@ -508,6 +537,7 @@ impl Controller {
             deployments: BTreeMap::new(),
             evidence: BTreeMap::new(),
             disk_presets: BTreeMap::new(),
+            disk_profiles: BTreeMap::new(),
             preset_baselines: BTreeMap::new(),
             running_games: BTreeSet::new(),
             preset_reads: BTreeSet::new(),
@@ -676,7 +706,12 @@ impl Controller {
     }
     pub fn cloud_label(&self, p: &cloud::Package) -> String {
         let name = match p.scheme_id.as_str() {
-            "upstream-0.3.5-310-9" => Some("Dlssg_for_sm86 · 0.4.0"),
+            "upstream-0.3.5-310-9" => {
+                return format!(
+                    "Dlssg_for_sm86 · {}",
+                    p.upstream_version.as_deref().unwrap_or(&p.version)
+                );
+            }
             "rtxfg-0.3.5-dx12-vulkan" => {
                 Some("Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan")
             }
@@ -823,15 +858,38 @@ impl Controller {
         self.state[key].as_bool().unwrap_or(default)
     }
     pub fn parameter_profile(&self) -> String {
-        self.catalog.scheme_policies[&self.cloud_scheme()]
+        self.parameter_policy(self.focus.as_deref().unwrap_or(""), &self.cloud_scheme())
             .parameter_profile
-            .clone()
+    }
+    fn parameter_policy(&self, exe: &str, scheme: &str) -> cloud::Policy {
+        let mut policy = self.catalog.scheme_policies[scheme].clone();
+        if let Some((epoch, profile)) = self.disk_profiles.get(&(exe.into(), scheme.into()))
+            && *epoch == self.status_epoch
+        {
+            if policy.parameter_profile != *profile {
+                policy.parameter_profile = profile.clone();
+                policy.defaults.clear();
+            }
+            return policy;
+        }
+        if let Some(profiles) = self
+            .deployments
+            .get(exe)
+            .and_then(|d| d.parameter_profiles.get(scheme))
+            && profiles.len() == 1
+            && let Some(profile) = profiles.first()
+            && policy.parameter_profile != *profile
+        {
+            policy.parameter_profile = profile.clone();
+            policy.defaults.clear();
+        }
+        policy
     }
     pub fn preset_values(&self, exe: &str) -> rtx_fg_manager::presets::Values {
         self.preset_values_for(exe, &self.scheme_for(Some(exe)))
     }
     fn preset_values_for(&self, exe: &str, scheme: &str) -> rtx_fg_manager::presets::Values {
-        let policy = &self.catalog.scheme_policies[scheme];
+        let policy = &self.parameter_policy(exe, scheme);
         let profile = &policy.parameter_profile;
         let mut values = rtx_fg_manager::presets::defaults(profile, &policy.defaults);
         if let Some(game) = self.games.iter().find(|g| g.exe == exe) {
@@ -946,6 +1004,15 @@ impl Controller {
                 "rtx_vsync",
                 "rtx_reflex_limit",
             ]
+        } else if legacy_dirty
+            && rtx_fg_manager::upstream040::is_profile(
+                &self.parameter_policy(exe, scheme).parameter_profile,
+            )
+        {
+            saved
+                .and_then(Value::as_object)
+                .map(|v| v.keys().map(String::as_str).collect())
+                .unwrap_or_default()
         } else if legacy_dirty {
             vec!["tf_mode", "tf_target", "tf_dynamic56", "tf_overlay"]
         } else {
@@ -957,7 +1024,7 @@ impl Controller {
                 let value = saved?.get(key)?.as_str()?;
                 let item = BTreeMap::from([(key.to_owned(), value.to_owned())]);
                 rtx_fg_manager::presets::validate(
-                    &self.catalog.scheme_policies[scheme].parameter_profile,
+                    &self.parameter_policy(exe, scheme).parameter_profile,
                     &item,
                 )
                 .ok()
@@ -969,7 +1036,9 @@ impl Controller {
         let mut updates = Vec::new();
         let mut clamped = Vec::new();
         for game in &self.games {
-            for (scheme, policy) in &self.catalog.scheme_policies {
+            for scheme in self.catalog.scheme_policies.keys() {
+                let policy = self.parameter_policy(&game.exe, scheme);
+                let policy = &policy;
                 let context = rtx_fg_manager::presets::Context::new(
                     scheme,
                     policy,
@@ -1038,7 +1107,7 @@ impl Controller {
         let scheme = self.scheme_for(Some(exe));
         rtx_fg_manager::presets::Context::new(
             &scheme,
-            &self.catalog.scheme_policies[&scheme],
+            &self.parameter_policy(exe, &scheme),
             std::path::Path::new(exe),
         )
     }
@@ -1051,19 +1120,15 @@ impl Controller {
             return;
         }
         let scheme = self.scheme_for(Some(exe));
-        let profile = self.catalog.scheme_policies[&scheme]
-            .parameter_profile
-            .clone();
+        let policy = self.parameter_policy(exe, &scheme);
+        let profile = policy.parameter_profile.clone();
         let mut values = self.preset_values(exe);
         let identity = (exe.to_owned(), scheme.clone());
         self.preset_baselines
             .entry(identity.clone())
             .or_insert_with(|| values.clone());
         if key == "reset" {
-            values = rtx_fg_manager::presets::defaults(
-                &profile,
-                &self.catalog.scheme_policies[&scheme].defaults,
-            );
+            values = rtx_fg_manager::presets::defaults(&profile, &policy.defaults);
         } else {
             values.insert(key.into(), value.into());
         }
@@ -1071,10 +1136,7 @@ impl Controller {
         if rtx_fg_manager::presets::validate(&profile, &values).is_err() {
             return;
         }
-        let mut baseline = rtx_fg_manager::presets::defaults(
-            &profile,
-            &self.catalog.scheme_policies[&scheme].defaults,
-        );
+        let mut baseline = rtx_fg_manager::presets::defaults(&profile, &policy.defaults);
         baseline.extend(
             self.disk_presets
                 .get(&identity)
@@ -1093,6 +1155,9 @@ impl Controller {
                 dirty_keys.extend(values.keys().cloned());
             } else {
                 dirty_keys.insert(key.into());
+                if profile == rtx_fg_manager::upstream040::PROFILE_041 && key == "fg_engine" {
+                    dirty_keys.insert("max_generated_frames".into());
+                }
             }
             dirty_keys.retain(|key| baseline.get(key) != values.get(key));
         }
@@ -1348,7 +1413,7 @@ impl Controller {
         };
         let paths = game.deployment_executables();
         let scheme = self.cloud_scheme();
-        let policy = self.catalog.scheme_policies[&scheme].clone();
+        let policy = self.parameter_policy(&exe, &scheme);
         let values = if uses_explicit_edits(&policy.parameter_profile) {
             self.explicit_preset_values(&exe, &scheme)
         } else {
@@ -1564,7 +1629,7 @@ impl Controller {
                     }
                 }
                 let status = snapshot.status.clone();
-                c.send(Event::Deployments(epoch, g.exe.clone(), snapshot));
+                c.send(Event::Deployments(epoch, g.exe.clone(), Box::new(snapshot)));
                 c.send(Event::Statuses(epoch, vec![(g.exe, status)]));
             }
             Ok(())
@@ -2675,6 +2740,12 @@ impl Controller {
                                     &available,
                                     version,
                                 )?
+                            } else if payload.backend == rtx_fg_manager::upstream040::BACKEND
+                                && core::record(&game.deployment_target(&p).directory)?.is_some()
+                            {
+                                // The upgrade transaction migrates disk settings and explicit
+                                // edits using the installed version, before replacing files.
+                                files[name].clone()
                             } else {
                                 context.configure(&files[name], &options)?
                             };
@@ -2860,6 +2931,22 @@ impl Controller {
                 };
                 match values {
                     Ok(snapshot) => c.send(Event::PresetRead {
+                        profile: core::record(&location.directory)
+                            .ok()
+                            .flatten()
+                            .and_then(|r| {
+                                let policy =
+                                    catalog.scheme_policies.get(r.scheme_id.as_deref()?)?;
+                                Some(
+                                    rtx_fg_manager::presets::policy_for_version(
+                                        policy,
+                                        r.upstream_version
+                                            .as_deref()
+                                            .or(r.payload_version.as_deref()),
+                                    )
+                                    .parameter_profile,
+                                )
+                            }),
                         exe: target,
                         values: snapshot.values,
                         running,
@@ -3309,6 +3396,7 @@ impl Controller {
                 Event::PresetRead {
                     exe,
                     values,
+                    profile,
                     running,
                     epoch,
                     consistent,
@@ -3324,7 +3412,13 @@ impl Controller {
                     }
                     self.disk_presets.retain(|(game, _), _| game != &exe);
                     if let Some((scheme, mut values)) = values {
-                        if let Some(policy) = self.catalog.scheme_policies.get(&scheme) {
+                        if let Some(profile) = profile {
+                            self.disk_profiles
+                                .insert((exe.clone(), scheme.clone()), (epoch, profile));
+                        }
+                        if self.catalog.scheme_policies.contains_key(&scheme) {
+                            let policy = self.parameter_policy(&exe, &scheme);
+                            let policy = &policy;
                             let context = rtx_fg_manager::presets::Context::new(
                                 &scheme,
                                 policy,
@@ -3342,7 +3436,9 @@ impl Controller {
                         }
                         self.disk_presets
                             .insert((exe.clone(), scheme.clone()), values.clone());
-                        if let Some(policy) = self.catalog.scheme_policies.get(&scheme) {
+                        if self.catalog.scheme_policies.contains_key(&scheme) {
+                            let policy = self.parameter_policy(&exe, &scheme);
+                            let policy = &policy;
                             let mut baseline = rtx_fg_manager::presets::defaults(
                                 &policy.parameter_profile,
                                 &policy.defaults,
@@ -3504,7 +3600,7 @@ impl Controller {
                 }
                 Event::Deployments(epoch, exe, snapshot) => {
                     if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
-                        self.deployments.insert(exe, snapshot);
+                        self.deployments.insert(exe, *snapshot);
                     }
                 }
                 Event::CleanupPreview(epoch, fingerprint, plans) => {
@@ -3732,6 +3828,19 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn upstream_scheme_label_tracks_the_catalog_version() {
+        let (_dir, c) = controller();
+        let mut package = c
+            .catalog
+            .selected(rtx_fg_manager::upstream040::SCHEME)
+            .clone();
+        package.version = "0.4.2".into();
+        package.upstream_version = Some("0.4.2-rc.1".into());
+        assert_eq!(c.cloud_label(&package), "Dlssg_for_sm86 · 0.4.2-rc.1");
+        package.upstream_version = None;
+        assert_eq!(c.cloud_label(&package), "Dlssg_for_sm86 · 0.4.2");
+    }
     fn runtime_catalog_fixture() -> rtx_fg_manager::runtime_catalog::Catalog {
         serde_json::from_str(include_str!("../../cloud/runtime-catalog.json")).unwrap()
     }
@@ -3973,6 +4082,7 @@ mod tests {
         first_directory.insert("tf_mode".into(), "4".into());
         // The first directory succeeded, but the second could not be written.
         c.channel.send(Event::PresetRead {
+            profile: None,
             exe: exe.into(),
             values: Some((scheme.into(), first_directory)),
             running: false,
@@ -4069,6 +4179,7 @@ mod tests {
         disk.insert("reflexFrameLimit".into(), "141".into());
         disk.insert("tf_mode".into(), "2".into());
         c.channel.send(Event::PresetRead {
+            profile: None,
             exe: "Encore-A.exe".into(),
             values: Some((scheme.into(), disk)),
             running: false,
@@ -4364,6 +4475,7 @@ mod tests {
         assert_eq!(c.proxies(), vec!["version.dll"]);
         assert_eq!(c.preset_values("B.exe")["logging_level"], "1");
         c.channel.send(Event::PresetRead {
+            profile: None,
             exe: "A.exe".into(),
             values: Some((
                 "upstream-0.3.5-310-9".into(),
@@ -5336,7 +5448,10 @@ mod tests {
         assert_eq!(a["optimized"], "0");
         assert_eq!(
             c.preset_values("B.exe"),
-            rtx_fg_manager::presets::defaults("upstream040", &BTreeMap::new())
+            rtx_fg_manager::presets::defaults(
+                &c.parameter_profile(),
+                &c.catalog.scheme_policies[&c.cloud_scheme()].defaults
+            )
         );
         c.set_game_option("A.exe", "max_generated_frames", "99");
         assert_eq!(c.preset_values("A.exe"), a);
@@ -5344,8 +5459,47 @@ mod tests {
         c.tick_close();
     }
     #[test]
+    fn installed_040_profile_survives_new_041_catalog_and_draft_discard() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::upstream040::SCHEME.to_owned();
+        let exe = "A.exe".to_owned();
+        c.catalog
+            .scheme_policies
+            .get_mut(&scheme)
+            .unwrap()
+            .parameter_profile = "upstream041".into();
+        c.games = vec![Game {
+            exe: exe.clone(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.clone());
+        let values = rtx_fg_manager::presets::defaults("upstream040", &BTreeMap::new());
+        c.channel.send(Event::PresetRead {
+            exe: exe.clone(),
+            profile: Some("upstream040".into()),
+            values: Some((scheme.clone(), values.clone())),
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
+        c.events();
+        assert_eq!(c.parameter_profile(), "upstream040");
+        assert_eq!(c.preset_values(&exe)["xess_hudless"], "1");
+        c.set_game_option(&exe, "sr_mode", "On");
+        assert_eq!(c.preset_values(&exe)["sr_mode"], "On");
+        c.discard_presets(Some((&exe, &scheme)));
+        assert_eq!(c.preset_values(&exe), values);
+        c.close();
+        c.tick_close();
+    }
+    #[test]
     fn legacy_035_settings_migrate_to_040_without_overwriting_scheme_values() {
         let (_dir, mut c) = controller();
+        c.catalog
+            .scheme_policies
+            .get_mut(rtx_fg_manager::upstream040::SCHEME)
+            .unwrap()
+            .parameter_profile = "upstream040".into();
         let scheme = c.catalog.default_scheme.clone();
         c.games = vec![Game {
             exe: "A.exe".into(),
@@ -5406,7 +5560,7 @@ mod tests {
         assert_eq!(c.preset_values("A.exe")["optimized"], "3");
         assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "5");
         c.set_game_option("A.exe", "reset", "");
-        assert_eq!(c.preset_values("A.exe")["optimized"], "2");
+        assert_eq!(c.preset_values("A.exe")["optimized"], "1");
         c.close();
         c.tick_close();
     }
@@ -5451,6 +5605,7 @@ mod tests {
         assert_eq!(c.preset_values(exe)["max_generated_frames"], "3");
         c.set_game_option(exe, "max_generated_frames", "2");
         c.channel.send(Event::PresetRead {
+            profile: None,
             exe: exe.into(),
             values: Some((
                 extended.into(),
@@ -5472,6 +5627,7 @@ mod tests {
         ));
         c.events();
         c.channel.send(Event::PresetRead {
+            profile: None,
             exe: exe.into(),
             values: Some((
                 extended.into(),
@@ -5515,6 +5671,7 @@ mod tests {
             applied.clone(),
         ));
         c.channel.send(Event::PresetRead {
+            profile: None,
             exe: exe.clone(),
             values: Some((
                 scheme.clone(),

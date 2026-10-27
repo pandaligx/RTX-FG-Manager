@@ -1732,7 +1732,7 @@ impl Render for Recommendations {
                                 .presets
                                 .as_ref()
                                 .ok_or_else(|| self.t("此分享未附带参数，可仅安装方案。"))?
-                                .validate(&card.content.scheme, v)
+                                .for_version(&card.content.scheme, &card.content.patch_version, v)
                                 .map_err(|e| e.to_string())
                         })
                         .err();
@@ -1745,6 +1745,21 @@ impl Render for Recommendations {
                                 .text_color(cx.theme().warning)
                                 .child(self.t(error)),
                         );
+                    }
+                    if changed
+                        && parameter_error.is_none()
+                        && card
+                            .content
+                            .presets
+                            .as_ref()
+                            .is_some_and(|s| s.profile == rtx_fg_manager::upstream040::PROFILE)
+                        && available.as_ref().is_ok_and(|v| {
+                            rtx_fg_manager::upstream040::profile_for_version(Some(v))
+                                == rtx_fg_manager::upstream040::PROFILE_041
+                        })
+                    {
+                        body = body.child(div().text_xs().text_color(cx.theme().warning)
+                            .child(self.t("将按 0.4.1 转换旧参数：无 HUD 开启改为自动，Auto 预设改为 A；已取消的作用档位不再写入。")));
                     }
                     let runtime_error = card
                         .content

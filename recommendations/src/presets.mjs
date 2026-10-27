@@ -19,7 +19,8 @@ function compare(a,b){
 }
 export function presetSnapshot(input,scheme,version){
   exact(input,['schema','profile','values','defaults']);
-  const contract=contracts[scheme];
+  const base=contracts[scheme];
+  const contract=scheme==='upstream-0.3.5-310-9' && compare(version,'0.4.1')>=0?base?.from_041:base;
   need(input.schema===1 && contract?.profile===input.profile,'invalid_preset_protocol');
   exact(input.values,Object.keys(contract.fields));exact(input.defaults,Object.keys(contract.fields));
   const keys=Object.keys(input.values).sort();
@@ -37,6 +38,9 @@ export function presetSnapshot(input,scheme,version){
   }
   if(input.profile==='mfg_vulkan_sm86_7') for(const values of [input.values,input.defaults]){
     need(Number(values.force_multiplier||0)<=Number(values.max_interpolated_frames||5)+1,'invalid_preset_combination');
+  }
+  if(input.profile==='upstream041') for(const values of [input.values,input.defaults]){
+    need(!(values.fg_engine==='XeSS' && Number(values.max_generated_frames||0)>3),'invalid_preset_combination');
   }
   return {schema:1,profile:input.profile,values:Object.fromEntries(keys.map(k=>[k,input.values[k]])),defaults:Object.fromEntries(keys.map(k=>[k,input.defaults[k]]))};
 }

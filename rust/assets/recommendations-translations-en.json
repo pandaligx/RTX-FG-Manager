@@ -182,5 +182,6 @@
   "请先应用或放弃本机未应用的参数": "Apply or discard your pending local changes first.",
   "此分享未附带参数，请选择仅安装方案": "This setup has no shared parameters. Choose Install patch only.",
   "已安装方案不同，请使用安装并应用": "A different patch is installed. Choose Install and apply.",
-  "此游戏不支持分享中的部分参数，请手动调整后应用": "Some shared parameters are unsupported by this game. Adjust them manually."
+  "此游戏不支持分享中的部分参数，请手动调整后应用": "Some shared parameters are unsupported by this game. Adjust them manually.",
+  "将按 0.4.1 转换旧参数：无 HUD 开启改为自动，Auto 预设改为 A；已取消的作用档位不再写入。": "Legacy settings will be converted for 0.4.1: HUD-less on becomes Auto, preset Auto becomes A, and the removed SR tier will not be written."
 }

@@ -200,7 +200,7 @@ impl CompactCatalog {
             );
             let (ini_policy, max_selected_proxies) = match s.profile.as_str() {
                 "initial" => ("initial", 1),
-                crate::upstream040::PROFILE => ("upstream040", 1),
+                crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 => ("upstream040", 1),
                 crate::rtxmfg::PROFILE => ("rtxmfg_json", 1),
                 crate::transfusion::PROFILE => ("transfusion_json", 1),
                 crate::encore::PROFILE => ("encore_json", 1),
@@ -380,7 +380,7 @@ impl Catalog {
             ensure!(
                 match policy.parameter_profile.as_str() {
                     "initial" => policy.ini_policy == "initial",
-                    crate::upstream040::PROFILE =>
+                    crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 =>
                         policy.ini_policy == "upstream040"
                             && policy.max_selected_proxies == 1
                             && p.backends == [crate::upstream040::BACKEND],
@@ -426,7 +426,7 @@ impl Catalog {
                 );
                 safe_url(url)?;
             }
-            if policy.parameter_profile == crate::upstream040::PROFILE {
+            if crate::upstream040::is_profile(&policy.parameter_profile) {
                 ensure!(
                     self.schema == 3
                         && p.bytes > 0
@@ -617,7 +617,7 @@ impl Catalog {
             }
         }
         for (scheme, policy) in &self.scheme_policies {
-            if policy.parameter_profile != crate::upstream040::PROFILE {
+            if !crate::upstream040::is_profile(&policy.parameter_profile) {
                 continue;
             }
             let mut components = BTreeSet::new();
@@ -732,6 +732,7 @@ impl Catalog {
         if matches!(
             policy.parameter_profile.as_str(),
             crate::upstream040::PROFILE
+                | crate::upstream040::PROFILE_041
                 | crate::encore::PROFILE
                 | crate::rtxmfg::PROFILE
                 | crate::transfusion::PROFILE
@@ -818,6 +819,43 @@ pub fn bundled() -> Catalog {
     c.validate().expect("valid built-in cloud catalog");
     c
 }
+/// A stale mirror/cache must not downgrade a scheme below the build's reviewed
+/// baseline. A removed scheme stays removed; newer remote releases still win.
+fn retain_newer_baseline(catalog: &mut Catalog, baseline: &Catalog) {
+    for (scheme, policy) in &baseline.scheme_policies {
+        if !catalog.scheme_policies.contains_key(scheme) {
+            continue;
+        }
+        let latest = |c: &Catalog| {
+            c.packages
+                .iter()
+                .filter(|p| &p.scheme_id == scheme)
+                .filter_map(|p| {
+                    semver::Version::parse(p.upstream_version.as_deref().unwrap_or(&p.version)).ok()
+                })
+                .max()
+        };
+        if latest(baseline) > latest(catalog) {
+            let position = catalog
+                .packages
+                .iter()
+                .position(|p| &p.scheme_id == scheme)
+                .unwrap_or(catalog.packages.len());
+            catalog.packages.retain(|p| &p.scheme_id != scheme);
+            catalog.packages.splice(
+                position..position,
+                baseline
+                    .packages
+                    .iter()
+                    .filter(|p| &p.scheme_id == scheme)
+                    .cloned(),
+            );
+            catalog
+                .scheme_policies
+                .insert(scheme.clone(), policy.clone());
+        }
+    }
+}
 pub fn cached() -> Catalog {
     assets::cache_root()
         .ok()
@@ -831,6 +869,7 @@ fn cached_at(root: &Path) -> Catalog {
         .and_then(|v| serde_json::from_value::<Catalog>(v).ok())
         .map(|mut c| {
             c.enable_legacy_delta_sm89();
+            retain_newer_baseline(&mut c, &bundled());
             c
         })
         .filter(|c| c.validate().is_ok())
@@ -915,6 +954,8 @@ pub fn refresh_with_options(
             stage = "索引或方案配置无效";
             let mut c = compact.expand(&fs::read(index)?)?;
             c.prefer_github = prefer_github;
+            c.validate()?;
+            retain_newer_baseline(&mut c, &bundled());
             c.validate()?;
             ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
             stage = "云端目录缓存写入失败";
@@ -1200,7 +1241,7 @@ pub fn prepare_with_progress(
                     && !p.component
                     && package_supports_entry(p, policy, &proxy)
                     && p.backends.iter().any(|b| {
-                        if policy.parameter_profile == crate::upstream040::PROFILE {
+                        if crate::upstream040::is_profile(&policy.parameter_profile) {
                             return b == crate::upstream040::BACKEND;
                         }
                         if policy.parameter_profile == crate::rtxmfg::PROFILE {
@@ -1222,7 +1263,7 @@ pub fn prepare_with_progress(
             .backends
             .iter()
             .find(|b| {
-                if policy.parameter_profile == crate::upstream040::PROFILE {
+                if crate::upstream040::is_profile(&policy.parameter_profile) {
                     return b.as_str() == crate::upstream040::BACKEND;
                 }
                 if policy.parameter_profile == crate::rtxmfg::PROFILE {
@@ -1341,6 +1382,51 @@ pub fn known_image(image: &str) -> bool {
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn stale_catalog_retains_reviewed_versions_without_reviving_removed_schemes() {
+        let baseline = bundled();
+        let scheme = crate::upstream040::SCHEME;
+        let mut stale = baseline.clone();
+        for p in &mut stale.packages {
+            if p.scheme_id == scheme {
+                p.version = "0.3.0".into();
+                p.upstream_version = Some("0.3.0".into());
+            }
+        }
+        stale
+            .scheme_policies
+            .get_mut(scheme)
+            .unwrap()
+            .parameter_profile = "upstream035".into();
+        retain_newer_baseline(&mut stale, &baseline);
+        assert_eq!(
+            serde_json::to_value(&stale.packages).unwrap(),
+            serde_json::to_value(&baseline.packages).unwrap()
+        );
+        assert_eq!(
+            stale.scheme_policies[scheme].parameter_profile,
+            baseline.scheme_policies[scheme].parameter_profile
+        );
+        for p in &mut stale.packages {
+            if p.scheme_id == scheme {
+                p.version = "0.5.0".into();
+                p.upstream_version = Some("0.5.0".into());
+            }
+        }
+        retain_newer_baseline(&mut stale, &baseline);
+        assert!(
+            stale
+                .packages
+                .iter()
+                .filter(|p| p.scheme_id == scheme)
+                .all(|p| p.version == "0.5.0")
+        );
+        stale.scheme_policies.remove(scheme);
+        stale.packages.retain(|p| p.scheme_id != scheme);
+        retain_newer_baseline(&mut stale, &baseline);
+        assert!(!stale.scheme_policies.contains_key(scheme));
+        assert!(!stale.packages.iter().any(|p| p.scheme_id == scheme));
+    }
     #[test]
     fn dedicated_encore_and_mfg_plugin_routes_do_not_cross_load() {
         let c = super::bundled();

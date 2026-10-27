@@ -349,6 +349,9 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
     }))
 }
 fn is_log(name: &str) -> bool {
+    if matches!(name, "dlssg_sm86.log" | "frame_timing.txt") {
+        return true;
+    }
     if name
         .strip_prefix("ngx_log_")
         .and_then(|s| s.strip_suffix(".txt"))

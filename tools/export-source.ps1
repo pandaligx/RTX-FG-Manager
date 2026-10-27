@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Destination,
     [switch]$ExcludeCloudMetadata
@@ -106,6 +106,7 @@ Add-Tree 'rust/assets' @('.json', '.jsonc', '.svg', '.png', '.ico', '.txt', '.md
 Add-Tree 'vendor/gpui_fast_windows/src' @('.rs', '.hlsl')
 Add-Tree 'vendor/gpui_fast_windows/resources' @('.rc', '.xml', '.manifest', '.ico')
 foreach ($item in Get-ChildItem -LiteralPath (Join-Path $root 'tests') -File -Filter '*.rs') { Add-File "tests/$($item.Name)" }
+Add-Tree 'tests/fixtures/catalog041' @('.ini')
 foreach ($version in @('420', '421', '422', '425', '429')) { Add-Tree "tests/fixtures/catalog$version" @('.json') }
 # Public cloud metadata and publish automation are separately reviewed source inputs.
 foreach ($name in @('cloud/schemes.json', 'tools/cloud_release.py', 'docs/cloud-publishing.md', '.github/scripts/mirror_gitee.py')) { Add-File $name $false }
