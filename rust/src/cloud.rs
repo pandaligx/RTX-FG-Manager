@@ -1577,6 +1577,7 @@ mod tests {
             "pipotoufik-mfg-vulkan-sm86-7",
             "rtx40mfg-1.3.3-hf2",
             "dlssg-transfusion-1.4.5.3",
+            "mfg-unlocker-1.6.1-compat",
         ];
         assert_eq!(
             c.schemes()
