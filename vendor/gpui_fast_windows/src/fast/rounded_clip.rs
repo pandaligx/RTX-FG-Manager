@@ -3,7 +3,9 @@
 //! directly in the colour shader. Each child appends its geometry and restores
 //! the enclosing stack afterward; no mask render targets or passes are needed.
 
-use std::{path::PathBuf, slice};
+#[cfg(debug_assertions)]
+use std::path::PathBuf;
+use std::slice;
 
 use anyhow::{Context as _, Result};
 use gpui::{AtlasTextureId, LayerFrame, Scene};
@@ -23,6 +25,7 @@ use crate::directx_renderer::{
 };
 use crate::fast::frame::{FrameState, PathTargets, Target, draw_scene_masked, upload};
 
+#[cfg(debug_assertions)]
 pub(crate) fn shader_path(original: PathBuf, out_dir: &str) -> PathBuf {
     if original
         .file_name()

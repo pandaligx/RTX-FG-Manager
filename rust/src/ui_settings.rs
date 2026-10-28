@@ -62,7 +62,8 @@ impl Render for SettingsView {
 impl Manager {
     pub(super) fn clear_settings_window(&mut self, cx: &mut Context<Self>) {
         self.settings_window = None;
-        self.theme_preview = None;
+        // A theme picker can belong to the main window. Only its own dismissal
+        // or native-window removal may end the preview and release its modal.
         // Select subscriptions are window-bound. Recreate them on reopening,
         // rather than dispatching changes into a closed native window.
         cx.notify();
@@ -114,7 +115,7 @@ impl Manager {
             ..Default::default()
         };
         let owner = cx.entity();
-        self.dialog_active = true;
+        self.utility_opening = true;
         cx.defer(move |cx| {
             let result_owner = owner.clone();
             let result = cx.open_window(options, move |window, cx| {
@@ -178,7 +179,7 @@ impl Manager {
                 cx.new(|cx| Root::new(view, window, cx))
             });
             result_owner.update(cx, |owner, cx| {
-                owner.dialog_active = false;
+                owner.utility_opening = false;
                 match result {
                     Ok(handle) => owner.settings_window = Some(handle.into()),
                     Err(error) => owner.c.warning = Some(format!("{error:#}")),

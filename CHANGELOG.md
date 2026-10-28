@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.16
+
+- Show the renamed GPU only while its name differs from the original, and hide it after restoration. Remove empty GPU-scheduling feedback space to leave more room for patch options.
+- Fix unresponsive main-window controls after opening the theme picker and closing the separate Settings window. Cancel, confirmation and Esc now finish theme previews correctly.
+- Track theme-preview ownership separately from utility-window creation and reconcile modal state with live windows. Closing an unrelated window preserves the active interaction; recover stale interaction locks without discarding pending parameters.
+- Fix an unused-function warning in Release builds of the Windows rendering dependency.
+
 ## 4.3.15
 
 - Fresh Dlssg_for_sm86 installations use the new bundle defaults after uninstalling, instead of replaying cached 0.4.0 values such as Optimized=2 into 0.4.1. Preserve existing installations and explicit edits. Align the GPU identity fields and separate sidebar selection backgrounds.

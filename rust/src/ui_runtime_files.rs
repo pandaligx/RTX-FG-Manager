@@ -132,7 +132,7 @@ impl Manager {
         };
         // Native window creation may draw synchronously on Windows. Defer until
         // Manager's event-handler lease is released before rendering its child.
-        self.dialog_active = true;
+        self.utility_opening = true;
         cx.defer(move |cx| {
             let result_owner = owner.clone();
             let result = cx.open_window(options, move |window, cx| {
@@ -189,7 +189,7 @@ impl Manager {
                 cx.new(|cx| Root::new(editor, window, cx))
             });
             result_owner.update(cx, |owner, cx| {
-                owner.dialog_active = false;
+                owner.utility_opening = false;
                 match result {
                     Ok(handle) => owner.runtime_window = Some(handle.into()),
                     Err(error) => owner.c.warning = Some(format!("{error:#}")),

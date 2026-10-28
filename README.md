@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.15"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.16"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.15 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.16 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,21 +41,21 @@
 
 ## Download
 
-**Version 4.3.15** · Windows 10 / 11 x64
+**Version 4.3.16** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.15 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.15) | Default domestic source |
-| **GitHub** | [Open 4.3.15 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.15) | Primary project and fallback |
+| **GitCode** | [Open 4.3.16 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.16) | Default domestic source |
+| **GitHub** | [Open 4.3.16 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.16) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
-Download **`RTXManager-v4.3.15-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
+Download **`RTXManager-v4.3.16-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.15 highlights
+## 4.3.16 highlights
 
-- Separate settings and recommendation windows, compact setup tables, and selectable patch, parameter and runtime installation.
-- Complete MFG 1.6.1 preset sharing and fix recommendation installation, settings menus and multi-window controls.
-- Fix stale defaults when reinstalling 0.4.1; restore manager-owned DLSS originals when removing patches.
+- Fix unresponsive main-window controls when closing Settings with the theme picker open.
+- Isolate window interaction state while preserving unapplied parameters.
+- Show the modified GPU name only when needed and compact the hardware area to leave more room for patch options.
 
 [Full changelog →](CHANGELOG.md)
 

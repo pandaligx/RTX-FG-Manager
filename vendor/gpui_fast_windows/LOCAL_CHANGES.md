@@ -17,6 +17,10 @@ For the unpublished 4.3.13 candidate they were rebased again onto 0.1.12.
 Both draw paths retain the new upstream frame scheduling after the local
 first-frame visibility hook; they must not be replaced by the older draw bodies.
 The unused upstream `HWND` import in `fast/composition.rs` is also removed.
+For manager 4.3.16, `fast/rounded_clip.rs` compiles its shader-path helper and
+`PathBuf` import only with `debug_assertions`, matching its sole caller. Release
+builds use embedded shaders; this removes an unused-function warning without
+changing either rendering path.
 The shared `fast/rounded_clip_fixtures.rs` test input is copied from
 the matching published `gpui-fast` 0.1.10 crate (Apache-2.0). The Windows pixel
 tests refer to that local copy instead of an absent sibling in the upstream

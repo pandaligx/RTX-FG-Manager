@@ -44,6 +44,8 @@ mod recommendations;
 mod runtime_files;
 #[path = "ui_settings.rs"]
 mod settings;
+#[path = "ui_theme_preview.rs"]
+mod theme_preview;
 
 #[derive(Clone, PartialEq)]
 enum Command {
@@ -190,6 +192,7 @@ pub struct Manager {
     smoke_step: u8,
     update_ready_sent: bool,
     dialog_active: bool,
+    utility_opening: bool,
     runtime_window: Option<AnyWindowHandle>,
     settings_window: Option<AnyWindowHandle>,
     recommendation_windows: HashMap<String, AnyWindowHandle>,
@@ -200,8 +203,7 @@ pub struct Manager {
     runtime_feedback: Option<(bool, String)>,
     editor_open: bool,
     preset_close: Option<bool>, // true: app exit; false: editor dismissal
-    theme_preview: Option<u64>,
-    theme_generation: u64,
+    theme_preview: theme_preview::ThemePreview<WindowId>,
 }
 /// Render after Manager::render has released its entity borrow. Building a
 /// live editor inside Root::render_dialog_layer would recursively borrow Manager.
@@ -354,6 +356,7 @@ impl Manager {
             smoke_step: 0,
             update_ready_sent: false,
             dialog_active: false,
+            utility_opening: false,
             runtime_window: None,
             settings_window: None,
             recommendation_windows: HashMap::new(),
@@ -365,11 +368,10 @@ impl Manager {
             drag_gap: None,
             editor_open: false,
             preset_close: None,
-            theme_preview: None,
-            theme_generation: 0,
+            theme_preview: theme_preview::ThemePreview::new(),
         };
         view.filter();
-        view.theme(window, cx);
+        view.theme(cx);
         let owner = cx.entity().downgrade();
         cx.on_window_closed(move |cx, closed| {
             let owner = owner.clone();
@@ -377,6 +379,10 @@ impl Manager {
             // update. Release that lease before touching the owning view.
             cx.defer(move |cx| {
                 let _ = owner.update(cx, |this, cx| {
+                    if this.theme_preview.window_closed(closed) {
+                        this.dialog_active = false;
+                        this.theme(cx);
+                    }
                     this.choices.borrow_mut().retain(|(id, _), _| *id != closed);
                     this.recommendation_windows
                         .retain(|_, w| w.window_id() != closed);
@@ -482,8 +488,8 @@ impl Manager {
             self.scroll.remeasure();
         }
     }
-    fn theme(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        if self.theme_preview.is_some() {
+    fn theme(&mut self, cx: &mut Context<Self>) {
+        if self.theme_preview.is_active() {
             return;
         }
         let mode = match self.c.choice("theme", "跟随系统").as_str() {
@@ -519,11 +525,12 @@ impl Manager {
         }
     }
     fn act(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
-        if self.c.closing {
+        if self.c.closing || self.utility_opening {
             return;
         }
         self.reconcile_runtime_window(cx);
         self.reconcile_settings_window(cx);
+        self.reconcile_dialogs(window, cx);
         if self.dialog_active && !window.has_active_dialog(cx) {
             // Only an actual modal owns interaction, never an open utility.
             if let Some(handle) = self.feedback_window {
@@ -802,7 +809,7 @@ impl Manager {
                 self.search.update(cx, |state, cx| {
                     state.set_placeholder(self.c.text("搜索游戏"), window, cx)
                 });
-                self.theme(window, cx)
+                self.theme(cx)
             }
             Command::Themes => self.open_themes(window, cx),
             Command::Motion(mode) => {
@@ -1171,18 +1178,12 @@ impl Manager {
         sidebar.into_any_element()
     }
 
-    fn finish_theme_preview(
-        &mut self,
-        generation: u64,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if self.theme_preview != Some(generation) {
+    fn finish_theme_preview(&mut self, generation: u64, cx: &mut Context<Self>) {
+        if !self.theme_preview.finish(generation) {
             return;
         }
-        self.theme_preview = None;
         self.dialog_active = false;
-        self.theme(window, cx);
+        self.theme(cx);
         cx.notify();
     }
 
@@ -1228,9 +1229,7 @@ impl Manager {
             })
             .collect::<Vec<_>>();
         let palette = cx.new(|cx| CommandState::new(window, cx));
-        self.theme_generation = self.theme_generation.wrapping_add(1);
-        let generation = self.theme_generation;
-        self.theme_preview = Some(generation);
+        let generation = self.theme_preview.begin(window.window_handle().window_id());
         self.dialog_active = true;
         let owner = cx.weak_entity();
         let focus = Rc::new(Cell::new(true));
@@ -1252,10 +1251,9 @@ impl Manager {
                 .close_button(false)
                 .overlay(false)
                 .overlay_closable(true)
-                .on_close(move |_, window, cx| {
-                    let _ = close_owner.update(cx, |this, cx| {
-                        this.finish_theme_preview(generation, window, cx)
-                    });
+                .on_close(move |_, _, cx| {
+                    let _ = close_owner
+                        .update(cx, |this, cx| this.finish_theme_preview(generation, cx));
                 })
                 .content(move |content, window, cx| {
                     let height =
@@ -1283,17 +1281,17 @@ impl Manager {
                                     return;
                                 }
                                 let _ = outside_owner.update(cx, |this, cx| {
-                                    if this.theme_preview != Some(generation) {
+                                    if !this.theme_preview.matches(generation) {
                                         return;
                                     }
-                                    this.finish_theme_preview(generation, window, cx);
+                                    this.finish_theme_preview(generation, cx);
                                     window.close_dialog(cx);
                                     cx.stop_propagation();
                                 });
                             })
                             .capture_action(move |_: &Cancel, window, cx| {
                                 let _ = cancel_owner.update(cx, |this, cx| {
-                                    this.finish_theme_preview(generation, window, cx)
+                                    this.finish_theme_preview(generation, cx)
                                 });
                                 window.close_dialog(cx);
                                 cx.stop_propagation();
@@ -1306,7 +1304,7 @@ impl Manager {
                                     .items(items.clone())
                                     .on_select(move |index, _, cx| {
                                         let _ = select_owner.update(cx, |this, cx| {
-                                            if this.theme_preview != Some(generation) {
+                                            if !this.theme_preview.matches(generation) {
                                                 return;
                                             }
                                             if let Some(choice) = selected_choices.get(index.row) {
@@ -1316,14 +1314,14 @@ impl Manager {
                                     })
                                     .on_confirm(move |index, window, cx| {
                                         let _ = confirm_owner.update(cx, |this, cx| {
-                                            if this.theme_preview != Some(generation) {
+                                            if !this.theme_preview.matches(generation) {
                                                 return;
                                             }
                                             if let Some(choice) = confirmed_choices.get(index.row) {
                                                 choice.persist(&mut this.c.state);
                                                 this.c.save();
                                             }
-                                            this.finish_theme_preview(generation, window, cx);
+                                            this.finish_theme_preview(generation, cx);
                                             window.close_dialog(cx);
                                         });
                                     })
@@ -2747,17 +2745,16 @@ impl Manager {
             .and_then(|d| d.original_name.as_deref())
             .unwrap_or(&self.c.gpu)
             .to_owned();
-        let modified = device
-            .and_then(|d| d.modified_name.clone())
-            .unwrap_or_else(|| self.c.text("未修改"));
-        let names = [
-            ("inspector-gpu-name", self.t("实际型号"), gpu),
-            ("inspector-gpu-modified", self.t("修改后型号"), modified),
-        ];
+        let names = std::iter::once(("inspector-gpu-name", self.t("实际型号"), gpu)).chain(
+            device
+                .and_then(|d| d.modified_name.clone())
+                .map(|name| ("inspector-gpu-modified", self.t("修改后型号"), name)),
+        );
         div()
             .v_flex()
             .flex_shrink_0()
             .p_4()
+            .pb_3()
             .gap_3()
             .border_b_1()
             .border_color(cx.theme().border)
@@ -2767,7 +2764,7 @@ impl Manager {
                     .w_full()
                     .min_w_0()
                     .gap_2()
-                    .children(names.into_iter().map(|(id, label, value)| {
+                    .children(names.map(|(id, label, value)| {
                         let full = value.clone();
                         div()
                             .id(id)
@@ -2811,7 +2808,7 @@ impl Manager {
                             .min_w_0()
                             .text_sm()
                             .text_color(cx.theme().muted_foreground)
-                            .child(self.t("硬件加速GPU调度")),
+                            .child(self.t("硬件加速 GPU 调度")),
                     )
                     .child(
                         div()
@@ -2833,7 +2830,7 @@ impl Manager {
                                     .focus_ring(crate::ui_focus::visible(cx))
                                     .small()
                                     .flex_shrink_0()
-                                    .accessibility_label(self.t("硬件加速GPU调度"))
+                                    .accessibility_label(self.t("硬件加速 GPU 调度"))
                                     .checked(
                                         self.c
                                             .hags
@@ -2848,10 +2845,10 @@ impl Manager {
                             ),
                     ),
             )
-            .child(self.hags_feedback(cx))
+            .children(self.hags_feedback(cx))
             .into_any_element()
     }
-    fn hags_feedback(&self, cx: &Context<Self>) -> AnyElement {
+    fn hags_feedback(&self, cx: &Context<Self>) -> Option<AnyElement> {
         let state = self.c.hags.as_ref();
         let message = if self.c.hags_busy && (self.c.hags_writing || state.is_none()) {
             Some(if self.c.hags_writing {
@@ -2870,31 +2867,31 @@ impl Manager {
         } else {
             None
         };
-        let Some(message) = message else {
-            return div().into_any_element();
-        };
+        let message = message?;
         let retry = !self.c.hags_busy
             && (self.c.hags_error.is_some() || state.is_some_and(|s| s.state == "unknown"));
-        div()
-            .v_flex()
-            .gap_1()
-            .text_xs()
-            .text_color(cx.theme().muted_foreground)
-            .child(self.t(message))
-            .when(retry, |d| {
-                d.child(
-                    self.button("hags-retry", "刷新", Command::RefreshHags, cx)
-                        .ghost()
-                        .tooltip(
-                            self.c
-                                .hags_error
-                                .as_deref()
-                                .map(|s| self.c.text(s))
-                                .unwrap_or_default(),
-                        ),
-                )
-            })
-            .into_any_element()
+        Some(
+            div()
+                .v_flex()
+                .gap_1()
+                .text_xs()
+                .text_color(cx.theme().muted_foreground)
+                .child(self.t(message))
+                .when(retry, |d| {
+                    d.child(
+                        self.button("hags-retry", "刷新", Command::RefreshHags, cx)
+                            .ghost()
+                            .tooltip(
+                                self.c
+                                    .hags_error
+                                    .as_deref()
+                                    .map(|s| self.c.text(s))
+                                    .unwrap_or_default(),
+                            ),
+                    )
+                })
+                .into_any_element(),
+        )
     }
     fn neural_panel(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let Some(exe) = &self.c.focus else {
@@ -3955,6 +3952,39 @@ impl Manager {
         self.feedback_window.unwrap_or(self.main_window).window_id()
             == window.window_handle().window_id()
     }
+    /// GPUI owns whether a dialog is still open. Do not let a skipped close
+    /// callback or a removed utility leave a permanent application-wide lock.
+    fn reconcile_dialogs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.utility_opening {
+            return;
+        }
+        let current = window.window_handle().window_id();
+        let active = cx.windows().into_iter().find(|handle| {
+            if handle.window_id() == current {
+                window.has_active_dialog(cx)
+            } else {
+                handle
+                    .update(cx, |_, window, cx| window.has_active_dialog(cx))
+                    .unwrap_or(false)
+            }
+        });
+        if let Some(handle) = active {
+            self.dialog_active = true;
+            // An actual modal, not an unrelated utility, receives feedback and
+            // focus when the user clicks a different native window.
+            self.feedback_window = Some(handle);
+        } else if self.dialog_active || self.theme_preview.is_active() {
+            self.dialog_active = false;
+            self.editor_open = false;
+            self.preset_close = None;
+            // Restore the saved theme; do not save a hover-only preview or
+            // discard the Controller's pending parameter changes.
+            if self.theme_preview.clear() {
+                self.theme(cx);
+            }
+            cx.notify();
+        }
+    }
     fn dialogs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.dialog_active || !self.accepts_feedback(window) {
             return;
@@ -4249,6 +4279,7 @@ impl Manager {
     fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.reconcile_runtime_window(cx);
         self.reconcile_settings_window(cx);
+        self.reconcile_dialogs(window, cx);
         if self
             .folder_feedback
             .as_ref()
@@ -4288,7 +4319,7 @@ impl Manager {
             let choice = self.c.choice("theme", "跟随系统");
             if choice != self.theme_choice || choice == "跟随系统" {
                 self.theme_choice = choice;
-                self.theme(window, cx)
+                self.theme(cx)
             }
             if self.c.smoke.is_none()
                 && !self.c.closing

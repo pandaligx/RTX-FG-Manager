@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.15"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.16"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.15 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.16 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,21 +41,21 @@
 
 ## 下载
 
-**版本 4.3.15** · Windows 10 / 11 x64
+**版本 4.3.16** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.15 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.15) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.15 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.15) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.16 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.16) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.16 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.16) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
-下载 **`RTXManager-v4.3.15-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+下载 **`RTXManager-v4.3.16-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.15 更新亮点
+## 4.3.16 更新亮点
 
-- 独立设置与玩家推荐窗口，紧凑方案表格，可选择安装补丁、参数和运行库。
-- 补齐 MFG 1.6.1 参数分享，修复推荐安装、设置下拉及多窗口操作。
-- 修复 0.4.1 重装沿用旧参数；卸载时恢复管理器更新的 DLSS 原件。
+- 修复关闭设置窗口后主题选择导致主界面无法操作的问题。
+- 独立管理多窗口交互状态，保留尚未应用的参数。
+- 修改后显卡型号按需显示，紧凑硬件区域为适配方案腾出空间。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 

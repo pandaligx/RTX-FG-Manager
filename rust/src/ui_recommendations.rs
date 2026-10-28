@@ -2265,6 +2265,7 @@ impl Manager {
         };
         let owner = cx.entity();
         // Release Manager before native creation can synchronously draw a view.
+        self.utility_opening = true;
         cx.defer(move |cx| {
             let result_owner = owner.clone();
             let result = cx.open_window(options, move |window, cx| {
@@ -2277,6 +2278,7 @@ impl Manager {
                 cx.new(|cx| Root::new(view, window, cx))
             });
             result_owner.update(cx, |owner, cx| {
+                owner.utility_opening = false;
                 match result {
                     Ok(handle) => {
                         owner.recommendation_windows.insert(exe, handle.into());
