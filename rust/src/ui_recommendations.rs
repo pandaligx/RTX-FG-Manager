@@ -1,8 +1,10 @@
 //! A single game-scoped dialog; browsing, login, sharing and preview keep context.
 use super::*;
 use gpui_component::avatar::Avatar;
+use gpui_component::button::DropdownButton;
 use gpui_component::input::{Textarea, TextareaState};
 use gpui_component::scroll::{Scrollbar, ScrollbarMode};
+use gpui_component::table::{Table, TableBody, TableCell, TableHead, TableHeader, TableRow};
 use rtx_fg_manager::{cloud, game_names, recommendations as rec, scanner::Game};
 use rtx_fg_manager::{encore, recommendation_presets, recommendation_runtimes};
 use rtx_fg_manager::{presets, recommendation_presets::Action as RecipeAction};
@@ -59,6 +61,8 @@ struct Recommendations {
     editing: Option<rec::Card>,
     preview: Option<rec::Card>,
     selected_action: RecipeAction,
+    selected_parts: [bool; 3],
+    operation_busy: bool,
     submission: String,
     title: Entity<InputState>,
     edition: Entity<InputState>,
@@ -85,6 +89,9 @@ impl Recommendations {
         cx: &mut Context<Self>,
     ) -> Self {
         crate::ui_focus::observe(cx);
+        if let Some(owner) = owner.upgrade() {
+            cx.observe(&owner, |_, _, cx| cx.notify()).detach();
+        }
         cx.observe_global::<Theme>(|_, cx| cx.notify()).detach();
         let identity = rec::identify(&game, &c.game_names);
         let input = |value: &str, window: &mut Window, cx: &mut Context<Self>| {
@@ -172,6 +179,8 @@ impl Recommendations {
             editing: None,
             preview: None,
             selected_action: RecipeAction::InstallAndApply,
+            selected_parts: [true; 3],
+            operation_busy: false,
             submission: String::new(),
             title,
             edition,
@@ -198,8 +207,19 @@ impl Recommendations {
             && let Ok(card) = serde_json::from_slice::<rec::Card>(&bytes)
             && card.content.validate(&view.catalog).is_ok()
         {
-            view.preview = Some(card);
-            view.mode = Mode::Preview;
+            if std::env::var("RTXFG_RECIPE_PREVIEW_MODE").as_deref() == Ok("share") {
+                view.title.update(cx, |s, cx| {
+                    s.set_value(card.content.title.clone(), window, cx)
+                });
+                view.notes.update(cx, |s, cx| {
+                    s.set_value(card.content.notes.clone(), window, cx)
+                });
+                view.draft = Some(card.content);
+                view.mode = Mode::Share;
+            } else {
+                view.preview = Some(card);
+                view.mode = Mode::Preview;
+            }
             return view;
         }
         let data = c.data.clone();
@@ -207,8 +227,8 @@ impl Recommendations {
         cx.spawn_in(window, async move |this, cx| {
             loop {
                 smol::Timer::after(Duration::from_millis(120)).await;
-                if this
-                    .update_in(cx, |this, window, cx| this.poll(window, cx))
+                if cx
+                    .update(|window, cx| this.update(cx, |this, cx| this.poll(window, cx)))
                     .is_err()
                 {
                     break;
@@ -242,6 +262,21 @@ impl Recommendations {
         });
     }
     fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let _ = self.owner.update(cx, |owner, cx| {
+            if owner.accepts_feedback(window) {
+                if let Some(message) = owner.c.warning.take().or_else(|| owner.c.notice.take()) {
+                    self.message = owner.c.text(&message);
+                    cx.notify();
+                }
+                if owner.c.confirm.is_some() {
+                    owner.dialogs(window, cx);
+                }
+            }
+            if self.operation_busy != owner.c.busy {
+                self.operation_busy = owner.c.busy;
+                cx.notify();
+            }
+        });
         while let Ok(result) = self.rx.try_recv() {
             self.busy = false;
             self.message.clear();
@@ -429,6 +464,10 @@ impl Recommendations {
         self.read_installed(false);
     }
     fn read_installed(&mut self, reload: bool) {
+        if self.operation_busy {
+            self.message = self.t("当前正在处理游戏，请稍后再试");
+            return;
+        }
         let Some(id) = self.identity.clone() else {
             self.mode = Mode::Identity;
             return;
@@ -471,6 +510,7 @@ impl Recommendations {
         let exe = self.game.exe.clone();
         let value = serde_json::to_value(&id).unwrap_or(Value::Null);
         let result = self.owner.update(cx, |owner, cx| {
+            anyhow::ensure!(!owner.dialog_active, "请先关闭当前参数或确认窗口");
             anyhow::ensure!(
                 !owner.c.busy && !owner.c.read_only,
                 "当前正在处理游戏，请稍后再试"
@@ -561,8 +601,9 @@ impl Recommendations {
             return;
         }
         let result = self.owner.update(cx, |owner, cx| {
+            anyhow::ensure!(!owner.dialog_active, "请先关闭当前参数或确认窗口");
             anyhow::ensure!(
-                !owner.c.busy && !owner.c.read_only && owner.c.focus.as_deref() == Some(&exe),
+                !owner.c.busy && !owner.c.read_only && owner.c.games.iter().any(|g| g.exe == exe),
                 "当前游戏已变化，请关闭后重新打开推荐"
             );
             anyhow::ensure!(
@@ -572,12 +613,18 @@ impl Recommendations {
                 "推荐不属于当前游戏"
             );
             card.content.available_version(&owner.c.catalog)?;
+            owner.c.focus = Some(exe.clone());
+            owner.feedback_window = Some(window.window_handle());
             owner.c.use_recommendation(card.content.clone(), action)?;
             cx.notify();
             Ok::<_, anyhow::Error>(())
         });
         match result {
-            Ok(Ok(())) => self.close(window, cx),
+            Ok(Ok(())) => {
+                self.mode = Mode::Preview;
+                self.operation_busy = true;
+                self.message = self.t("正在处理…");
+            }
             Ok(Err(e)) => self.message = self.t(&e.to_string()),
             Err(_) => self.message = self.t("游戏已从库中移除"),
         }
@@ -619,19 +666,7 @@ impl Recommendations {
             );
         }
         let fields = presets::parameters(&snapshot.profile);
-        panel = panel.child(
-            div()
-                .h_flex()
-                .w_full()
-                .gap_2()
-                .pb_1()
-                .text_sm()
-                .text_color(cx.theme().muted_foreground)
-                .child(div().flex_1().min_w_0().child(self.t("参数")))
-                .child(div().flex_1().min_w_0().child(self.t("默认值")))
-                .child(div().w(rems(1.)).flex_shrink_0())
-                .child(div().flex_1().min_w_0().child(self.t("玩家值"))),
-        );
+        let mut rows = Vec::new();
         for (key, before, after) in changes {
             let field = fields.iter().find(|p| p.key == key);
             let label = field.map(|p| p.label).unwrap_or(key);
@@ -664,30 +699,13 @@ impl Recommendations {
                     })
                 },
             );
-            let mut row = div()
-                .h_flex()
-                .w_full()
-                .items_center()
-                .gap_2()
-                .py_1()
-                .border_t_1()
-                .border_color(cx.theme().border)
-                .text_sm()
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .whitespace_normal()
-                        .child(self.t(label)),
-                );
+            let mut cells = vec![
+                div()
+                    .whitespace_normal()
+                    .child(self.t(label))
+                    .into_any_element(),
+            ];
             for (side, v) in [before, after].iter().enumerate() {
-                if side == 1 {
-                    row = row.child(
-                        Icon::new(IconName::ArrowRight)
-                            .size(rems(1.))
-                            .text_color(cx.theme().muted_foreground),
-                    );
-                }
                 let color = if side == 1 {
                     cx.theme().primary
                 } else {
@@ -721,14 +739,14 @@ impl Recommendations {
                             .child(value(v)),
                     );
                 }
-                row = row.child(cell);
+                cells.push(cell.into_any_element());
             }
-            panel = panel.child(row);
+            rows.push(cells);
         }
-        panel
+        panel.child(self.recipe_table("recipe-parameters", &["参数", "默认值", "玩家值"], rows, cx))
     }
     fn runtime_inventory(&self, recipe: &rec::Recipe, cx: &Context<Self>) -> Div {
-        let mut panel = div().v_flex().min_w_0().child(
+        let panel = div().v_flex().min_w_0().child(
             div()
                 .pb_2()
                 .font_weight(FontWeight::MEDIUM)
@@ -750,17 +768,7 @@ impl Recommendations {
                     .child(self.t("未检测到可共享的运行库")),
             );
         }
-        panel = panel.child(
-            div()
-                .h_flex()
-                .gap_2()
-                .pb_1()
-                .text_sm()
-                .text_color(cx.theme().muted_foreground)
-                .child(div().flex_1().child(self.t("组件")))
-                .child(div().flex_1().child(self.t("版本号")))
-                .child(div().flex_1().child(self.t("来源"))),
-        );
+        let mut rows = Vec::new();
         for c in &snapshot.components {
             let version = c
                 .versions
@@ -787,45 +795,30 @@ impl Recommendations {
                         .child(format!("SDK {package}")),
                 );
             }
-            panel = panel.child(
+            rows.push(vec![
                 div()
-                    .h_flex()
-                    .items_start()
-                    .gap_2()
-                    .py_1()
-                    .border_t_1()
-                    .border_color(cx.theme().border)
-                    .text_sm()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(recommendation_runtimes::label(&c.kind)),
-                    )
-                    .child(versions)
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .whitespace_normal()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(self.t(match c.source.as_str() {
-                                "patch" => "随补丁提供",
-                                "managed" => "管理器安装",
-                                _ => "游戏目录",
-                            })),
-                    ),
-            );
+                    .child(recommendation_runtimes::label(&c.kind))
+                    .into_any_element(),
+                versions.into_any_element(),
+                div()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(self.t(if c.preserves_game_files() {
+                        "游戏原有（保留本机）"
+                    } else {
+                        match c.source.as_str() {
+                            "patch" => "随补丁提供",
+                            "managed" => "管理器安装",
+                            _ => "游戏目录",
+                        }
+                    }))
+                    .into_any_element(),
+            ]);
         }
-        panel
-    }
-    fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // Programmatic close does not invoke Dialog::on_close in GPUI Kit.
-        let _ = self.owner.update(cx, |owner, cx| {
-            owner.dialog_active = false;
-            cx.notify();
-        });
-        window.close_dialog(cx);
+        panel.child(self.recipe_table("recipe-runtimes", &["组件", "版本号", "来源"], rows, cx))
+            .when(snapshot.components.iter().any(|c| c.preserves_game_files()), |d| {
+                d.child(div().pt_2().text_xs().text_color(cx.theme().muted_foreground)
+                    .child(self.t("未收录或含多个版本的游戏原有组件仅作参考；安装并应用会保留本机文件，不自动替换。")))
+            })
     }
     fn picker(
         &self,
@@ -923,83 +916,109 @@ impl Recommendations {
         let fields = [
             ("补丁方案", format!("{base} {}", recipe.patch_version)),
             ("DLL 入口", recipe.entries.join(" / ")),
-            ("图形 / NR", format!("{renderer} / {neural}")),
             ("显卡改名", alias),
+            ("图形 / NR", format!("{renderer} / {neural}")),
             ("游戏版本", platform),
             ("玩家硬件", recipe.gpu_model.clone()),
             ("驱动版本", recipe.driver.clone()),
         ];
-        let mut table = div().v_flex().min_w_0().w_full().text_sm();
-        for pair in fields.chunks(2) {
-            table = table.child(
-                div()
-                    .h_flex()
-                    .items_start()
-                    .gap_4()
-                    .py_1()
-                    .border_b_1()
-                    .border_color(cx.theme().border)
-                    .children(pair.iter().map(|(label, value)| {
-                        div()
-                            .h_flex()
-                            .items_start()
-                            .flex_1()
-                            .min_w_0()
-                            .gap_2()
-                            .child(
-                                div()
-                                    .w(rems(5.))
-                                    .flex_shrink_0()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(self.t(label)),
-                            )
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .whitespace_normal()
-                                    .when(
-                                        *label == "显卡改名"
-                                            && recipe.required_gpu_name().is_some(),
-                                        |d| d.text_color(cx.theme().warning),
-                                    )
-                                    .child(if value.is_empty() {
-                                        "—".to_owned()
-                                    } else {
-                                        value.clone()
-                                    }),
-                            )
-                    })),
-            );
-        }
-        table
-    }
-    fn preview_sections(&self, recipe: &rec::Recipe, window: &Window, cx: &Context<Self>) -> Div {
-        let summary = self.recipe_summary(recipe, cx);
-        let parameters = self.parameter_comparison(recipe, cx);
-        let runtimes = self.runtime_inventory(recipe, cx);
-        let notes = self.player_notes(&recipe.notes, cx);
-        let mut body = div().v_flex().gap_3().min_w_0().flex_shrink_0();
-        if window.viewport_size().width >= window.rem_size() * 64. {
-            body = body
-                .child(summary)
-                .child(
+        let rows = fields
+            .into_iter()
+            // Editable fields appear once in the confirmation table below.
+            .filter(|(label, _)| {
+                self.mode != Mode::Share || !matches!(*label, "显卡改名" | "游戏版本" | "玩家硬件")
+            })
+            .map(|(label, value)| {
+                vec![
                     div()
-                        .h_flex()
-                        .items_start()
-                        .gap_5()
-                        .child(div().flex_1().min_w_0().child(parameters))
-                        .child(div().flex_1().min_w_0().child(runtimes)),
-                )
-                .child(notes);
-        } else {
-            body = body
-                .child(summary)
-                .child(parameters)
-                .child(runtimes)
-                .child(notes);
-        }
-        body
+                        .text_color(cx.theme().muted_foreground)
+                        .child(self.t(label))
+                        .into_any_element(),
+                    div()
+                        .whitespace_normal()
+                        .when(
+                            label == "显卡改名" && recipe.required_gpu_name().is_some(),
+                            |d| d.text_color(cx.theme().warning),
+                        )
+                        .child(if value.is_empty() {
+                            "—".to_owned()
+                        } else {
+                            value
+                        })
+                        .into_any_element(),
+                ]
+            })
+            .collect();
+        self.recipe_table("recipe-summary", &["项目", "方案内容"], rows, cx)
+    }
+
+    // Every section uses the same label lane, insets and grid lines. A short
+    // static table preserves wrapping without adding DataTable selection state.
+    fn recipe_table(
+        &self,
+        id: &'static str,
+        headings: &[&str],
+        rows: Vec<Vec<AnyElement>>,
+        cx: &Context<Self>,
+    ) -> Div {
+        let last = headings.len() - 1;
+        let header = TableRow::new().children(headings.iter().enumerate().map(|(i, label)| {
+            TableHead::new()
+                .min_w_0()
+                .text_color(cx.theme().foreground)
+                .font_weight(FontWeight::MEDIUM)
+                .px_3()
+                .py_1p5()
+                .when(i == 0, |cell| cell.w(rems(12.)).flex_shrink_0())
+                .when(i > 0, |cell| cell.flex_1())
+                .when(i < last, |cell| {
+                    cell.border_r_1().border_color(cx.theme().border)
+                })
+                .child(div().min_w_0().whitespace_normal().child(self.t(label)))
+        }));
+        let body = TableBody::new().children(rows.into_iter().map(|cells| {
+            TableRow::new().children(cells.into_iter().enumerate().map(|(i, value)| {
+                TableCell::new()
+                    .min_w_0()
+                    .px_3()
+                    .py_1p5()
+                    .when(i == 0, |cell| cell.w(rems(12.)).flex_shrink_0())
+                    .when(i > 0, |cell| cell.flex_1())
+                    .when(i < last, |cell| {
+                        cell.border_r_1().border_color(cx.theme().border)
+                    })
+                    .child(div().w_full().min_w_0().whitespace_normal().child(value))
+            }))
+        }));
+        div().w_full().min_w_0().flex_shrink_0().child(
+            div()
+                .id(id)
+                .w_full()
+                .min_w_0()
+                .border_1()
+                .border_color(cx.theme().border)
+                .rounded_md()
+                .overflow_hidden()
+                .child(
+                    Table::new()
+                        .small()
+                        .accessibility_label(self.t(headings[1]))
+                        .child(TableHeader::new().child(header))
+                        .child(body),
+                ),
+        )
+    }
+
+    fn preview_sections(&self, recipe: &rec::Recipe, _window: &Window, cx: &Context<Self>) -> Div {
+        div()
+            .v_flex()
+            .gap_3()
+            .min_w_0()
+            .flex_shrink_0()
+            .child(self.recipe_summary(recipe, cx))
+            .child(self.parameter_comparison(recipe, cx))
+            .child(self.runtime_inventory(recipe, cx))
+            .child(self.player_notes(&recipe.notes, cx))
     }
 
     fn player_notes(&self, notes: &str, cx: &Context<Self>) -> Div {
@@ -1220,6 +1239,7 @@ impl Recommendations {
                 )
                 .disabled(self.busy || card.status == "hidden")
                 .on_click(cx.listener(move |this, _, _, cx| {
+                    this.selected_parts = [true; 3];
                     this.preview = Some(choose.clone());
                     this.mode = Mode::Preview;
                     this.message.clear();
@@ -1330,6 +1350,35 @@ impl Recommendations {
 }
 impl Render for Recommendations {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let mut game_image = None;
+        let mut game_title = game_names::original(&self.game);
+        if let Some(owner) = self.owner.upgrade() {
+            let owner = owner.read(cx);
+            if self.tr.language != owner.c.tr.language {
+                self.tr = i18n::Translator::new(&owner.c.tr.language);
+            }
+            if self.catalog.revision != owner.c.catalog.revision {
+                self.catalog = owner.c.catalog.clone();
+            }
+            self.operation_busy = owner.c.busy;
+            self.gpu = owner
+                .c
+                .devices
+                .get(owner.c.device_index)
+                .map(|d| {
+                    d.modified_name
+                        .as_ref()
+                        .or(d.original_name.as_ref())
+                        .unwrap_or(&d.name)
+                        .clone()
+                })
+                .unwrap_or_else(|| owner.c.gpu.clone());
+            game_image = owner.c.icons.get(&self.game.exe).and_then(|v| v.clone());
+            if let Some(game) = owner.c.games.iter().find(|g| g.exe == self.game.exe) {
+                self.game = game.clone();
+            }
+            game_title = owner.c.game_name(&self.game);
+        }
         let ring = crate::ui_focus::visible(cx);
         let title = self
             .identity
@@ -1452,7 +1501,7 @@ impl Render for Recommendations {
             );
         }
         let mut primary = None;
-        let mut extra_actions = Vec::new();
+        let mut install_menu: Option<AnyElement> = None;
         let body = match self.mode {
             Mode::Browse => self.browse(cx),
             Mode::Identity => {
@@ -1648,17 +1697,133 @@ impl Render for Recommendations {
                         );
                 }
                 if let Some(draft) = &self.draft {
-                    body=body.child(self.recipe_summary(draft,cx)).child(self.parameter_comparison(draft,cx)).child(self.runtime_inventory(draft,cx))
-                    .child(self.t("游戏平台"))
-                    .child(self.picker("recipe-platform",&draft.platform,&[("unknown","来源未注明"),("steam","Steam"),("epic","Epic Games"),("gog","GOG"),("ea","EA App"),("ubisoft","Ubisoft Connect"),("xbox","Xbox / Microsoft Store"),("battlenet","战网"),("wegame","WeGame"),("hoyo","米哈游"),("cube","方块游戏"),("sonkwo","杉果"),("standalone","独立客户端")],cx))
-                    .child(self.t("游戏版本（选填，例如重制版、版本号）")).child(Input::new(&self.edition).focus_ring(ring))
-                    .child(self.t("方案名称")).child(Input::new(&self.title).focus_ring(ring))
-                    .child(self.t("备注（可填游戏设置、操作步骤）")).child(div().p_2().rounded_md().border_1().border_color(if ring && self.notes.read(cx).focus_handle(cx).is_focused(window){cx.theme().ring}else{cx.theme().border}).child(Textarea::new(&self.notes).appearance(false).bordered(false)))
-                    .child(div().text_xs().text_color(if self.notes.read(cx).value().chars().count()>rec::NOTES_LIMIT {cx.theme().danger}else{cx.theme().muted_foreground}).child(format!("{} / {}",self.notes.read(cx).value().chars().count(),rec::NOTES_LIMIT)))
-                    .child(self.t("显卡型号（实际型号）")).child(Input::new(&self.gpu_input).focus_ring(ring))
-                    .child(self.picker("recipe-renderer",&draft.renderer,&[("unknown","图形接口：未说明"),("dx12","DX12"),("vulkan","Vulkan"),("dx11","DX11")],cx))
-                    .child(self.picker("recipe-alias",&draft.gpu_alias,&[("unknown","显卡型号修改：未说明"),("unchanged","不需要修改显卡型号"),("rtx4060","修改为 RTX 4060"),("rtx5090","修改为 RTX 5090")],cx))
-                    .child(div().text_xs().text_color(cx.theme().muted_foreground).child(self.t("以上内容将公开。仅分享你在这款游戏中测试可用的方案；不上传路径、日志、邮箱或原始配置文件。")));
+                    let field = |label: &str, control: AnyElement| {
+                        vec![
+                            div()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(self.t(label))
+                                .into_any_element(),
+                            control,
+                        ]
+                    };
+                    let notes = div()
+                        .v_flex()
+                        .w_full()
+                        .gap_1()
+                        .child(
+                            div()
+                                .p_2()
+                                .rounded_md()
+                                .border_1()
+                                .border_color(
+                                    if ring
+                                        && self.notes.read(cx).focus_handle(cx).is_focused(window)
+                                    {
+                                        cx.theme().ring
+                                    } else {
+                                        cx.theme().border
+                                    },
+                                )
+                                .child(
+                                    Textarea::new(&self.notes).appearance(false).bordered(false),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(
+                                    if self.notes.read(cx).value().chars().count()
+                                        > rec::NOTES_LIMIT
+                                    {
+                                        cx.theme().danger
+                                    } else {
+                                        cx.theme().muted_foreground
+                                    },
+                                )
+                                .child(format!(
+                                    "{} / {}",
+                                    self.notes.read(cx).value().chars().count(),
+                                    rec::NOTES_LIMIT
+                                )),
+                        )
+                        .into_any_element();
+                    let fields = vec![
+                        field(
+                            "方案名称",
+                            Input::new(&self.title).focus_ring(ring).into_any_element(),
+                        ),
+                        field(
+                            "游戏平台",
+                            self.picker(
+                                "recipe-platform",
+                                &draft.platform,
+                                &[
+                                    ("unknown", "来源未注明"),
+                                    ("steam", "Steam"),
+                                    ("epic", "Epic Games"),
+                                    ("gog", "GOG"),
+                                    ("ea", "EA App"),
+                                    ("ubisoft", "Ubisoft Connect"),
+                                    ("xbox", "Xbox / Microsoft Store"),
+                                    ("battlenet", "战网"),
+                                    ("wegame", "WeGame"),
+                                    ("hoyo", "米哈游"),
+                                    ("cube", "方块游戏"),
+                                    ("sonkwo", "杉果"),
+                                    ("standalone", "独立客户端"),
+                                ],
+                                cx,
+                            ),
+                        ),
+                        field(
+                            "游戏版本",
+                            Input::new(&self.edition)
+                                .focus_ring(ring)
+                                .into_any_element(),
+                        ),
+                        field(
+                            "显卡型号（实际型号）",
+                            Input::new(&self.gpu_input)
+                                .focus_ring(ring)
+                                .into_any_element(),
+                        ),
+                        field(
+                            "图形接口",
+                            self.picker(
+                                "recipe-renderer",
+                                &draft.renderer,
+                                &[
+                                    ("unknown", "图形接口：未说明"),
+                                    ("dx12", "DX12"),
+                                    ("vulkan", "Vulkan"),
+                                    ("dx11", "DX11"),
+                                ],
+                                cx,
+                            ),
+                        ),
+                        field(
+                            "显卡改名",
+                            self.picker(
+                                "recipe-alias",
+                                &draft.gpu_alias,
+                                &[
+                                    ("unknown", "显卡型号修改：未说明"),
+                                    ("unchanged", "不需要修改显卡型号"),
+                                    ("rtx4060", "修改为 RTX 4060"),
+                                    ("rtx5090", "修改为 RTX 5090"),
+                                ],
+                                cx,
+                            ),
+                        ),
+                        field("玩家备注", notes),
+                    ];
+                    body = body
+                        .child(self.recipe_summary(draft, cx))
+                        .child(self.parameter_comparison(draft, cx))
+                        .child(self.runtime_inventory(draft, cx))
+                        .child(self.recipe_table("recipe-share-fields", &["项目", "分享内容"], fields, cx))
+                        .child(div().text_xs().text_color(cx.theme().muted_foreground)
+                            .child(self.t("以上内容将公开。仅分享你在这款游戏中测试可用的方案；不上传路径、日志、邮箱或原始配置文件。")));
                     primary = Some(
                         self.button(
                             "recipe-publish",
@@ -1774,32 +1939,66 @@ impl Render for Recommendations {
                                 .child(self.t(&error.to_string())),
                         );
                     }
-                    extra_actions.push(
-                        self.button("recipe-install-only", "仅安装方案", cx)
-                            .small()
-                            .disabled(self.busy || available.is_err())
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.apply_selection(RecipeAction::InstallOnly, window, cx)
-                            })),
-                    );
-                    extra_actions.push(
-                        self.button("recipe-parameters-only", "仅应用参数", cx)
-                            .small()
-                            .disabled(self.busy || parameter_error.is_some())
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.apply_selection(RecipeAction::ParametersOnly, window, cx)
-                            })),
-                    );
-                    primary = Some(
-                        self.button("recipe-apply", "安装并应用", cx)
+                    let has_parameters = card.content.presets.is_some();
+                    let has_runtimes = card
+                        .content
+                        .runtimes
+                        .as_ref()
+                        .is_some_and(|r| !r.components.is_empty())
+                        || card.content.neural_runtime == "310.9.16";
+                    let parts = self.selected_parts;
+                    let action = RecipeAction::Selected {
+                        patch: parts[0],
+                        parameters: parts[1] && has_parameters,
+                        runtimes: parts[2] && has_runtimes,
+                    };
+                    let choices = [
+                        (0, self.t("补丁方案"), true),
+                        (1, self.t("参数"), has_parameters),
+                        (2, self.t("运行库"), has_runtimes),
+                    ];
+                    let view = cx.entity().downgrade();
+                    install_menu = Some(
+                        DropdownButton::new("recipe-install-options")
+                            .button(
+                                self.button("recipe-apply", "安装并应用", cx)
+                                    .disabled(
+                                        self.busy
+                                            || self.operation_busy
+                                            || action.is_empty()
+                                            || available.is_err()
+                                            || (action.parameters() && parameter_error.is_some())
+                                            || (action.runtimes() && runtime_error.is_some()),
+                                    )
+                                    .on_click(cx.listener(move |this, _, window, cx| {
+                                        this.apply_selection(action, window, cx)
+                                    })),
+                            )
                             .primary()
                             .small()
-                            .disabled(
-                                self.busy || parameter_error.is_some() || runtime_error.is_some(),
-                            )
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.apply_selection(RecipeAction::InstallAndApply, window, cx)
-                            })),
+                            .menu_accessibility_label(self.t("选择安装内容"))
+                            .dropdown_menu(move |mut menu, _, _| {
+                                for (index, label, visible) in &choices {
+                                    if !visible {
+                                        continue;
+                                    }
+                                    let index = *index;
+                                    let view = view.clone();
+                                    menu = menu.item(
+                                        PopupMenuItem::new(label.clone())
+                                            .checked(parts[index])
+                                            .on_click(move |_, _, cx| {
+                                                let _ = view.update(cx, |this, cx| {
+                                                    this.selected_parts[index] =
+                                                        !this.selected_parts[index];
+                                                    cx.notify();
+                                                });
+                                            }),
+                                    );
+                                }
+                                menu
+                            })
+                            .into_any_element(),
                     );
                 }
                 body
@@ -1812,10 +2011,20 @@ impl Render for Recommendations {
                     .unwrap_or_default();
                 primary = Some(
                     self.button("recipe-gpu-editor", "修改显卡型号", cx)
+                        .disabled(self.operation_busy)
                         .primary()
                         .on_click(cx.listener(|this, _, window, cx| {
+                            if this.owner.upgrade().is_none_or(|owner| {
+                                let owner = owner.read(cx);
+                                owner.dialog_active || owner.c.busy || owner.c.read_only
+                            }) {
+                                this.message = this.t("请先关闭当前参数或确认窗口");
+                                cx.notify();
+                                return;
+                            }
                             if let Some(card)=&this.preview {
                                 let _=this.owner.update(cx,|owner,_|{
+                                    owner.c.focus = Some(this.game.exe.clone());
                                     owner.c.set_selection(card.content.scheme.clone(),owner.c.cloud_series(),card.content.entries.clone());
                                     if let Some(game)=owner.c.games.iter_mut().find(|g|g.exe==this.game.exe) {
                                         game.extra.insert("recommendation_gpu".into(),json!({"scheme":card.content.scheme,"name":card.content.required_gpu_name()}));
@@ -1823,10 +2032,10 @@ impl Render for Recommendations {
                                     owner.c.save();
                                 });
                             }
-                            this.close(window, cx);
+
                             let _ = this
                                 .owner
-                                .update(cx, |owner, cx| owner.gpu_editor(window, cx));
+                                .update(cx, |owner, cx| { owner.feedback_window = Some(window.window_handle()); owner.gpu_editor(window, cx) });
                         })),
                 );
                 div().v_flex().gap_3()
@@ -1906,15 +2115,16 @@ impl Render for Recommendations {
             .entry(scroll_id.clone())
             .or_default()
             .clone();
-        div()
+        let content = div()
             .v_flex()
             .gap_3()
             .min_w_0()
             .text_sm()
-            .when(self.mode != Mode::Preview, |d| d.child(top))
+            .when(self.mode != Mode::Preview, |d| d.child(top.flex_shrink_0()))
             .child(
                 div()
                     .relative()
+                    .flex_1()
                     .min_h_0()
                     .min_w_0()
                     .child(
@@ -1923,12 +2133,7 @@ impl Render for Recommendations {
                             .v_flex()
                             .min_h_0()
                             .min_w_0()
-                            .max_h(
-                                (window.viewport_size().height
-                                    - window.rem_size()
-                                        * if self.mode == Mode::Preview { 12. } else { 18. })
-                                .max(window.rem_size() * 8.),
-                            )
+                            .h_full()
                             .track_scroll(&scroll)
                             .overflow_y_scroll()
                             .child(body.flex_shrink_0().min_w_0().pr_3()),
@@ -1984,10 +2189,36 @@ impl Render for Recommendations {
                             .h_flex()
                             .gap_2()
                             .flex_wrap()
-                            .children(extra_actions)
+                            .children(install_menu)
                             .children(primary),
                     ),
+            );
+        div()
+            .v_flex()
+            .size_full()
+            .min_w_0()
+            .min_h_0()
+            .font_family("Microsoft YaHei UI")
+            .text_sm()
+            .bg(cx.theme().background)
+            .text_color(cx.theme().foreground)
+            .child(
+                TitleBar::new().child(
+                    div()
+                        .h_flex()
+                        .gap_2()
+                        .pl_3()
+                        .min_w_0()
+                        .child(match game_image {
+                            Some(icon) => img(icon).size_5().into_any_element(),
+                            None => Icon::new(IconName::LayoutDashboard)
+                                .size_5()
+                                .into_any_element(),
+                        })
+                        .child(div().min_w_0().text_sm().child(game_title)),
+                ),
             )
+            .child(content.p_3().flex_1().min_h_0())
     }
 }
 impl Manager {
@@ -2000,81 +2231,60 @@ impl Manager {
         if self.dialog_active {
             return;
         }
+        if let Some(handle) = self.recommendation_windows.get(&exe).copied() {
+            cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, w, _| w.activate_window());
+            });
+            return;
+        }
         let Some(game) = self.c.games.iter().find(|g| g.exe == exe).cloned() else {
             return;
         };
-        self.dialog_active = true;
-        let owner = cx.entity().downgrade();
-        let view = cx.new(|cx| Recommendations::new(owner.clone(), game, &self.c, window, cx));
-        let title = self.t("玩家推荐方案");
-        let game_name = self.c.game_name(&view.read(cx).game);
-        let game_image = self.c.icons.get(&exe).and_then(|v| v.clone());
-        window.open_dialog(cx, move |dialog, dialog_window, cx| {
-            let owner = owner.clone();
-            let dialog_width = if view.read(cx).mode == Mode::Preview {
-                (dialog_window.rem_size() * 74.)
-                    .min(dialog_window.viewport_size().width - dialog_window.rem_size() * 4.)
-            } else {
-                (dialog_window.rem_size() * 48.)
-                    .min(dialog_window.viewport_size().width - dialog_window.rem_size() * 4.)
-            };
-            dialog
-                .title({
-                    let details = view.read(cx).mode == Mode::Preview;
-                    let keyboard = crate::ui_focus::visible(cx);
-                    div()
-                        .h_flex()
-                        .w((dialog_width - px(32.)).max(px(0.)))
-                        .items_center()
-                        .justify_between()
-                        .gap_2()
-                        .child(
-                            div()
-                                .h_flex()
-                                .items_center()
-                                .gap_2()
-                                .min_w_0()
-                                .flex_1()
-                                .when(details, |d| {
-                                    d.child(match game_image.as_ref() {
-                                        Some(icon) => img(icon.clone()).size_6().into_any_element(),
-                                        None => Icon::new(IconName::LayoutDashboard)
-                                            .size_6()
-                                            .into_any_element(),
-                                    })
-                                })
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .text_sm()
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .child(if details {
-                                            game_name.clone()
-                                        } else {
-                                            title.to_string()
-                                        }),
-                                ),
-                        )
-                        .child(div().size_6().flex_shrink_0().child(
-                            gpui_component::dialog::DialogClose::new().trigger(move |button| {
-                                button
-                                    .small()
-                                    .ghost()
-                                    .focus_ring(keyboard)
-                                    .icon(IconName::Close)
-                            }),
-                        ))
-                })
-                .close_button(false)
-                .width(dialog_width)
-                .child(view.clone())
-                .on_close(move |_, _, cx| {
-                    let _ = owner.update(cx, |this, cx| {
-                        this.dialog_active = false;
-                        cx.notify();
-                    });
-                })
+        let work = window
+            .display(cx)
+            .map(|d| d.visible_bounds())
+            .unwrap_or(window.bounds());
+        let options = WindowOptions {
+            titlebar: Some(TitlebarOptions {
+                title: Some(self.t("玩家推荐方案")),
+                appears_transparent: true,
+                ..Default::default()
+            }),
+            window_bounds: Some(WindowBounds::Windowed(Bounds::centered_at(
+                work.center(),
+                size(
+                    (window.rem_size() * 70.).min(work.size.width),
+                    (window.rem_size() * 48.).min(work.size.height),
+                ),
+            ))),
+            window_min_size: Some(size(
+                px(600.).min(work.size.width),
+                px(480.).min(work.size.height),
+            )),
+            ..Default::default()
+        };
+        let owner = cx.entity();
+        // Release Manager before native creation can synchronously draw a view.
+        cx.defer(move |cx| {
+            let result_owner = owner.clone();
+            let result = cx.open_window(options, move |window, cx| {
+                window.on_window_should_close(cx, |window, cx| !window.has_active_dialog(cx));
+                let view = owner.update(cx, |manager, cx| {
+                    cx.new(|cx| {
+                        Recommendations::new(owner.downgrade(), game, &manager.c, window, cx)
+                    })
+                });
+                cx.new(|cx| Root::new(view, window, cx))
+            });
+            result_owner.update(cx, |owner, cx| {
+                match result {
+                    Ok(handle) => {
+                        owner.recommendation_windows.insert(exe, handle.into());
+                    }
+                    Err(error) => owner.c.warning = Some(format!("{error:#}")),
+                }
+                cx.notify();
+            });
         });
     }
 }

@@ -17,6 +17,18 @@ pub struct Component {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub package_version: Option<String>,
 }
+impl Component {
+    /// An old inventory can list several native versions without identifying
+    /// their locations. It is reference information, not a safe replacement map.
+    pub fn preserves_game_files(&self) -> bool {
+        self.source == "game"
+            && ["sr", "rr", "fg"].contains(&self.kind.as_str())
+            && (self.versions.len() > 1
+                || self.versions.first().is_some_and(|v| {
+                    v != "unknown" && !runtime_files::versions(&self.kind).contains(&normalized(v))
+                }))
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Snapshot {
@@ -106,6 +118,10 @@ impl Snapshot {
             if c.source == "patch" {
                 continue;
             }
+            if c.preserves_game_files() {
+                ensure!(c.kind != "nr", "分享包含多个 NR 版本，请手动核对");
+                continue;
+            }
             if c.source == "managed" {
                 ensure!(
                     c.package_version
@@ -159,13 +175,24 @@ impl Snapshot {
                         .suffix(".dll")
                         .tempfile()?;
                     file.write_all(bytes)?;
-                    Ok(file_version(file.path()))
+                    file.as_file().sync_all()?;
+                    // Windows version APIs cannot read a NamedTempFile while
+                    // its delete-on-close handle is open. Keep the path guard,
+                    // but close the writer before inspecting the PE resource.
+                    let path = file.into_temp_path();
+                    let version = win::file_version(&path)
+                        .with_context(|| format!("无法读取配套运行库版本：{}", component.kind))?
+                        .0;
+                    Ok(normalized(&version))
                 })
                 .collect::<Result<BTreeSet<_>>>()?;
             ensure!(
                 !component.versions.iter().any(|v| v == "unknown")
-                    && versions == component.versions.iter().cloned().collect(),
-                "当前补丁配套运行库与分享不同，尚未安装；可选择仅安装方案"
+                    && versions == component.versions.iter().map(|v| normalized(v)).collect(),
+                "当前补丁配套运行库与分享不同，尚未安装；可选择仅安装方案（{}：分享 {}，当前 {}）",
+                label(&component.kind),
+                component.versions.join(" / "),
+                versions.iter().cloned().collect::<Vec<_>>().join(" / ")
             );
         }
         Ok(())
@@ -214,6 +241,16 @@ impl Snapshot {
         for target in targets {
             let actual = capture(target)?;
             for expected in &self.components {
+                if expected.preserves_game_files() {
+                    // Explicitly retained native files are not claimed to be
+                    // an exact reproduction of the author's installation.
+                    let status = runtime_files::inspect(target, &expected.kind);
+                    ensure!(
+                        status.available && status.present,
+                        "游戏原有运行库缺失，请刷新后检查"
+                    );
+                    continue;
+                }
                 ensure!(
                     actual.components.iter().any(|c| c.kind == expected.kind
                         && c.source == expected.source
@@ -237,7 +274,24 @@ impl Snapshot {
     ) -> Result<()> {
         let mut intel = false;
         for c in &self.components {
-            if c.source == "patch" {
+            if c.source == "patch" || c.preserves_game_files() {
+                continue;
+            }
+            if c.source == "game"
+                && c.kind != "nr"
+                && targets.iter().all(|target| {
+                    let current = runtime_files::inspect(target, &c.kind);
+                    current.available
+                        && current.present
+                        && current.warning.is_none()
+                        && current
+                            .versions
+                            .iter()
+                            .map(|v| normalized(v))
+                            .collect::<BTreeSet<_>>()
+                            == c.versions.iter().map(|v| normalized(v)).collect()
+                })
+            {
                 continue;
             }
             let mut report = |transfer| {
@@ -370,8 +424,23 @@ mod tests {
     #[test]
     fn unavailable_versions_are_not_replaced_with_latest() {
         snapshot("310.9.16.0").installable().unwrap();
-        assert!(snapshot("999.1.0").installable().is_err());
+        assert!(snapshot("999.1.0").components[0].preserves_game_files());
         assert!(snapshot("unknown").installable().is_err());
+    }
+    #[test]
+    fn multi_version_native_inventory_does_not_download_or_replace_files() -> Result<()> {
+        let mut s = snapshot("310.5.0");
+        s.components[0].versions.push("310.7.0".into());
+        assert!(s.components[0].preserves_game_files());
+        s.installable()?;
+        s.install(&[], false, &AtomicBool::new(false), &mut |_| {
+            panic!("native reference inventory must never start a download");
+        })?;
+        // Unlisted native versions are retained, never substituted with latest.
+        assert!(snapshot("999.1.0").components[0].preserves_game_files());
+        s.components[0].kind = "nr".into();
+        assert!(s.installable().is_err());
+        Ok(())
     }
     #[test]
     fn intel_is_a_complete_same_version_sdk_pair() {
@@ -397,5 +466,29 @@ mod tests {
         let mut s = snapshot("310.9.16");
         s.components[0].source = "patch".into();
         assert!(s.verify_prepared(&BTreeMap::new()).is_err());
+    }
+    #[test]
+    #[cfg(windows)]
+    fn prepared_bytes_keep_the_same_windows_version_as_the_closed_source() -> Result<()> {
+        // Use an existing Windows PE solely as a version-resource fixture;
+        // nothing is loaded or installed. No signed patch fixtures are required.
+        let source =
+            std::path::PathBuf::from(std::env::var("SystemRoot")?).join("System32/kernel32.dll");
+        // Windows can virtualize kernel32's version at its system location for
+        // an unmanifested test harness. Establish the baseline from a copy.
+        let fixture = tempfile::tempdir()?;
+        let copied = fixture.path().join("version-fixture.dll");
+        std::fs::copy(&source, &copied)?;
+        let expected = file_version(&copied);
+        assert_ne!(expected, "unknown");
+        let mut snapshot = snapshot(&expected);
+        snapshot.components[0].source = "patch".into();
+        let files = BTreeMap::from([("components/nvngx_dlss.dll".into(), std::fs::read(source)?)]);
+        snapshot.verify_prepared(&files)?;
+        snapshot.components[0].versions[0].push_str(".0");
+        snapshot.verify_prepared(&files)?;
+        snapshot.components[0].versions[0] = "999.1.0".into();
+        assert!(snapshot.verify_prepared(&files).is_err());
+        Ok(())
     }
 }

@@ -14,6 +14,49 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('MFG 1.6.1 compatibility shares, edits and retains feedback without breaking old readers',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...content(),scheme:'mfg-unlocker-1.6.1-compat',patchVersion:'1.6.1',entries:['version.dll'],presets:{schema:1,profile:'rtxmfg_universal_133',values:{rtx_mode:'3'},defaults:{rtx_mode:'2'}}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',10);
+  assert.deepEqual(posted.content.presets,c.presets);
+  const path='/v1/recipes/'+posted.id;
+  const voter=await f.login('voter@example.com');
+  await f.call('PUT',path+'/vote',{revision:1,value:1},voter.token,'test-ip',10);
+  for(const protocol of [false,5,6,7,8,9]) {
+    const old=await f.call('GET','/v1/recipes?game=steam:292030',null,null,'test-ip',protocol);
+    assert.equal(old.items.length,1);
+    assert.equal(old.items[0].content.scheme,c.scheme);
+    assert.equal(Object.hasOwn(old.items[0].content,'presets'),false);
+  }
+  const old=(await f.call('GET',path,null,u.token,'test-ip',9)).content;
+  old.notes='旧版只修改备注';
+  await f.call('PUT',path,{revision:1,content:old},u.token,'test-ip',9);
+  const saved=await f.call('GET',path,null,u.token,'test-ip',10);
+  assert.deepEqual(saved.content.presets,c.presets);
+  saved.content.presets.values.rtx_mode='4';
+  const updated=await f.call('PUT',path,{revision:2,content:saved.content},u.token,'test-ip',10);
+  assert.equal(updated.content.presets.values.rtx_mode,'4');
+  assert.equal(updated.id,posted.id);
+  assert.equal(updated.likes,1);
+  assert.equal((await f.call('GET','/v1/capabilities')).mfg161,1);
+  assert.throws(()=>recipe({...c,patchVersion:'1.7.0'}));
+  for(const key of ['rtx_nr','rtx_xemfg','rtx_opti_ui','logDirectory']) {
+    const bad=structuredClone(c);bad.presets.values[key]='1';bad.presets.defaults[key]='0';
+    assert.throws(()=>recipe(bad),key);
+  }
+  assert.throws(()=>recipe({...c,neuralRuntime:'310.9.16'}));
+  assert.throws(()=>recipe({...c,runtimes:{schema:1,components:[{kind:'xess_fg',source:'managed',versions:['3.0.2']}]}}));
+  for(const runtimes of [null,{}, {schema:1,components:null}]) {
+    assert.throws(()=>recipe({...c,runtimes}),e=>e.status===400);
+  }
+  const plugin=recipe({...c,entries:['OptiScaler/plugins/MFGUnlocker.asi']});
+  assert.equal(plugin.presets.values.rtx_mode,'3');
+  const modern=structuredClone(c);modern.scheme='rtx40mfg-1.3.3-hf2';modern.patchVersion='1.7.0';modern.presets.values.rtx_nr='1';modern.presets.defaults.rtx_nr='0';
+  assert.equal(recipe(modern).presets.values.rtx_nr,'1');
+  await f.call('DELETE',path,{revision:3},u.token,'test-ip',10);
+  assert.equal((await f.call('GET','/v1/recipes?game=steam:292030',null,null,'test-ip',10)).items.length,0);
+});
+
 test('Long notes are Unicode bounded, old readers get a safe excerpt and cannot erase the rest',async t=>{
   const f=fixture(t),u=await f.login();
   const full={...complete(),notes:'游戏🙂'.repeat(1666)+'完成'};

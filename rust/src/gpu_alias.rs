@@ -73,6 +73,10 @@ pub struct Device {
     pub version: String,
     pub inf: String,
     pub name: String,
+    #[serde(default)]
+    pub original_name: Option<String>,
+    #[serde(default)]
+    pub modified_name: Option<String>,
 }
 impl Device {
     fn identity(&self) -> serde_json::Value {
@@ -194,6 +198,8 @@ pub fn enumerate() -> Result<Vec<Device>> {
             version: String::new(),
             inf: String::new(),
             name: String::new(),
+            original_name: None,
+            modified_name: None,
         };
         let key = RegKey::predef(HKEY_LOCAL_MACHINE)
             .open_subkey_with_flags(d.path("DriverDesc")?, KEY_READ | KEY_WOW64_64KEY)?;
@@ -205,6 +211,23 @@ pub fn enumerate() -> Result<Vec<Device>> {
         rows.push(d);
         Ok(())
     })?;
+    for device in &mut rows {
+        let backend = WindowsBackend(device.clone());
+        // Read the installed driver's description, not its mutable display
+        // name. A matching manager backup is a fallback for older drivers.
+        let original = backend.driver_description().ok().flatten().or_else(|| {
+            let record = backend.load().ok().flatten()?;
+            record.validate(&device.identity()).ok()?;
+            record
+                .original
+                .get("DriverDesc")?
+                .as_ref()
+                .map(|v| v.data.clone())
+        });
+        let current = backend.read("DriverDesc").ok().flatten().map(|v| v.data);
+        device.modified_name = current.filter(|s| original.as_ref().is_some_and(|o| s != o));
+        device.original_name = original;
+    }
     Ok(rows)
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

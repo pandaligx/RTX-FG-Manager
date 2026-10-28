@@ -1103,6 +1103,57 @@ impl Controller {
         }
         self.save();
     }
+    /// A cached installation snapshot is not a choice for a fresh installation.
+    /// Only call after every deployment directory is confirmed uninstalled.
+    fn reset_uninstalled_upstream_presets(&mut self, exe: &str) {
+        let schemes: Vec<_> = self
+            .catalog
+            .scheme_policies
+            .iter()
+            .filter(|(_, p)| rtx_fg_manager::upstream040::is_profile(&p.parameter_profile))
+            .map(|(id, p)| (id.clone(), p.clone()))
+            .collect();
+        let mut changed = false;
+        for (scheme, policy) in schemes {
+            let identity = (exe.to_owned(), scheme.clone());
+            self.disk_profiles.remove(&identity);
+            self.disk_presets.remove(&identity);
+            let explicit = self.explicit_preset_values(exe, &scheme);
+            let defaults =
+                rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            let mut values = defaults.clone();
+            values.extend(explicit);
+            rtx_fg_manager::presets::Context::new(&scheme, &policy, std::path::Path::new(exe))
+                .normalize(&mut values);
+            let keys: Vec<_> = values
+                .iter()
+                .filter(|(key, value)| defaults.get(*key) != Some(*value))
+                .map(|(key, _)| key.clone())
+                .collect();
+            if let Some(baseline) = self.preset_baselines.get_mut(&identity) {
+                *baseline = defaults;
+            }
+            if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
+                for (field, value) in [
+                    ("preset_options_v2", json!(values)),
+                    ("preset_dirty", json!(!keys.is_empty())),
+                    ("preset_dirty_keys", json!(keys)),
+                ] {
+                    let entry = game.extra.entry(field).or_insert_with(|| json!({}));
+                    if !entry.is_object() {
+                        *entry = json!({});
+                    }
+                    if entry.get(&scheme) != Some(&value) {
+                        entry[&scheme] = value;
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if changed {
+            self.save();
+        }
+    }
     pub fn preset_context(&self, exe: &str) -> rtx_fg_manager::presets::Context {
         let scheme = self.scheme_for(Some(exe));
         rtx_fg_manager::presets::Context::new(
@@ -2217,7 +2268,7 @@ impl Controller {
                 .presets
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("此分享未附带参数，请选择仅安装方案"))?
-                .validate(&recipe.scheme, &version)?;
+                .for_version(&recipe.scheme, &recipe.patch_version, &version)?;
         }
         anyhow::ensure!(
             self.first_pending_preset().is_none(),
@@ -2293,6 +2344,9 @@ impl Controller {
                     }
                     rtx_fg_manager::recommendation_presets::Action::ParametersOnly => {
                         "玩家参数已应用；下次启动游戏生效。"
+                    }
+                    rtx_fg_manager::recommendation_presets::Action::Selected { .. } => {
+                        "所选内容已完成；下次启动游戏生效。"
                     }
                 }
                 .into(),
@@ -2740,12 +2794,15 @@ impl Controller {
                                     &available,
                                     version,
                                 )?
-                            } else if payload.backend == rtx_fg_manager::upstream040::BACKEND
-                                && core::record(&game.deployment_target(&p).directory)?.is_some()
-                            {
-                                // The upgrade transaction migrates disk settings and explicit
-                                // edits using the installed version, before replacing files.
-                                files[name].clone()
+                            } else if payload.backend == rtx_fg_manager::upstream040::BACKEND {
+                                if core::record(&game.deployment_target(&p).directory)?.is_some() {
+                                    // Existing installations preserve their disk values.
+                                    files[name].clone()
+                                } else {
+                                    // Do not replay a 0.4.0 snapshot into a fresh 0.4.1 INI,
+                                    // even if the background status refresh has not arrived.
+                                    context.configure(&files[name], &overrides)?
+                                }
                             } else {
                                 context.configure(&files[name], &options)?
                             };
@@ -3411,6 +3468,7 @@ impl Controller {
                         self.running_games.remove(&exe);
                     }
                     self.disk_presets.retain(|(game, _), _| game != &exe);
+                    self.disk_profiles.retain(|(game, _), _| game != &exe);
                     if let Some((scheme, mut values)) = values {
                         if let Some(profile) = profile {
                             self.disk_profiles
@@ -3600,7 +3658,11 @@ impl Controller {
                 }
                 Event::Deployments(epoch, exe, snapshot) => {
                     if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
-                        self.deployments.insert(exe, *snapshot);
+                        let uninstalled = snapshot.status == "未部署" && snapshot.installed == 0;
+                        self.deployments.insert(exe.clone(), *snapshot);
+                        if uninstalled {
+                            self.reset_uninstalled_upstream_presets(&exe);
+                        }
                     }
                 }
                 Event::CleanupPreview(epoch, fingerprint, plans) => {
@@ -4856,7 +4918,13 @@ mod tests {
                         assert!(Instant::now() < deadline);
                         std::thread::sleep(Duration::from_millis(10));
                     }
-                    assert_eq!(c.confirm.take().as_deref(), Some("delete_cleanup"));
+                    assert_eq!(
+                        c.confirm.take().as_deref(),
+                        Some("delete_cleanup"),
+                        "action={action}, warning={:?}, logs={:?}",
+                        c.warning,
+                        c.logs
+                    );
                     assert!(c.cleanup_deletion_list().contains("version.dll.stage"));
                     if action == "cancel" {
                         c.cancel_patch();
@@ -5455,6 +5523,213 @@ mod tests {
         );
         c.set_game_option("A.exe", "max_generated_frames", "99");
         assert_eq!(c.preset_values("A.exe"), a);
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    #[ignore = "requires an isolated staged 0.4.1 bundle cache; never runs a game"]
+    fn cached_041_fresh_install_and_uninstall_do_not_replay_040_snapshot() -> Result<()> {
+        let cache = std::env::var("LOCALAPPDATA")?;
+        anyhow::ensure!(
+            cache.contains("isolated-appdata"),
+            "Use an isolated bundle cache"
+        );
+        let (data, mut c) = controller();
+        let game_dir = tempfile::tempdir()?;
+        let path = game_dir.path().join("FixtureGame.exe");
+        std::fs::copy(std::env::current_exe()?, &path)?;
+        let exe = path.to_string_lossy().into_owned();
+        let scheme = rtx_fg_manager::upstream040::SCHEME;
+        let old = rtx_fg_manager::presets::defaults("upstream040", &BTreeMap::new());
+        c.games = vec![Game {
+            exe: exe.clone(),
+            extra: [("preset_options_v2".into(), json!({scheme:old}))]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.clone());
+        c.set_selection(scheme.into(), 1, vec!["version.dll".into()]);
+        let finish = |c: &mut Controller| -> Result<()> {
+            let deadline = Instant::now() + Duration::from_secs(90);
+            while c.busy || c.refresh_busy || !c.preset_reads.is_empty() {
+                c.events();
+                anyhow::ensure!(Instant::now() < deadline, "operation timed out");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            anyhow::ensure!(c.warning.is_none(), "{:?}", c.warning);
+            Ok(())
+        };
+        // No refresh is delivered before this click: exercise the worker guard.
+        assert_eq!(c.preset_values(&exe)["optimized"], "2");
+        c.perform(false, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        let config = game_dir.path().join(core::INI);
+        assert_eq!(
+            rtx_fg_manager::upstream040::read_041(&std::fs::read(&config)?)?["optimized"],
+            "1"
+        );
+        // Preserve a real user's existing installation choice.
+        let context = c.preset_context(&exe);
+        core::apply_parameters_at(
+            &core::DeploymentTarget::for_game(&path),
+            &context,
+            &BTreeMap::from([("optimized".into(), "2".into())]),
+        )?;
+        c.perform(false, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        assert_eq!(
+            rtx_fg_manager::upstream040::read_041(&std::fs::read(&config)?)?["optimized"],
+            "2"
+        );
+        c.perform(true, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        assert!(!config.exists());
+        assert_eq!(c.preset_values(&exe)["optimized"], "1");
+        c.perform(false, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        assert_eq!(
+            rtx_fg_manager::upstream040::read_041(&std::fs::read(&config)?)?["optimized"],
+            "1"
+        );
+        c.perform(true, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        assert!(!config.exists());
+        assert!(data.path().exists());
+        c.close();
+        c.tick_close();
+        Ok(())
+    }
+    #[test]
+    fn uninstalled_041_uses_new_defaults_without_deleting_preferences() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::upstream040::SCHEME;
+        let exe = "A.exe";
+        let old = rtx_fg_manager::presets::defaults("upstream040", &BTreeMap::new());
+        c.games = vec![Game {
+            exe: exe.into(),
+            title: "My game".into(),
+            extra: [
+                (
+                    "preset_options_v2".into(),
+                    json!({scheme:old, "rtxfg-0.3.5-dx12-vulkan":{"optimized":"2"}}),
+                ),
+                ("preset_options".into(), json!({"upstream040":old})),
+                ("preset_dirty".into(), json!({scheme:false})),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        c.disk_presets
+            .insert((exe.into(), scheme.into()), old.clone());
+        c.disk_profiles.insert(
+            (exe.into(), scheme.into()),
+            (c.status_epoch, "upstream040".into()),
+        );
+        c.channel.send(Event::Deployments(
+            c.status_epoch,
+            exe.into(),
+            Box::new({
+                let mut s = rtx_fg_manager::deployment::Snapshot::default();
+                s.status = "未部署".into();
+                s.total = 1;
+                s
+            }),
+        ));
+        c.events();
+        assert_eq!(c.parameter_profile(), "upstream041");
+        assert_eq!(c.preset_values(exe)["optimized"], "1");
+        assert_eq!(c.preset_values(exe)["preset"], "A");
+        assert_eq!(c.preset_values(exe)["xess_hudless"], "Auto");
+        assert_eq!(c.games[0].title, "My game");
+        assert_eq!(
+            c.games[0].extra["preset_options_v2"]["rtxfg-0.3.5-dx12-vulkan"]["optimized"],
+            "2"
+        );
+        c.save();
+        let persisted = c.state.clone();
+        c.close();
+        c.tick_close();
+        let restart_dir = tempfile::tempdir().unwrap();
+        let mut restarted = Controller::new(
+            restart_dir.path().into(),
+            persisted,
+            None,
+            Some(restart_dir.path().join("smoke.json")),
+        );
+        restarted.focus = Some(exe.into());
+        assert_eq!(restarted.preset_values(exe)["optimized"], "1");
+        restarted.close();
+        restarted.tick_close();
+    }
+    #[test]
+    fn uninstalled_041_preserves_current_explicit_choices_and_discard_baseline() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::upstream040::SCHEME;
+        let exe = "A.exe";
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        c.set_game_option(exe, "optimized", "2");
+        for _ in 0..2 {
+            c.channel.send(Event::Deployments(
+                c.status_epoch,
+                exe.into(),
+                Box::new({
+                    let mut s = rtx_fg_manager::deployment::Snapshot::default();
+                    s.status = "未部署".into();
+                    s.total = 1;
+                    s
+                }),
+            ));
+            c.events();
+            assert_eq!(c.preset_values(exe)["optimized"], "2");
+            assert!(c.preset_dirty(exe));
+        }
+        c.discard_presets(Some((exe, scheme)));
+        assert_eq!(c.preset_values(exe)["optimized"], "1");
+        assert!(!c.preset_dirty(exe));
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn installed_041_lossy_choice_is_not_reset_by_catalog_or_partial_cleanup() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::upstream040::SCHEME;
+        let exe = "A.exe";
+        c.games = vec![Game {
+            exe: exe.into(),
+            extra: [(
+                "preset_options_v2".into(),
+                json!({scheme:{"optimized":"2"}}),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        for status in ["已部署", "部分已部署", "需检查", "补丁已移除，缓存待清理"]
+        {
+            c.channel.send(Event::Deployments(
+                c.status_epoch,
+                exe.into(),
+                Box::new({
+                    let mut s = rtx_fg_manager::deployment::Snapshot::default();
+                    s.status = status.into();
+                    s.total = 2;
+                    s.installed = 1;
+                    s.parameter_profiles =
+                        BTreeMap::from([(scheme.into(), BTreeSet::from(["upstream041".into()]))]);
+                    s
+                }),
+            ));
+            c.events();
+            assert_eq!(c.preset_values(exe)["optimized"], "2", "{status}");
+        }
         c.close();
         c.tick_close();
     }

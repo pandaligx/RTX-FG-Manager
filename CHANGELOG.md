@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.3.15
+
+- Fresh Dlssg_for_sm86 installations use the new bundle defaults after uninstalling, instead of replaying cached 0.4.0 values such as Optimized=2 into 0.4.1. Preserve existing installations and explicit edits. Align the GPU identity fields and separate sidebar selection backgrounds.
+- Fix multi-window control and dropdown routing, keep preset sections stable when expanding advanced options, and use proportionate vector logos. Show actual and renamed GPU names separately.
+- Keep player recommendations in a standalone window after installation. Combine installation into one split button with independent patch, parameter and runtime selections. Patch removal also restores manager-owned DLSS SR/RR/FG originals; preserve externally changed files for review.
+- Fix recommendation installation: read Windows runtime versions after closing temporary writers. Keep mixed or unlisted native game components with an explicit notice while installing the patch and applying shared parameters.
+- Move preferences into a separate GPUI Kit Settings window with search, categorized pages and a redesigned About page with the app logo. Align full recommendation details and sharing confirmation in compact tables that follow the configured font size; retain the previous DLSS/XeSS runtime window. Fix a possible exit when accessibility queries overlap window destruction.
+- Complete preset sharing for the MFG-Unlocker 1.6.1 compatibility option: capture applied settings, compare changed values, install the scheme alone, apply parameters alone or install and apply across game folders. Keep 1.7.0 available and reject settings unsupported by 1.6.1.
+- Preserve older clients' browsing and edits without discarding newer shared parameters. Retain existing offline recommendations when upgrading.
+- Retain Encore 1.4.5, which includes the 1.4.3 Streamline, Intel component recognition and NR input fixes. No configuration reset or extra patch downgrade is required; preserve original game files.
+
 ## 4.3.14
 
 - Support the complete Dlssg_for_sm86 0.4.1 bundle, with XeSS 2X–4X, coarse flow from 4K and strict/automatic HUD-less input. Fresh installs default to Optimized=1, preset A and SR off. XeSS uses the bundled backend without extra Intel DLLs.

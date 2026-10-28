@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.14"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.15"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.14 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.15 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,21 +41,21 @@
 
 ## 下载
 
-**版本 4.3.14** · Windows 10 / 11 x64
+**版本 4.3.15** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.14 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.14) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.14 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.14) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.15 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.15) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.15 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.15) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
-下载 **`RTXManager-v4.3.14-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+下载 **`RTXManager-v4.3.15-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.14 更新亮点
+## 4.3.15 更新亮点
 
-- 接入 Dlssg_for_sm86 0.4.1，支持 XeSS 2X–4X、4K 起始光流和无 HUD 输入设置。
-- 保留旧版配置，升级时提示不兼容参数；同步适配玩家参数分享与日志清理。
-- 更新 RTX Encore 1.4.5，完善 Smooth Motion 要求说明，防止旧缓存回退方案版本。
+- 独立设置与玩家推荐窗口，紧凑方案表格，可选择安装补丁、参数和运行库。
+- 补齐 MFG 1.6.1 参数分享，修复推荐安装、设置下拉及多窗口操作。
+- 修复 0.4.1 重装沿用旧参数；卸载时恢复管理器更新的 DLSS 原件。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -71,7 +71,7 @@
 | **MFG-Unlocker · 1.7.0** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **RTX Encore · 1.4.5** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion 与兼容性设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
-> MFG-Unlocker 1.6.1 已作为兼容备用方案保留；切换版本请先卸载现有补丁再安装。备用方案的玩家参数分享暂不支持。
+> MFG-Unlocker 1.6.1 已作为兼容备用方案保留；切换版本请先卸载现有补丁再安装。管理器 4.3.15 起支持该方案的玩家参数分享。
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。初始方案与 0.2.6 不再提供新安装入口，旧安装仍保留归属识别、恢复与卸载能力。
 
@@ -146,7 +146,7 @@ MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 3
 
 卸载覆盖 dlssg 帧时间/NGX 日志、MFG 对应该游戏的临时日志、Encore 会话/异常/性能日志，以及符合上游命名规则的崩溃转储。未知文件、手动抓取和其他游戏/插件保留；占用文件或未完成恢复可重试。OptiScaler 只恢复管理器修改、且之后未被用户再次改动的字段。
 
-每个方案一个完整 ZIP，统一放在 [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads)。0.4.0 包含完整分发组件，只部署选中的入口。Encore 完整包超过 Gitee 单附件限制，使用 GitCode / GitHub 下载。
+每个方案一个完整 ZIP，统一放在 [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads)。0.4.1 包含完整分发组件，只部署选中的入口。Encore 完整包超过 Gitee 单附件限制，使用 GitCode / GitHub 下载。
 
 ## 常见问题
 
@@ -160,7 +160,7 @@ MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 3
 <details>
 <summary><b>为什么 0.4.0 的内核模式是 2？</b></summary>
 
-`Optimized=2` 来自下载的上游 0.4.0 默认 INI，并非管理器强制调整。支持的升级过程会保留用户已有设置。
+0.4.0 默认 `Optimized=2`，0.4.1 新安装默认 `Optimized=1`。4.3.15 修复旧缓存覆盖新默认值的问题；受影响时卸载后重装即可，无需删除管理器数据。已有安装中的手动设置保留。
 
 </details>
 

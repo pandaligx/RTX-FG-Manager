@@ -163,7 +163,7 @@ fn parameter_only_does_not_install_shared_runtimes_or_require_their_downloads() 
     recipe.runtimes = Some(serde_json::from_value(
         serde_json::json!({"schema":1,"components":[{"kind":"sr","source":"game","versions":["999.0.0"]}]}),
     )?);
-    assert!(recipe.runtimes.as_ref().unwrap().installable().is_err());
+    assert!(recipe.runtimes.as_ref().unwrap().components[0].preserves_game_files());
     shared::execute(
         &game,
         &catalog,

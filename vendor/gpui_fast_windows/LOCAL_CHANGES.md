@@ -49,6 +49,12 @@ rounding; its other channels, opacity and all clip-edge checks remain exact.
   but its Jump List code still imports ICU's `u_strlen`. `destination_list.rs`
   replaces that call with a bounded Rust scan of the UTF-16 description buffer,
   preserving the old manager's lack of an external ICU loader dependency.
+- `events.rs` / `window.rs`: retire the AccessKit adapter during `WM_DESTROY`
+  and programmatic close, while the native handle is still valid. Otherwise
+  deferred window cleanup can keep its context alive after HWND destruction;
+  UI Automation queries triggered by returning focus to the parent can then
+  panic inside AccessKit's coordinate conversion. Live windows retain normal
+  accessibility support. Adapter destruction occurs outside the RefCell borrow.
 
 The font-byte lifetime/range tests and hidden-window placement regression are
 retained in the compatibility modules. Their execution on a development Windows

@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.14"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.15"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.14 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.15 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,21 +41,21 @@
 
 ## Download
 
-**Version 4.3.14** · Windows 10 / 11 x64
+**Version 4.3.15** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.14 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.14) | Default domestic source |
-| **GitHub** | [Open 4.3.14 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.14) | Primary project and fallback |
+| **GitCode** | [Open 4.3.15 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.15) | Default domestic source |
+| **GitHub** | [Open 4.3.15 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.15) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
-Download **`RTXManager-v4.3.14-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
+Download **`RTXManager-v4.3.15-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.14 highlights
+## 4.3.15 highlights
 
-- Integrate Dlssg_for_sm86 0.4.1 with XeSS 2X–4X, coarse flow from 4K and HUD-less input controls.
-- Preserve existing settings, flag incompatible migration choices, and update shared presets and owned-log cleanup.
-- Update RTX Encore to 1.4.5, clarify Smooth Motion requirements and prevent stale catalog downgrades.
+- Separate settings and recommendation windows, compact setup tables, and selectable patch, parameter and runtime installation.
+- Complete MFG 1.6.1 preset sharing and fix recommendation installation, settings menus and multi-window controls.
+- Fix stale defaults when reinstalling 0.4.1; restore manager-owned DLSS originals when removing patches.
 
 [Full changelog →](CHANGELOG.md)
 
@@ -71,7 +71,7 @@ Download **`RTXManager-v4.3.14-x64.exe`** and run it. No separate Python, Rust, 
 | **MFG-Unlocker · 1.7.0** | Standalone DLL or an existing OptiScaler 10 plugin installation; these modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
 | **RTX Encore · 1.4.5** | SR/RR/FG presets, fixed/dynamic FG, NR, Smooth Motion and compatibility controls. | **Insert**, unless the menu is disabled or its key was changed |
 
-> MFG-Unlocker 1.6.1 is available as a compatibility option. Uninstall the current patch before switching versions. Sharing presets for this compatibility option is not supported yet.
+> MFG-Unlocker 1.6.1 is available as a compatibility option. Uninstall the current patch before switching versions. Preset sharing for this option is supported from manager 4.3.15.
 
 GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility. The initial scheme and 0.2.6 are retired from new installation choices; existing installations remain eligible for owned cleanup/recovery.
 
@@ -146,7 +146,7 @@ Upgrading rc.3 preserves the existing JSONC, including comments, unknown fields 
 
 Cleanup includes dlssg frame-time/NGX logs, MFG game-specific temporary logs, and Encore session, exception, performance logs and recognized generated crash dumps. Unknown files, manual captures and other games/plugins are retained. Locked files or incomplete recovery remain visible for retry. OptiScaler fields are restored only if the manager changed them and they have not since been edited.
 
-Resources use one complete ZIP per scheme in [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads). The 0.4.0 package includes all required distributed components; only selected loaders are deployed. Encore's complete ZIP exceeds Gitee's per-file limit, so its download uses GitCode/GitHub.
+Resources use one complete ZIP per scheme in [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads). The 0.4.1 package includes all required distributed components; only selected loaders are deployed. Encore's complete ZIP exceeds Gitee's per-file limit, so its download uses GitCode/GitHub.
 
 ## Frequently asked questions
 
@@ -160,7 +160,7 @@ Use the relevant upstream game's compatibility notes and the game's actual API. 
 <details>
 <summary><b>Why is 0.4.0's kernel mode 2?</b></summary>
 
-`Optimized=2` is the downloaded upstream 0.4.0 INI's default, not a forced manager optimization. Existing user settings are preserved during supported upgrades.
+0.4.0 defaults to `Optimized=2`; fresh 0.4.1 installs default to `Optimized=1`. Manager 4.3.15 fixes stale cached defaults: reinstall the patch if affected, without deleting manager data. Explicit settings in existing installations are preserved.
 
 </details>
 

@@ -326,6 +326,11 @@ impl WindowsWindowInner {
     }
 
     fn handle_destroy_msg(&self, handle: HWND) -> Option<isize> {
+        // UIA providers hold weak references to the adapter context. Release it
+        // while the HWND is still valid, before restoring focus to another
+        // window can make assistive clients query the closing window again.
+        let a11y = self.state.a11y.borrow_mut().take();
+        drop(a11y);
         let callback = { self.state.callbacks.close.take() };
         // Re-enable parent window if this was a modal dialog
         if let Some(parent_hwnd) = self.parent_hwnd {

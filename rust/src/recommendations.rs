@@ -253,6 +253,17 @@ impl Recipe {
     /// Reading historical cards must not depend on the currently available downloads.
     fn validate_public(&self) -> Result<()> {
         ensure!(self.schema == 1, "此推荐需要更新管理器");
+        crate::recommendation_presets::validate_scheme_version(&self.scheme, &self.patch_version)?;
+        if self.scheme == crate::recommendation_presets::MFG_161_COMPAT {
+            ensure!(
+                self.neural_runtime == "none"
+                    && self.runtimes.as_ref().is_none_or(|r| r
+                        .components
+                        .iter()
+                        .all(|c| c.kind != "nr" && c.source != "managed")),
+                "MFG 1.6.1 不支持 DLSSNR 或独立 XeSS 运行库"
+            );
+        }
         if let Some(presets) = &self.presets {
             presets.validate(&self.scheme, &self.patch_version)?;
         }
@@ -398,6 +409,16 @@ pub fn installed_recipe(
             runtimes: Some(crate::recommendation_runtimes::capture(&target)?),
         };
         let mut current = current;
+        if current.scheme == crate::recommendation_presets::MFG_161_COMPAT {
+            // Unrelated runtime files can remain after switching patches. They
+            // must not become an installation requirement for this older MFG.
+            current.neural_runtime = "none".into();
+            if let Some(runtimes) = &mut current.runtimes {
+                runtimes
+                    .components
+                    .retain(|c| c.kind != "nr" && c.source != "managed");
+            }
+        }
         current.presets = Some(crate::recommendation_presets::capture(
             &target,
             catalog,
@@ -845,7 +866,7 @@ impl Client {
         let mut request = self
             .http(network)?
             .request(method.clone(), format!("{}{route}", self.origin()))
-            .header("X-RTXFG-Feedback", "9")
+            .header("X-RTXFG-Feedback", "10")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
         if method == Method::GET {
@@ -957,10 +978,16 @@ impl Client {
     }
     fn cache_path(&self, id: &str) -> PathBuf {
         self.root
-            .join(format!("{:x}.setup-v4.json", Sha256::digest(id.as_bytes())))
+            .join(format!("{:x}.setup-v5.json", Sha256::digest(id.as_bytes())))
     }
     pub fn cached(&self, game: &GameIdentity, catalog: &cloud::Catalog) -> Option<Page> {
         let b = fs::read(self.cache_path(&game.id))
+            .or_else(|_| {
+                fs::read(self.root.join(format!(
+                    "{:x}.setup-v4.json",
+                    Sha256::digest(game.id.as_bytes())
+                )))
+            })
             .or_else(|_| {
                 fs::read(self.root.join(format!(
                     "{:x}.setup-v2.json",
@@ -1335,6 +1362,34 @@ mod tests {
         }));
         client.origin = origin;
         client
+    }
+    #[test]
+    fn compatibility_sharing_cache_keeps_4314_offline_records_and_uses_new_protocol() {
+        let data = tempfile::tempdir().unwrap();
+        let old = card("RTX 3060", "581.80", 1);
+        let game = old.content.game.clone();
+        let page = json!({"items":[old],"total":1,"nextOffset":null});
+        let (origin, server) = mock_service(vec![(200, page.clone())]);
+        let client = online_test_client(data.path(), origin);
+        let previous = client.root.join(format!(
+            "{:x}.setup-v4.json",
+            Sha256::digest(game.id.as_bytes())
+        ));
+        core::atomic_json(&previous, &page).unwrap();
+        assert_eq!(client.cached(&game, &cloud::bundled()).unwrap().total, 1);
+        client
+            .browse(&game, &cloud::bundled(), 0, false, false)
+            .unwrap();
+        assert!(client.cache_path(&game.id).is_file());
+        assert_eq!(
+            serde_json::from_slice::<Value>(&fs::read(previous).unwrap()).unwrap(),
+            page
+        );
+        assert!(
+            server.join().unwrap()[0]
+                .to_ascii_lowercase()
+                .contains("x-rtxfg-feedback: 10")
+        );
     }
     #[test]
     fn recommendation_read_recovers_from_unreachable_proxy() {

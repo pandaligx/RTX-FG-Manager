@@ -9,6 +9,11 @@ impl AssetSource for Assets {
         if let Some(bytes) = RecommendationAssets.load(path)? {
             return Ok(Some(bytes));
         }
+        if path == "app/manager-backplate.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!(
+                "../assets/manager-backplate.svg"
+            ))));
+        }
         if path == "app/manager.png" {
             return Ok(Some(Cow::Borrowed(include_bytes!("../assets/manager.png"))));
         }
@@ -30,6 +35,7 @@ impl AssetSource for Assets {
         files.extend(RecommendationAssets.list(path)?);
         for name in [
             "app/manager.png",
+            "app/manager-backplate.svg",
             "app/refresh.svg",
             "app/trash.svg",
             "app/bilibili.svg",

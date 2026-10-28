@@ -42,6 +42,7 @@ const universal = ['version.dll','dinput8.dll','winmm.dll','dxgi.dll','d3d9.dll'
 export const schemes = {
   'dlssg-transfusion-1.4.5.3': [...universal, 'rtx-encore.asi'],
   'rtx40mfg-1.3.3-hf2': [...universal, 'OptiScaler/plugins/MFGUnlocker.asi'],
+  'mfg-unlocker-1.6.1-compat': [...universal, 'OptiScaler/plugins/MFGUnlocker.asi'],
   'upstream-0.3.5-310-9': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
   'rtxfg-0.3.5-dx12-vulkan': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
   'pipotoufik-mfg-vulkan-sm86-7': ['version.dll'],
@@ -70,9 +71,14 @@ export function recipe(input) {
   need(['unchanged','rtx4060','rtx5090','unknown'].includes(input.gpuAlias), 'invalid_gpu_alias');
   need(['none','310.9.16','unknown'].includes(input.neuralRuntime), 'invalid_neural_runtime');
   need(input.platform===undefined || ['unknown','steam','epic','ea','gog','ubisoft','xbox','battlenet','wegame','hoyo','cube','sonkwo','standalone'].includes(input.platform),'invalid_platform');
+  const runtimes=input.runtimes===undefined?undefined:runtimeSnapshot(input.runtimes);
+  if(input.scheme==='mfg-unlocker-1.6.1-compat'){
+    need(input.patchVersion==='1.6.1','invalid_patch_version');
+    need(input.neuralRuntime==='none' && (!runtimes || runtimes.components.every(c=>c.kind!=='nr' && c.source!=='managed')),'unsupported_runtime_for_scheme');
+  }
   return { schema: 1, game, title: text(input.title, 80), notes: text(input.notes || '', NOTES_LIMIT, true),
     ...(input.presets===undefined?{}:{presets:presetSnapshot(input.presets,input.scheme,input.patchVersion)}),
-    ...(input.runtimes===undefined?{}:{runtimes:runtimeSnapshot(input.runtimes)}),
+    ...(runtimes===undefined?{}:{runtimes}),
     ...(input.platform?{platform:input.platform}:{}),...(input.edition?{edition:text(input.edition,80)}:{}),
     scheme: input.scheme, patchVersion: input.patchVersion, entries: input.entries,
     renderer: input.renderer, gpuModel: text(input.gpuModel || '', 80, true),

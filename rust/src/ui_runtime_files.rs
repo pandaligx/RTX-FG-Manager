@@ -8,7 +8,14 @@ struct RuntimeView {
 impl Render for RuntimeView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.owner
-            .update(cx, |owner, cx| owner.runtime_body(window, cx))
+            .update(cx, |owner, cx| {
+                // Render the fixed target without changing the library selection.
+                let selected = owner.c.focus.clone();
+                owner.c.focus = owner.runtime_game.clone();
+                let body = owner.runtime_body(window, cx);
+                owner.c.focus = selected;
+                body
+            })
             .unwrap_or_else(|_| div().into_any_element())
     }
 }
@@ -66,7 +73,7 @@ impl Manager {
     pub(super) fn clear_runtime_window(&mut self, cx: &mut Context<Self>) {
         self.runtime_window = None;
         self.runtime_feedback = None;
-        self.dialog_active = false;
+        self.runtime_game = None;
         cx.notify();
     }
     pub(super) fn reconcile_runtime_window(&mut self, cx: &mut Context<Self>) {
@@ -93,6 +100,7 @@ impl Manager {
         if self.dialog_active || self.c.focus.is_none() || self.c.busy {
             return;
         }
+        self.runtime_game = self.c.focus.clone();
         self.runtime_versions.clear();
         self.runtime_feedback = None;
         let owner = cx.entity();
@@ -129,10 +137,10 @@ impl Manager {
             let result_owner = owner.clone();
             let result = cx.open_window(options, move |window, cx| {
                 let close = owner.downgrade();
-                window.on_window_should_close(cx, move |_, cx| {
+                window.on_window_should_close(cx, move |window, cx| {
                     close
                         .update(cx, |this, cx| {
-                            if this.dialog_active {
+                            if window.has_active_dialog(cx) {
                                 return false;
                             }
                             this.clear_runtime_window(cx);
@@ -147,23 +155,25 @@ impl Manager {
                     cx.spawn_in(window, async move |this, cx| {
                         loop {
                             smol::Timer::after(Duration::from_millis(80)).await;
-                            if this
-                                .update_in(cx, |this: &mut RuntimeView, window, cx| {
-                                    let _ = this.owner.update(cx, |owner, cx| {
-                                        if owner.c.closing {
-                                            return;
-                                        }
-                                        if let Some(message) = owner.c.warning.take() {
-                                            owner.runtime_feedback = Some((true, message));
-                                            cx.notify();
-                                        } else if let Some(message) = owner.c.notice.take() {
-                                            owner.runtime_feedback = Some((false, message));
-                                            cx.notify();
-                                        }
-                                        if owner.c.confirm.is_some() {
-                                            owner.dialogs(window, cx);
-                                        }
-                                    });
+                            if cx
+                                .update(|window, cx| {
+                                    this.update(cx, |this: &mut RuntimeView, cx| {
+                                        let _ = this.owner.update(cx, |owner, cx| {
+                                            if owner.c.closing || !owner.accepts_feedback(window) {
+                                                return;
+                                            }
+                                            if let Some(message) = owner.c.warning.take() {
+                                                owner.runtime_feedback = Some((true, message));
+                                                cx.notify();
+                                            } else if let Some(message) = owner.c.notice.take() {
+                                                owner.runtime_feedback = Some((false, message));
+                                                cx.notify();
+                                            }
+                                            if owner.c.confirm.is_some() {
+                                                owner.dialogs(window, cx);
+                                            }
+                                        });
+                                    })
                                 })
                                 .is_err()
                             {

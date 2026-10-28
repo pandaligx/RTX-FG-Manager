@@ -949,6 +949,42 @@ mod tests {
             .collect()
     }
     #[test]
+    fn patch_cleanup_restores_owned_dlss_but_preserves_external_changes() -> Result<()> {
+        for foreign in [false, true] {
+            let tmp = tempfile::tempdir()?;
+            let t = target(&tmp.path().join("Game"))?;
+            for kind in ["sr", "rr", "fg"] {
+                let s = sources(&tmp.path().join("sources").join(kind), kind)?;
+                let path = t.directory.join(filename(kind)?);
+                fs::write(&path, format!("original {kind}"))?;
+                install_locked(&t, kind, &[path], &s)?;
+            }
+            let foreign_path = t.directory.join(filename("sr")?);
+            if foreign {
+                fs::write(&foreign_path, b"external change")?;
+            }
+            let result = crate::cleanup::clean_outcome_at(&t);
+            if foreign {
+                assert!(result.is_err());
+                assert_eq!(fs::read(&foreign_path)?, b"external change");
+                assert!(
+                    read(&t, "sr")?.is_some(),
+                    "keep ownership and recovery backup"
+                );
+            } else {
+                assert!(result?.complete);
+                for kind in ["sr", "rr", "fg"] {
+                    assert_eq!(
+                        fs::read(t.directory.join(filename(kind)?))?,
+                        format!("original {kind}").as_bytes()
+                    );
+                    assert!(read(&t, kind)?.is_none());
+                }
+            }
+        }
+        Ok(())
+    }
+    #[test]
     fn mixed_separators_keep_legacy_ownership_and_restore_originals() -> Result<()> {
         let tmp = tempfile::tempdir()?;
         let t = target(&tmp.path().join("The Witcher 3/bin/x64_dx12"))?;

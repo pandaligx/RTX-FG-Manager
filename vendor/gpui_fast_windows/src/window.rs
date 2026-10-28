@@ -616,6 +616,10 @@ impl rwh::HasDisplayHandle for WindowsWindow {
 impl Drop for WindowsWindow {
     fn drop(&mut self) {
         self.0.dialog_owner.close();
+        // Programmatic closes also retire accessibility providers before HWND
+        // destruction; the async dialog-owner drain can retain this Rc longer.
+        let a11y = self.0.state.a11y.borrow_mut().take();
+        drop(a11y);
         unsafe { ShowWindowAsync(self.0.hwnd, SW_HIDE).ok().log_err() };
         // `DestroyWindow` below sends `WM_SHOWWINDOW`; without a callback the
         // resulting visibility report has nothing to notify.

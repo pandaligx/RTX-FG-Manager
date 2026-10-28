@@ -1,4 +1,10 @@
 {
+  "关于": "About",
+  "版本号": "Version",
+  "图形接口": "Graphics API",
+  "分享内容": "Share details",
+  "方案内容": "Setup",
+  "项目": "Item",
   "游戏": "Games",
   "游戏详情": "Game details",
   "设置": "Settings",
@@ -301,5 +307,15 @@
   "删除后，其他玩家将无法再查看或评价这个分享。此操作不可撤销。": "This permanently deletes the share and its feedback. Other players will no longer see it.",
   "只能修改自己的分享": "You can only edit your own shares",
   "不能更换已分享方案的游戏": "An existing share cannot be moved to another game",
-  "此邮箱还没有分享这款游戏的方案。请使用分享时的邮箱登录。": "This email has no shares for this game. Sign in with the email used to publish your setup."
+  "此邮箱还没有分享这款游戏的方案。请使用分享时的邮箱登录。": "This email has no shares for this game. Sign in with the email used to publish your setup.",
+  "Windows 帧生成补丁管理器": "Frame-generation patch manager for Windows",
+  "作者": "Author",
+  "项目主页": "Project",
+  "作者主页": "Author links",
+  "补丁项目": "Patch projects",
+  "界面组件": "UI framework",
+  "鸣谢": "Acknowledgements",
+  "大大大怪将军阁下（测试支持）": "Da Da Da Guai Jiangjun (testing)",
+  "游戏原有（保留本机）": "Native files (keep local)",
+  "未收录或含多个版本的游戏原有组件仅作参考；安装并应用会保留本机文件，不自动替换。": "Unlisted or mixed native versions are reference only. Install and apply retains local files without automatically replacing them."
 }

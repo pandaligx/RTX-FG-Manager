@@ -16,7 +16,7 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
-    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, notesLimit:NOTES_LIMIT };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, mfg161:1, notesLimit:NOTES_LIMIT };
     if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
@@ -27,13 +27,14 @@ export function createApi(db, options) {
     const user = auth.user(headers.authorization, method!=='GET');
     // Older test clients reject unknown JSON fields. Opt in to the feedback extension.
     const feedback=headers['x-rtxfg-feedback'];
-    const crossStore=['4','5','6','7','8','9'].includes(feedback);
+    const crossStore=['4','5','6','7','8','9','10'].includes(feedback);
     const context=url.searchParams.get('game');
     const card = (row,requested=context) => {
-      const result=publicRecipe(db,row,user,['2','3','4','5','6','7','8','9'].includes(feedback),['3','4','5','6','7','8','9'].includes(feedback),['5','6','7','8','9'].includes(feedback));
-      if(!['6','7','8','9'].includes(feedback)) delete result.content.presets;
-      if(!['7','8','9'].includes(feedback)) delete result.content.runtimes;
-      if(feedback!=='9' && result.content.presets?.profile==='upstream041') delete result.content.presets;
+      const result=publicRecipe(db,row,user,['2','3','4','5','6','7','8','9','10'].includes(feedback),['3','4','5','6','7','8','9','10'].includes(feedback),['5','6','7','8','9','10'].includes(feedback));
+      if(!['6','7','8','9','10'].includes(feedback)) delete result.content.presets;
+      if(!['7','8','9','10'].includes(feedback)) delete result.content.runtimes;
+      if(!['9','10'].includes(feedback) && result.content.presets?.profile==='upstream041') delete result.content.presets;
+      if(feedback!=='10' && result.content.scheme==='mfg-unlocker-1.6.1-compat') delete result.content.presets;
       if(crossStore && requested) {
         need(games.resolve(requested)===games.resolve(row.game),'game_mismatch');
         result.content.game={id:requested,name:games.describe(requested).name};
@@ -41,7 +42,7 @@ export function createApi(db, options) {
         if(requested.startsWith('custom:')) result.content.game.name=games.label(requested);
       }
       if(!crossStore){delete result.content.platform;delete result.content.edition;}
-      if(!['8','9'].includes(feedback)) result.content.notes=legacyNotes(result.content.notes);
+      if(!['8','9','10'].includes(feedback)) result.content.notes=legacyNotes(result.content.notes);
       return result;
     };
     if (method === 'GET' && route === '/v1/me') { need(user,'login_required',401); return { id:user.id, admin:user.admin, expiresAt:user.expires }; }
@@ -124,7 +125,7 @@ export function createApi(db, options) {
             db.prepare("INSERT INTO audit(actor,action,target,created) VALUES('system','report_threshold_hide',?,?)").run(row.id,t);
           }
         }
-        return ['3','4','5','6','7','8','9'].includes(feedback) ? card(lookup(row.id)) : {ok:true};
+        return ['3','4','5','6','7','8','9','10'].includes(feedback) ? card(lookup(row.id)) : {ok:true};
       }
       need(!match[2],'not_found',404); need(row.author===user.id,'not_owner',403);
       if(method==='DELETE') {
@@ -138,15 +139,16 @@ export function createApi(db, options) {
       const original=JSON.parse(row.content);content.game=original.game;
       // Old clients only received a bounded excerpt. Never overwrite the full text
       // with that excerpt, or silently erase its unseen remainder during edits.
-      if(!['8','9'].includes(feedback) && [...original.notes].length>500) {
+      if(!['8','9','10'].includes(feedback) && [...original.notes].length>500) {
         need(content.notes===legacyNotes(original.notes),'long_notes_require_update',409);
         content.notes=original.notes;
       }
       // Legacy editors never saw this extension. Preserve it for metadata-only
       // edits; a change of patch/project drops it instead of mixing protocols.
-      if(!['6','7','8','9'].includes(feedback) && original.presets && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.presets=original.presets;
-      if(feedback!=='9' && original.presets?.profile==='upstream041' && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.presets=original.presets;
-      if(!['7','8','9'].includes(feedback) && original.runtimes && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.runtimes=original.runtimes;
+      if(!['6','7','8','9','10'].includes(feedback) && original.presets && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.presets=original.presets;
+      if(!['9','10'].includes(feedback) && original.presets?.profile==='upstream041' && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.presets=original.presets;
+      if(feedback!=='10' && original.scheme==='mfg-unlocker-1.6.1-compat' && original.presets && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.presets=original.presets;
+      if(!['7','8','9','10'].includes(feedback) && original.runtimes && original.scheme===content.scheme && original.patchVersion===content.patchVersion)content.runtimes=original.runtimes;
       if(!crossStore)for(const field of ['platform','edition'])if(original[field])content[field]=original[field];
       db.prepare('UPDATE recipes SET content=?,revision=revision+1,updated=? WHERE id=?').run(JSON.stringify(content),t,row.id);
       // Feedback belongs to the shared setup across edits. Keep the revision guard

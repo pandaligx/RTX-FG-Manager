@@ -42,6 +42,8 @@ mod recommendation_entry;
 mod recommendations;
 #[path = "ui_runtime_files.rs"]
 mod runtime_files;
+#[path = "ui_settings.rs"]
+mod settings;
 
 #[derive(Clone, PartialEq)]
 enum Command {
@@ -163,7 +165,7 @@ fn game_directories(game: &rtx_fg_manager::scanner::Game) -> Vec<String> {
 pub struct Manager {
     drag_gap: Option<(String, bool)>,
     folder_feedback: Option<(String, Instant)>,
-    choices: RefCell<HashMap<&'static str, ChoiceBinding>>,
+    choices: RefCell<HashMap<(WindowId, &'static str), ChoiceBinding>>,
     encore_editor: RefCell<Option<(String, Entity<encore_editor::EncoreEditor>)>>,
     encore_invalid: Rc<Cell<bool>>,
     c: Controller,
@@ -189,6 +191,11 @@ pub struct Manager {
     update_ready_sent: bool,
     dialog_active: bool,
     runtime_window: Option<AnyWindowHandle>,
+    settings_window: Option<AnyWindowHandle>,
+    recommendation_windows: HashMap<String, AnyWindowHandle>,
+    feedback_window: Option<AnyWindowHandle>,
+    main_window: AnyWindowHandle,
+    runtime_game: Option<String>,
     runtime_versions: HashMap<&'static str, String>,
     runtime_feedback: Option<(bool, String)>,
     editor_open: bool,
@@ -286,14 +293,20 @@ impl Manager {
                 .step(1.)
                 .default_value(font_size)
         });
-        let font_subscription =
-            cx.subscribe_in(&font_slider, window, |this, _, event, window, cx| {
-                if let SliderEvent::Change(value) = event {
-                    this.set_font_size(value.end().round() as u8, window, cx);
-                }
-            });
+        let font_window = window.window_handle();
+        let font_subscription = cx.subscribe(&font_slider, move |_, _, event, cx| {
+            if let SliderEvent::Change(value) = event {
+                let size = value.end().round() as u8;
+                let owner = cx.entity().downgrade();
+                cx.defer(move |cx| {
+                    let _ = font_window.update(cx, |_, window, cx| {
+                        let _ = owner.update(cx, |owner, cx| owner.set_font_size(size, window, cx));
+                    });
+                });
+            }
+        });
         let search = cx.new(|cx| InputState::new(window, cx).placeholder(c.text("搜索游戏")));
-        let subscription = cx.subscribe_in(&search, window, |this, state, event, _, cx| {
+        let subscription = cx.subscribe(&search, |this, state, event, cx| {
             if matches!(event, InputEvent::Change) {
                 this.c.search = state.read(cx).value().to_string();
                 this.filter();
@@ -342,6 +355,11 @@ impl Manager {
             update_ready_sent: false,
             dialog_active: false,
             runtime_window: None,
+            settings_window: None,
+            recommendation_windows: HashMap::new(),
+            feedback_window: None,
+            main_window: window.window_handle(),
+            runtime_game: None,
             runtime_versions: HashMap::new(),
             runtime_feedback: None,
             drag_gap: None,
@@ -359,8 +377,23 @@ impl Manager {
             // update. Release that lease before touching the owning view.
             cx.defer(move |cx| {
                 let _ = owner.update(cx, |this, cx| {
+                    this.choices.borrow_mut().retain(|(id, _), _| *id != closed);
+                    this.recommendation_windows
+                        .retain(|_, w| w.window_id() != closed);
+                    if this
+                        .feedback_window
+                        .is_some_and(|w| w.window_id() == closed)
+                    {
+                        this.feedback_window = None;
+                    }
                     if this.runtime_window.is_some_and(|w| w.window_id() == closed) {
                         this.clear_runtime_window(cx);
+                    }
+                    if this
+                        .settings_window
+                        .is_some_and(|w| w.window_id() == closed)
+                    {
+                        this.clear_settings_window(cx);
                     }
                 });
             });
@@ -369,8 +402,8 @@ impl Manager {
         cx.spawn_in(window, async move |this, cx| {
             loop {
                 smol::Timer::after(Duration::from_millis(20)).await;
-                if this
-                    .update_in(cx, |this, window, cx| this.tick(window, cx))
+                if cx
+                    .update(|window, cx| this.update(cx, |this, cx| this.tick(window, cx)))
                     .is_err()
                 {
                     break;
@@ -490,15 +523,42 @@ impl Manager {
             return;
         }
         self.reconcile_runtime_window(cx);
-        // The utility owns the selected game until it closes. Main-window
-        // commands cannot silently retarget an operation or a process retry.
-        if let Some(runtime) = self.runtime_window
-            && runtime.window_id() != window.window_handle().window_id()
-        {
-            cx.defer(move |cx| {
-                let _ = runtime.update(cx, |_, window, _| window.activate_window());
-            });
+        self.reconcile_settings_window(cx);
+        if self.dialog_active && !window.has_active_dialog(cx) {
+            // Only an actual modal owns interaction, never an open utility.
+            if let Some(handle) = self.feedback_window {
+                cx.defer(move |cx| {
+                    let _ = handle.update(cx, |_, w, _| w.activate_window());
+                });
+            }
             return;
+        }
+        if !self.c.busy {
+            self.feedback_window = Some(window.window_handle());
+        }
+        // Utility actions are bound to the game shown in that utility. Explicit
+        // activation selects that game in the main view too; opening another
+        // window or changing the library selection never silently retargets it.
+        if self
+            .runtime_window
+            .is_some_and(|w| w.window_id() == window.window_handle().window_id())
+            && matches!(
+                command,
+                Command::InstallNeural(_)
+                    | Command::RuntimeOperation(..)
+                    | Command::RefreshRuntimeFiles
+                    | Command::Confirm(_)
+                    | Command::Commit(_)
+            )
+            && let Some(exe) = self.runtime_game.clone()
+        {
+            if !self.c.games.iter().any(|g| g.exe == exe) {
+                self.runtime_feedback =
+                    Some((true, self.c.text("游戏已移除，请关闭此窗口后重新选择游戏")));
+                cx.notify();
+                return;
+            }
+            self.c.focus = Some(exe);
         }
         if self.encore_invalid.get()
             && self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE
@@ -542,6 +602,7 @@ impl Manager {
                     json!(!self.c.boolean("sidebar_collapsed", true));
                 self.c.save();
             }
+            Command::Page(2) => self.open_settings(window, cx),
             Command::Page(p) => self.c.page = p,
             Command::GpuEditor => self.gpu_editor(window, cx),
             Command::RenameGame(exe) => self.rename_game(exe, window, cx),
@@ -897,6 +958,25 @@ impl Manager {
                 this.act(action.clone(), window, cx)
             }))
     }
+    fn brand_logo(size: Rems, cx: &App) -> Div {
+        div()
+            .size(size)
+            .flex_shrink_0()
+            .relative()
+            .child(
+                svg()
+                    .path("app/manager-backplate.svg")
+                    .size_full()
+                    .text_color(cx.theme().foreground),
+            )
+            .child(
+                div().absolute().inset_0().h_flex().justify_center().child(
+                    Icon::new(IconName::Cpu)
+                        .size(size * 0.625)
+                        .text_color(cx.theme().background),
+                ),
+            )
+    }
     fn icon(name: IconName) -> Icon {
         Icon::new(name).size(px(20.))
     }
@@ -961,22 +1041,31 @@ impl Manager {
             .position(|(_, _, checked)| *checked)
             .map(IndexPath::new);
         let mut choices = self.choices.borrow_mut();
-        let binding = choices.entry(id).or_insert_with(|| {
+        let key = (window.window_handle().window_id(), id);
+        let binding = choices.entry(key).or_insert_with(|| {
             let state = cx.new(|cx| SelectState::new(options(), selected, window, cx));
-            let subscription =
-                cx.subscribe_in(&state, window, move |this, _, event, window, cx| {
-                    let SelectEvent::Confirm(value) = event;
-                    let action = value.and_then(|index| {
-                        this.choices
-                            .borrow()
-                            .get(id)
-                            .and_then(|b| b.items.get(index))
-                            .map(|(_, action, _)| action.clone())
-                    });
-                    if let Some(action) = action {
-                        this.act(action, window, cx);
-                    }
+            let event_window = window.window_handle();
+            let subscription = cx.subscribe(&state, move |this, _, event, cx| {
+                let SelectEvent::Confirm(value) = event;
+                let action = value.and_then(|index| {
+                    this.choices
+                        .borrow()
+                        .get(&key)
+                        .and_then(|binding| binding.items.get(index))
+                        .map(|(_, action, _)| action.clone())
                 });
+                if let Some(action) = action {
+                    let owner = cx.entity().downgrade();
+                    // The shared Manager can be observed by several windows.
+                    // Resolve the exact emitting window, not Manager's current
+                    // entity-to-window association in GPUI.
+                    cx.defer(move |cx| {
+                        let _ = event_window.update(cx, |_, window, cx| {
+                            let _ = owner.update(cx, |owner, cx| owner.act(action, window, cx));
+                        });
+                    });
+                }
+            });
             ChoiceBinding {
                 state,
                 items: items.clone(),
@@ -1032,27 +1121,17 @@ impl Manager {
             .child(
                 div()
                     .h_flex()
-                    .h_8()
+                    .h(rems(2.5))
                     .w_full()
                     .gap_2()
                     .when(collapsed, |d| d.justify_center())
                     .when(!collapsed, |d| d.px_1())
-                    .child(
-                        div()
-                            .size_8()
-                            .flex_shrink_0()
-                            .rounded_lg()
-                            .bg(cx.theme().foreground)
-                            .text_color(cx.theme().background)
-                            .h_flex()
-                            .justify_center()
-                            .child(Self::icon(IconName::Cpu).size_5()),
-                    )
+                    .child(Self::brand_logo(rems(2.5), cx))
                     .when(!collapsed, |d| {
                         d.child(div().text_sm().whitespace_nowrap().child("RTX-FG-Manager"))
                     }),
             );
-        let mut navigation = div().v_flex().w_full();
+        let mut navigation = div().v_flex().w_full().gap_1();
         for (page, icon, label) in [
             (0, IconName::LayoutDashboard, "游戏"),
             (2, IconName::Settings, "设置"),
@@ -1077,7 +1156,11 @@ impl Manager {
                                 d.child(div().text_sm().child(label.clone()))
                             }),
                     )
-                    .selected(self.c.page == page)
+                    .selected(if page == 2 {
+                        self.settings_window.is_some()
+                    } else {
+                        self.c.page == page
+                    })
                     .when(collapsed, |b| b.tooltip(label.clone()))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.act(Command::Page(page), window, cx)
@@ -1773,7 +1856,7 @@ impl Manager {
         let view = cx.entity().downgrade();
         let remove_label = self.t("从游戏库移除");
         let rename_label = self.t("修改游戏名称");
-        let menu_disabled = self.c.busy || self.runtime_window.is_some();
+        let menu_disabled = self.c.busy;
         let game_icon = self
             .c
             .icons
@@ -2012,9 +2095,6 @@ impl Manager {
                         .disabled(menu_disabled)
                         .on_click(move |_, window, cx| {
                             let _ = view.update(cx, |this, cx| {
-                                if this.runtime_window.is_some() {
-                                    return;
-                                }
                                 this.c.focus = Some(exe.clone());
                                 this.act(Command::Confirm("remove".into()), window, cx);
                             });
@@ -2234,19 +2314,16 @@ impl Manager {
             })).small()))
             .child(common)
             .child(
-                Accordion::new("preset-accordion")
-                    .small()
-                    .item(|item| {
-                        item.title(self.t("高级参数"))
-                            .open(self.c.boolean("preset_expanded", false))
-                            .child(fields)
-                    })
-                    .on_toggle_click(cx.listener(|this, indices: &[usize], _, cx| {
-                        this.c.state["preset_expanded"] = json!(!indices.is_empty());
-                        this.c.save();
-                        cx.notify();
+                Button::new("preset-accordion")
+                    .label(self.t("高级参数"))
+                    .icon(if self.c.boolean("preset_expanded", false) { IconName::ChevronDown } else { IconName::ChevronRight })
+                    .ghost().small().w_full().justify_start().flex_shrink_0()
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.c.state["preset_expanded"] = json!(!this.c.boolean("preset_expanded", false));
+                        this.c.save(); cx.notify();
                     })),
             )
+            .when(self.c.boolean("preset_expanded", false), |d| d.child(fields.flex_shrink_0()))
             .into_any_element()
     }
     fn proxy_panel(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -2342,6 +2419,7 @@ impl Manager {
             return;
         }
         self.dialog_active = true;
+        self.feedback_window = Some(window.window_handle());
         self.editor_open = true;
         self.c.state["preset_help_open"] = json!(false);
         let owner = cx.entity();
@@ -2438,6 +2516,7 @@ impl Manager {
         let name = game.map(|g| self.c.game_name(g)).unwrap_or_default();
         let mut content = div()
             .v_flex()
+            .flex_shrink_0()
             .gap_3()
             .child(div().font_weight(FontWeight::SEMIBOLD).child(name))
             .child(
@@ -2491,7 +2570,7 @@ impl Manager {
             .v_flex()
             .w_full()
             .min_h_0()
-            .max_h((window.viewport_size().height - px(180.)).max(px(180.)))
+            .h((window.viewport_size().height - px(180.)).max(px(180.)))
             .child(
                 div()
                     .id("game-editor-scroll")
@@ -2663,16 +2742,18 @@ impl Manager {
             .into_any_element()
     }
     fn hardware_summary(&self, cx: &Context<Self>) -> AnyElement {
-        let gpu = self
-            .c
-            .gpu
-            .split(" | ")
-            .next()
+        let device = self.c.devices.get(self.c.device_index);
+        let gpu = device
+            .and_then(|d| d.original_name.as_deref())
             .unwrap_or(&self.c.gpu)
-            .strip_prefix("NVIDIA ")
-            .unwrap_or_else(|| self.c.gpu.split(" | ").next().unwrap_or(&self.c.gpu))
             .to_owned();
-        let full_gpu = self.c.gpu.clone();
+        let modified = device
+            .and_then(|d| d.modified_name.clone())
+            .unwrap_or_else(|| self.c.text("未修改"));
+        let names = [
+            ("inspector-gpu-name", self.t("实际型号"), gpu),
+            ("inspector-gpu-modified", self.t("修改后型号"), modified),
+        ];
         div()
             .v_flex()
             .flex_shrink_0()
@@ -2682,25 +2763,29 @@ impl Manager {
             .border_color(cx.theme().border)
             .child(
                 div()
-                    .h_flex()
+                    .v_flex()
+                    .w_full()
+                    .min_w_0()
                     .gap_2()
-                    .child(
-                        Self::icon(IconName::Cpu)
-                            .size_5()
-                            .text_color(cx.theme().muted_foreground),
-                    )
-                    .child(
+                    .children(names.into_iter().map(|(id, label, value)| {
+                        let full = value.clone();
                         div()
-                            .id("inspector-gpu-name")
-                            .flex_1()
+                            .id(id)
+                            .v_flex()
+                            .w_full()
                             .min_w_0()
+                            .gap_0p5()
                             .text_sm()
                             .whitespace_normal()
-                            .tooltip(move |window, cx| {
-                                Tooltip::new(full_gpu.clone()).build(window, cx)
-                            })
-                            .child(gpu),
-                    ),
+                            .tooltip(move |window, cx| Tooltip::new(full.clone()).build(window, cx))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(label),
+                            )
+                            .child(value)
+                    })),
             )
             .child(
                 self.button("gpu-editor", "修改显卡型号", Command::GpuEditor, cx)
@@ -3280,98 +3365,8 @@ impl Manager {
             )
             .into_any_element()
     }
-    fn settings_section(&self, title: &str, icon: IconName, cx: &App) -> Div {
-        div()
-            .v_flex()
-            .w_full()
-            .min_w_0()
-            .gap_3()
-            .p_4()
-            .border_1()
-            .border_color(cx.theme().border)
-            .rounded_lg()
-            .child(
-                div()
-                    .h_flex()
-                    .gap_2()
-                    .pb_2()
-                    .border_b_1()
-                    .border_color(cx.theme().border)
-                    .child(
-                        Icon::new(icon)
-                            .size_4()
-                            .text_color(cx.theme().muted_foreground),
-                    )
-                    .child(div().font_weight(FontWeight::SEMIBOLD).child(self.t(title))),
-            )
-    }
-    fn settings_row(&self, label: &str, control: AnyElement) -> Div {
-        div()
-            .h_flex()
-            .w_full()
-            .min_w_0()
-            .gap_4()
-            .child(div().flex_1().min_w_0().child(self.t(label)))
-            .child(div().w(rems(14.)).flex_shrink_0().child(control))
-    }
-    fn update_panel(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let source = self.c.choice("download_source", "domestic");
-        let mut panel = div()
-            .v_flex()
-            .w_full()
-            .min_w_0()
-            .flex_shrink_0()
-            .gap_3()
-            .child(
-                self.settings_row(
-                    "当前版本",
-                    div()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(format!("v{VERSION}"))
-                        .into_any_element(),
-                ),
-            )
-            .child(
-                self.settings_row(
-                    "下载来源",
-                    self.menu(
-                        "source",
-                        self.t(match source.as_str() {
-                            "github" => "GitHub 优先",
-                            _ => "GitCode 优先",
-                        }),
-                        [("domestic", "GitCode 优先"), ("github", "GitHub 优先")]
-                            .iter()
-                            .map(|(s, t)| (self.t(t), Command::Source((*s).into()), *s == source))
-                            .collect(),
-                        false,
-                        window,
-                        cx,
-                    ),
-                ),
-            );
-        for (key, label, default) in [
-            ("auto_update", "自动检查更新", true),
-            ("auto_download", "自动下载更新", false),
-        ] {
-            panel = panel.child(
-                div()
-                    .h_flex()
-                    .w_full()
-                    .gap_4()
-                    .child(div().flex_1().min_w_0().child(self.t(label)))
-                    .child(
-                        Switch::new(key)
-                            .focus_ring(crate::ui_focus::visible(cx))
-                            .accessibility_label(self.t(label))
-                            .checked(self.c.boolean(key, default))
-                            .on_click(cx.listener(move |this, yes, window, cx| {
-                                this.act(Command::Boolean(key.into(), *yes), window, cx)
-                            })),
-                    ),
-            );
-        }
-        panel = panel.child(
+    fn update_panel(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let mut panel = div().v_flex().w_full().min_w_0().gap_3().child(
             div()
                 .h_flex()
                 .gap_2()
@@ -3490,342 +3485,6 @@ impl Manager {
             );
         }
         panel.into_any_element()
-    }
-    fn settings(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        // Scale the column breakpoint with the app font. Each section keeps one
-        // reading order and the outer viewport owns scrolling at every width.
-        let wide = f32::from(window.viewport_size().width) - self.layout(window).nav
-            >= 924. * self.scale();
-        let language = self.c.choice("language", "system");
-        let language_menu = self.menu(
-            "language",
-            i18n::LANGUAGES
-                .iter()
-                .find(|(code, _)| *code == language)
-                .map(|(code, label)| {
-                    if *code == "system" {
-                        self.t("跟随系统")
-                    } else {
-                        (*label).into()
-                    }
-                })
-                .unwrap_or_else(|| self.t("跟随系统")),
-            i18n::LANGUAGES
-                .iter()
-                .map(|(code, label)| {
-                    (
-                        if *code == "system" {
-                            self.t("跟随系统")
-                        } else {
-                            (*label).into()
-                        },
-                        Command::Language((*code).into()),
-                        *code == language,
-                    )
-                })
-                .collect(),
-            false,
-            window,
-            cx,
-        );
-        let motion = self.c.choice("ui_motion", "on");
-        let motion_choices = [("system", "跟随系统"), ("on", "开启"), ("off", "关闭")];
-        let motion_menu = self.menu(
-            "ui-motion",
-            self.t(motion_choices
-                .iter()
-                .find(|(key, _)| *key == motion)
-                .map(|(_, label)| *label)
-                .unwrap_or("开启")),
-            motion_choices
-                .into_iter()
-                .map(|(key, label)| (self.t(label), Command::Motion(key), key == motion))
-                .collect(),
-            false,
-            window,
-            cx,
-        );
-        let theme = if self.c.choice("theme", "跟随系统") == "跟随系统" {
-            self.t("跟随系统")
-        } else {
-            cx.theme().theme_name().to_string().into()
-        };
-        let font_size = preferred_font_size(&self.c.state) as u8;
-        let appearance = self
-            .settings_section("外观", IconName::Palette, cx)
-            .child(self.settings_row("语言", language_menu))
-            .child(
-                self.settings_row(
-                    "主题",
-                    self.button("settings-theme", "更换主题…", Command::Themes, cx)
-                        .with_size(gpui_component::Size::Medium)
-                        .label(format!("{theme}…"))
-                        .tooltip(self.t("更换主题…"))
-                        .icon(IconName::Palette)
-                        .w_full()
-                        .into_any_element(),
-                ),
-            )
-            .child(self.settings_row("界面动效", motion_menu))
-            .child(
-                div()
-                    .v_flex()
-                    .gap_3()
-                    .pt_4()
-                    .border_t_1()
-                    .border_color(cx.theme().border)
-                    .child(
-                        div()
-                            .h_flex()
-                            .justify_between()
-                            .gap_2()
-                            .child(self.t("字体大小"))
-                            .child(
-                                div()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(format!("{font_size} px")),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .h_flex()
-                            .w_full()
-                            .gap_3()
-                            .child(
-                                self.button(
-                                    "font-smaller",
-                                    "缩小字体",
-                                    Command::FontSize(font_size.saturating_sub(1)),
-                                    cx,
-                                )
-                                .label("A−")
-                                .accessibility_label(self.t("缩小字体"))
-                                .tooltip(self.t("缩小字体"))
-                                .disabled(font_size <= 12),
-                            )
-                            .child(Slider::new(&self.font_slider).flex_1().min_w_0())
-                            .child(
-                                self.button(
-                                    "font-larger",
-                                    "放大字体",
-                                    Command::FontSize(font_size + 1),
-                                    cx,
-                                )
-                                .label("A+")
-                                .accessibility_label(self.t("放大字体"))
-                                .tooltip(self.t("放大字体"))
-                                .disabled(font_size >= 18),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .h_flex()
-                            .gap_3()
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .text_sm()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(self.t("即时生效，控件与间距同步缩放")),
-                            )
-                            .child(
-                                self.button("font-reset", "恢复默认", Command::FontSize(13), cx)
-                                    .ghost(),
-                            ),
-                    ),
-            );
-        let updates = self
-            .settings_section("软件更新", IconName::RefreshCw, cx)
-            .child(self.update_panel(window, cx));
-        let library = self
-            .settings_section("游戏库", IconName::Folder, cx)
-            .child(
-                div()
-                    .h_flex()
-                    .gap_4()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(self.t("中文界面优先显示中文游戏名")),
-                    )
-                    .child(
-                        Switch::new("chinese-game-names")
-                            .focus_ring(crate::ui_focus::visible(cx))
-                            .accessibility_label(self.t("中文界面优先显示中文游戏名"))
-                            .checked(self.c.boolean("chinese_game_names", true))
-                            .on_click(cx.listener(|this, yes, window, cx| {
-                                this.act(
-                                    Command::Boolean("chinese_game_names".into(), *yes),
-                                    window,
-                                    cx,
-                                )
-                            })),
-                    ),
-            )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(self.t("名称优先读取安装记录；无法确认时保留原名，可手动改名。")),
-            )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(self.c.text(&format!(
-                        "离线名称库：{0} 条 · {1}",
-                        self.c.game_names.len(),
-                        self.c.game_names.revision()
-                    ))),
-            )
-            .when(!self.c.names_status.is_empty(), |d| {
-                d.child(div().text_sm().child(self.t(&self.c.names_status)))
-            })
-            .child(
-                div().h_flex().child(
-                    self.button(
-                        "update-game-names",
-                        "更新名称库",
-                        Command::UpdateGameNames,
-                        cx,
-                    )
-                    .with_size(gpui_component::Size::Medium)
-                    .disabled(self.c.names_busy || self.c.read_only),
-                ),
-            );
-        let maintenance = self.settings_section("缓存维护", IconName::Settings, cx)
-            .child(div().text_sm().text_color(cx.theme().muted_foreground)
-                .child(self.t("清理下载、更新暂存及未使用的已识别组件缓存；保留游戏列表、参数和归属记录。需要时重新下载或生成缓存。")))
-            .child(div().h_flex().child(self.button("clear-cache", "清理缓存", Command::ClearCache, cx)
-                .with_size(gpui_component::Size::Medium)
-                .disabled(self.c.busy || self.c.update_busy)));
-        let mut links = div().h_flex().w_full().flex_wrap().gap_x_4().gap_y_2();
-        for (label, url) in [
-            (
-                "GitHub · sdli1995",
-                "https://github.com/sdli1995/dlssg_for_sm86",
-            ),
-            ("小南瓜 · lgxng.cn", "https://lgxng.cn/"),
-            ("GitHub · pandaligx", "https://github.com/pandaligx"),
-            ("哔哩哔哩 · 小南瓜", "https://b23.tv/5mHCHFn"),
-            (
-                "哔哩哔哩 · 大大大怪将军阁下（测试支持）",
-                "https://space.bilibili.com/608531525",
-            ),
-            (
-                "哔哩哔哩 · 云外逸声",
-                "https://space.bilibili.com/256887068",
-            ),
-        ] {
-            // Base Link provides keyboard activation and link semantics, while
-            // this app supplies the quiet theme treatment and existing opener.
-            links = links.child(
-                gpui::base::Link::new(url)
-                    .href(url)
-                    .accessibility_label(self.t(label))
-                    .on_activate(cx.listener(move |this, _, window, cx| {
-                        this.act(Command::Open(url.into()), window, cx)
-                    }))
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .underline()
-                    .cursor_pointer()
-                    .hover(|d| d.text_color(cx.theme().foreground))
-                    .when(crate::ui_focus::visible(cx), |d| {
-                        d.focus(|s| s.bg(cx.theme().muted))
-                    })
-                    .child(self.t(label)),
-            );
-        }
-        // Independent columns keep short sections compact; the narrow layout
-        // retains a single reading order at larger font sizes.
-        let sections = if wide {
-            div()
-                .h_flex()
-                .items_start()
-                .w_full()
-                .min_w_0()
-                .gap_4()
-                .child(
-                    div()
-                        .v_flex()
-                        .flex_1()
-                        .min_w_0()
-                        .gap_4()
-                        .child(appearance)
-                        .child(library),
-                )
-                .child(
-                    div()
-                        .v_flex()
-                        .flex_1()
-                        .min_w_0()
-                        .gap_4()
-                        .child(updates)
-                        .child(maintenance),
-                )
-        } else {
-            div()
-                .v_flex()
-                .w_full()
-                .min_w_0()
-                .gap_4()
-                .child(appearance)
-                .child(updates)
-                .child(library)
-                .child(maintenance)
-        };
-        let content = div()
-            .v_flex()
-            .w_full()
-            .max_w(rems(80.))
-            .min_w_0()
-            .gap_5()
-            .child(
-                div()
-                    .v_flex()
-                    .gap_1()
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(self.t("设置")),
-                    )
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(self.t("外观与偏好更改后自动保存")),
-                    ),
-            )
-            .child(sections)
-            .child(
-                div()
-                    .v_flex()
-                    .gap_3()
-                    .pt_4()
-                    .border_t_1()
-                    .border_color(cx.theme().border)
-                    .child(
-                        div()
-                            .text_sm()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(self.t("关于与致谢")),
-                    )
-                    .child(links),
-            );
-        div()
-            .id("settings-scroll")
-            .v_flex()
-            .flex_1()
-            .min_h_0()
-            .min_w_0()
-            .overflow_y_scroll()
-            .bg(cx.theme().background)
-            .child(div().v_flex().items_center().w_full().p_5().child(content))
-            .into_any_element()
     }
     fn download_ring(&self, diameter: f32, cx: &App) -> AnyElement {
         self.progress_ring(diameter, self.c.download_progress.percent() / 100., cx)
@@ -4292,8 +3951,12 @@ impl Manager {
                 })
         });
     }
+    fn accepts_feedback(&self, window: &Window) -> bool {
+        self.feedback_window.unwrap_or(self.main_window).window_id()
+            == window.window_handle().window_id()
+    }
     fn dialogs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.dialog_active {
+        if self.dialog_active || !self.accepts_feedback(window) {
             return;
         }
         if self.c.warning.is_none()
@@ -4585,6 +4248,7 @@ impl Manager {
     }
     fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.reconcile_runtime_window(cx);
+        self.reconcile_settings_window(cx);
         if self
             .folder_feedback
             .as_ref()
@@ -4635,7 +4299,7 @@ impl Manager {
                 cx.notify();
             }
         }
-        if !self.c.closing && self.runtime_window.is_none() {
+        if !self.c.closing && self.accepts_feedback(window) {
             if self.dialog_active && self.c.confirm.as_deref() == Some("end_processes") {
                 window.close_dialog(cx);
                 self.dialog_active = false;
@@ -4714,7 +4378,6 @@ impl Render for Manager {
             self.first_render_ms = Some(self.started.elapsed().as_secs_f64() * 1000.)
         }
         let content = match self.c.page {
-            2 => self.settings(window, cx),
             3 if self.layout(window).compact => self.details(window, cx),
             _ => self.home(window, cx),
         };
@@ -4825,19 +4488,10 @@ impl Render for Manager {
                                 ),
                         )
                     })
-                    .child(
-                        div()
-                            .v_flex()
-                            .flex_1()
-                            .min_h_0()
-                            .min_w_0()
-                            .when(self.c.page == 2, |d| d.p_4())
-                            .child(content),
-                    )
-                    .when(
-                        self.c.page != 2 && self.c.update_busy && !self.c.checking,
-                        |d| d.child(self.download_bar(cx)),
-                    )
+                    .child(div().v_flex().flex_1().min_h_0().min_w_0().child(content))
+                    .when(self.c.update_busy && !self.c.checking, |d| {
+                        d.child(self.download_bar(cx))
+                    })
                     .when(self.c.closing, |d| d.child(self.t(self.c.close_status()))),
             )
     }
@@ -4937,18 +4591,7 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
                     close
                         .update(cx, |this, cx| {
                             this.reconcile_runtime_window(cx);
-                            if let Some(runtime) = this.runtime_window
-                                && this.any_preset_pending()
-                            {
-                                // Resolve the utility first before retargeting a
-                                // pending parameter editor to another game.
-                                cx.defer(move |cx| {
-                                    let _ = runtime.update(cx, |_, window, _| {
-                                        window.activate_window();
-                                    });
-                                });
-                                return false;
-                            }
+                            this.reconcile_settings_window(cx);
                             if this.any_preset_pending() {
                                 if !this.editor_open {
                                     if let Some((exe, scheme)) = this.c.first_pending_preset() {

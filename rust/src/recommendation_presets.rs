@@ -22,28 +22,62 @@ pub struct Snapshot {
 pub const PROFILES: &[(&str, &str)] = &[
     ("dlssg-transfusion-1.4.5.3", encore::PROFILE),
     ("rtx40mfg-1.3.3-hf2", rtxmfg::PROFILE),
+    (MFG_161_COMPAT, rtxmfg::PROFILE),
     ("upstream-0.3.5-310-9", crate::upstream040::PROFILE),
     ("upstream-0.3.5-310-9", crate::upstream040::PROFILE_041),
     ("rtxfg-0.3.5-dx12-vulkan", "upstream035"),
     ("pipotoufik-mfg-vulkan-sm86-7", presets::MFG_VULKAN),
 ];
 
+pub const MFG_161_COMPAT: &str = "mfg-unlocker-1.6.1-compat";
+
+pub fn validate_scheme_version(scheme: &str, version: &str) -> Result<()> {
+    ensure!(
+        scheme != MFG_161_COMPAT || version == "1.6.1",
+        "MFG 1.6.1 兼容方案只能使用 1.6.1 参数"
+    );
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     InstallAndApply,
     InstallOnly,
     ParametersOnly,
+    Selected {
+        patch: bool,
+        parameters: bool,
+        runtimes: bool,
+    },
 }
 impl Action {
     pub fn installs(self) -> bool {
-        self != Self::ParametersOnly
+        match self {
+            Self::Selected { patch, .. } => patch,
+            Self::ParametersOnly => false,
+            _ => true,
+        }
     }
     pub fn parameters(self) -> bool {
-        self != Self::InstallOnly
+        match self {
+            Self::Selected { parameters, .. } => parameters,
+            Self::InstallOnly => false,
+            _ => true,
+        }
+    }
+    pub fn runtimes(self) -> bool {
+        match self {
+            Self::Selected { runtimes, .. } => runtimes,
+            Self::InstallAndApply => true,
+            _ => false,
+        }
+    }
+    pub fn is_empty(self) -> bool {
+        !self.installs() && !self.parameters() && !self.runtimes()
     }
     pub fn label(self) -> &'static str {
         match self {
-            Self::InstallAndApply => "安装并应用",
+            Self::InstallAndApply | Self::Selected { .. } => "安装并应用",
             Self::InstallOnly => "仅安装方案",
             Self::ParametersOnly => "仅应用参数",
         }
@@ -62,6 +96,7 @@ pub fn execute(
     mut progress: impl FnMut(cloud::CloudProgress),
 ) -> Result<()> {
     use std::sync::atomic::Ordering;
+    ensure!(!action.is_empty(), "请至少选择一项安装内容");
     let version = recipe.available_version(catalog)?;
     let converted;
     let settings = if action.parameters() {
@@ -76,10 +111,24 @@ pub fn execute(
     };
     let targets = game.deployment_targets();
     ensure!(!targets.is_empty(), "未找到游戏的部署目录");
-    if action == Action::InstallAndApply
+    if action.runtimes()
         && let Some(runtimes) = &recipe.runtimes
     {
         runtimes.preflight(&targets, recipe)?;
+        if !action.installs() {
+            // Patch-private components cannot be replaced independently. Reject
+            // mismatches before updating any of the separately managed files.
+            let patch = crate::recommendation_runtimes::Snapshot {
+                schema: runtimes.schema,
+                components: runtimes
+                    .components
+                    .iter()
+                    .filter(|c| c.source == "patch")
+                    .cloned()
+                    .collect(),
+            };
+            patch.verify_installed(&targets)?;
+        }
     }
     let policy = catalog
         .scheme_policies
@@ -115,7 +164,9 @@ pub fn execute(
                 installed == version || !crate::upstream040::is_profile(&policy.parameter_profile),
                 "已安装的 dlssg 版本不同，请先安装当前版本，或在参数窗口编辑原版本"
             );
-            settings.unwrap().validate(&recipe.scheme, installed)?;
+            if let Some(settings) = settings {
+                settings.validate(&recipe.scheme, installed)?;
+            }
             ensure!(
                 core::status_at(target).starts_with("已部署"),
                 "补丁文件已变化，请刷新后检查"
@@ -127,7 +178,7 @@ pub fn execute(
             !(settings.requires_xemfg() && recipe.entries.iter().any(|p| p.ends_with(".asi"))),
             "此分享启用了独立 XeSS，但选择了插件入口；请先修正分享方案"
         );
-        if !action.installs() {
+        if !action.runtimes() {
             for target in &targets {
                 ensure!(
                     !settings.requires_nr() || crate::neural_runtime::inspect(target).present,
@@ -150,7 +201,7 @@ pub fn execute(
             cancel,
             &mut progress,
         )?;
-        if action == Action::InstallAndApply
+        if action.runtimes()
             && let Some(runtimes) = &recipe.runtimes
         {
             runtimes.verify_prepared(&prepared.files)?;
@@ -173,59 +224,61 @@ pub fn execute(
             )?;
         }
     }
-    if let Some(settings) = settings {
-        if action == Action::InstallAndApply {
-            if let Some(runtimes) = &recipe.runtimes {
-                runtimes
-                    .install(&targets, catalog.prefer_github, cancel, &mut progress)
-                    .context("方案已安装，配套运行库未完成；参数尚未应用，可重试")?;
-            }
-            let shared_nr = recipe
-                .runtimes
-                .as_ref()
-                .is_some_and(|r| r.components.iter().any(|c| c.kind == "nr"));
-            let shared_xess = recipe
-                .runtimes
-                .as_ref()
-                .is_some_and(|r| r.components.iter().any(|c| c.source == "managed"));
-            if !shared_nr && (settings.requires_nr() || recipe.neural_runtime == "310.9.16") {
-                crate::neural_runtime::install_many(
-                    &targets,
-                    "310.9.16",
-                    catalog.prefer_github,
-                    cancel,
-                    &mut |transfer| {
-                        progress(cloud::CloudProgress {
-                            transfer,
-                            proxy: "nvngx_dlssnr.dll".into(),
-                            package_index: 1,
-                            package_count: 1,
-                        })
-                    },
-                )
-                .context("方案已安装，DLSSNR 未完成；参数尚未应用，可重试")?;
-            }
-            if settings.requires_xemfg() && !shared_xess {
-                crate::runtime_files::install_many(
-                    &targets,
-                    "xemfg",
-                    catalog.prefer_github,
-                    cancel,
-                    &mut |transfer| {
-                        progress(cloud::CloudProgress {
-                            transfer,
-                            proxy: "xemfg".into(),
-                            package_index: 1,
-                            package_count: 1,
-                        })
-                    },
-                )
-                .context("方案已安装，XeSS 未完成；参数尚未应用，可重试")?;
-            }
-            if let Some(runtimes) = &recipe.runtimes {
-                runtimes.verify_installed(&targets)?;
-            }
+    if action.runtimes() {
+        if let Some(runtimes) = &recipe.runtimes {
+            runtimes
+                .install(&targets, catalog.prefer_github, cancel, &mut progress)
+                .context("方案已安装，配套运行库未完成；参数尚未应用，可重试")?;
         }
+        let shared_nr = recipe
+            .runtimes
+            .as_ref()
+            .is_some_and(|r| r.components.iter().any(|c| c.kind == "nr"));
+        let shared_xess = recipe
+            .runtimes
+            .as_ref()
+            .is_some_and(|r| r.components.iter().any(|c| c.source == "managed"));
+        if !shared_nr
+            && (settings.is_some_and(|s| s.requires_nr()) || recipe.neural_runtime == "310.9.16")
+        {
+            crate::neural_runtime::install_many(
+                &targets,
+                "310.9.16",
+                catalog.prefer_github,
+                cancel,
+                &mut |transfer| {
+                    progress(cloud::CloudProgress {
+                        transfer,
+                        proxy: "nvngx_dlssnr.dll".into(),
+                        package_index: 1,
+                        package_count: 1,
+                    })
+                },
+            )
+            .context("方案已安装，DLSSNR 未完成；参数尚未应用，可重试")?;
+        }
+        if settings.is_some_and(|s| s.requires_xemfg()) && !shared_xess {
+            crate::runtime_files::install_many(
+                &targets,
+                "xemfg",
+                catalog.prefer_github,
+                cancel,
+                &mut |transfer| {
+                    progress(cloud::CloudProgress {
+                        transfer,
+                        proxy: "xemfg".into(),
+                        package_index: 1,
+                        package_count: 1,
+                    })
+                },
+            )
+            .context("方案已安装，XeSS 未完成；参数尚未应用，可重试")?;
+        }
+        if let Some(runtimes) = &recipe.runtimes {
+            runtimes.verify_installed(&targets)?;
+        }
+    }
+    if let Some(settings) = settings {
         for target in &targets {
             ensure!(
                 !cancel.load(Ordering::Relaxed),
@@ -294,6 +347,7 @@ impl Snapshot {
         Ok(self.clone())
     }
     pub fn validate(&self, scheme: &str, version: &str) -> Result<()> {
+        validate_scheme_version(scheme, version)?;
         ensure!(
             self.schema == 1 && PROFILES.contains(&(scheme, self.profile.as_str())),
             "分享参数属于其他方案或不支持的配置协议"
@@ -491,6 +545,67 @@ pub fn contracts() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn selected_contents_are_independent_and_empty_selection_is_rejected() {
+        for mask in 0..8 {
+            let action = Action::Selected {
+                patch: mask & 1 != 0,
+                parameters: mask & 2 != 0,
+                runtimes: mask & 4 != 0,
+            };
+            assert_eq!(action.installs(), mask & 1 != 0);
+            assert_eq!(action.parameters(), mask & 2 != 0);
+            assert_eq!(action.runtimes(), mask & 4 != 0);
+            assert_eq!(action.is_empty(), mask == 0);
+        }
+        assert!(!Action::InstallOnly.runtimes());
+        assert!(!Action::ParametersOnly.runtimes());
+        assert!(Action::InstallAndApply.runtimes());
+    }
+    #[test]
+    fn mfg_161_shares_its_parameters_without_accepting_170_features() {
+        let mut snapshot = Snapshot {
+            schema: 1,
+            profile: rtxmfg::PROFILE.into(),
+            values: Values::from([
+                ("rtx_mode".into(), "3".into()),
+                ("rtx_sr_preset".into(), "K".into()),
+            ]),
+            defaults: Values::from([
+                ("rtx_mode".into(), "2".into()),
+                ("rtx_sr_preset".into(), "Default".into()),
+            ]),
+        };
+        // Use the existing metadata values, including the exact enum spelling.
+        let preset = presets::parameters(rtxmfg::PROFILE)
+            .into_iter()
+            .find(|p| p.key == "rtx_sr_preset")
+            .unwrap();
+        snapshot.values.insert(
+            "rtx_sr_preset".into(),
+            preset.choices.last().unwrap().0.into(),
+        );
+        snapshot
+            .defaults
+            .insert("rtx_sr_preset".into(), preset.choices[0].0.into());
+        snapshot.validate(MFG_161_COMPAT, "1.6.1").unwrap();
+        assert!(
+            snapshot
+                .for_version(MFG_161_COMPAT, "1.6.1", "1.7.0")
+                .is_err()
+        );
+        for key in ["rtx_nr", "rtx_xemfg", "rtx_opti_ui", "logDirectory"] {
+            let mut bad = snapshot.clone();
+            bad.values.insert(key.into(), "1".into());
+            bad.defaults.insert(key.into(), "0".into());
+            assert!(bad.validate(MFG_161_COMPAT, "1.6.1").is_err(), "{key}");
+        }
+        assert!(snapshot.validate(encore::SCHEME, "1.6.1").is_err());
+        snapshot.values.insert("rtx_nr".into(), "1".into());
+        snapshot.defaults.insert("rtx_nr".into(), "0".into());
+        snapshot.validate("rtx40mfg-1.3.3-hf2", "1.7.0").unwrap();
+    }
+
     #[test]
     fn legacy_dlssg_cards_convert_semantics_and_reject_ambiguous_modes() {
         let scheme = crate::upstream040::SCHEME;
