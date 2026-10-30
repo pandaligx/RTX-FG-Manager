@@ -238,6 +238,39 @@ fn legacy_identity(journal: &Path) -> Result<Option<String>> {
     );
     Ok(Some(dll.into()))
 }
+/// Only private paths from our directory bundles are eligible. This is cleanup
+/// recognition, never a whitelist for installing a newly signed proxy.
+pub fn private_components(record: &Record) -> &'static [&'static str] {
+    match record.backend.as_str() {
+        crate::upstream040::BACKEND => &crate::upstream040::COMPONENTS,
+        crate::encore::BACKEND => &crate::encore::INTEL_FILES,
+        _ => &[],
+    }
+}
+pub fn known_component(path: &Path, name: &str) -> Result<bool> {
+    let path = core::no_links(path)?;
+    if !path.is_file() || path.metadata()?.len() > 128 * 1024 * 1024 {
+        return Ok(false);
+    }
+    let catalog: Value = serde_json::from_str(include_str!("../assets/component-cleanup.json"))?;
+    let Some(expected) = catalog.get(name) else {
+        return Ok(false);
+    };
+    let (sha, image) = identity(&path)?;
+    Ok(expected["sha256"]
+        .as_array()
+        .is_some_and(|a| a.iter().any(|h| h.as_str() == Some(&sha)))
+        || image.is_some_and(|image| {
+            expected["image_sha256"]
+                .as_array()
+                .is_some_and(|a| a.iter().any(|h| h.as_str() == Some(&image)))
+        }))
+}
+pub fn orphaned_components(dir: &Path) -> bool {
+    crate::upstream040::COMPONENTS
+        .iter()
+        .any(|name| known_component(&dir.join(name), name).unwrap_or(false))
+}
 fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Option<Record>> {
     let mut hashes = BTreeMap::new();
     let mut delta_runtime = false;
@@ -252,7 +285,12 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
         }
     }
     let helper = core::no_links(&dir.join(HELPER))?;
-    if hashes.is_empty() && legacy.is_none() && !(helper.is_file() && known_helper(&helper)?) {
+    let upstream_components = orphaned_components(dir);
+    if hashes.is_empty()
+        && legacy.is_none()
+        && !upstream_components
+        && !(helper.is_file() && known_helper(&helper)?)
+    {
         return Ok(None);
     }
     if hashes.is_empty() {
@@ -298,6 +336,20 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
             core::hash(b"")
         },
     );
+    if upstream_components && !encore && !rtxmfg && !transfusion {
+        for name in crate::upstream040::COMPONENTS {
+            let path = dir.join(name);
+            // A lost old marker must not grant ownership to an unknown neighbor.
+            hashes.insert(
+                name.into(),
+                if known_component(&path, name)? {
+                    core::digest(&path)?
+                } else {
+                    core::hash(b"")
+                },
+            );
+        }
+    }
     if encore {
         let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
         // A manually copied notice is owned only when it is byte-identical to
@@ -325,6 +377,8 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
             crate::rtxmfg::BACKEND
         } else if transfusion {
             crate::transfusion::BACKEND
+        } else if upstream_components {
+            crate::upstream040::BACKEND
         } else {
             "manual"
         }
@@ -452,18 +506,20 @@ fn scan_encore_logs(
         kept.insert(root);
         return Ok(());
     }
-    const NAMES: [&str; 6] = [
+    const NAMES: [&str; 8] = [
         "rtx-encore-status.json",
         "rtx-encore.log",
         "rtx-encore.crash.log",
         "rtx-encore_perf.csv",
         "rtx-encore_nr.csv",
         "rtx-encore_nr_open_steps.csv",
+        "rtx-encore.gpu-bootstrap.log",
+        "rtx-encore.log.previous-legacy.log",
     ];
     static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
     let rotated = ROTATED.get_or_init(|| {
         regex::Regex::new(
-            r"^(rtx-encore_frames_[0-9]{1,10}\.jsonl|rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}((\.crash)?\.log|\.dump[0-9]{1,10}\.dmp))$",
+            r"^(rtx-encore_frames_[0-9]{1,10}\.jsonl|rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}((\.(crash|calls))?\.log|\.(dump[0-9]{1,10}|exit|gpu|hang)\.dmp))$",
         )
         .expect("fixed Encore session-log pattern")
     });
@@ -478,10 +534,7 @@ fn scan_encore_logs(
         }
         let path = core::no_links(&path)?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if (NAMES.contains(&name.as_str()) || rotated.is_match(&name))
-            && path.is_file()
-            && path.metadata()?.len() <= 128 * 1024 * 1024
-        {
+        if (NAMES.contains(&name.as_str()) || rotated.is_match(&name)) && path.is_file() {
             targets.insert(path.clone(), core::digest(&path)?);
         } else {
             kept.insert(path);
@@ -629,23 +682,37 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
         }
         kept.insert(q);
     }
-    if !pending_only && record.backend == crate::upstream040::BACKEND {
-        for name in crate::upstream040::COMPONENTS {
+    let mut component_pending = Vec::new();
+    for &name in private_components(&record) {
+        if record.hashes.contains_key(name) {
             let path = core::no_links(&dir.join(name))?;
             if path.is_file()
                 && record
                     .hashes
                     .get(name)
                     .is_some_and(|h| core::digest(&path).is_ok_and(|actual| &actual == h))
+                || known_component(&path, name)?
             {
                 targets.insert(path.clone(), core::digest(&path)?);
             } else if path.exists() {
                 kept.insert(path.clone());
+                if record.hashes.get(name) != Some(&core::hash(b"")) {
+                    component_pending
+                        .push(format!("配套文件已变化，打开清理详情确认后可删除：{name}"));
+                }
             }
             if let Some(parent) = path.parent() {
                 dirs.insert(parent.to_path_buf());
             }
         }
+    }
+    if record.backend == crate::encore::BACKEND
+        && crate::encore::INTEL_FILES
+            .iter()
+            .any(|name| record.hashes.contains_key(*name))
+    {
+        dirs.insert(dir.join("rtx-encore-runtimes/intel"));
+        dirs.insert(dir.join("rtx-encore-runtimes"));
     }
     if !pending_only {
         let helper = core::no_links(&dir.join(HELPER))?;
@@ -676,23 +743,6 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
             }
         }
         if record.backend == crate::encore::BACKEND {
-            for name in crate::encore::INTEL_FILES {
-                if let Some(expected) = record.hashes.get(name) {
-                    let path = core::no_links(&dir.join(name))?;
-                    if path.is_file() && core::digest(&path)? == *expected {
-                        targets.insert(path.clone(), expected.clone());
-                    } else if path.exists() {
-                        kept.insert(path);
-                    }
-                }
-            }
-            if crate::encore::INTEL_FILES
-                .iter()
-                .any(|name| record.hashes.contains_key(*name))
-            {
-                dirs.insert(dir.join("rtx-encore-runtimes/intel"));
-                dirs.insert(dir.join("rtx-encore-runtimes"));
-            }
             let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
             if notice.exists() {
                 if notice.is_file()
@@ -721,7 +771,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
             }
             for path in crate::rtxmfg::log_paths(&p) {
                 let path = core::no_links(&path)?;
-                if path.is_file() && path.metadata()?.len() <= 128 * 1024 * 1024 {
+                if path.is_file() {
                     targets.insert(path.clone(), core::digest(&path)?);
                 }
             }
@@ -891,6 +941,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     };
     let pending_stage = !stage_pending.is_empty();
     pending.extend(stage_pending);
+    pending.extend(component_pending);
     if !pending.is_empty() {
         record.cache_pending = true;
         record.cleanup_pending_reasons = pending

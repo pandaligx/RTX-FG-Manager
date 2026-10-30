@@ -999,6 +999,9 @@ pub fn status_at(target: &DeploymentTarget) -> String {
         {
             return Ok("已有手动补丁或其他 MOD / 卸载会自动识别本项目文件".into());
         }
+        if crate::cleanup::orphaned_components(dir) {
+            return Ok("已有手动补丁或其他 MOD / 发现旧版配套文件，请先卸载清理".into());
+        }
         Ok("未部署".into())
     }
     inner(target).unwrap_or_else(|e| format!("需检查：{e}"))

@@ -1,6 +1,6 @@
 [package]
 name = "rtx-fg-manager"
-version = "4.3.16"
+version = "4.3.17"
 edition = "2024"
 publish = false
 build = "rust/build.rs"
@@ -51,6 +51,7 @@ flate2 = "1.1"
 image = { version = "0.25", default-features = false, features = ["png", "ico"] }
 libloading = "0.8"
 regex = "1.12"
+rust-i18n = "=4.2.2"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls-native-roots", "system-proxy"] }
 rfd = "0.14"
 serde = { version = "1.0", features = ["derive"] }

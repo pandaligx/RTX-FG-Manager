@@ -2,11 +2,11 @@
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
     "bytes": 55241,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-6d9a95a823e829f60899.json",
-    "sha256": "a68d8388199cb0e292239cdc5684c5c8966be33de2f72d616805ef4640a2aead",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-6d9a95a823e829f60899.json"
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-09782948436ae628ee3b.json",
+    "sha256": "ef5a224ba129d43f6e7068a36bb36dc266bcdbe896c3f045b6fc9d608365ad69",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-09782948436ae628ee3b.json"
   },
-  "revision": "bundles-6d9a95a823e829f60899",
+  "revision": "bundles-09782948436ae628ee3b",
   "schema": 3,
   "schemes": [
     {
@@ -98,7 +98,7 @@
     },
     {
       "archives": [
-        "rtx-encore-1.4.5-complete-75b366ac3005.zip"
+        "rtx-encore-1.5.0-complete-6f4b6b094f6b.zip"
       ],
       "capabilities": [
         "encore_dedicated_entries"
@@ -236,13 +236,13 @@
       },
       "id": "dlssg-transfusion-1.4.5.3",
       "min_manager_version": "4.3.10",
-      "name": "RTX Encore · 1.4.5",
+      "name": "RTX Encore · 1.5.0",
       "names": {
-        "en": "RTX Encore · 1.4.5",
-        "ja": "RTX Encore · 1.4.5",
-        "ko": "RTX Encore · 1.4.5",
-        "ru": "RTX Encore · 1.4.5",
-        "zh": "RTX Encore · 1.4.5"
+        "en": "RTX Encore · 1.5.0",
+        "ja": "RTX Encore · 1.5.0",
+        "ko": "RTX Encore · 1.5.0",
+        "ru": "RTX Encore · 1.5.0",
+        "zh": "RTX Encore · 1.5.0"
       },
       "profile": "rtx_encore_json_v4",
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"

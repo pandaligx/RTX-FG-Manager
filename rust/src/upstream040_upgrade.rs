@@ -302,7 +302,7 @@ pub fn upgrade_locked(
         )?;
         ensure!(
             name == core::INI || core::hash(&bytes) == *hash,
-            "旧补丁 DLL 已变化，请先检查再升级"
+            "旧补丁文件已变化：{name}。请先卸载；无法确认的文件可在清理详情确认删除，再安装新版。原安装尚未修改。"
         );
         originals.insert(name.clone(), bytes);
     }
@@ -744,7 +744,7 @@ mod tests {
         fs::write(&changed, b"another mod replaced this component")?;
         let unknown = target.directory.join("dlssg_sm86/sr/user-capture.bin");
         fs::write(&unknown, b"manual capture")?;
-        crate::cleanup::clean_at(&target)?;
+        assert!(!crate::cleanup::clean_outcome_at(&target)?.complete);
         assert!(changed.exists() && unknown.exists());
         assert!(!target.directory.join("version.dll").exists());
         for name in &upstream040::COMPONENTS[1..] {
@@ -754,6 +754,14 @@ mod tests {
             fs::read(target.directory.join("unrelated-mod.json"))?,
             b"preserve"
         );
+        assert!(core::record(&target.directory)?.unwrap().cache_pending);
+        let plan = crate::cleanup_pending::prepare_at(&target, None)?;
+        assert_eq!(plan.paths().collect::<Vec<_>>(), vec![changed.as_path()]);
+        crate::cleanup_pending::delete_confirmed(&plan)?;
+        assert!(crate::cleanup::clean_outcome_at(&target)?.complete);
+        assert!(!changed.exists() && unknown.exists());
+        install(&target, false)?;
+        assert!(core::status_at(&target).starts_with("已部署"));
         Ok(())
     }
 }

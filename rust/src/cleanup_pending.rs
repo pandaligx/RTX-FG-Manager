@@ -78,6 +78,19 @@ fn roots(target: &core::DeploymentTarget, cache_root: Option<&Path>) -> Result<V
             paths.push(path);
         }
     }
+    for &name in crate::cleanup::private_components(&record) {
+        if record
+            .hashes
+            .get(name)
+            .is_some_and(|hash| *hash != core::hash(b""))
+        {
+            let path = core::no_links(&target.directory.join(name))?;
+            if path.try_exists()? {
+                ensure!(path.is_file(), "配套文件不是普通文件");
+                paths.push(path);
+            }
+        }
+    }
     paths.sort();
     paths.dedup();
     Ok(paths)

@@ -14,6 +14,25 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('Encore 1.5 Tensor settings stay independent and old clients preserve unseen fields',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...shared(),patchVersion:'1.5.0',presets:{schema:1,profile:'rtx_encore_json_v4',values:{xessTensorCores:'1',xefgTensorCores:'0',frameGenerationEngine:'dlss-fg'},defaults:{xessTensorCores:'0',xefgTensorCores:'0',frameGenerationEngine:'game'}}};
+  const post=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',11);
+  assert.deepEqual(post.content.presets,c.presets);
+  const path='/v1/recipes/'+post.id;
+  const old=await f.call('GET',path,null,u.token,'test-ip',10);
+  assert.equal(Object.hasOwn(old.content,'presets'),false);
+  old.content.notes='Older client updates notes';
+  await f.call('PUT',path,{revision:1,content:old.content},u.token,'test-ip',10);
+  const current=await f.call('GET',path,null,u.token,'test-ip',11);
+  assert.deepEqual(current.content.presets,c.presets);
+  assert.throws(()=>recipe({...c,patchVersion:'1.4.7'}));
+  const dlss={...c,patchVersion:'1.4.5',presets:{schema:1,profile:c.presets.profile,values:{frameGenerationEngine:'dlss-fg'},defaults:{frameGenerationEngine:'game'}}};
+  assert.throws(()=>recipe(dlss));
+  assert.equal(recipe({...dlss,patchVersion:'1.4.6'}).presets.values.frameGenerationEngine,'dlss-fg');
+  assert.equal((await f.call('GET','/v1/capabilities')).encore150,1);
+});
+
 test('MFG 1.6.1 compatibility shares, edits and retains feedback without breaking old readers',async t=>{
   const f=fixture(t),u=await f.login();
   const c={...content(),scheme:'mfg-unlocker-1.6.1-compat',patchVersion:'1.6.1',entries:['version.dll'],presets:{schema:1,profile:'rtxmfg_universal_133',values:{rtx_mode:'3'},defaults:{rtx_mode:'2'}}};

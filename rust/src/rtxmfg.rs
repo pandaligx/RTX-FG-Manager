@@ -550,7 +550,9 @@ pub fn log_paths(exe: &std::path::Path) -> Vec<std::path::PathBuf> {
     let interval = current.with_file_name(interval);
     let previous2 = current.with_extension("previous2.log");
     let crash = current.with_extension("crash.dmp");
-    let mut paths = vec![current, previous, previous2, crash, interval];
+    let fault = current.with_extension("fault.dmp");
+    let hang = current.with_extension("hang.dmp");
+    let mut paths = vec![current, previous, previous2, crash, interval, fault, hang];
     if let Some(dir) = exe.parent() {
         for path in paths.clone() {
             let local = dir.join(path.file_name().unwrap());
@@ -609,7 +611,7 @@ mod tests {
         );
         assert_ne!(a, b);
         assert!(
-            a[..5]
+            a[..7]
                 .iter()
                 .all(|p| p.parent() == Some(std::env::temp_dir().as_path()))
         );
@@ -617,7 +619,9 @@ mod tests {
         assert!(a[2].to_string_lossy().ends_with(".previous2.log"));
         assert!(a[3].to_string_lossy().ends_with(".crash.dmp"));
         assert!(a[4].to_string_lossy().ends_with("-intervals.csv"));
-        assert_eq!(a.len(), 10);
-        assert_eq!(a[5].parent(), Some(std::path::Path::new("D:/游戏 A")));
+        assert!(a[5].to_string_lossy().ends_with(".fault.dmp"));
+        assert!(a[6].to_string_lossy().ends_with(".hang.dmp"));
+        assert_eq!(a.len(), 14);
+        assert_eq!(a[7].parent(), Some(std::path::Path::new("D:/游戏 A")));
     }
 }

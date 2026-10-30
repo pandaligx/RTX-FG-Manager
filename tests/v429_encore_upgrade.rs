@@ -237,9 +237,15 @@ fn intel_unknown_or_replaced_runtime_is_not_overwritten_or_deleted() -> Result<(
     fs::remove_file(&path)?;
     install_120(&target)?;
     fs::write(&path, b"changed after installation")?;
-    cleanup::clean_outcome_at(&target)?;
+    assert!(!cleanup::clean_outcome_at(&target)?.complete);
     assert_eq!(fs::read(&path)?, b"changed after installation");
     assert!(!target.directory.join(encore::INTEL_FILES[1]).exists());
+    let plan = rtx_fg_manager::cleanup_pending::prepare_at(&target, None)?;
+    assert_eq!(plan.paths().collect::<Vec<_>>(), vec![path.as_path()]);
+    rtx_fg_manager::cleanup_pending::delete_confirmed(&plan)?;
+    assert!(cleanup::retry_pending_at(&target)?.complete);
+    assert!(!target.directory.join("rtx-encore-runtimes").exists());
+    assert!(core::record(&target.directory)?.is_none());
     Ok(())
 }
 
@@ -473,6 +479,17 @@ fn cleanup_retains_modified_notice_and_unrecognized_files_inside_logs() -> Resul
     fs::write(logs.join(rotated), b"owned rotated session")?;
     let dump = "rtx-encore-13512-134365138303574349.dump1.dmp";
     fs::write(logs.join(dump), b"generated crash dump")?;
+    let extra = [
+        "rtx-encore.gpu-bootstrap.log",
+        "rtx-encore.log.previous-legacy.log",
+        "rtx-encore-13512-134365138303574349.calls.log",
+        "rtx-encore-13512-134365138303574349.exit.dmp",
+        "rtx-encore-13512-134365138303574349.gpu.dmp",
+        "rtx-encore-13512-134365138303574349.hang.dmp",
+    ];
+    for name in extra {
+        fs::write(logs.join(name), b"generated diagnostic")?;
+    }
     let retained_dumps = [
         "manual-capture.dmp",
         "rtx-encore-user.dump1.dmp",
@@ -500,6 +517,9 @@ fn cleanup_retains_modified_notice_and_unrecognized_files_inside_logs() -> Resul
     assert!(!logs.join("rtx-encore_perf.csv").exists());
     assert!(!logs.join(rotated).exists());
     assert!(!logs.join(dump).exists());
+    for name in extra {
+        assert!(!logs.join(name).exists(), "{name}");
+    }
     for name in retained_dumps {
         assert_eq!(fs::read(logs.join(name))?, b"user capture");
     }

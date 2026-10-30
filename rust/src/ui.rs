@@ -126,6 +126,7 @@ impl SelectItem for ChoiceItem {
 }
 struct ChoiceBinding {
     state: Entity<SelectState<Vec<ChoiceItem>>>,
+    trigger_focus: FocusHandle,
     items: Vec<(SharedString, Command, bool)>,
     _subscription: Subscription,
 }
@@ -1051,6 +1052,10 @@ impl Manager {
         let key = (window.window_handle().window_id(), id);
         let binding = choices.entry(key).or_insert_with(|| {
             let state = cx.new(|cx| SelectState::new(options(), selected, window, cx));
+            // Capture the closed trigger once. SelectState::focus_handle switches
+            // to the popup list while open, which must keep focus until mouse-up
+            // confirms an item (the popup lies outside this wrapper's hitbox).
+            let trigger_focus = state.focus_handle(cx);
             let event_window = window.window_handle();
             let subscription = cx.subscribe(&state, move |this, _, event, cx| {
                 let SelectEvent::Confirm(value) = event;
@@ -1075,6 +1080,7 @@ impl Manager {
             });
             ChoiceBinding {
                 state,
+                trigger_focus,
                 items: items.clone(),
                 _subscription: subscription,
             }
@@ -1086,16 +1092,17 @@ impl Manager {
             });
             binding.items = items;
         }
-        let state = binding.state.clone();
+        let trigger_focus = binding.trigger_focus.clone();
         div()
             .id(SharedString::from(format!("select-surface-{id}")))
             .w_full()
             .on_mouse_down_out(move |_, window, cx| {
-                let state = state.clone();
+                let trigger_focus = trigger_focus.clone();
                 // Outside pointer dismissal must not leave the restored trigger focused.
-                // Defer until the popup and any newly clicked control have handled the event.
+                // Never blur the popup list: a human click spans separate down/up
+                // events, and blurring on down cancels the choice before up arrives.
                 window.defer(cx, move |window, cx| {
-                    if state.focus_handle(cx).is_focused(window) {
+                    if trigger_focus.is_focused(window) {
                         window.blur(cx);
                     }
                 });
@@ -1467,8 +1474,7 @@ impl Manager {
         if pending {
             details = details.child(div().text_xs().whitespace_normal()
                 .child(snapshot.cleanup_details.iter().map(|s| self.c.text(s)).collect::<Vec<_>>().join("\n\n")))
-                .child(div().text_xs().child(self.t("常规清理仍有残留时，可查看管理器允许删除的具体文件，确认后再删除。共享目录和其他游戏文件会保留。")))
-                .child(self.button("cleanup-preview", "查看可删除文件", Command::DeleteCleanup, cx).small().disabled(self.c.busy || self.c.read_only));
+                .child(div().text_xs().child(self.t("常规清理仍有残留时，可查看管理器允许删除的具体文件，确认后再删除。共享目录和其他游戏文件会保留。")));
         }
         let name = self
             .c
@@ -1482,7 +1488,7 @@ impl Manager {
             .child(div().id("review-scroll").v_flex().min_h_0().gap_3()
                 .max_h(window.viewport_size().height * 0.48).overflow_y_scroll()
                 .child(summary)
-                .when(pending, |body| body.child(div().text_sm().child(self.t("仅处理标记为待清理的目录。游戏存档、原文件备份、其他 MOD 和正常部署目录保持不变。"))))
+                .when(pending, |body| body.child(div().text_sm().child(self.t("仅处理列出的残留文件。游戏存档、原文件备份、其他 MOD 和正常部署目录保持不变。"))))
                 .child(Accordion::new("review-details").small()
                     .item(|item| item.title(self.t("技术详情与文件位置")).open(details_open).child(details))
                     .on_toggle_click(move |indices: &[usize], _, cx| {
@@ -1492,7 +1498,9 @@ impl Manager {
                 .child(self.button("review-close", "关闭详情", Command::CloseReview, cx).small().ghost())
                 .when(kinds.contains(&IssueKind::Unavailable), |buttons| buttons.child(self.button("review-refresh", "刷新", Command::RefreshReview, cx).small().disabled(self.c.busy)))
                 .when(repair, |buttons| buttons.child(self.button("review-recover", "卸载并恢复", Command::RecoverGame, cx).small().disabled(self.c.busy)))
-                .when(pending, |buttons| buttons.child(self.button("cleanup-retry-dialog", "清理残留", Command::RetryCleanup, cx).small().primary().disabled(self.c.busy))))
+                .when(pending, |buttons| buttons
+                    .child(self.button("cleanup-retry-dialog", "清理残留", Command::RetryCleanup, cx).small().disabled(self.c.busy))
+                    .child(self.button("cleanup-preview", "查看可删除文件", Command::DeleteCleanup, cx).small().primary().disabled(self.c.busy || self.c.read_only))))
             .into_any_element()
     }
     fn cleanup_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -4546,6 +4554,7 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
         .with_assets(crate::ui_assets::Assets)
         .run(move |cx| {
             gpui::init(cx);
+            rust_i18n::extend!(gpui_component);
             crate::ui_focus::init(cx);
             if let Err(error) = crate::ui_themes::register(cx) {
                 win::message(

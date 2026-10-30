@@ -30,6 +30,7 @@ export function presetSnapshot(input,scheme,version){
     need((!f.since || compare(version,f.since)>=0)&&(!f.until || compare(version,f.until)<0),'unsupported_preset_version');
     for(const value of [input.values[key],input.defaults[key]]){
       need(typeof value==='string' && value.length>0 && value.length<=64 && value.trim()===value,'invalid_preset_value');
+      need(!f.valueSince?.[value] || compare(version,f.valueSince[value])>=0,'unsupported_preset_version');
       const numeric=f.number && /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value);
       const n=Number(value);
       need(f.values?.includes(value) || f.inherit && value==='inherit' || numeric && Number.isFinite(n)

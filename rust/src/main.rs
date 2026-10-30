@@ -5,6 +5,9 @@ mod ui;
 mod ui_assets;
 mod ui_focus;
 mod ui_themes;
+// Supplement Kit translations without modifying the pinned framework sources.
+rust_i18n::i18n!("rust/assets/component-locales", fallback = "en");
+
 fn main() {
     if let Err(e) = run() {
         if std::env::args().any(|s| {
@@ -257,5 +260,35 @@ fn run() -> anyhow::Result<()> {
             }
             ui::run(data, smoke)
         }
+    }
+}
+
+#[cfg(test)]
+mod component_locale_tests {
+    #[test]
+    fn settings_search_extension_keeps_upstream_fallbacks() {
+        use gpui::component as gpui_component;
+        rust_i18n::extend!(gpui_component);
+        for (locale, expected) in [
+            ("en", "Search..."),
+            ("zh-CN", "搜索..."),
+            ("ja", "検索..."),
+            ("ko", "검색..."),
+            ("ru", "Поиск..."),
+        ] {
+            assert_eq!(
+                gpui_component::_rust_i18n_translate(locale, "Settings.search_placeholder"),
+                expected
+            );
+        }
+        // Extending one prompt must not replace the framework's other messages.
+        assert_eq!(
+            gpui_component::_rust_i18n_translate("zh-CN", "Settings.Reset All"),
+            "重置全部"
+        );
+        assert_eq!(
+            gpui_component::_rust_i18n_translate("ru", "Settings.Reset All"),
+            "Reset All"
+        );
     }
 }

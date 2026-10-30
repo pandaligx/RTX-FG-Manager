@@ -2846,11 +2846,16 @@
       {
         "value": "xefg",
         "label": "Intel XeFG（实验）"
+      },
+      {
+        "value": "dlss-fg",
+        "label": "DLSS-FG（替换原生 Intel FG）",
+        "since": "1.4.6"
       }
     ],
     "restart": true,
     "dependencies": [],
-    "help": "实验功能，需要兼容的游戏输入。选中不代表已实际启用；默认跟随游戏。不能为任意游戏凭空添加帧生成。不要假定与 NR、Smooth Motion 的组合已经验证。",
+    "help": "实验功能，需兼容的原生帧生成输入。DLSS-FG 在合格的 DX12 原生 Intel FG 游戏中替换 Intel FG：重启后仍在游戏中启用 Intel FG，使用固定倍率；Game 为 2X，动态模式不可用。原生 FSR/DLSS FG 保持原引擎。",
     "optional": true,
     "since": "1.2.0-beta.1"
   },
@@ -3912,5 +3917,101 @@
     "help": "Encore Insert 菜单语言；不更改管理器语言。",
     "optional": true,
     "since": "1.4.0"
+  },
+  {
+    "key": "xessTensorCores",
+    "path": [
+      "renderingEngines",
+      "xessTensorCores"
+    ],
+    "label": "XeSS Tensor Cores（实验）",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "reconstructionEngine=xess"
+    ],
+    "help": "默认关闭。上游初步验证仅 RTX 4090、驱动 621.01、DX12 及兼容 Intel 运行库；不代表其他硬件已验证。准备不支持时保持标准 XeSS 路径。",
+    "optional": true,
+    "since": "1.5.0"
+  },
+  {
+    "key": "xefgTensorCores",
+    "path": [
+      "renderingEngines",
+      "xefgTensorCores"
+    ],
+    "label": "XeFG Tensor Cores（实验）",
+    "group": "frames",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "frameGenerationEngine=xefg"
+    ],
+    "help": "默认关闭，独立于 XeSS 开关。上游初步验证仅 RTX 4090、驱动 621.01、DX12 及兼容 Intel 运行库；固定 2X–6X 受初始化容量限制。执行异常需重启游戏。",
+    "optional": true,
+    "since": "1.5.0"
+  },
+  {
+    "key": "reflexMode",
+    "path": [
+      "nativeMenuFeatures",
+      "reflexMode"
+    ],
+    "label": "Reflex 模式",
+    "group": "frames",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "on",
+        "label": "开启"
+      },
+      {
+        "value": "on-boost",
+        "label": "开启 + Boost"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "不会降低游戏请求的模式；动态插帧或 XeLL 接管延迟时暂停覆盖。Boost 不保证降低延迟。",
+    "optional": true,
+    "since": "1.4.6"
+  },
+  {
+    "key": "overlayShowLatency",
+    "path": [
+      "overlay",
+      "metrics",
+      "overlayShowLatency"
+    ],
+    "label": "延迟报告",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_overlay=1"
+    ],
+    "help": "显示游戏渲染帧的 Reflex/XeLL 报告，不是显示器端到端延迟，不统计生成帧；游戏未提供标记时不显示。",
+    "optional": true,
+    "since": "1.4.6"
   }
 ]

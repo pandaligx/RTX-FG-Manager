@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.16"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.17"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.16 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.17 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,25 +41,25 @@
 
 ## 下载
 
-**版本 4.3.16** · Windows 10 / 11 x64
+**版本 4.3.17** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.16 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.16) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.16 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.16) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.17 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.17) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.17 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.17) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
-下载 **`RTXManager-v4.3.16-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+下载 **`RTXManager-v4.3.17-x64.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.16 更新亮点
+## 4.3.17 更新亮点
 
-- 修复关闭设置窗口后主题选择导致主界面无法操作的问题。
-- 独立管理多窗口交互状态，保留尚未应用的参数。
-- 修改后显卡型号按需显示，紧凑硬件区域为适配方案腾出空间。
+- 适配 RTX Encore 1.5.0 的 XeSS/XeFG Tensor、DLSS-FG、Reflex 与延迟设置。
+- 修复旧 Dlssg 0.4.0 卸载残留阻止重装，补齐补丁专属日志清理。
+- 修复鼠标选择语言不生效，设置搜索提示同步切换五种语言。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
-> 新版 **Dlssg_for_sm86 0.4.1** 需管理器 **4.3.14**；**MFG 1.7.0 / Encore 1.4.5** 保留现有客户端版本要求。按需升级游戏，管理器更新不会自动替换已安装补丁。
+> **Dlssg_for_sm86 0.4.1** 需管理器 **4.3.14**；**Encore 1.5.0** 的新增参数与分享请使用 **4.3.17**。按需升级游戏，管理器更新不会自动替换已安装补丁。
 
 ## 方案怎么选
 
@@ -69,7 +69,7 @@
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
 | **MFG-Unlocker · 1.7.0** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
-| **RTX Encore · 1.4.5** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion 与兼容性设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
+| **RTX Encore · 1.5.0** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion、XeSS/XeFG Tensor 与 Reflex 设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
 > MFG-Unlocker 1.6.1 已作为兼容备用方案保留；切换版本请先卸载现有补丁再安装。管理器 4.3.15 起支持该方案的玩家参数分享。
 
@@ -83,7 +83,7 @@
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 保留本项目自定义适配 | 保留本项目自定义适配 | 本项目已提供 SM89 适配；不保证所有游戏 |
 | Dlssg_for_sm86-MFG-version · Vulkan | 上游面向 20/30 系列；以所选 Vulkan 包为准 | 上游主要目标系列 | 上游未明确保证 |
 | MFG-Unlocker · 1.7.0 | 实验性 DLSS MFG；限受支持的 310.9 运行库 | 上游支持 DLSS MFG | 上游支持 DLSS MFG |
-| RTX Encore · 1.4.5 | FG / NR 实验性；Smooth Motion V1/V2 限 621.01、DX12 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
+| RTX Encore · 1.5.0 | FG / NR 实验性；Smooth Motion V1/V2 限 621.01、DX12 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
 
 依据：[Dlssg_for_sm86 运行要求与限制](https://github.com/sdli1995/dlssg_for_sm86#运行要求)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。三角洲方案属于本项目保留的自定义包，不能将其适配范围等同于上游原版。表格用于选型，不代表管理器完成了各显卡和游戏的实机验证。
 
@@ -188,7 +188,7 @@ GitCode 暂时不可用时，切换 GitHub 来源重试，或从上方发行页�
 
 感谢 [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore)、[GPUI](https://gpui.rs/)、[GPUI Kit](https://github.com/longbridge/gpui-kit)、[GPUI Fast](https://github.com/longbridge/gpui-fast) 与 [aria2](https://github.com/aria2/aria2)。详见 [第三方说明](THIRD_PARTY_NOTICES.txt)。
 
-特别感谢 [大大大怪将军阁下](https://space.bilibili.com/608531525)、[云外逸声](https://space.bilibili.com/256887068) 和提供兼容性反馈的用户。本项目与 NVIDIA、游戏厂商及上游项目无官方隶属关系。
+特别感谢 [大大大怪将军阁下](https://space.bilibili.com/608531525)、[云外逸声](https://space.bilibili.com/256887068)、[坏坏的帅帅啊](https://space.bilibili.com/296225145) 和提供兼容性反馈的用户。本项目与 NVIDIA、游戏厂商及上游项目无官方隶属关系。
 
 ---
 

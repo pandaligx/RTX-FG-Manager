@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.3.17
+
+- Add the Bilibili profile of 坏坏的帅帅啊 to About and project acknowledgements.
+- Fix language and other dropdown choices being cancelled by focus loss between mouse-down and mouse-up. Preserve outside-click focus clearing, Tab navigation and multi-window behavior.
+- Refresh the Settings search placeholder immediately when switching languages, with prompts for all five interface languages.
+- Support RTX Encore 1.5.0: separate XeSS and XeFG Tensor Core controls, native Intel FG to DLSS-FG selection, Reflex mode and latency metrics. Gate settings by installed patch version and preserve JSONC comments, unknown fields and menu state.
+- Fix orphaned Dlssg_for_sm86 private components blocking reinstallation after a 0.4.0 uninstall. Recognize shipped private files, retain ownership for changed files, and offer scoped cleanup review instead of reporting a completed uninstall.
+- Include new Encore session diagnostics and game-specific MFG fault/hang dumps in uninstall cleanup. Preserve unrelated files, manual captures, other games and shared caches.
+- Extend player preset sharing for the new Encore settings while preserving older clients and existing player data.
+
 ## 4.3.16
 
 - Show the renamed GPU only while its name differs from the original, and hide it after restoration. Remove empty GPU-scheduling feedback space to leave more room for patch options.

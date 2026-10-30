@@ -366,7 +366,9 @@ impl Snapshot {
         );
         for (key, value) in self.values.iter().chain(&self.defaults) {
             ensure!(
-                supported(&self.profile, key, version),
+                supported(&self.profile, key, version)
+                    && (self.profile != encore::PROFILE
+                        || encore::value_available(key, value, Some(version))),
                 "此版本不支持分享参数：{key}"
             );
             ensure!(
@@ -485,6 +487,14 @@ pub fn contracts() -> Value {
                         "integer": f.kind == encore::FieldKind::Integer,
                         "inherit": f.kind == encore::FieldKind::InheritDecimal}),
                 };
+                let choice_since: serde_json::Map<String, serde_json::Value> = f
+                    .choices
+                    .iter()
+                    .filter_map(|c| c.since.as_ref().map(|v| (c.value.clone(), json!(v))))
+                    .collect();
+                if !choice_since.is_empty() {
+                    rule["valueSince"] = json!(choice_since);
+                }
                 if let Some(since) = &f.since {
                     rule["since"] = json!(since);
                 }

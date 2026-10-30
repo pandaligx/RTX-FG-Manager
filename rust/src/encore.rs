@@ -66,6 +66,8 @@ pub enum FieldKind {
 pub struct Choice {
     pub value: String,
     pub label: String,
+    #[serde(default)]
+    pub since: Option<String>,
 }
 #[derive(Debug, Clone, Deserialize)]
 pub struct Field {
@@ -136,6 +138,23 @@ pub fn field_available(field: &Field, version: Option<&str>) -> bool {
             .and_then(|v| semver::Version::parse(v).ok())
             .zip(semver::Version::parse(since).ok())
             .is_some_and(|(v, min)| v >= min)
+    })
+}
+pub fn choice_available(choice: &Choice, version: Option<&str>) -> bool {
+    choice.since.as_deref().is_none_or(|since| {
+        version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .zip(semver::Version::parse(since).ok())
+            .is_some_and(|(v, minimum)| v >= minimum)
+    })
+}
+pub fn value_available(key: &str, value: &str, version: Option<&str>) -> bool {
+    field(key).is_some_and(|f| {
+        field_available(f, version)
+            && (f.kind != FieldKind::Choice
+                || f.choices
+                    .iter()
+                    .any(|c| c.value == value && choice_available(c, version)))
     })
 }
 pub fn requires_restart(field: &Field, version: Option<&str>) -> bool {
@@ -612,7 +631,7 @@ pub fn configure_for_version(
     values: &Values,
     version: Option<&str>,
 ) -> Result<Vec<u8>> {
-    for key in values.keys() {
+    for (key, value) in values {
         let f = field(if key == "nrPreset" {
             "dlssNrPreset"
         } else {
@@ -620,7 +639,7 @@ pub fn configure_for_version(
         })
         .context("Unknown Encore field")?;
         ensure!(
-            field_available(f, version),
+            value_available(&f.key, value, version),
             "Encore setting unavailable in installed version: {key}"
         );
     }

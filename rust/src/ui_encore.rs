@@ -222,6 +222,7 @@ impl EncoreEditor {
             let choices: Vec<_> = field
                 .choices
                 .iter()
+                .filter(|choice| encore::choice_available(choice, self.version.as_deref()))
                 .map(|choice| (choice.value.clone(), self.t(&choice.label)))
                 .collect();
             let owner = cx.weak_entity();

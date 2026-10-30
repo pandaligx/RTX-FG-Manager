@@ -38,7 +38,7 @@ impl IssueKind {
     pub fn help(self) -> &'static str {
         match self {
             Self::Residuals => {
-                "补丁已移除。可清理当前游戏留下的缓存和安装临时文件，无需清空全部下载缓存。"
+                "补丁入口已移除，仍有配套文件、缓存或安装临时文件待处理。点击“查看可删除文件”确认清理，无需手动清空下载缓存。"
             }
             Self::Interrupted => "安装或升级未完成。可先卸载并恢复原文件，再重新安装所需方案。",
             Self::Modified => {
@@ -142,6 +142,17 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
             && status.starts_with("补丁已移除，缓存待清理")
         {
             snapshot.cleanup_pending = true;
+            snapshot.cleanup_paths.extend(
+                crate::cleanup::private_components(r)
+                    .iter()
+                    .filter(|name| {
+                        r.hashes
+                            .get(**name)
+                            .is_some_and(|hash| *hash != core::hash(b""))
+                    })
+                    .map(|name| target.directory.join(name))
+                    .filter(|path| path.is_file()),
+            );
             if let Ok(root) = crate::delta::root() {
                 snapshot.cleanup_paths.extend(
                     r.delta_cache_ids

@@ -16,7 +16,7 @@ $('email').oninput=previewEmail;
 $('email').onblur=()=>{$('email').value=address();previewEmail();};
 $('domain').onchange=()=>{const value=$('email').value.trim();if($('domain').value && value.includes('@'))$('email').value=value.split('@')[0];previewEmail();};
 async function api(path,method='GET',body){
-  const response=await fetch('/v1/'+path,{method,headers:{'X-RTXFG-Feedback':'10',...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+  const response=await fetch('/v1/'+path,{method,headers:{'X-RTXFG-Feedback':'11',...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});
   const value=await response.json();if(!response.ok){if(response.status===401){token='';$('review').hidden=true;$('login').hidden=false;$('logout').hidden=true;}throw new Error(errors[value.error]||'操作失败，请稍后重试');}return value;
 }
 async function run(action){if(busy)return;busy=true;$('status').textContent='处理中…';$('review').setAttribute('aria-busy','true');try{await action();$('status').textContent='';}catch(error){$('status').textContent=error.message;}finally{busy=false;$('review').setAttribute('aria-busy','false');}}

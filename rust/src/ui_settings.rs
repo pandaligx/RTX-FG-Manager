@@ -247,6 +247,7 @@ impl Manager {
                         "https://space.bilibili.com/608531525",
                     ),
                     ("云外逸声", "https://space.bilibili.com/256887068"),
+                    ("坏坏的帅帅啊", "https://space.bilibili.com/296225145"),
                 ],
             ),
         ];
@@ -577,19 +578,25 @@ impl Manager {
             .min_h_0()
             .bg(cx.theme().background)
             .child(
-                Settings::new("manager-settings-pages")
-                    .small()
-                    .sidebar_width(window.rem_size() * 14.)
-                    .sidebar_size_range(window.rem_size() * 11. ..window.rem_size() * 22.)
-                    .with_group_variant(GroupBoxVariant::Outline)
-                    .pages([
-                        page("外观", IconName::Palette, appearance)
-                            .description(self.t("外观与偏好更改后自动保存")),
-                        page("游戏库", IconName::Folder, library),
-                        page("软件更新", IconName::RefreshCw, updates),
-                        page("缓存维护", IconName::Settings, maintenance),
-                        page("关于", IconName::Info, about),
-                    ]),
+                // Kit retains the search InputState (including its placeholder).
+                // Give each resolved language its own stable state so switching
+                // language refreshes the prompt and avoids a stale-language filter.
+                Settings::new(SharedString::from(format!(
+                    "manager-settings-pages-{}",
+                    self.c.tr.language
+                )))
+                .small()
+                .sidebar_width(window.rem_size() * 14.)
+                .sidebar_size_range(window.rem_size() * 11. ..window.rem_size() * 22.)
+                .with_group_variant(GroupBoxVariant::Outline)
+                .pages([
+                    page("外观", IconName::Palette, appearance)
+                        .description(self.t("外观与偏好更改后自动保存")),
+                    page("游戏库", IconName::Folder, library),
+                    page("软件更新", IconName::RefreshCw, updates),
+                    page("缓存维护", IconName::Settings, maintenance),
+                    page("关于", IconName::Info, about),
+                ]),
             )
             .into_any_element()
     }

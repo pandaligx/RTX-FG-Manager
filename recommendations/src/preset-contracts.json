@@ -835,13 +835,18 @@
       "frameGenerationEngine": {
         "values": [
           "game",
-          "xefg"
+          "xefg",
+          "dlss-fg"
         ],
+        "valueSince": {
+          "dlss-fg": "1.4.6"
+        },
         "since": "1.2.0-beta.1",
         "label": "帧生成引擎",
         "labels": {
           "game": "跟随游戏",
-          "xefg": "Intel XeFG（实验）"
+          "xefg": "Intel XeFG（实验）",
+          "dlss-fg": "DLSS-FG（替换原生 Intel FG）"
         }
       },
       "xefgMfg4VariablePacing": {
@@ -1249,6 +1254,46 @@
           "auto": "运行库默认",
           "a": "A",
           "b": "B"
+        }
+      },
+      "xessTensorCores": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.5.0",
+        "label": "XeSS Tensor Cores（实验）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "xefgTensorCores": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "1.5.0",
+        "label": "XeFG Tensor Cores（实验）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "reflexMode": {
+        "values": [
+          "game",
+          "on",
+          "on-boost"
+        ],
+        "since": "1.4.6",
+        "label": "Reflex 模式",
+        "labels": {
+          "game": "跟随游戏",
+          "on": "开启",
+          "on-boost": "开启 + Boost"
         }
       }
     }

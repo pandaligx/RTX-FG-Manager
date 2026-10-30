@@ -1,7 +1,9 @@
 {
   "renderingEngines": {
     "reconstructionEngine": "game",
-    "frameGenerationEngine": "game"
+    "frameGenerationEngine": "game",
+    "xessTensorCores": false,
+    "xefgTensorCores": false
   },
   "xefg": {
     "xefgMfg4VariablePacing": true,
@@ -42,6 +44,7 @@
     "dlssFgLite": "game"                     // Diagnostic-only JSON override; not shown as a menu setting. Leave game to follow the preset (A/B Normal, C Lite) or the game/driver. Only for diagnostics with qualified 310.9.16.0: off forces Normal, on forces Lite, taking priority over the preset. Restart to apply.
   },
   "nativeMenuFeatures": {
+    "reflexMode": "game", // Encore 1.4.6: game, on, on-boost. Never lowers the game request.
     "reflexFrameLimit": 0,                   // 0 restores the game's Reflex settings; 1-1000 requests a Reflex FPS limit. FG may count toward it depending on the game/driver. Applied on options updates or the next available Reflex sleep boundary.
     "vsyncOff": false,                       // Request interval zero on the application's own DXGI Present. Driver overrides keep priority; TEST/nested presents are preserved.
     "hairEnabled": true                      // Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change.
