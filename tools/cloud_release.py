@@ -221,7 +221,8 @@ def validate_encore_config(config):
         for part in field["path"]:
             require(isinstance(value, dict), "Invalid Encore section: " + ".".join(field["path"]))
             if part not in value:
-                require(field.get("optional", False), "Missing Encore field: " + field["key"])
+                modern_vsync = field["key"] == "vsyncOff" and "vsync" in config.get("nativeMenuFeatures", {})
+                require(field.get("optional", False) or modern_vsync, "Missing Encore field: " + field["key"])
                 missing = True
                 break
             value = value[part]

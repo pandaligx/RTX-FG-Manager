@@ -323,6 +323,31 @@ impl Snapshot {
     /// modes remain a visible error; they are never silently dropped.
     pub fn for_version(&self, scheme: &str, from: &str, to: &str) -> Result<Self> {
         self.validate(scheme, from)?;
+        if self.profile == encore::PROFILE
+            && semver::Version::parse(to)? >= semver::Version::parse(from)?
+        {
+            let convert = |values: &Values| {
+                let mut out = values.clone();
+                if !supported(&self.profile, "smoothMotionTuringVariant", to) {
+                    out.remove("smoothMotionTuringVariant");
+                }
+                if supported(&self.profile, "vsync", to)
+                    && let Some(old) = out.remove("vsyncOff")
+                {
+                    out.entry("vsync".into())
+                        .or_insert_with(|| if old == "1" { "off" } else { "game" }.into());
+                }
+                out
+            };
+            let result = Self {
+                schema: self.schema,
+                profile: self.profile.clone(),
+                values: convert(&self.values),
+                defaults: convert(&self.defaults),
+            };
+            result.validate(scheme, to)?;
+            return Ok(result);
+        }
         if self.profile == crate::upstream040::PROFILE
             && crate::upstream040::profile_for_version(Some(to)) == crate::upstream040::PROFILE_041
         {
@@ -497,6 +522,9 @@ pub fn contracts() -> Value {
                 }
                 if let Some(since) = &f.since {
                     rule["since"] = json!(since);
+                }
+                if let Some(until) = &f.until {
+                    rule["until"] = json!(until);
                 }
                 if p.key == "nrEngine" || p.key.starts_with("nrOpen") {
                     rule["until"] = json!("1.3.0");

@@ -86,6 +86,8 @@ pub struct Field {
     pub optional: bool,
     #[serde(default)]
     pub since: Option<String>,
+    #[serde(default)]
+    pub until: Option<String>,
 }
 pub fn fields() -> &'static [Field] {
     static FIELDS: OnceLock<Vec<Field>> = OnceLock::new();
@@ -120,6 +122,14 @@ fn removed_open_field(key: &str) -> bool {
     key == "nrEngine" || key.starts_with("nrOpen")
 }
 pub fn field_available(field: &Field, version: Option<&str>) -> bool {
+    if field.until.as_deref().is_some_and(|until| {
+        version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .zip(semver::Version::parse(until).ok())
+            .is_some_and(|(v, end)| v >= end)
+    }) {
+        return false;
+    }
     if supports_130(version) && removed_open_field(&field.key) {
         return false;
     }
@@ -519,6 +529,29 @@ pub fn read(bytes: &[u8]) -> Result<Values> {
     let mut values = defaults();
     let mult = multiplier(&doc)?;
     for f in fields() {
+        if f.key == "vsync" {
+            if let Some(value) = vsync_value(&doc)? {
+                values.insert(f.key.clone(), value);
+            }
+            continue;
+        }
+        if f.key == "vsyncOff"
+            && resolve(&doc, &path(&["nativeMenuFeatures", "vsync"]))?
+                .0
+                .is_some()
+        {
+            // The new key has priority, including over malformed legacy values.
+            values.insert(
+                f.key.clone(),
+                if vsync_value(&doc)?.as_deref() == Some("off") {
+                    "1"
+                } else {
+                    "0"
+                }
+                .into(),
+            );
+            continue;
+        }
         if let Some(v) = resolve(&doc, &f.path)?.0 {
             let result = if f.key == "tf_mode" {
                 match v.as_str().context("Invalid Encore mode type")? {
@@ -541,6 +574,17 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
     read(bytes)?;
     let mut out = bytes.to_vec();
     for (key, value) in values {
+        if key == "vsyncOff" {
+            if values.contains_key("vsync") {
+                continue;
+            }
+            let modern = path(&["nativeMenuFeatures", "vsync"]);
+            if resolve(&document(&out)?, &modern)?.0.is_some() {
+                out = document(&out)?
+                    .set(&modern, json!(if value == "1" { "off" } else { "game" }))?;
+                continue;
+            }
+        }
         if key == "nrPreset" {
             if !values.contains_key("dlssNrPreset") {
                 let mapped = normalized("dlssNrPreset", &json!(value.parse::<u64>()?));
@@ -618,11 +662,74 @@ pub fn migrate_130(bytes: &[u8]) -> Result<Vec<u8>> {
     Ok(out)
 }
 
+fn at_least(version: Option<&str>, minor: u64, patch: u64) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(1, minor, patch))
+}
+
+fn vsync_value(doc: &Document) -> Result<Option<String>> {
+    if let Some(value) = resolve(doc, &path(&["nativeMenuFeatures", "vsync"]))?.0 {
+        return decode(field("vsync").expect("V-Sync metadata"), &value).map(Some);
+    }
+    resolve(doc, &path(&["nativeMenuFeatures", "vsyncOff"]))?
+        .0
+        .map(|value| {
+            let disabled = value
+                .as_bool()
+                .context("Invalid Encore legacy V-Sync boolean")?;
+            Ok(if disabled { "off" } else { "game" }.to_owned())
+        })
+        .transpose()
+}
+
+/// Retire only documented aliases. Preserve unknown objects and original bytes
+/// in the caller's upgrade journal; repeated migration is byte-for-byte stable.
+fn migrate_version_fields(bytes: &[u8], version: Option<&str>) -> Result<Vec<u8>> {
+    let mut out = bytes.to_vec();
+    if at_least(version, 5, 1) {
+        let mut candidates = Vec::new();
+        locations(
+            &document(&out)?.value,
+            "smoothMotionTuringVariant",
+            &mut Vec::new(),
+            &mut candidates,
+        );
+        for (p, _) in candidates {
+            out = document(&out)?.remove(&p)?;
+        }
+    }
+    let doc = document(&out)?;
+    let modern = path(&["nativeMenuFeatures", "vsync"]);
+    let legacy = path(&["nativeMenuFeatures", "vsyncOff"]);
+    if at_least(version, 5, 2) {
+        if let Some(value) = vsync_value(&doc)? {
+            let mut retired = Vec::new();
+            locations(&doc.value, "vsyncOff", &mut Vec::new(), &mut retired);
+            for (p, _) in retired {
+                out = document(&out)?.remove(&p)?;
+            }
+            out = document(&out)?.set(&modern, json!(value))?;
+        }
+    } else if version.is_some() && resolve(&doc, &modern)?.0.is_some() {
+        // Bundled defaults also serve older installed patches. Never silently
+        // downgrade forced-on V-Sync, which old Encore cannot represent.
+        let value = vsync_value(&doc)?.context("Missing V-Sync setting")?;
+        ensure!(value != "on", "此 Encore 版本不支持强制开启垂直同步");
+        for p in resolve(&doc, &modern)?.1 {
+            out = document(&out)?.remove(&p)?;
+        }
+        out = document(&out)?.set(&legacy, json!(value == "off"))?;
+    }
+    Ok(out)
+}
+
 pub fn read_for_version(bytes: &[u8], version: Option<&str>) -> Result<Values> {
+    let bytes = migrate_version_fields(bytes, version)?;
     if supports_130(version) {
-        read(&migrate_130(bytes)?)
+        read(&migrate_130(&bytes)?)
     } else {
-        read(bytes)
+        read(&bytes)
     }
 }
 
@@ -643,11 +750,12 @@ pub fn configure_for_version(
             "Encore setting unavailable in installed version: {key}"
         );
     }
+    let bytes = migrate_version_fields(bytes, version)?;
     if !supports_130(version) {
-        return configure(bytes, values);
+        return configure(&bytes, values);
     }
-    let open = used_open_nr(bytes)?;
-    let migrated = migrate_130(bytes)?;
+    let open = used_open_nr(&bytes)?;
+    let migrated = migrate_130(&bytes)?;
     let mut values = values.clone();
     if open {
         // Even a stale draft from the previous engine must not silently turn
@@ -721,7 +829,10 @@ pub fn validate_template(bytes: &[u8]) -> Result<()> {
     );
     for f in fields().iter().filter(|f| !f.optional) {
         ensure!(
-            if f.key == "flipMeteringBypass" {
+            if f.key == "vsyncOff" {
+                doc.get(&f.path)?.is_some()
+                    || doc.get(&path(&["nativeMenuFeatures", "vsync"]))?.is_some()
+            } else if f.key == "flipMeteringBypass" {
                 resolve(&doc, &f.path)?.0.is_some()
             } else {
                 doc.get(&f.path)?.is_some()

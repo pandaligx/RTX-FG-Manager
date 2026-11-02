@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.18
+
+- Support RTX Encore 1.5.3: three-way V-Sync control, RR preset F (RR2), and updated Tensor Core requirements. Keep options tied to the installed patch version.
+- Convert legacy V-Sync settings and player shares without losing comments, unknown fields or menu state. Retire the RTX 20 Smooth Motion variant selector from Encore 1.5.1 onward.
+- Extend player parameter sharing while preserving older clients. Bound cache reads and fall back to an earlier valid cache if the newest one is damaged.
+- Preserve the existing interface, other patch schemes and private runtime deployment paths.
+
 ## 4.3.17
 
 - Add the Bilibili profile of 坏坏的帅帅啊 to About and project acknowledgements.

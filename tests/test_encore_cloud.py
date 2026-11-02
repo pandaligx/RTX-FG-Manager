@@ -61,7 +61,7 @@ class EncoreCloudTests(unittest.TestCase):
                 yield path
         paths = {tuple(field["path"]) for field in fields}
         native_paths = set(leaves(config()))
-        self.assertEqual(len(fields), 147)
+        self.assertEqual(len(fields), 148)
         self.assertEqual(
             {field["key"] for field in fields if field.get("since") == "1.5.0"},
             {"xessTensorCores", "xefgTensorCores"},
@@ -77,7 +77,7 @@ class EncoreCloudTests(unittest.TestCase):
         # schema marker is not editable; upstream persists menu settings on demand.
         self.assertEqual(native_paths - paths, {("configVersion",), ("frameGeneration", "multiplier")})
         retired = {tuple(f["path"]) for f in fields if f["key"] == "nrEngine" or f["key"].startswith("nrOpen")}
-        self.assertEqual(paths - native_paths, retired | {("menuState", "menuKey"), ("menuState", "menuLanguage"), ("smoothMotion", "smoothMotionForce"), ("providerPatchPolicy",), ("overlay", "metrics", "overlayShowLatency")})
+        self.assertEqual(paths - native_paths, retired | {("menuState", "menuKey"), ("menuState", "menuLanguage"), ("smoothMotion", "smoothMotionForce"), ("smoothMotion", "smoothMotionTuringVariant"), ("nativeMenuFeatures", "vsyncOff"), ("providerPatchPolicy",), ("overlay", "metrics", "overlayShowLatency")})
         for key in ("menuKey", "menuLanguage"):
             self.assertTrue(next(field for field in fields if field["key"] == key)["optional"])
 

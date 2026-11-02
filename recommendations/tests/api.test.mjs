@@ -14,6 +14,32 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('Encore 1.5.3 sharing gates V-Sync, RR2 and retired Turing; old editors preserve unseen settings',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...shared(),patchVersion:'1.5.3',presets:{schema:1,profile:'rtx_encore_json_v4',values:{vsync:'on',dlssRrPreset:'f'},defaults:{vsync:'game',dlssRrPreset:'game'}}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',12);
+  assert.deepEqual(posted.content.presets,c.presets);
+  let revision=posted.revision;
+  for(const protocol of [8,9,10,11]) {
+    const path='/v1/recipes/'+posted.id;
+    const old=await f.call('GET',path,null,u.token,'test-ip',protocol);
+    assert.equal(Object.hasOwn(old.content,'presets'),false);
+    old.content.notes='Legacy metadata edit '+protocol;
+    await f.call('PUT',path,{revision,content:old.content},u.token,'test-ip',protocol);
+    revision++;
+    const current=await f.call('GET',path,null,u.token,'test-ip',12);
+    assert.deepEqual(current.content.presets,c.presets);
+  }
+  assert.throws(()=>recipe({...c,patchVersion:'1.5.2'}));
+  const sync=structuredClone(c);delete sync.presets.values.dlssRrPreset;delete sync.presets.defaults.dlssRrPreset;
+  assert.equal(recipe({...sync,patchVersion:'1.5.2'}).presets.values.vsync,'on');
+  assert.throws(()=>recipe({...sync,patchVersion:'1.5.1'}));
+  const legacy={schema:1,profile:c.presets.profile,values:{vsyncOff:'1',smoothMotionTuringVariant:'v1'},defaults:{vsyncOff:'0',smoothMotionTuringVariant:'v1'}};
+  assert.deepEqual(recipe({...c,patchVersion:'1.5.0',presets:legacy}).presets,legacy);
+  assert.throws(()=>recipe({...c,patchVersion:'1.5.1',presets:legacy}));
+  assert.equal((await f.call('GET','/v1/capabilities')).encore153,1);
+});
+
 test('Encore 1.5 Tensor settings stay independent and old clients preserve unseen fields',async t=>{
   const f=fixture(t),u=await f.login();
   const c={...shared(),patchVersion:'1.5.0',presets:{schema:1,profile:'rtx_encore_json_v4',values:{xessTensorCores:'1',xefgTensorCores:'0',frameGenerationEngine:'dlss-fg'},defaults:{xessTensorCores:'0',xefgTensorCores:'0',frameGenerationEngine:'game'}}};

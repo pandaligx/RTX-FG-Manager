@@ -866,7 +866,7 @@ impl Client {
         let mut request = self
             .http(network)?
             .request(method.clone(), format!("{}{route}", self.origin()))
-            .header("X-RTXFG-Feedback", "11")
+            .header("X-RTXFG-Feedback", "12")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
         if method == Method::GET {
@@ -978,46 +978,29 @@ impl Client {
     }
     fn cache_path(&self, id: &str) -> PathBuf {
         self.root
-            .join(format!("{:x}.setup-v6.json", Sha256::digest(id.as_bytes())))
+            .join(format!("{:x}.setup-v7.json", Sha256::digest(id.as_bytes())))
     }
     pub fn cached(&self, game: &GameIdentity, catalog: &cloud::Catalog) -> Option<Page> {
-        let b = fs::read(self.cache_path(&game.id))
-            .or_else(|_| {
-                fs::read(self.root.join(format!(
-                    "{:x}.setup-v5.json",
-                    Sha256::digest(game.id.as_bytes())
-                )))
-            })
-            .or_else(|_| {
-                fs::read(self.root.join(format!(
-                    "{:x}.setup-v4.json",
-                    Sha256::digest(game.id.as_bytes())
-                )))
-            })
-            .or_else(|_| {
-                fs::read(self.root.join(format!(
-                    "{:x}.setup-v2.json",
-                    Sha256::digest(game.id.as_bytes())
-                )))
-            })
-            .or_else(|_| {
-                fs::read(self.root.join(format!(
-                    "{:x}.presets-v1.json",
-                    Sha256::digest(game.id.as_bytes())
-                )))
-            })
-            .or_else(|_| {
-                fs::read(
-                    self.root
-                        .join(format!("{:x}.json", Sha256::digest(game.id.as_bytes()))),
-                )
-            })
-            .ok()?;
-        if b.len() > RESPONSE_LIMIT as usize {
-            return None;
-        }
-        let mut p: Page = serde_json::from_slice(&b).ok()?;
-        p.validate(&game.id, catalog).ok()?;
+        let digest = format!("{:x}", Sha256::digest(game.id.as_bytes()));
+        let mut p = [
+            "setup-v7.json",
+            "setup-v6.json",
+            "setup-v5.json",
+            "setup-v4.json",
+            "setup-v2.json",
+            "presets-v1.json",
+            "json",
+        ]
+        .iter()
+        .find_map(|suffix| {
+            // Bound reads before allocating and try a previous complete cache
+            // when the newest file is truncated, oversized or incompatible.
+            let path = self.root.join(format!("{digest}.{suffix}"));
+            let value = core::read_json(&path, RESPONSE_LIMIT).ok()?;
+            let page: Page = serde_json::from_value(value).ok()?;
+            page.validate(&game.id, catalog).ok()?;
+            Some(page)
+        })?;
         for c in &mut p.items {
             c.mine = false;
             c.liked = false;
@@ -1370,6 +1353,33 @@ mod tests {
         client
     }
     #[test]
+    fn corrupt_or_oversized_new_cache_uses_previous_valid_page() {
+        let data = tempfile::tempdir().unwrap();
+        let mut saved = card("RTX 3060", "581.80", 1);
+        saved.mine = true;
+        saved.liked = true;
+        let game = saved.content.game.clone();
+        let page = json!({"items":[saved],"total":1,"nextOffset":null});
+        let client = online_test_client(data.path(), "http://127.0.0.1:1".into());
+        let previous = client.root.join(format!(
+            "{:x}.setup-v6.json",
+            Sha256::digest(game.id.as_bytes())
+        ));
+        fs::write(&previous, serde_json::to_vec(&page).unwrap()).unwrap();
+        for invalid in [b"{".as_slice(), br#"{"items":[],"total":-1}"#] {
+            fs::write(client.cache_path(&game.id), invalid).unwrap();
+            let recovered = client.cached(&game, &cloud::bundled()).unwrap();
+            assert_eq!(recovered.total, 1);
+            assert!(!recovered.items[0].mine && !recovered.items[0].liked);
+        }
+        let oversized = fs::File::create(client.cache_path(&game.id)).unwrap();
+        oversized.set_len(RESPONSE_LIMIT + 1).unwrap();
+        drop(oversized);
+        assert_eq!(client.cached(&game, &cloud::bundled()).unwrap().total, 1);
+        fs::write(&previous, b"{}").unwrap();
+        assert!(client.cached(&game, &cloud::bundled()).is_none());
+    }
+    #[test]
     fn compatibility_sharing_cache_keeps_4314_offline_records_and_uses_new_protocol() {
         let data = tempfile::tempdir().unwrap();
         let old = card("RTX 3060", "581.80", 1);
@@ -1394,7 +1404,7 @@ mod tests {
         assert!(
             server.join().unwrap()[0]
                 .to_ascii_lowercase()
-                .contains("x-rtxfg-feedback: 11")
+                .contains("x-rtxfg-feedback: 12")
         );
     }
     #[test]

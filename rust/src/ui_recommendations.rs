@@ -1931,6 +1931,23 @@ impl Render for Recommendations {
                         .runtimes
                         .as_ref()
                         .and_then(|s| s.installable().err());
+                    if changed
+                        && parameter_error.is_none()
+                        && card.content.presets.as_ref().is_some_and(|s| {
+                            s.profile == rtx_fg_manager::encore::PROFILE
+                                && (s.values.contains_key("vsyncOff")
+                                    || s.values.contains_key("smoothMotionTuringVariant"))
+                        })
+                        && available.as_ref().is_ok_and(|v| {
+                            rtx_fg_manager::encore::field_available(
+                                rtx_fg_manager::encore::field("vsync").expect("V-Sync metadata"),
+                                Some(v),
+                            )
+                        })
+                    {
+                        body = body.child(div().text_xs().text_color(cx.theme().warning)
+                            .child(self.t("旧版垂直同步设置将转换；RTX 20 平滑运动从 Encore 1.5.1 起固定使用 V2。")));
+                    }
                     if let Some(error) = &runtime_error {
                         body = body.child(
                             div()
