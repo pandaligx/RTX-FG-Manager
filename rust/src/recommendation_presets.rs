@@ -111,6 +111,9 @@ pub fn execute(
     };
     let targets = game.deployment_targets();
     ensure!(!targets.is_empty(), "未找到游戏的部署目录");
+    if action.runtimes() && recipe.neural_runtime == "310.9.16" {
+        crate::recommendation_runtimes::ensure_nr_scheme(&recipe.scheme)?;
+    }
     if action.runtimes()
         && let Some(runtimes) = &recipe.runtimes
     {

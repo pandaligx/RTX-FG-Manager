@@ -288,7 +288,7 @@ mod component_locale_tests {
         );
         assert_eq!(
             gpui_component::_rust_i18n_translate("ru", "Settings.Reset All"),
-            "Reset All"
+            "Сбросить все"
         );
     }
 }

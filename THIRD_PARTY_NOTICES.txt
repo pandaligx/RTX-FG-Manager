@@ -15,13 +15,13 @@ not an official platform translation database or a compatibility guarantee.
 Manager source and distribution notes (2026-10-26; 4.3.13 candidate, not released)
 The manager is a Rust native application using GPUI Kit with the GPUI Fast backend.
 It does not bundle a Python interpreter, Tcl/Tk or a PyInstaller bootloader.
-GPUI Kit 0.8.1, including Base, Component and Kit assets:
+GPUI Kit 0.9.0, including Base, Component and Kit assets:
 https://github.com/longbridge/gpui-kit
-Pinned source: 99576db58ec8103417c41a092e891b4022d24e7e (Apache-2.0).
-GPUI Fast 0.1.12: https://github.com/longbridge/gpui-fast (Apache-2.0).
+Pinned source: 7591a35eced761e3613c01e71ff04c10129dae1a (Apache-2.0).
+GPUI Fast 0.1.13: https://github.com/longbridge/gpui-fast (Apache-2.0).
 Copyright 2022 - 2025 Zed Industries, Inc.; Copyright 2026 Longbridge.
 The exact released Fast license is retained in rust/assets/licenses/GPUI-FAST-LICENSE.
-GPUI Pre support crates 0.3.10: https://github.com/zed-industries/zed (Apache-2.0).
+GPUI Pre support crates 0.3.11: https://github.com/zed-industries/zed (Apache-2.0).
 Recorded Zed source: 93d745668805029476e6d7fbb19652116fed51de.
 This includes sum-tree, ztracing and ztracing-macro; the older snapshot's
 GPL-only tracing-chain workaround is not needed for these Apache-2.0 packages.

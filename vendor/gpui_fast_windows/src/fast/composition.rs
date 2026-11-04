@@ -241,7 +241,7 @@ fn draw(
     let Some(base_surface) = renderer.fast_composition.base else {
         return renderer.draw(scene.scene(), background_appearance);
     };
-    if renderer.skip_draws {
+    if renderer.skip_draws || !crate::fast::device_recovery::can_draw(renderer) {
         return Ok(());
     }
 

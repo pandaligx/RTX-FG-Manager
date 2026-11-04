@@ -253,10 +253,8 @@ mod tests {
     #[test]
     fn theme_changes_keep_the_users_text_scale() {
         for size in [12., 14., 18.] {
-            let mut theme = Theme {
-                font_size: px(size * 8. / 7.),
-                ..Default::default()
-            };
+            let mut theme = Theme::default();
+            theme.font_size = px(size * 8. / 7.);
             for mode in [ThemeMode::Light, ThemeMode::Dark] {
                 let fallback = default_theme(mode);
                 apply_config_with_defaults(&mut theme, &fallback, &fallback);
@@ -307,16 +305,15 @@ mod tests {
     }
 
     fn default_theme(mode: ThemeMode) -> Rc<ThemeConfig> {
-        Rc::new(ThemeConfig {
-            name: if mode.is_dark() {
-                "Default Dark".into()
-            } else {
-                "Default Light".into()
-            },
-            mode,
-            is_default: true,
-            ..Default::default()
-        })
+        let mut config = ThemeConfig::default();
+        config.name = if mode.is_dark() {
+            "Default Dark".into()
+        } else {
+            "Default Light".into()
+        };
+        config.mode = mode;
+        config.is_default = true;
+        Rc::new(config)
     }
 
     #[test]
@@ -417,27 +414,23 @@ mod tests {
     #[test]
     fn omitted_config_fields_restore_mode_defaults_without_resetting_interactions() {
         for mode in [ThemeMode::Light, ThemeMode::Dark] {
-            let fallback = Rc::new(ThemeConfig {
-                highlight: Some(Default::default()),
-                ..default_theme(mode).as_ref().clone()
-            });
-            let custom = Rc::new(ThemeConfig {
-                name: "Custom optional fields".into(),
-                mode,
-                font_family: Some("Temporary UI font".into()),
-                font_size: Some(22.),
-                mono_font_family: Some("Temporary mono font".into()),
-                mono_font_size: Some(19.),
-                radius: Some(1),
-                radius_lg: Some(2),
-                shadow: Some(false),
-                highlight: Some(Default::default()),
-                ..Default::default()
-            });
-            let mut theme = Theme {
-                focus_ring: false,
-                ..Default::default()
-            };
+            let mut fallback = default_theme(mode).as_ref().clone();
+            fallback.highlight = Some(Default::default());
+            let fallback = Rc::new(fallback);
+            let mut custom = ThemeConfig::default();
+            custom.name = "Custom optional fields".into();
+            custom.mode = mode;
+            custom.font_family = Some("Temporary UI font".into());
+            custom.font_size = Some(22.);
+            custom.mono_font_family = Some("Temporary mono font".into());
+            custom.mono_font_size = Some(19.);
+            custom.radius = Some(1);
+            custom.radius_lg = Some(2);
+            custom.shadow = Some(false);
+            custom.highlight = Some(Default::default());
+            let custom = Rc::new(custom);
+            let mut theme = Theme::default();
+            theme.focus_ring = false;
             apply_config_with_defaults(&mut theme, &custom, &fallback);
             assert_eq!(theme.mono_font_family, "Temporary mono font");
             assert_eq!(theme.radius, px(1.));

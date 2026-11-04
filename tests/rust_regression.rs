@@ -649,6 +649,42 @@ fn versioned_update_preserves_modified_destination_on_failed_launch() -> Result<
 }
 
 #[test]
+fn update_keeps_existing_filename_and_rolls_back_without_breaking_shortcuts() -> Result<()> {
+    for name in [
+        "RTXManager-v4.3.18-x64.exe",
+        "RTXManager.exe",
+        "我的管理器.exe",
+    ] {
+        let d = tempfile::tempdir()?;
+        let target = d.path().join(name);
+        let stage = d.path().join("update.new");
+        let backup = d.path().join("update.previous");
+        let unrelated = d.path().join("RTXManager-v4.3.19-x64.exe");
+        fs::write(&target, b"old")?;
+        fs::write(&stage, b"new")?;
+        fs::write(&unrelated, b"unrelated")?;
+        assert!(
+            updater::replace_and_launch(&target, &stage, &backup, &core::hash(b"old"), || {
+                assert_eq!(fs::read(&target)?, b"new");
+                anyhow::bail!("new window did not become ready")
+            })
+            .is_err()
+        );
+        assert_eq!(fs::read(&target)?, b"old");
+        assert!(!backup.exists());
+        fs::write(&stage, b"new")?;
+        updater::replace_and_launch(&target, &stage, &backup, &core::hash(b"old"), || {
+            assert_eq!(fs::read(&target)?, b"new");
+            Ok(())
+        })?;
+        assert_eq!(fs::read(&target)?, b"new");
+        assert_eq!(fs::read(&unrelated)?, b"unrelated");
+        assert!(!backup.exists());
+    }
+    Ok(())
+}
+
+#[test]
 #[cfg(feature = "fixture-tests")]
 fn renamed_update_launches_verified_windows_baseline_from_new_path() -> Result<()> {
     use std::os::windows::process::CommandExt;

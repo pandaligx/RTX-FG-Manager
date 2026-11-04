@@ -10,8 +10,10 @@
 
 pub(crate) mod class_names;
 pub(crate) mod composition;
+pub(crate) mod device_recovery;
 pub(crate) mod device_wake;
 pub(crate) mod draw_state;
+pub(crate) mod font_fallback;
 pub(crate) mod frame;
 pub(crate) mod frame_schedule;
 pub(crate) mod globals;

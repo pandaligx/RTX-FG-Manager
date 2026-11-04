@@ -1,10 +1,10 @@
 # Windows manager compatibility patch
 
-Baseline: the published `gpui-fast-windows` **0.1.12** crate from crates.io
-(`gpui-fast-windows-0.1.12.crate` SHA-256
-`6a1a193343ef7faaa18eb9ccc0aadf8ec9571f2791c4419c2ca23aa17198f970`).
+Baseline: the published `gpui-fast-windows` **0.1.13** crate from crates.io
+(`gpui-fast-windows-0.1.13.crate` SHA-256
+`088654835f1408e1aaa79afcc316530461a14fa1c4e543d47b1881b6ced63f19`).
 The crate's Apache-2.0 `LICENSE`, README and original manifest are retained.
-The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.12`
+The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.13`
 and sets `publish = false`.
 
 The manager previously applied equivalent compatibility changes to Zed commit
@@ -65,3 +65,12 @@ retained in the compatibility modules. Their execution on a development Windows
 machine does not establish older Windows 10, physical mixed-DPI, GPU or game
 compatibility. The application build's lockfile and release validation remain
 required.
+
+For manager 4.3.19 these changes are rebased onto Fast 0.1.13. The upstream
+device-loss/resize recovery, bounded text caches, redundant-frame suppression
+and legacy font lookup remain intact. The new `fast/font_fallback.rs` accepts
+the retained `IDWriteFactory3`; it uses APIs available on that interface.
+`DirectWriteComponents.factory` keeps upstream crate visibility so both font
+lookup paths share the same factory. No new minimum Windows version is imposed.
+The manager's application-level tests and GUI checks do not simulate actual
+device removal or establish older Windows 10/mixed-DPI compatibility.

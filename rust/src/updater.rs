@@ -411,14 +411,6 @@ pub fn install(path: &Path, m: &Manifest, data: &Path) -> Result<()> {
         version(&s.version)? < version(&m.version)?,
         "当前版本无需更新"
     );
-    let destination = target.with_file_name(&m.file);
-    ensure!(
-        target
-            .to_string_lossy()
-            .eq_ignore_ascii_case(&destination.to_string_lossy())
-            || !destination.exists(),
-        "新版文件名已被占用，未替换任何文件"
-    );
     // Display-only notes must not enlarge the small, backward-compatible install ticket.
     let mut install_manifest = m.clone();
     install_manifest.notes.clear();
@@ -534,10 +526,7 @@ pub fn signal_ready(data: &Path) -> Result<()> {
     let ticket: Ticket =
         serde_json::from_value(core::read_json(&folder.join("install.json"), 16384)?)?;
     let exe = core::no_links(&std::env::current_exe()?)?;
-    ensure!(
-        exe == ticket.target.with_file_name(&ticket.manifest.file),
-        "Unexpected updated executable"
-    );
+    ensure!(exe == ticket.target, "Unexpected updated executable");
     verify(&exe, &ticket.manifest)?;
     core::atomic_json(
         &folder.join("ready.json"),
@@ -585,7 +574,9 @@ pub fn apply(ticket: &Path) -> Result<()> {
         "更新目标已变化，已停止替换"
     );
     let name = target.file_name().context("无效路径")?.to_string_lossy();
-    let destination = target.with_file_name(&t.manifest.file);
+    // Retain the user's filename so shortcuts and pinned launchers keep working.
+    // The manifest filename identifies the verified download, not its destination.
+    let destination = target.clone();
     let stage = target.with_file_name(format!("{name}.{token}.new"));
     let backup = target.with_file_name(format!("{name}.{token}.previous"));
     ensure!(!stage.exists() && !backup.exists(), "更新备份路径冲突");

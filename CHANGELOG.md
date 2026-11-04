@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.19
+
+- Upgrade GPUI Kit to 0.9.0 and GPUI Fast to 0.1.13; preserve the manager's Windows compatibility patches.
+- Check shared runtime compatibility before installation. Unsupported DLSSNR or standalone XeSS is explained in the details window, with an option to deselect runtimes.
+- Open the install-options menu above its button. Automatic updates retain the installed EXE filename to preserve shortcuts (#17).
+
 ## 4.3.18
 
 - Support RTX Encore 1.5.3: three-way V-Sync control, RR preset F (RR2), and updated Tensor Core requirements. Keep options tied to the installed patch version.

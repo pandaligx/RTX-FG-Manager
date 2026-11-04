@@ -158,6 +158,56 @@ fn cancellation_and_legacy_shares_do_not_write_parameters() -> Result<()> {
 }
 
 #[test]
+fn incompatible_neural_share_is_rejected_before_download_or_file_changes() -> Result<()> {
+    let (_temp, game, catalog, mut recipe) = fixture()?;
+    recipe.scheme = rtx_fg_manager::upstream040::SCHEME.into();
+    recipe.patch_version = "0.4.1".into();
+    recipe.presets = None;
+    recipe.neural_runtime = "310.9.16".into();
+    let before = game
+        .deployment_targets()
+        .iter()
+        .map(|target| {
+            Ok((
+                fs::read(target.directory.join(encore::CONFIG))?,
+                fs::read(target.directory.join("dxgi.dll"))?,
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    for inventory in [false, true] {
+        recipe.runtimes = if inventory {
+            Some(serde_json::from_value(
+                serde_json::json!({"schema":1,"components":[{"kind":"nr","source":"game","versions":["310.9.16"]}]}),
+            )?)
+        } else {
+            None
+        };
+        // Cover both the legacy NR flag and a modern inventory-only share.
+        recipe.neural_runtime = if inventory { "none" } else { "310.9.16" }.into();
+        let error = shared::execute(
+            &game,
+            &catalog,
+            &recipe,
+            shared::Action::Selected {
+                patch: true,
+                parameters: false,
+                runtimes: true,
+            },
+            1,
+            &AtomicBool::new(false),
+            |_| panic!("incompatible NR must fail before download"),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("DLSSNR"), "{error:#}");
+        for (target, (config, dll)) in game.deployment_targets().iter().zip(&before) {
+            assert_eq!(fs::read(target.directory.join(encore::CONFIG))?, *config);
+            assert_eq!(fs::read(target.directory.join("dxgi.dll"))?, *dll);
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn parameter_only_does_not_install_shared_runtimes_or_require_their_downloads() -> Result<()> {
     let (_temp, game, catalog, mut recipe) = fixture()?;
     recipe.runtimes = Some(serde_json::from_value(

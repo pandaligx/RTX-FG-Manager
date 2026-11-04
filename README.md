@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.18"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.19"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.18 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.19 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,25 +41,25 @@
 
 ## Download
 
-**Version 4.3.18** · Windows 10 / 11 x64
+**Version 4.3.19** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.18 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.18) | Default domestic source |
-| **GitHub** | [Open 4.3.18 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.18) | Primary project and fallback |
+| **GitCode** | [Open 4.3.19 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.19) | Default domestic source |
+| **GitHub** | [Open 4.3.19 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.19) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
-Download **`RTXManager-v4.3.18-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
+Download **`RTXManager-v4.3.19-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.18 highlights
+## 4.3.19 highlights
 
-- Support RTX Encore 1.5.3 V-Sync modes and RR preset F (RR2), with settings matched to the installed version.
-- Migrate legacy settings and player presets while preserving JSONC comments and existing client compatibility.
-- Fall back to an earlier valid cache when the latest cache is damaged.
+- Upgrade GPUI Kit 0.9.0 / GPUI Fast 0.1.13 for window and popup fixes.
+- Check shared runtime compatibility before installation, with an option to deselect unsupported runtimes; open install options above the button.
+- Future automatic updates retain the installed executable name to preserve shortcuts.
 
 [Full changelog →](CHANGELOG.md)
 
-> **Dlssg_for_sm86 0.4.1** requires manager **4.3.14**; use **4.3.18** for **Encore 1.6.0** settings and preset sharing. Upgrade games explicitly; manager updates do not automatically replace installed patches.
+> **Dlssg_for_sm86 0.4.1** requires manager **4.3.14**; use **4.3.18 or later** for **Encore 1.6.0** settings and preset sharing. Upgrade games explicitly; manager updates do not automatically replace installed patches.
 
 ## Choose a patch
 

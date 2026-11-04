@@ -1502,6 +1502,7 @@ impl Render for Recommendations {
         }
         let mut primary = None;
         let mut install_menu: Option<AnyElement> = None;
+        let mut install_notice: Option<AnyElement> = None;
         let body = match self.mode {
             Mode::Browse => self.browse(cx),
             Mode::Identity => {
@@ -1930,7 +1931,18 @@ impl Render for Recommendations {
                         .content
                         .runtimes
                         .as_ref()
-                        .and_then(|s| s.installable().err());
+                        .map(|s| s.compatible_with(&card.content.scheme, &card.content.entries))
+                        .unwrap_or(Ok(()))
+                        .and_then(|()| {
+                            if card.content.neural_runtime == "310.9.16" {
+                                rtx_fg_manager::recommendation_runtimes::ensure_nr_scheme(
+                                    &card.content.scheme,
+                                )
+                            } else {
+                                Ok(())
+                            }
+                        })
+                        .err();
                     if changed
                         && parameter_error.is_none()
                         && card.content.presets.as_ref().is_some_and(|s| {
@@ -1948,12 +1960,31 @@ impl Render for Recommendations {
                         body = body.child(div().text_xs().text_color(cx.theme().warning)
                             .child(self.t("旧版垂直同步设置将转换；RTX 20 平滑运动从 Encore 1.5.1 起固定使用 V2。")));
                     }
-                    if let Some(error) = &runtime_error {
-                        body = body.child(
+                    if let Some(error) = &runtime_error
+                        && self.selected_parts[2]
+                    {
+                        install_notice = Some(
                             div()
-                                .text_xs()
-                                .text_color(cx.theme().warning)
-                                .child(self.t(&error.to_string())),
+                                .h_flex()
+                                .flex_wrap()
+                                .gap_2()
+                                .flex_shrink_0()
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().warning)
+                                        .child(self.t(&error.to_string())),
+                                )
+                                .child(
+                                    self.button("recipe-skip-runtimes", "取消勾选运行库", cx)
+                                        .disabled(self.busy || self.operation_busy)
+                                        .on_click(cx.listener(|this, _, _, cx| {
+                                            this.selected_parts[2] = false;
+                                            this.message.clear();
+                                            cx.notify();
+                                        })),
+                                )
+                                .into_any_element(),
                         );
                     }
                     let has_parameters = card.content.presets.is_some();
@@ -1994,27 +2025,30 @@ impl Render for Recommendations {
                             .primary()
                             .small()
                             .menu_accessibility_label(self.t("选择安装内容"))
-                            .dropdown_menu(move |mut menu, _, _| {
-                                for (index, label, visible) in &choices {
-                                    if !visible {
-                                        continue;
+                            .dropdown_menu_with_anchor(
+                                Anchor::BottomRight,
+                                move |mut menu, _, _| {
+                                    for (index, label, visible) in &choices {
+                                        if !visible {
+                                            continue;
+                                        }
+                                        let index = *index;
+                                        let view = view.clone();
+                                        menu = menu.item(
+                                            PopupMenuItem::new(label.clone())
+                                                .checked(parts[index])
+                                                .on_click(move |_, _, cx| {
+                                                    let _ = view.update(cx, |this, cx| {
+                                                        this.selected_parts[index] =
+                                                            !this.selected_parts[index];
+                                                        cx.notify();
+                                                    });
+                                                }),
+                                        );
                                     }
-                                    let index = *index;
-                                    let view = view.clone();
-                                    menu = menu.item(
-                                        PopupMenuItem::new(label.clone())
-                                            .checked(parts[index])
-                                            .on_click(move |_, _, cx| {
-                                                let _ = view.update(cx, |this, cx| {
-                                                    this.selected_parts[index] =
-                                                        !this.selected_parts[index];
-                                                    cx.notify();
-                                                });
-                                            }),
-                                    );
-                                }
-                                menu
-                            })
+                                    menu
+                                },
+                            )
                             .into_any_element(),
                     );
                 }
@@ -2162,6 +2196,7 @@ impl Render for Recommendations {
                             .child(Scrollbar::vertical(&scroll).mode(ScrollbarMode::Always)),
                     ),
             )
+            .children(install_notice)
             .when(!self.message.is_empty(), |d| {
                 d.child(
                     div()

@@ -202,27 +202,15 @@ impl Snapshot {
         targets: &[core::DeploymentTarget],
         recipe: &crate::recommendations::Recipe,
     ) -> Result<()> {
-        self.installable()?;
+        self.compatible_with(&recipe.scheme, &recipe.entries)?;
         for c in &self.components {
             if c.kind == "nr" && c.source == "game" {
-                ensure!(
-                    ["dlssg-transfusion-1.4.5.3", "rtx40mfg-1.3.3-hf2"]
-                        .contains(&recipe.scheme.as_str()),
-                    "此方案不支持分享中的 DLSSNR 运行库"
-                );
                 for target in targets {
                     ensure!(
                         crate::scanner::inspect(&target.game_exe).neural_input(),
                         "未发现游戏的 DLSS 超分或光线重建组件；不会添加 NR 运行库"
                     );
                 }
-            }
-            if c.source == "managed" {
-                ensure!(
-                    recipe.scheme == "rtx40mfg-1.3.3-hf2"
-                        && !recipe.entries.iter().any(|e| e.ends_with(".asi")),
-                    "此方案不能使用独立 XeSS 运行库"
-                );
             }
             if c.source != "game" || c.kind == "nr" {
                 continue;
@@ -235,6 +223,23 @@ impl Snapshot {
                 );
             }
         }
+        Ok(())
+    }
+    /// Check the shared components before downloads or filesystem inspection.
+    pub fn compatible_with(&self, scheme: &str, entries: &[String]) -> Result<()> {
+        self.installable()?;
+        if self
+            .components
+            .iter()
+            .any(|c| c.kind == "nr" && c.source == "game")
+        {
+            ensure_nr_scheme(scheme)?;
+        }
+        ensure!(
+            !self.components.iter().any(|c| c.source == "managed")
+                || scheme == "rtx40mfg-1.3.3-hf2" && !entries.iter().any(|e| e.ends_with(".asi")),
+            "此方案不能使用独立 XeSS 运行库"
+        );
         Ok(())
     }
     pub fn verify_installed(&self, targets: &[core::DeploymentTarget]) -> Result<()> {
@@ -329,6 +334,15 @@ impl Snapshot {
         }
         Ok(())
     }
+}
+
+/// A copied inventory may include NR left over from a different patch.
+pub fn ensure_nr_scheme(scheme: &str) -> Result<()> {
+    ensure!(
+        [crate::encore::SCHEME, "rtx40mfg-1.3.3-hf2"].contains(&scheme),
+        "此方案不支持分享中的 DLSSNR 运行库"
+    );
+    Ok(())
 }
 
 pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
@@ -466,6 +480,25 @@ mod tests {
         let mut s = snapshot("310.9.16");
         s.components[0].source = "patch".into();
         assert!(s.verify_prepared(&BTreeMap::new()).is_err());
+    }
+    #[test]
+    fn neural_runtime_compatibility_is_checked_before_game_access() -> Result<()> {
+        let mut s = snapshot("310.9.16");
+        s.components[0].kind = "nr".into();
+        for scheme in [crate::encore::SCHEME, "rtx40mfg-1.3.3-hf2"] {
+            s.compatible_with(scheme, &["dxgi.dll".into()])?;
+        }
+        for scheme in [
+            crate::upstream040::SCHEME,
+            crate::recommendation_presets::MFG_161_COMPAT,
+            "rtxfg-0.3.5-dx12-vulkan",
+        ] {
+            let error = s.compatible_with(scheme, &["dxgi.dll".into()]).unwrap_err();
+            assert!(error.to_string().contains("DLSSNR"));
+        }
+        // An ordinary SR inventory remains valid on the same older schemes.
+        snapshot("310.9.16").compatible_with(crate::upstream040::SCHEME, &["dxgi.dll".into()])?;
+        Ok(())
     }
     #[test]
     #[cfg(windows)]

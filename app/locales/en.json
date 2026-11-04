@@ -317,5 +317,8 @@
   "鸣谢": "Acknowledgements",
   "大大大怪将军阁下（测试支持）": "Da Da Da Guai Jiangjun (testing)",
   "游戏原有（保留本机）": "Native files (keep local)",
-  "未收录或含多个版本的游戏原有组件仅作参考；安装并应用会保留本机文件，不自动替换。": "Unlisted or mixed native versions are reference only. Install and apply retains local files without automatically replacing them."
+  "未收录或含多个版本的游戏原有组件仅作参考；安装并应用会保留本机文件，不自动替换。": "Unlisted or mixed native versions are reference only. Install and apply retains local files without automatically replacing them.",
+  "取消勾选运行库": "Deselect runtimes",
+  "此方案不支持分享中的 DLSSNR 运行库": "This patch does not support the shared DLSSNR runtime",
+  "此方案不能使用独立 XeSS 运行库": "This patch cannot use standalone XeSS runtimes"
 }

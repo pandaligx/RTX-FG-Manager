@@ -146,7 +146,6 @@ pub(crate) fn on_input(
     window: &WindowsWindow,
     mut callback: Box<dyn FnMut(PlatformInput) -> DispatchEventResult>,
 ) {
-    let request = window.state.fast_frame_request.clone();
     #[cfg(test)]
     let hwnd = gpui::PlatformWindow::get_raw_handle(window).0 as usize;
     window
@@ -157,7 +156,6 @@ pub(crate) fn on_input(
             #[cfg(test)]
             crate::fast::native_tests::input(hwnd);
             let result = callback(event);
-            request.request();
             result
         })));
 }
