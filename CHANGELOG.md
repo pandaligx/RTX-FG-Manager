@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.3.20
+
+- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: "auto"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.
+- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.
+
 ## 4.3.19
 
 - Upgrade GPUI Kit to 0.9.0 and GPUI Fast to 0.1.13; preserve the manager's Windows compatibility patches.

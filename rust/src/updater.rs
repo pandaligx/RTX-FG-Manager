@@ -6,7 +6,6 @@ use std::{
     fs,
     os::windows::process::CommandExt,
     path::{Path, PathBuf},
-    process::Command,
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
@@ -396,7 +395,7 @@ pub struct Ticket {
     pub data_dir: PathBuf,
 }
 fn launch(path: &Path, args: &[&std::ffi::OsStr]) -> Result<()> {
-    Command::new(path)
+    crate::executable_name::command(path)
         .args(args)
         .current_dir(path.parent().context("无效路径")?)
         .creation_flags(0x08000000)
@@ -515,6 +514,7 @@ pub fn replace_named_and_launch(
 
 /// Called once after the new manager has drawn frames, with disk work off the UI thread.
 pub fn signal_ready(data: &Path) -> Result<()> {
+    crate::executable_name::signal_ready(data)?;
     let Ok(token) = std::env::var("RTXFG_UPDATE_READY") else {
         return Ok(());
     };
@@ -596,7 +596,7 @@ pub fn apply(ticket: &Path) -> Result<()> {
         &backup,
         &t.old_sha256,
         || {
-            let mut child = Command::new(&destination)
+            let mut child = crate::executable_name::command(&destination)
                 .args(["--data-dir".as_ref(), t.data_dir.as_os_str()])
                 .env("RTXFG_UPDATE_READY", token.as_ref())
                 .current_dir(destination.parent().context("无效路径")?)

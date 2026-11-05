@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.19"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.20"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.19 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.20 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,21 +41,21 @@
 
 ## Download
 
-**Version 4.3.19** · Windows 10 / 11 x64
+**Version 4.3.20** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.19 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.19) | Default domestic source |
-| **GitHub** | [Open 4.3.19 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.19) | Primary project and fallback |
+| **GitCode** | [Open 4.3.20 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.20) | Default domestic source |
+| **GitHub** | [Open 4.3.20 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.20) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
-Download **`RTXManager-v4.3.19-x64.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
+Download **`RTXManager.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.19 highlights
+## 4.3.20 highlights
 
-- Upgrade GPUI Kit 0.9.0 / GPUI Fast 0.1.13 for window and popup fixes.
-- Check shared runtime compatibility before installation, with an option to deselect unsupported runtimes; open install options above the button.
-- Future automatic updates retain the installed executable name to preserve shortcuts.
+- Fix MFG-Unlocker 1.7.0 rejecting the automatic menu setting; apply parameters once to repair existing game configs without clearing the cache.
+- New downloads use `RTXManager.exe`; older installations can opt into filename migration in Settings, including recognized shortcuts.
+- Keep older clients compatible with updates and retain the current installation path during automatic updates.
 
 [Full changelog →](CHANGELOG.md)
 

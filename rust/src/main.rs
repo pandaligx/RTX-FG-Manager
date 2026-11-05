@@ -42,6 +42,7 @@ fn run() -> anyhow::Result<()> {
     let args: Vec<_> = std::env::args().collect();
     let arg = |n: usize| args.get(n).context("缺少命令参数");
     match args.get(1).map(String::as_str) {
+        Some("--rename-manager") => rtx_fg_manager::executable_name::apply(&PathBuf::from(arg(2)?)),
         Some("--bundle-check") => {
             // Prepare one chosen entry in the download cache, never deploy it.
             let catalog = rtx_fg_manager::cloud::bundled();

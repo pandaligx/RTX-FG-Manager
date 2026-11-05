@@ -108,6 +108,27 @@ fn applies_both_files_in_correct_locations_and_rejects_old_version() -> Result<(
 }
 
 #[test]
+fn legacy_auto_repair_uses_owned_transaction_and_needs_no_dummy_edit() -> Result<()> {
+    for custom in [false, true] {
+        let (_temp, target) = fixture(custom, "1.7.0")?;
+        let path = target.directory.join(rtxmfg::CONFIG);
+        let original = br#"{"version":13,"optiScalerUi":"auto","mode":"fixed","followGame":false,"multiplier":3,"custom":7}"#;
+        fs::write(&path, original)?;
+        let ui = target.game_exe.parent().unwrap().join(rtxmfg::UI_CONFIG);
+        fs::write(&ui, INI)?;
+        core::apply_parameters_at(&target, &context(), &presets::Values::new())?;
+        let result: serde_json::Value = serde_json::from_slice(&fs::read(&path)?)?;
+        assert!(result.get("optiScalerUi").is_none());
+        assert_eq!(result["multiplier"], 3);
+        assert_eq!(result["custom"], 7);
+        assert_eq!(fs::read(ui)?, INI);
+        assert!(!rtxmfg_settings::has_pending(&target.directory)?);
+        assert!(core::status_at(&target).starts_with("已部署"));
+    }
+    Ok(())
+}
+
+#[test]
 fn locked_ui_rolls_back_json_and_preserves_original_bytes() -> Result<()> {
     let (_temp, target) = fixture(false, "1.6.1")?;
     let ui = target.directory.join(rtxmfg::UI_CONFIG);

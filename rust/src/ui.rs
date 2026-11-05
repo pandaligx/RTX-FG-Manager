@@ -924,6 +924,7 @@ impl Manager {
                 self.filter();
             }
             "update" => self.c.install_update(),
+            "rename_manager" => self.c.rename_manager(),
             "alias" | "restore" => {
                 if self.c.busy {
                     return;
@@ -4032,9 +4033,22 @@ impl Manager {
                 }
                 "remove" | "remove_checked" => "仅从游戏库移除；游戏文件和已部署补丁保持不变。",
                 "update" => "更新将关闭管理器并替换程序，成功启动后删除旧版。是否继续？",
+                "rename_manager" => {
+                    "将当前程序改为同目录的 RTXManager.exe，并重启。同步迁移桌面、开始菜单和任务栏中可识别的快捷方式；自定义脚本或其他位置的入口需自行调整。遇到同名文件不覆盖，操作失败恢复原文件名。"
+                }
                 _ => "仅修改 Windows 显示名称，不改变显卡性能或硬件能力。修改和还原后请重启电脑。",
             };
             let mut message = self.c.text(text);
+            if a == "rename_manager"
+                && let Ok(path) = std::env::current_exe()
+            {
+                message.push_str(&format!(
+                    "\n\n{}\n→ {}",
+                    path.display(),
+                    path.with_file_name(rtx_fg_manager::executable_name::FILE_NAME)
+                        .display()
+                ));
+            }
             if matches!(a.as_str(), "alias" | "restore")
                 && let Some(device) = self.c.devices.get(self.c.device_index)
             {
@@ -4125,6 +4139,8 @@ impl Manager {
             "删除并重新清理"
         } else if action.as_deref() == Some("recover_patch") {
             "卸载并恢复"
+        } else if action.as_deref() == Some("rename_manager") {
+            "统一文件名并重启"
         } else if action.is_some() {
             "继续"
         } else {

@@ -1,6 +1,6 @@
 [package]
 name = "rtx-fg-manager"
-version = "4.3.19"
+version = "4.3.20"
 edition = "2024"
 publish = false
 build = "rust/build.rs"

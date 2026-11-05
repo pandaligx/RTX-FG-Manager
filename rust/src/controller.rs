@@ -59,6 +59,7 @@ pub enum Event {
     DownloadProgress(updater::DownloadProgress),
     UpdateDone,
     Installed,
+    RenamePrepared(Result<()>),
     Saved(Result<()>),
     SmokeWritten,
 }
@@ -3208,6 +3209,27 @@ impl Controller {
             Ok(())
         });
     }
+    pub fn rename_manager(&mut self) {
+        if self.busy || self.critical || self.update_busy || self.closing || self.read_only {
+            return;
+        }
+        if self.first_pending_preset().is_some() {
+            self.warning = Some(self.text("请先应用或放弃待修改参数，再统一文件名。"));
+            return;
+        }
+        self.busy = true;
+        self.critical = true;
+        self.update_busy = true;
+        self.update_installing = true;
+        self.progress = "正在准备改名，完成后自动重启…".into();
+        let data = self.data.clone();
+        self.channel.job(move |c| {
+            c.send(Event::RenamePrepared(
+                rtx_fg_manager::executable_name::prepare(&data),
+            ));
+            Ok(())
+        });
+    }
     fn begin_runtime_catalog_refresh(&mut self) -> Option<u64> {
         if self.closing || self.busy || self.runtime_catalog_load.loading {
             return None;
@@ -3779,6 +3801,17 @@ impl Controller {
                     self.update_installing = false;
                     self.closing = true;
                     self.pending_catalog = None;
+                }
+                Event::RenamePrepared(result) => {
+                    self.busy = false;
+                    self.critical = false;
+                    self.update_busy = false;
+                    self.update_installing = false;
+                    self.progress.clear();
+                    match result {
+                        Ok(()) => self.close(),
+                        Err(error) => self.warning = Some(error.to_string()),
+                    }
                 }
                 Event::SmokeWritten => self.close(),
                 Event::Saved(result) => match result {
@@ -5006,6 +5039,26 @@ mod tests {
         c.tick_close();
         assert!(c.store.is_some());
         c.hags_writing = false;
+        c.tick_close();
+        assert!(c.store.is_none());
+    }
+    #[test]
+    fn rename_failure_releases_operation_guards_and_success_saves_before_exit() {
+        let (_dir, mut c) = controller();
+        c.busy = true;
+        c.critical = true;
+        c.update_busy = true;
+        c.update_installing = true;
+        c.channel
+            .send(Event::RenamePrepared(Err(anyhow::anyhow!("name conflict"))));
+        c.events();
+        assert!(!c.busy && !c.critical && !c.update_busy && !c.update_installing);
+        assert!(!c.closing);
+        assert_eq!(c.warning.as_deref(), Some("name conflict"));
+        c.channel.send(Event::RenamePrepared(Ok(())));
+        c.events();
+        assert!(c.closing);
+        assert!(c.runtime_catalog_cancel.load(Ordering::Relaxed));
         c.tick_close();
         assert!(c.store.is_none());
     }

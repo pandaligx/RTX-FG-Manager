@@ -514,6 +514,42 @@ impl Manager {
                 cx,
                 |this, window, cx| this.update_panel(window, cx),
             ),
+            self.setting_field("程序文件名", cx, |this, _, cx| {
+                let path = std::env::current_exe().ok();
+                let standard = path
+                    .as_deref()
+                    .is_some_and(rtx_fg_manager::executable_name::is_standard);
+                div()
+                    .h_flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap_2()
+                    .child(
+                        path.as_ref()
+                            .and_then(|p| p.file_name())
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default(),
+                    )
+                    .when(!standard, |d| {
+                        d.child(
+                            this.button(
+                                "rename-manager",
+                                "统一文件名…",
+                                Command::Confirm("rename_manager".into()),
+                                cx,
+                            )
+                            .small()
+                            .disabled(
+                                this.c.busy
+                                    || this.c.update_busy
+                                    || this.c.read_only
+                                    || this.any_preset_pending()
+                                    || path.is_none(),
+                            ),
+                        )
+                    })
+                    .into_any_element()
+            }),
         ]);
         let maintenance = SettingGroup::new().gap_3().item(
             self.setting_field("清理缓存", cx, |this, _, cx| {

@@ -345,8 +345,18 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
         serde_json::from_slice(bytes.strip_prefix(&[239, 187, 191]).unwrap_or(bytes))?;
     ensure!(data.is_object(), "RTXMFG JSON 必须是对象");
     crate::presets::validate(PROFILE, values)?;
-    if values.keys().all(|key| is_sidecar_key(key)) {
+    // `auto` is a manager-only selection. MFG 1.7 rejects the whole JSON if
+    // that literal reaches its parser; absence selects its host-aware default.
+    // Also repair configurations emitted by older managers on explicit Apply,
+    // including an otherwise empty edit. Never rewrite healthy unedited bytes.
+    let legacy_auto = data.get("optiScalerUi").and_then(Value::as_str) == Some("auto");
+    if values.keys().all(|key| is_sidecar_key(key)) && !legacy_auto {
         return Ok(bytes.to_vec());
+    }
+    if legacy_auto {
+        data.as_object_mut()
+            .expect("checked object")
+            .remove("optiScalerUi");
     }
     if let Some(mode) = values.get("rtx_mode") {
         data["followGame"] = json!(mode == "follow");
@@ -365,7 +375,13 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
         .filter(|p| p.section.is_empty())
     {
         if let Some(value) = values.get(p.key) {
-            data[p.ini_key] = json_value(p.key, value)?;
+            if p.key == "rtx_opti_ui" && value == "auto" {
+                data.as_object_mut()
+                    .expect("checked object")
+                    .remove(p.ini_key);
+            } else {
+                data[p.ini_key] = json_value(p.key, value)?;
+            }
         }
     }
     // Freeze explicitly edited NR settings at the current generation so the
