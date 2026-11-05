@@ -1,14 +1,14 @@
 {
   "schema": 1,
-  "version": "4.3.19",
-  "file": "RTXManager-v4.3.19-x64.exe",
-  "bytes": 49361480,
-  "sha256": "37d4cef983138521467e328b3ab5c9f19fb097b76e471c2c7a08eaf213406c2d",
+  "version": "4.3.20",
+  "file": "RTXManager-v4.3.20-x64.exe",
+  "bytes": 49437360,
+  "sha256": "1c8a498bba5053a78f1ec056a60d7099d3cecc2d4c416c7afb55d49fb48cf8b4",
   "notes": {
-    "zh-CN": "## 4.3.19 更新日志\n\n- 升级 GPUI Kit 0.9.0 和 GPUI Fast 0.1.13，保留管理器原有 Windows 兼容补丁。\n- 安装前检查玩家分享的运行库兼容性；不支持的 DLSSNR 或独立 XeSS 在完整方案中明确提示，可取消勾选运行库。\n- 安装选项菜单向上展开，避免遮挡按钮。自动更新保留原 EXE 文件名，保持快捷方式有效（#17）。\n",
-    "en": "## 4.3.19 Release notes\n\n- Upgrade GPUI Kit to 0.9.0 and GPUI Fast to 0.1.13; preserve the manager's Windows compatibility patches.\n- Check shared runtime compatibility before installation. Unsupported DLSSNR or standalone XeSS is explained in the details window, with an option to deselect runtimes.\n- Open the install-options menu above its button. Automatic updates retain the installed EXE filename to preserve shortcuts (#17).\n",
-    "ru": "English fallback\n\n## 4.3.19 Release notes\n\n- Upgrade GPUI Kit to 0.9.0 and GPUI Fast to 0.1.13; preserve the manager's Windows compatibility patches.\n- Check shared runtime compatibility before installation. Unsupported DLSSNR or standalone XeSS is explained in the details window, with an option to deselect runtimes.\n- Open the install-options menu above its button. Automatic updates retain the installed EXE filename to preserve shortcuts (#17).\n",
-    "ja": "English fallback\n\n## 4.3.19 Release notes\n\n- Upgrade GPUI Kit to 0.9.0 and GPUI Fast to 0.1.13; preserve the manager's Windows compatibility patches.\n- Check shared runtime compatibility before installation. Unsupported DLSSNR or standalone XeSS is explained in the details window, with an option to deselect runtimes.\n- Open the install-options menu above its button. Automatic updates retain the installed EXE filename to preserve shortcuts (#17).\n",
-    "ko": "English fallback\n\n## 4.3.19 Release notes\n\n- Upgrade GPUI Kit to 0.9.0 and GPUI Fast to 0.1.13; preserve the manager's Windows compatibility patches.\n- Check shared runtime compatibility before installation. Unsupported DLSSNR or standalone XeSS is explained in the details window, with an option to deselect runtimes.\n- Open the install-options menu above its button. Automatic updates retain the installed EXE filename to preserve shortcuts (#17).\n"
+    "zh-CN": "## 4.3.20 更新日志\n\n- 修复 MFG Unlocker 1.7.0 因 `optiScalerUi: \"auto\"` 拒绝整份配置的问题（#18）。自动模式改为省略该字段；应用参数同时修复已有问题配置，无需清空缓存。\n- 设置中新增一次性统一为 `RTXManager.exe` 的操作，保留可识别快捷方式的启动参数，失败恢复原文件名；现有更新清单继续兼容旧客户端。\n",
+    "en": "## 4.3.20 Release notes\n\n- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: \"auto\"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.\n- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.\n",
+    "ru": "English fallback\n\n## 4.3.20 Release notes\n\n- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: \"auto\"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.\n- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.\n",
+    "ja": "English fallback\n\n## 4.3.20 Release notes\n\n- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: \"auto\"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.\n- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.\n",
+    "ko": "English fallback\n\n## 4.3.20 Release notes\n\n- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: \"auto\"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.\n- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.\n"
   }
 }
