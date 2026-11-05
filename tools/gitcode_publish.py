@@ -24,6 +24,9 @@ GC_REPO = 'gcw_qWIjmve7/RTX-FG-Manager'
 PAYLOAD_REPO = GC_REPO + '-payloads'
 API = 'https://api.gitcode.com/api/v5/repos/'
 VERIFIED = set()
+_protocol_spec = importlib.util.spec_from_file_location('client_release', Path(__file__).with_name('client_release.py'))
+client_release = importlib.util.module_from_spec(_protocol_spec)
+_protocol_spec.loader.exec_module(client_release)
 
 
 def artifact_size_limit(url):
@@ -213,10 +216,8 @@ def create_release(repo, tag, commit, title, body):
 
 
 def verify_update(data):
-    m = json.loads(data)
-    v = m.get('version', '')
-    if m.get('schema') != 1 or not re.fullmatch(r'\d{1,4}\.\d{1,4}\.\d{1,4}', v) or m.get('file') != f'RTXManager-v{v}-x64.exe':
-        raise RuntimeError('Invalid update manifest')
+    m = client_release.checked(data)
+    v = m['version']
     verify(asset_url(GC_REPO, 'v' + v, m['file']), m['bytes'], m['sha256'])
     verify(f'https://github.com/{GH_REPO}/releases/download/v{v}/{m["file"]}', m['bytes'], m['sha256'])
 
@@ -225,13 +226,47 @@ def mirror_assets(folder, repo, tag, allow_exe=False):
     files = list(Path(folder).iterdir())
     if not files or any(not p.is_file() or p.is_symlink() for p in files):
         raise RuntimeError('Asset directory must contain only reviewed regular files')
-    manifest = next((p for p in files if p.name == 'update.json'), None)
-    for path in sorted(files, key=lambda p: p.name == 'update.json'):
+    channels = ('update.json', 'update-v2.json')
+    if repo == GC_REPO and re.fullmatch(r'v\d{1,4}\.\d{1,4}\.\d{1,4}', tag) and tuple(map(int, tag[1:].split('.'))) >= (4, 3, 21):
+        modern = client_release.checked((Path(folder) / 'update-v2.json').read_bytes(), 'update-v2.json')
+        legacy = (Path(folder) / 'update.json').read_bytes()
+        client_release.release_manifests(modern, legacy)
+        if modern['version'] != tag[1:]:
+            raise RuntimeError('Modern manifest must match the release tag')
+        expected = {'RTXManager.exe'}
+        if tag == 'v4.3.21':
+            expected.add('RTXManager-v4.3.21-x64.exe')
+        if any(p.suffix.lower() == '.exe' and p.name not in expected for p in files):
+            raise RuntimeError('Unexpected client executable attachment')
+    # Both channels follow the locally uploaded and verified executables.
+    for path in sorted(files, key=lambda p: (p.name in channels, p.name == 'update-v2.json')):
         if path.suffix.lower() == '.exe' and not allow_exe:
             continue
-        if path == manifest:
+        if path.name in channels:
+            client_release.checked(path.read_bytes(), path.name)
             verify_update(path.read_bytes())
         upload(repo, tag, path, allow_exe)
+
+
+def verify_client_metadata(root, review, before, entries):
+    for channel in ('update.json', 'update-v2.json'):
+        update = entries.get(channel)
+        old = before.get(channel)
+        if update == old:
+            continue
+        if not update:
+            raise RuntimeError('Cannot remove an update channel')
+        raw = review.git(root, 'cat-file', 'blob', update[2], binary=True)
+        previous = review.git(root, 'cat-file', 'blob', old[2], binary=True) if old else None
+        client_release.transition(previous, raw, channel)
+        verify_update(raw)
+    if entries.get('update-v2.json'):
+        legacy = entries.get('update.json')
+        if not legacy:
+            raise RuntimeError('Modern updates require the retained legacy bridge')
+        modern = review.git(root, 'cat-file', 'blob', entries['update-v2.json'][2], binary=True)
+        old = review.git(root, 'cat-file', 'blob', legacy[2], binary=True)
+        client_release.release_manifests(client_release.checked(modern, 'update-v2.json'), old)
 
 
 def complete_pending_bundle_index(root, review, entries, final):
@@ -300,16 +335,7 @@ def sync_source(root):
         for entries in history:
             review.validate_tree(root, entries, seen)
             entries = {path: value for path, value in entries.items() if path not in abandoned}
-            update = entries.get('update.json')
-            if update != before.get('update.json'):
-                if not update:
-                    raise RuntimeError('Cannot remove transition update manifest')
-                old = before.get('update.json')
-                new_bytes = review.git(root, 'cat-file', 'blob', update[2], binary=True)
-                old_bytes = review.git(root, 'cat-file', 'blob', old[2], binary=True) if old else None
-                if review.static_update_action(old_bytes, new_bytes) == 'older-release':
-                    raise RuntimeError('Update manifest cannot roll back')
-                verify_update(new_bytes)
+            verify_client_metadata(root, review, before, entries)
             # Legacy catalogs are a transition contract. Schema 3 references
             # are verified before their source commit becomes visible here.
             legacy = lambda e: {p:v for p,v in e.items() if p == 'cloud/catalog.json' or p.startswith('cloud/indexes/')}

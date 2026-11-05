@@ -1,4 +1,4 @@
-"""CI entry point. Never upload an executable; update.json is always last."""
+"""CI entry point. Never upload an executable; update channels follow assets."""
 import json
 import os
 from pathlib import Path
@@ -39,7 +39,7 @@ def main():
                     continue
                 if not re.fullmatch(r'[A-Za-z0-9._-]{1,160}', name):
                     raise RuntimeError('Unsafe release asset name')
-                if not payload and name not in ('update.json', 'SHA256SUMS.txt', 'third-party-info.json'):
+                if not payload and name not in ('update.json', 'update-v2.json', 'SHA256SUMS.txt', 'third-party-info.json'):
                     raise RuntimeError('Unexpected stable release asset')
                 if asset['size'] > (512 if payload else 2) * 1024 * 1024:
                     raise RuntimeError('Unexpected asset size')

@@ -5977,7 +5977,7 @@ dependencies = [
 
 [[package]]
 name = "rtx-fg-manager"
-version = "4.3.20"
+version = "4.3.21"
 dependencies = [
  "aes-gcm",
  "anyhow",

@@ -39,7 +39,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify publisher guards
-        run: python -m unittest discover -s tests -p test_gitcode_publish.py -v
+        run: |
+          python -m unittest discover -s tests -p test_gitcode_publish.py -v
+          python -m unittest discover -s tests -p test_client_release.py -v
       - name: Mirror release resources, then fast-forward source
         env:
           GH_TOKEN: ${{ github.token }}

@@ -42,7 +42,7 @@ ALLOWED = {
     '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md',
     'community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore',
     'community/wrangler.example.jsonc', 'community/README.md', 'cloud/help.json',
-    'update.json',
+    'update.json', 'update-v2.json', 'tools/client_release.py', 'tests/test_client_release.py', 'docs/client-updates.md',
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore', '.gitattributes',
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json',

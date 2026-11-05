@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.3.21
+
+- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.
+- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.
+
 ## 4.3.20
 
 - Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: "auto"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.

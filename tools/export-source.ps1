@@ -81,6 +81,9 @@ Add-File 'tests/test_game_names.py'
 Add-File '.github/workflows/update-game-names.yml'
 Add-File 'docs/game-names.md'
 Add-File 'tools/update_download_stats.py'
+Add-File 'tools/client_release.py'
+Add-File 'tests/test_client_release.py'
+Add-File 'docs/client-updates.md'
 Add-File 'tests/test_download_stats.py'
 Add-File '.github/workflows/update-download-stats.yml'
 Add-File 'docs/download-stats.json'
@@ -112,6 +115,7 @@ foreach ($version in @('420', '421', '422', '425', '429')) { Add-Tree "tests/fix
 foreach ($name in @('cloud/schemes.json', 'tools/cloud_release.py', 'docs/cloud-publishing.md', '.github/scripts/mirror_gitee.py')) { Add-File $name $false }
 if (-not $ExcludeCloudMetadata) {
     Add-File 'update.json' $false
+    Add-File 'update-v2.json' $false
     Add-File 'cloud/catalog.json' $false
     Add-Tree 'cloud/indexes' @('.json')
     Add-Tree 'cloud/v3' @('.json')

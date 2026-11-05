@@ -3870,9 +3870,8 @@ impl Manager {
         };
         self.dialog_active = true;
         let title = self.t("发现新版本");
-        let explanation = self.t(
-            "下载校验完成后使用新版文件名并自动重启。新版界面启动成功后删除旧程序，失败则还原。",
-        );
+        let explanation =
+            self.t("下载校验完成后在原位置更新并自动重启，保留现有文件名。启动失败时还原旧版本。");
         let details = format!(
             "v{VERSION} → v{}\n{}\n{:.1} MB · {}",
             m.version,

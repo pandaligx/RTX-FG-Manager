@@ -51,15 +51,19 @@ pub fn version(s: &str) -> Result<[u16; 3]> {
 impl Manifest {
     pub fn validate(&self, tag: &str) -> Result<()> {
         ensure!(
-            self.schema == 1 && version(&self.version)? == version(tag)?,
+            matches!(self.schema, 1 | 2) && version(&self.version)? == version(tag)?,
             "更新清单与版本不匹配"
         );
         ensure!(
             self.file
-                == format!(
-                    "RTXManager-v{}-x64.exe",
-                    self.version.trim_start_matches('v')
-                )
+                == match self.schema {
+                    1 => format!(
+                        "RTXManager-v{}-x64.exe",
+                        self.version.trim_start_matches('v')
+                    ),
+                    2 => "RTXManager.exe".into(),
+                    _ => unreachable!("schema checked above"),
+                }
                 && core::valid_hash(&self.sha256.to_lowercase()),
             "更新清单文件或摘要无效"
         );
@@ -74,10 +78,18 @@ impl Manifest {
         Ok(())
     }
     pub fn same_file(&self, other: &Self) -> bool {
-        self.version == other.version
+        self.schema == other.schema
+            && self.version == other.version
             && self.file == other.file
             && self.bytes == other.bytes
             && self.sha256.eq_ignore_ascii_case(&other.sha256)
+    }
+    fn metadata_file(&self) -> &'static str {
+        if self.schema == 2 {
+            "update-v2.json"
+        } else {
+            "update.json"
+        }
     }
 }
 pub fn safe_url(s: &str) -> Result<reqwest::Url> {
@@ -115,12 +127,12 @@ fn release_with_fetch(
     // Only the release publisher promotes these after verifying both sites.
     let urls = match source {
         "gitcode" => vec![format!(
-            "https://api.gitcode.com/api/v5/repos/{GITCODE_REPO}/raw/update.json?ref=main"
+            "https://api.gitcode.com/api/v5/repos/{GITCODE_REPO}/raw/update-v2.json?ref=main"
         )],
-        "gitee" => vec![format!("https://gitee.com/{REPO}/raw/main/update.json")],
+        "gitee" => vec![format!("https://gitee.com/{REPO}/raw/main/update-v2.json")],
         "github" => vec![
-            format!("https://raw.githubusercontent.com/{REPO}/main/update.json"),
-            format!("https://github.com/{REPO}/releases/latest/download/update.json"),
+            format!("https://raw.githubusercontent.com/{REPO}/main/update-v2.json"),
+            format!("https://github.com/{REPO}/releases/latest/download/update-v2.json"),
         ],
         _ => bail!("更新来源无效"),
     };
@@ -130,6 +142,10 @@ fn release_with_fetch(
         let result = (|| -> Result<Manifest> {
             let mut m: Manifest = serde_json::from_value(fetch(&url, cancel)?)?;
             m.validate(&m.version)?;
+            // Legacy update.json is permanently pinned to the bridge. Falling
+            // back to it would falsely report "up to date" during a v2 outage.
+            // Schema 1 is accepted only for incoming legacy install tickets.
+            ensure!(m.schema == 2, "新更新通道清单格式无效");
             m.version = m.version.trim_start_matches('v').into();
             // Never accept a manifest-supplied EXE URL or source, even if the
             // JSON came from an official host. Construct the versioned route.
@@ -179,7 +195,7 @@ fn check_with_fetch(
 fn mirror_release(m: &Manifest, source: &str, cancel: &AtomicBool) -> Result<Manifest> {
     let base = release_base(source, &m.version)?;
     let other: Manifest = serde_json::from_value(get_json_with_cancel(
-        &format!("{base}/update.json"),
+        &format!("{base}/{}", m.metadata_file()),
         cancel,
     )?)?;
     matching_mirror(m, source, other)
@@ -649,11 +665,20 @@ mod download_tests {
         }
     }
 
+    fn fixed_manifest() -> Manifest {
+        Manifest {
+            schema: 2,
+            version: crate::VERSION.into(),
+            file: "RTXManager.exe".into(),
+            ..checked_github_manifest()
+        }
+    }
+
     #[test]
     fn domestic_check_uses_anonymous_gitcode_file_without_github() -> Result<()> {
         let cancel = AtomicBool::new(false);
         let mut calls = Vec::new();
-        let mut supplied = checked_github_manifest();
+        let mut supplied = fixed_manifest();
         supplied.source = "untrusted".into();
         supplied.url = "https://example.invalid/untrusted.exe".into();
         let mut fetch = |url: &str, _: &AtomicBool| {
@@ -665,7 +690,8 @@ mod download_tests {
         assert_eq!(
             actual.url,
             format!(
-                "https://gitcode.com/{GITCODE_REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
+                "https://gitcode.com/{GITCODE_REPO}/releases/download/v{}/RTXManager.exe",
+                crate::VERSION
             )
         );
         // An older published manifest still counts as a successful check, and
@@ -675,7 +701,7 @@ mod download_tests {
             calls,
             vec![
                 format!(
-                    "https://api.gitcode.com/api/v5/repos/{GITCODE_REPO}/raw/update.json?ref=main"
+                    "https://api.gitcode.com/api/v5/repos/{GITCODE_REPO}/raw/update-v2.json?ref=main"
                 );
                 2
             ]
@@ -688,9 +714,8 @@ mod download_tests {
         for malformed in [false, true] {
             let cancel = AtomicBool::new(false);
             let mut calls = Vec::new();
-            let mut m = checked_github_manifest();
+            let mut m = fixed_manifest();
             m.version = "9999.0.0".into();
-            m.file = "RTXManager-v9999.0.0-x64.exe".into();
             let mut fetch = |url: &str, _: &AtomicBool| {
                 calls.push(url.to_owned());
                 if url.starts_with("https://api.gitcode.com/") {
@@ -712,18 +737,77 @@ mod download_tests {
     }
 
     #[test]
-    fn legacy_github_manifest_remains_a_fallback() -> Result<()> {
+    fn github_release_asset_remains_a_fallback() -> Result<()> {
         let mut calls = Vec::new();
         let mut fetch = |url: &str, _: &AtomicBool| {
             calls.push(url.to_owned());
             if url.contains("raw.githubusercontent.com") {
                 bail!("TLS connection failed");
             }
-            Ok(serde_json::to_value(checked_github_manifest())?)
+            Ok(serde_json::to_value(fixed_manifest())?)
         };
         release_with_fetch("github", &AtomicBool::new(false), &mut fetch)?;
         assert_eq!(calls.len(), 2);
-        assert!(calls[1].ends_with("/releases/latest/download/update.json"));
+        assert!(calls[1].ends_with("/releases/latest/download/update-v2.json"));
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_bridge_is_accepted_for_install_but_never_hides_a_new_update() -> Result<()> {
+        let legacy = checked_github_manifest();
+        legacy.validate(&legacy.version)?;
+        let mut calls = Vec::new();
+        let mut fetch = |url: &str, _: &AtomicBool| {
+            calls.push(url.to_owned());
+            Ok(serde_json::to_value(&legacy)?)
+        };
+        assert!(check_with_fetch("auto", &AtomicBool::new(false), &mut fetch).is_err());
+        assert!(calls.iter().all(|url| url.contains("update-v2.json")));
+        // Both supported install formats use the old ticket envelope, so the
+        // signed bridge installer can be launched by an unmodified old client.
+        for manifest in [legacy, fixed_manifest()] {
+            let json = serde_json::json!({"schema":1,"target":"game/manager.exe",
+                "old_sha256":"b".repeat(64),"manifest":manifest,"parent":123,
+                "data_dir":"data"});
+            let ticket: Ticket = serde_json::from_value(json)?;
+            assert_eq!(ticket.schema, 1);
+            ticket.manifest.validate(&ticket.manifest.version)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn fixed_filename_keeps_version_digest_and_schema_bound_to_the_mirror() -> Result<()> {
+        let current = fixed_manifest();
+        current.validate(&current.version)?;
+        assert_eq!(current.metadata_file(), "update-v2.json");
+        assert_eq!(checked_github_manifest().metadata_file(), "update.json");
+        let other = matching_mirror(&current, "gitcode", current.clone())?;
+        assert!(
+            other
+                .url
+                .ends_with(&format!("/v{}/RTXManager.exe", crate::VERSION))
+        );
+        for change in ["schema", "version", "hash", "bytes", "file"] {
+            let mut other = current.clone();
+            match change {
+                "schema" => other.schema = 1,
+                "version" => other.version = "9999.0.0".into(),
+                "hash" => other.sha256 = "b".repeat(64),
+                "bytes" => other.bytes += 1,
+                "file" => other.file = "../RTXManager.exe".into(),
+                _ => unreachable!(),
+            }
+            assert!(
+                matching_mirror(&current, "gitcode", other).is_err(),
+                "{change}"
+            );
+        }
+        for schema in [0, 1, 3, u32::MAX] {
+            let mut invalid = current.clone();
+            invalid.schema = schema;
+            assert!(invalid.validate(&invalid.version).is_err());
+        }
         Ok(())
     }
 

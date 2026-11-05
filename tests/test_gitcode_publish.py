@@ -94,7 +94,7 @@ class PublicationTests(unittest.TestCase):
                 pub.upload(pub.GC_REPO,'v4.3.0',p,True)
 
     def test_update_waits_for_both_exact_executables(self):
-        m=dict(schema=1,version='4.3.0',file='RTXManager-v4.3.0-x64.exe',bytes=1000000,sha256='a'*64)
+        m=dict(schema=1,version='4.3.0',file='RTXManager-v4.3.0-x64.exe',bytes=1048576,sha256='a'*64)
         with patch.object(pub,'verify') as verify:
             pub.verify_update(json.dumps(m))
             self.assertEqual(verify.call_count,2)
@@ -107,6 +107,8 @@ class PublicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             for name in ['update.json','RTXManager-v4.3.0-x64.exe','SHA256SUMS.txt','third-party-info.json']:
                 (Path(d)/name).write_text('{}')
+            (Path(d)/'update.json').write_text(json.dumps(dict(schema=1, version='4.3.0',
+                file='RTXManager-v4.3.0-x64.exe', bytes=1048576, sha256='a'*64)))
             events=[]
             with (patch.object(pub,'verify_update',side_effect=lambda _:events.append('verify')),
                  patch.object(pub,'upload',side_effect=lambda repo,tag,path,allow:events.append(path.name))):

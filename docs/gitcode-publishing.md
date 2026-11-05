@@ -12,10 +12,10 @@ GitHub Actions 使用 `mirror-gitcode.yml`。维护者在 GitHub 仓库 Actions 
 发布顺序：
 
 1. `build_scheme_bundles.py --baseline <原展开清单> --output <新目录>` 将已审核本地资源合并为每方案一个完整 ZIP，保留原文件字节。0.4.0 包含所有组件；客户端只提取所选入口。`build_v430_resources.py` 仅用于历史 4.3.0 格式维护。
-2. GitHub、GitCode、Gitee 均使用固定 `payloads` 标签，标题为 **Resources (not a manager update)**。用 `gitcode_publish.py assets --payloads --tag payloads --folder <资源目录>` 同步 GitCode。不要为每个组件或帮助版本创建新发行。附件名包含内容摘要，同名不同内容不可覆盖；上传后核对分发文件。Gitee 单附件上限 100 MB，Encore 完整包超过限制，仅使用 GitCode/GitHub，并从其包地址中省略 Gitee。
+2. GitHub、GitCode 使用固定 `payloads` 标签，标题为 **Resources (not a manager update)**。用 `gitcode_publish.py assets --payloads --tag payloads --folder <资源目录>` 同步 GitCode。不要为每个组件或帮助版本创建新发行。附件名包含内容摘要，同名不同内容不可覆盖；上传后核对分发文件。Gitee 已停止新版本发布，保留历史资源。
 3. 资源齐全后提交 schema 3 清单和索引。源码镜像在提升清单前核对其新国内资源引用，历史 Gitee 包保留原地址。4.3.1 已移除客户端帮助窗口；`cloud/help.json` 和旧帮助 ZIP 仅保留供旧客户端兼容，当前说明在中英文 README。
-4. 客户端完成统一验收，交用户签名一次。助手从本机上传同一份签名 EXE 到 GitHub、GitCode 和过渡 Gitee。Actions 永不上传 EXE。
-5. 同源 EXE 大小与摘要核对后，上传小附件；`update.json` 最后上传并提升到仓库固定位置。签后不得重建。缺少附件时保持旧清单。
+4. 客户端完成统一验收，交用户签名一次。助手从本机上传同一份签名 EXE 到 GitHub、GitCode。Actions 永不上传 EXE。4.3.21 最后保留版本化兼容附件；4.3.22 起每版只上传 `RTXManager.exe`。
+5. 同源 EXE 大小与摘要核对后，上传小附件，最后提升更新清单。4.3.21 起使用[双更新通道](client-updates.md)：`update.json` 永久保留过渡版，`update-v2.json` 指向新版。签后不得重建，缺少附件时保持旧清单。
 
 `gitcode_publish.py` 从环境变量读取发布凭据，拒绝带凭据的 URL，上传授权不跨重定向传递。自动化仍需首次配置凭据；工作流文件存在不等同于已成功运行。
 

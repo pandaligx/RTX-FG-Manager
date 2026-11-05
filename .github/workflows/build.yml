@@ -43,6 +43,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -B -m unittest discover -s tests -p test_gitcode_publish.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_client_release.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Build release

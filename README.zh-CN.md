@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.20"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.21"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.20 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.21 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,21 +41,20 @@
 
 ## 下载
 
-**版本 4.3.20** · Windows 10 / 11 x64
+**版本 4.3.21** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.20 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.20) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.20 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.20) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.21 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.21) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.21 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.21) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
 下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.20 更新亮点
+## 4.3.21 更新亮点
 
-- 修复 MFG-Unlocker 1.7.0 自动菜单选项导致配置不生效；已有游戏应用一次参数即可修复，无需清空缓存。
-- 新下载统一使用 `RTXManager.exe`；旧安装可在设置中主动统一文件名，迁移可识别快捷方式。
-- 保持旧客户端更新兼容，自动更新仍保留当前安装路径。
+- 旧版先升级到 4.3.21，再接入后续更新；从 4.3.22 起每版只提供一个 `RTXManager.exe`。
+- 自动更新保留原路径与文件名；如需统一名称，在“设置 → 软件更新”点击“统一文件名…”，确认后重启，同时迁移可识别快捷方式。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
