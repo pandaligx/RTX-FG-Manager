@@ -1,14 +1,14 @@
 {
   "schema": 1,
-  "version": "4.3.20",
-  "file": "RTXManager-v4.3.20-x64.exe",
-  "bytes": 49437360,
-  "sha256": "1c8a498bba5053a78f1ec056a60d7099d3cecc2d4c416c7afb55d49fb48cf8b4",
+  "version": "4.3.21",
+  "file": "RTXManager-v4.3.21-x64.exe",
+  "bytes": 49437872,
+  "sha256": "c3a9a923621c19c45d89ae3afe6d824e47bb89d312baf783aa8b16b67f9bcb0e",
   "notes": {
-    "zh-CN": "## 4.3.20 更新日志\n\n- 修复 MFG Unlocker 1.7.0 因 `optiScalerUi: \"auto\"` 拒绝整份配置的问题（#18）。自动模式改为省略该字段；应用参数同时修复已有问题配置，无需清空缓存。\n- 设置中新增一次性统一为 `RTXManager.exe` 的操作，保留可识别快捷方式的启动参数，失败恢复原文件名；现有更新清单继续兼容旧客户端。\n",
-    "en": "## 4.3.20 Release notes\n\n- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: \"auto\"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.\n- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.\n",
-    "ru": "English fallback\n\n## 4.3.20 Release notes\n\n- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: \"auto\"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.\n- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.\n",
-    "ja": "English fallback\n\n## 4.3.20 Release notes\n\n- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: \"auto\"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.\n- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.\n",
-    "ko": "English fallback\n\n## 4.3.20 Release notes\n\n- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: \"auto\"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.\n- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.\n"
+    "zh-CN": "## 4.3.21 更新日志\n\n- 新增长期更新过渡通道：旧版先升级至 4.3.21，新版通过独立清单更新固定名称 `RTXManager.exe`；从 4.3.22 起，每版只需一个 EXE。\n- 保留原安装路径、快捷方式、签名校验和启动失败回滚，修正更新窗口中的文件名说明。已发布的 4.3.20 附件不变。\n",
+    "en": "## 4.3.21 Release notes\n\n- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.\n- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.\n",
+    "ru": "English fallback\n\n## 4.3.21 Release notes\n\n- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.\n- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.\n",
+    "ja": "English fallback\n\n## 4.3.21 Release notes\n\n- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.\n- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.\n",
+    "ko": "English fallback\n\n## 4.3.21 Release notes\n\n- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.\n- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.\n"
   }
 }

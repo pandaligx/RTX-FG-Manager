@@ -1,0 +1,14 @@
+{
+  "schema": 2,
+  "version": "4.3.21",
+  "file": "RTXManager.exe",
+  "bytes": 49437872,
+  "sha256": "c3a9a923621c19c45d89ae3afe6d824e47bb89d312baf783aa8b16b67f9bcb0e",
+  "notes": {
+    "zh-CN": "## 4.3.21 更新日志\n\n- 新增长期更新过渡通道：旧版先升级至 4.3.21，新版通过独立清单更新固定名称 `RTXManager.exe`；从 4.3.22 起，每版只需一个 EXE。\n- 保留原安装路径、快捷方式、签名校验和启动失败回滚，修正更新窗口中的文件名说明。已发布的 4.3.20 附件不变。\n",
+    "en": "## 4.3.21 Release notes\n\n- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.\n- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.\n",
+    "ru": "English fallback\n\n## 4.3.21 Release notes\n\n- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.\n- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.\n",
+    "ja": "English fallback\n\n## 4.3.21 Release notes\n\n- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.\n- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.\n",
+    "ko": "English fallback\n\n## 4.3.21 Release notes\n\n- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.\n- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.\n"
+  }
+}
