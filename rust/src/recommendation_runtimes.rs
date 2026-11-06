@@ -44,6 +44,7 @@ pub fn label(kind: &str) -> &'static str {
         "xess" => "XeSS SR",
         "xess_fg" => "XeSS FG",
         "xell" => "XeLL",
+        "encorefg" => "新增 DLSS 帧生成组件",
         _ => "运行库",
     }
 }
@@ -90,7 +91,10 @@ impl Snapshot {
         let mut seen = BTreeSet::new();
         for c in &self.components {
             ensure!(
-                ["sr", "rr", "fg", "nr", "xess", "xess_fg", "xell"].contains(&c.kind.as_str())
+                [
+                    "sr", "rr", "fg", "nr", "xess", "xess_fg", "xell", "encorefg"
+                ]
+                .contains(&c.kind.as_str())
                     && ["game", "patch", "managed"].contains(&c.source.as_str())
                     && seen.insert((&c.kind, &c.source))
                     && !c.versions.is_empty()
@@ -100,14 +104,25 @@ impl Snapshot {
                     && c.package_version
                         .as_ref()
                         .is_none_or(|v| c.source == "managed"
-                            && ["xess_fg", "xell"].contains(&c.kind.as_str())
+                            && ["xess_fg", "xell", "encorefg"].contains(&c.kind.as_str())
                             && valid_version(v)
                             && v != "unknown"),
                 "运行库分享信息无效"
             );
             ensure!(
-                c.source != "managed" || ["xess_fg", "xell"].contains(&c.kind.as_str()),
+                c.source != "managed" || ["xess_fg", "xell", "encorefg"].contains(&c.kind.as_str()),
                 "运行库来源无效"
+            );
+            ensure!(
+                c.kind != "encorefg"
+                    || c.source == "managed"
+                        && c.package_version.as_deref() == Some("2.14.16")
+                        && c.versions
+                            .iter()
+                            .map(|v| normalized(v))
+                            .collect::<BTreeSet<_>>()
+                            == BTreeSet::from(["2.14.16".into(), "310.9.16".into()]),
+                "新增帧生成必须使用完整匹配的组件包"
             );
         }
         Ok(())
@@ -123,6 +138,14 @@ impl Snapshot {
                 continue;
             }
             if c.source == "managed" {
+                if c.kind == "encorefg" {
+                    ensure!(
+                        runtime_files::versions("encorefg")
+                            .contains(c.package_version.as_ref().context("新增帧生成版本缺失")?),
+                        "新增帧生成组件版本不可用"
+                    );
+                    continue;
+                }
                 ensure!(
                     c.package_version
                         .as_ref()
@@ -150,7 +173,7 @@ impl Snapshot {
         let managed = self
             .components
             .iter()
-            .filter(|c| c.source == "managed")
+            .filter(|c| c.source == "managed" && c.kind != "encorefg")
             .collect::<Vec<_>>();
         ensure!(
             managed.is_empty()
@@ -203,11 +226,20 @@ impl Snapshot {
         recipe: &crate::recommendations::Recipe,
     ) -> Result<()> {
         self.compatible_with(&recipe.scheme, &recipe.entries)?;
+        let added = recipe.scheme == crate::encore::SCHEME
+            && crate::encore::supports_200(Some(&recipe.patch_version));
         for c in &self.components {
+            if c.kind == "encorefg" {
+                ensure!(added, "新增帧生成组件需要 Encore 2.0+");
+                for target in targets {
+                    runtime_files::preflight_added_fg(target, None)?;
+                }
+                continue;
+            }
             if c.kind == "nr" && c.source == "game" {
                 for target in targets {
                     ensure!(
-                        crate::scanner::inspect(&target.game_exe).neural_input(),
+                        added || crate::scanner::inspect(&target.game_exe).neural_input(),
                         "未发现游戏的 DLSS 超分或光线重建组件；不会添加 NR 运行库"
                     );
                 }
@@ -216,6 +248,15 @@ impl Snapshot {
                 continue;
             }
             for target in targets {
+                if added && c.kind == "sr" {
+                    let evidence = crate::scanner::inspect(&target.game_exe);
+                    if !evidence.limited
+                        && !evidence.neural_input()
+                        && !evidence.super_resolution_plugin
+                    {
+                        continue;
+                    }
+                }
                 let status = runtime_files::inspect(target, &c.kind);
                 ensure!(
                     status.available && status.present,
@@ -236,9 +277,17 @@ impl Snapshot {
             ensure_nr_scheme(scheme)?;
         }
         ensure!(
-            !self.components.iter().any(|c| c.source == "managed")
+            !self
+                .components
+                .iter()
+                .any(|c| c.source == "managed" && c.kind != "encorefg")
                 || scheme == "rtx40mfg-1.3.3-hf2" && !entries.iter().any(|e| e.ends_with(".asi")),
             "此方案不能使用独立 XeSS 运行库"
+        );
+        ensure!(
+            !self.components.iter().any(|c| c.kind == "encorefg")
+                || scheme == crate::encore::SCHEME,
+            "此方案不支持新增 DLSS 帧生成组件"
         );
         Ok(())
     }
@@ -308,7 +357,16 @@ impl Snapshot {
                 })
             };
             if c.source == "managed" {
-                if !intel {
+                if c.kind == "encorefg" {
+                    runtime_files::install_version(
+                        targets,
+                        "encorefg",
+                        c.package_version.as_deref().context("新增帧生成版本未知")?,
+                        github,
+                        cancel,
+                        &mut report,
+                    )?;
+                } else if !intel {
                     runtime_files::install_version(
                         targets,
                         "xemfg",
@@ -358,7 +416,7 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
         Ok(())
     };
     for status in runtime_files::inspect_all(target) {
-        if status.kind == "xemfg" {
+        if matches!(status.kind.as_str(), "xemfg" | "encorefg") {
             continue;
         }
         for path in status.paths {
@@ -388,7 +446,7 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
     } else {
         None
     };
-    let components = groups
+    let mut components: Vec<Component> = groups
         .into_iter()
         .map(|((source, kind), versions)| Component {
             package_version: if source == "managed" {
@@ -401,6 +459,14 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
             versions: versions.into_iter().collect(),
         })
         .collect();
+    if let Some(package_version) = runtime_files::installed_package_version(target, "encorefg")? {
+        components.push(Component {
+            kind: "encorefg".into(),
+            source: "managed".into(),
+            versions: vec!["2.14.16".into(), "310.9.16".into()],
+            package_version: Some(package_version),
+        });
+    }
     let snapshot = Snapshot {
         schema: 1,
         components,

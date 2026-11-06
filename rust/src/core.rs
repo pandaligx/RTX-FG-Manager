@@ -904,6 +904,16 @@ pub fn apply_parameters_at(
     } else {
         context.configure(&before, values)?
     };
+    if record.backend == crate::encore::BACKEND
+        && crate::encore::supports_200(
+            record
+                .upstream_version
+                .as_deref()
+                .or(record.payload_version.as_deref()),
+        )
+    {
+        crate::runtime_files::validate_encore_features(&target, &after)?;
+    }
     if record.backend == crate::rtxmfg::BACKEND {
         crate::rtxmfg_settings::preflight(
             &target,

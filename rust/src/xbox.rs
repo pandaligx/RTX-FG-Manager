@@ -76,6 +76,7 @@ fn read_manifest(path: &Path) -> Result<Manifest> {
     let mut games = Vec::new();
     let mut title = String::new();
     let mut store_id = String::new();
+    let mut store_text = String::new();
     let mut shell_logos = Vec::new();
     let mut identity = String::new();
     let mut publisher = String::new();
@@ -89,7 +90,11 @@ fn read_manifest(path: &Path) -> Result<Manifest> {
                         let a = a?;
                         Ok((
                             String::from_utf8(a.key.as_ref().to_vec())?,
-                            a.decode_and_unescape_value(reader.decoder())?.into_owned(),
+                            a.decoded_and_normalized_value(
+                                quick_xml::XmlVersion::Implicit1_0,
+                                reader.decoder(),
+                            )?
+                            .into_owned(),
                         ))
                     })
                     .collect::<Result<std::collections::BTreeMap<_, _>>>()?;
@@ -174,12 +179,19 @@ fn read_manifest(path: &Path) -> Result<Manifest> {
                 stack.push(name);
             }
             Event::Text(e) if stack.as_slice() == [b"Game".to_vec(), b"StoreId".to_vec()] => {
-                let id = e.unescape()?.trim().to_ascii_lowercase();
-                if crate::game_names::valid_key(&format!("xbox:{id}")) {
-                    store_id = id;
-                }
+                store_text.push_str(&e.decode()?);
+            }
+            Event::GeneralRef(e) if stack.as_slice() == [b"Game".to_vec(), b"StoreId".to_vec()] => {
+                store_text.push_str(&quick_xml::escape::unescape(&format!("&{};", e.decode()?))?);
             }
             Event::End(_) => {
+                if stack.as_slice() == [b"Game".to_vec(), b"StoreId".to_vec()] {
+                    let id = store_text.trim().to_ascii_lowercase();
+                    if crate::game_names::valid_key(&format!("xbox:{id}")) {
+                        store_id = id;
+                    }
+                    store_text.clear();
+                }
                 stack.pop();
             }
             Event::DocType(_) => anyhow::bail!("Xbox 游戏清单不支持 DTD"),

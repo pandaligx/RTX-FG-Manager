@@ -92,6 +92,12 @@ impl Manager {
     pub(super) fn runtime_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.reconcile_runtime_window(cx);
         if let Some(handle) = self.runtime_window {
+            if !self.c.busy && self.runtime_game != self.c.focus {
+                self.runtime_game = self.c.focus.clone();
+                self.runtime_versions.clear();
+                self.runtime_feedback = None;
+                cx.notify();
+            }
             cx.defer(move |cx| {
                 let _ = handle.update(cx, |_, window, _| window.activate_window());
             });
@@ -227,6 +233,11 @@ impl Manager {
             let statuses: Vec<_> = snapshot
                 .map(|s| s.runtimes.iter().filter(|s| s.kind == kind).collect())
                 .unwrap_or_default();
+            let access = runtime_files::access(kind, &statuses);
+            if access == runtime_files::Access::Hidden {
+                continue;
+            }
+            let restore_only = access == runtime_files::Access::RestoreOnly;
             let paths = statuses
                 .iter()
                 .flat_map(|s| &s.paths)
@@ -308,7 +319,11 @@ impl Manager {
                                 .font_weight(FontWeight::MEDIUM)
                                 .child(self.t(runtime_files::label(kind))),
                         )
-                        .child(runtime_version_indicator(current, &selected, cx)),
+                        .child(if restore_only {
+                            div().text_xs().child(current).into_any_element()
+                        } else {
+                            runtime_version_indicator(current, &selected, cx)
+                        }),
                 );
             for path in paths {
                 card = card.child(self.runtime_path(path, cx));
@@ -319,6 +334,14 @@ impl Manager {
                         .text_xs()
                         .text_color(cx.theme().muted_foreground)
                         .child(self.t(warning)),
+                );
+            }
+            if restore_only {
+                card = card.child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(self.t("当前安装方案不一致或不支持此组件，仅保留恢复 / 卸载。")),
                 );
             }
             if single_version && self.c.runtime_catalog_load.failed() {
@@ -335,35 +358,38 @@ impl Manager {
                     .flex_wrap()
                     .gap_2()
                     .justify_end()
-                    .child(picker)
-                    .child(
-                        self.button(
-                            match kind {
-                                "sr" => "runtime-sr-install",
-                                "rr" => "runtime-rr-install",
-                                "fg" => "runtime-fg-install",
-                                _ => "runtime-xemfg-install",
-                            },
-                            if kind == "xemfg" {
-                                "安装"
-                            } else {
-                                "备份并更新"
-                            },
-                            Command::RuntimeOperation(kind, false),
-                            cx,
+                    .when(!restore_only, |row| {
+                        row.child(picker).child(
+                            self.button(
+                                match kind {
+                                    "sr" => "runtime-sr-install",
+                                    "rr" => "runtime-rr-install",
+                                    "fg" => "runtime-fg-install",
+                                    "encorefg" => "runtime-encorefg-install",
+                                    _ => "runtime-xemfg-install",
+                                },
+                                if matches!(kind, "xemfg" | "encorefg") {
+                                    "安装"
+                                } else {
+                                    "备份并更新"
+                                },
+                                Command::RuntimeOperation(kind, false),
+                                cx,
+                            )
+                            .small()
+                            .disabled(self.c.busy || self.c.read_only || !available),
                         )
-                        .small()
-                        .disabled(self.c.busy || self.c.read_only || !available),
-                    )
+                    })
                     .child(
                         self.button(
                             match kind {
                                 "sr" => "runtime-sr-restore",
                                 "rr" => "runtime-rr-restore",
                                 "fg" => "runtime-fg-restore",
+                                "encorefg" => "runtime-encorefg-restore",
                                 _ => "runtime-xemfg-restore",
                             },
-                            if kind == "xemfg" {
+                            if matches!(kind, "xemfg" | "encorefg") {
                                 "卸载"
                             } else {
                                 "恢复原件"

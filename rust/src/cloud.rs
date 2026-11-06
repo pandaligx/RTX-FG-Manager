@@ -1000,7 +1000,7 @@ pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
     let mut expanded = 0u64;
     for i in 0..z.len() {
         let entry = z.by_index(i)?;
-        let name = entry.name();
+        let name = entry.name()?;
         ensure!(
             !entry.is_dir()
                 && !name.contains('\\')
@@ -1794,10 +1794,10 @@ mod tests {
         use std::io::Write;
         let mut p = bundled().packages[0].clone();
         let mut z = zip::ZipWriter::new(Cursor::new(Vec::new()));
-        z.start_file("../version.dll", zip::write::FileOptions::default())
+        z.start_file("../version.dll", zip::write::SimpleFileOptions::default())
             .unwrap();
         z.write_all(b"unsafe").unwrap();
-        z.start_file(core::INI, zip::write::FileOptions::default())
+        z.start_file(core::INI, zip::write::SimpleFileOptions::default())
             .unwrap();
         z.write_all(b"[Logging]\nLevel=1").unwrap();
         let bytes = z.finish().unwrap().into_inner();

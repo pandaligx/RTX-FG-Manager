@@ -110,6 +110,30 @@ enum Command {
     Patch(bool),
     Open(String),
 }
+
+/// Resolve utility commands against their displayed game, not the library's
+/// independently changing selection. Missing games must never fall through.
+fn bind_runtime_game(c: &mut Controller, command: &Command, shown: Option<&str>) -> Result<()> {
+    if !matches!(
+        command,
+        Command::NeuralVersion(_)
+            | Command::InstallNeural(_)
+            | Command::RemoveNeural
+            | Command::RuntimeVersion(..)
+            | Command::RuntimeOperation(..)
+            | Command::RefreshRuntimeFiles
+            | Command::RecheckBlocked
+            | Command::Confirm(_)
+            | Command::Commit(_)
+    ) {
+        return Ok(());
+    }
+    let exe = shown
+        .filter(|exe| c.games.iter().any(|g| g.exe == *exe))
+        .ok_or_else(|| anyhow::anyhow!(c.text("游戏已移除，请关闭此窗口后重新选择游戏")))?;
+    c.focus = Some(exe.to_owned());
+    Ok(())
+}
 #[derive(Clone)]
 struct ChoiceItem {
     label: SharedString,
@@ -550,23 +574,12 @@ impl Manager {
         if self
             .runtime_window
             .is_some_and(|w| w.window_id() == window.window_handle().window_id())
-            && matches!(
-                command,
-                Command::InstallNeural(_)
-                    | Command::RuntimeOperation(..)
-                    | Command::RefreshRuntimeFiles
-                    | Command::Confirm(_)
-                    | Command::Commit(_)
-            )
-            && let Some(exe) = self.runtime_game.clone()
+            && let Err(error) =
+                bind_runtime_game(&mut self.c, &command, self.runtime_game.as_deref())
         {
-            if !self.c.games.iter().any(|g| g.exe == exe) {
-                self.runtime_feedback =
-                    Some((true, self.c.text("游戏已移除，请关闭此窗口后重新选择游戏")));
-                cx.notify();
-                return;
-            }
-            self.c.focus = Some(exe);
+            self.runtime_feedback = Some((true, error.to_string()));
+            cx.notify();
+            return;
         }
         if self.encore_invalid.get()
             && self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE
@@ -2915,6 +2928,10 @@ impl Manager {
             .copied()
             .unwrap_or(rtx_fg_manager::neural_runtime::RECOMMENDED);
         let evidence = self.c.evidence.get(exe).and_then(Option::as_ref);
+        let added_nr = !statuses.is_empty()
+            && statuses
+                .iter()
+                .all(|n| rtx_fg_manager::encore::supports_200(n.encore_version.as_deref()));
         let reason = if statuses.is_empty() {
             "正在检测…"
         } else if statuses
@@ -2924,6 +2941,8 @@ impl Manager {
             "请先在所有部署目录安装 Encore 或 MFG 1.7+。"
         } else if statuses.iter().any(|n| !n.supports(version)) {
             "NR 需要 Encore 1.1.0+ 或 MFG 1.7.0+；MFG 使用 310.9.16 运行库"
+        } else if added_nr {
+            ""
         } else if evidence.is_none() {
             "正在检测…"
         } else if evidence.is_some_and(|e| !e.neural_input() && e.limited) {
@@ -4814,6 +4833,49 @@ mod layout_tests {
     use super::{GameFilter, deployment_label, fitted_bounds, game_display_name};
     use gpui::component::tag::TagVariant;
     use gpui::{Bounds, point, px, size};
+    #[test]
+    fn runtime_commands_keep_the_displayed_game_after_library_selection_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::controller::Controller::new(
+            dir.path().into(),
+            serde_json::json!({"games":[], "auto_update":false}),
+            None,
+            Some(dir.path().join("smoke.json")),
+        );
+        let shown = dir.path().join("A/game.exe").display().to_string();
+        let selected = dir.path().join("B/game.exe").display().to_string();
+        c.games = [shown.clone(), selected.clone()]
+            .into_iter()
+            .map(|exe| rtx_fg_manager::scanner::Game {
+                exe,
+                ..Default::default()
+            })
+            .collect();
+        let commands = [
+            super::Command::NeuralVersion("310.8.0"),
+            super::Command::RemoveNeural,
+            super::Command::RecheckBlocked,
+            super::Command::InstallNeural("310.9.16"),
+            super::Command::RuntimeOperation("sr", false),
+            super::Command::Commit("remove_neural".into()),
+        ];
+        for command in &commands {
+            c.focus = Some(selected.clone());
+            super::bind_runtime_game(&mut c, command, Some(&shown)).unwrap();
+            assert_eq!(c.focus.as_ref(), Some(&shown));
+        }
+        c.games.retain(|g| g.exe != shown);
+        c.focus = Some(selected.clone());
+        for command in &commands {
+            assert!(super::bind_runtime_game(&mut c, command, Some(&shown)).is_err());
+            assert!(super::bind_runtime_game(&mut c, command, None).is_err());
+            assert_eq!(c.focus.as_ref(), Some(&selected));
+        }
+        super::bind_runtime_game(&mut c, &super::Command::Themes, None).unwrap();
+        assert_eq!(c.focus.as_ref(), Some(&selected));
+        c.close();
+        c.tick_close();
+    }
     #[test]
     fn motion_defaults_on_and_preserves_explicit_choices() {
         for system in [false, true] {

@@ -35,7 +35,7 @@ fn each_available_scheme_downloads_one_archive_with_gitcode_first() {
 fn archive(entries: &[(&str, &[u8])]) -> Vec<u8> {
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     for (name, bytes) in entries {
-        zip.start_file(*name, zip::write::FileOptions::default())
+        zip.start_file(*name, zip::write::SimpleFileOptions::default())
             .unwrap();
         zip.write_all(bytes).unwrap();
     }

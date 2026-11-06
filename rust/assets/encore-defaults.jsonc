@@ -17,6 +17,8 @@
 
   "configVersion": 4,                        // Settings apply live unless the comment says to restart the game. Editable in the RTX Encore native menu (Insert).
   "frameGeneration": {
+    "frameGenerationWithoutGameFg": false, // Experimental, games without native FG only.
+    "flipMeteringLearned": "", // Local per-game measurement; never shared.
     "mode": "game",                          // fixed (the multiplier below), dynamic (DLSS-G picks the multiplier to reach the target FPS) or game (the game or NVIDIA Profile Inspector decides).
     "multiplier": 4,                         // Fixed mode multiplier: 2 to 6. 5 and 6 are experimental.
     "dynamicTargetFrameRate": 0,             // Dynamic mode target FPS. 0 follows the refresh rate of the monitor showing the game.
@@ -27,6 +29,10 @@
     "smoothMotionApi": "d3d12"              // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
   },
   "dlssSuperResolution": {
+    "dlssWithoutGameDlss": false,
+    "dlssWithoutGameDlssEngine": "dlss",
+    "dlssWithoutGameDlssOutput": "game",
+    "presentOpticalFlow": "encore",
     "fastSuperResolution": false, // RTX 30, DX12, SR 310.9.x preset M/L; restart. Not RR/DLAA.
     "dlssRenderScale": "game",               // Force the DLSS render resolution: game, dlaa, quality, balanced, performance, ultra-performance or custom. The game must use DLSS already.
     "dlssCustomScale": 67                    // Render scale in percent (50 to 100) when dlssRenderScale is custom.
@@ -49,6 +55,7 @@
     "hairEnabled": true                      // Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change.
   },
   "neuralRendering": {
+    "nrWithoutGameDlss": false,
     "passModels": {"nrPass1Preset":"inherit","nrPass2Preset":"inherit","nrPass3Preset":"inherit","nrPass4Preset":"inherit"},
     "passTuning": {
       "nrPass1Intensity": "inherit",
@@ -148,8 +155,8 @@
   "compatibility": {
     "disableInGameMenu": false, // Encore 1.0.0: for menu conflicts (e.g. Star Wars Outlaws). FG remains active. Insert cannot open the menu; turn this off here and restart to restore it.
     "disableMenuDetection": false,           // Keep frame generation running in menus and loading screens. Leave false: idling at 1x there avoids device-hang crashes.
-    "forceOTA": false,                       // Load the Frame Generation models downloaded by the NVIDIA App. Restart the game to apply.
-    "flipMeteringBypass": false,             // OptiScaler flip metering bypass, only for setups that need it. Restart the game to apply.
+    "forceOTA": false,                       // Use locally downloaded NVIDIA App models (SR/RR/FG/NR in Encore 2.0+). No OTA files are changed. Restart to apply.
+    "flipMeteringBypass": "auto",             // Encore 2.0+: auto measures pacing for this game; true forces bypass, false forces metering. Restart to apply.
     "disableMvDilation": false               // Legacy experiment: declare the motion vectors as already dilated. Leave false.
   },
   "diagnostics": {

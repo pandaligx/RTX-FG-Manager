@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.22
+
+- Fix runtime version selection targeting another game after changing the library selection with a runtime window open. Update TLS, certificate, ZIP and XML dependencies with security fixes; remove unused dependencies from the retired community implementation.
+- Support RTX Encore 2.0.1, including experimental DLSS/XeSS reconstruction, Neural Rendering and frame generation for games without native integration. Keep these features off by default and check required components before applying settings.
+- Add the matched NVIDIA Streamline 2.14.16 / DLSS-G 310.9.16 package for added frame generation. Protect native integrations, track all six files together, and restore manager-owned components on uninstall, including multiple game folders and ASI installations.
+- Preserve JSONC comments, menu state and learned pacing. Support automatic X3/X4 pacing, Ultra 75% scaling, four motion estimators and eleven menu languages; extend parameter/runtime sharing while keeping older clients compatible.
+- Retain the existing interface, other patch schemes and the permanent 4.3.21 update bridge. This and future releases use the single `RTXManager.exe` download.
+
 ## 4.3.21
 
 - Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.

@@ -9,6 +9,75 @@ struct TextBinding {
     _subscription: Subscription,
 }
 
+#[derive(Clone, Copy)]
+enum AddedFeature {
+    Sr,
+    Nr,
+    Fg,
+}
+impl AddedFeature {
+    fn key(self) -> &'static str {
+        match self {
+            Self::Sr => "dlssWithoutGameDlss",
+            Self::Nr => "nrWithoutGameDlss",
+            Self::Fg => "frameGenerationWithoutGameFg",
+        }
+    }
+    fn engine(self) -> Option<&'static str> {
+        match self {
+            Self::Sr => Some("dlssWithoutGameDlssEngine"),
+            Self::Fg => Some("frameGenerationEngine"),
+            Self::Nr => None,
+        }
+    }
+    fn selected(self, values: &Values) -> &str {
+        if values.get(self.key()).is_none_or(|v| v != "1") {
+            return "off";
+        }
+        match self {
+            Self::Sr
+                if values
+                    .get("dlssWithoutGameDlssEngine")
+                    .is_some_and(|v| v == "xess") =>
+            {
+                "xess"
+            }
+            Self::Sr => "dlss",
+            Self::Fg
+                if values
+                    .get("frameGenerationEngine")
+                    .is_some_and(|v| v == "xefg") =>
+            {
+                "xefg"
+            }
+            Self::Fg => "dlss-fg",
+            Self::Nr => "on",
+        }
+    }
+    fn edits(self, value: &str) -> Values {
+        let mut edits = Values::from([(
+            self.key().into(),
+            if value == "off" { "0" } else { "1" }.into(),
+        )]);
+        if value != "off"
+            && let Some(engine) = self.engine()
+        {
+            edits.insert(engine.into(), value.into());
+        }
+        edits
+    }
+}
+
+fn in_added_section(key: &str, values: &Values) -> bool {
+    matches!(
+        key,
+        "dlssWithoutGameDlss"
+            | "dlssWithoutGameDlssEngine"
+            | "nrWithoutGameDlss"
+            | "frameGenerationWithoutGameFg"
+    ) || key == "frameGenerationEngine" && AddedFeature::Fg.selected(values) != "off"
+}
+
 pub(super) struct EncoreEditor {
     owner: WeakEntity<Manager>,
     exe: String,
@@ -64,17 +133,23 @@ impl EncoreEditor {
     }
 
     fn set(&mut self, key: &str, value: &str, cx: &mut Context<Self>) {
+        self.set_edits(&Values::from([(key.into(), value.into())]), cx);
+    }
+
+    fn set_edits(&mut self, edits: &Values, cx: &mut Context<Self>) {
         let exe = self.exe.clone();
         let _ = self.owner.update(cx, |owner, cx| {
             if owner.c.focus.as_deref() == Some(&exe)
                 && owner.c.parameter_profile() == encore::PROFILE
             {
-                owner.c.set_game_option(&exe, key, value);
+                owner.c.set_game_options(&exe, edits);
                 cx.notify();
             }
         });
-        self.errors.remove(key);
-        if key == "nrFoveaPreset" && value != "custom" {
+        for key in edits.keys() {
+            self.errors.remove(key);
+        }
+        if edits.get("nrFoveaPreset").is_some_and(|v| v != "custom") {
             for key in [
                 "nrFoveaWidth",
                 "nrFoveaHeight",
@@ -90,16 +165,169 @@ impl EncoreEditor {
     }
 
     fn reset(&mut self, group_only: bool, cx: &mut Context<Self>) {
-        let defaults = encore::defaults();
-        let selected: Vec<_> = encore::fields()
+        let defaults = encore::defaults_for_version(self.version.as_deref());
+        let current = self
+            .owner
+            .upgrade()
+            .map(|owner| owner.read(cx).c.preset_values(&self.exe))
+            .unwrap_or_else(|| defaults.clone());
+        let edits: Values = encore::fields()
             .iter()
             .filter(|field| encore::field_available(field, self.version.as_deref()))
             .filter(|field| !group_only || field.group == self.group)
-            .map(|field| field.key.clone())
+            .filter(|field| !group_only || !in_added_section(&field.key, &current))
+            .map(|field| (field.key.clone(), defaults[&field.key].clone()))
             .collect();
-        for key in selected {
-            self.set(&key, &defaults[&key], cx);
+        self.set_edits(&edits, cx);
+    }
+
+    fn added_section(
+        &self,
+        values: &Values,
+        installed: Option<&rtx_fg_manager::deployment::Snapshot>,
+        locked: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let mut rows = div().v_flex().gap_2().min_w_0();
+        for (feature, label, choices) in [
+            (
+                AddedFeature::Sr,
+                "新增超分辨率",
+                vec![("off", "关闭"), ("dlss", "DLSS"), ("xess", "XeSS")],
+            ),
+            (
+                AddedFeature::Nr,
+                "新增神经渲染",
+                vec![("off", "关闭"), ("on", "DLSSNR")],
+            ),
+            (
+                AddedFeature::Fg,
+                "新增帧生成",
+                vec![("off", "关闭"), ("dlss-fg", "DLSS-FG"), ("xefg", "XeFG")],
+            ),
+        ] {
+            let selected = feature.selected(values);
+            let choice_label = choices
+                .iter()
+                .find(|(v, _)| *v == selected)
+                .map(|(_, l)| *l)
+                .unwrap_or("关闭");
+            let owner = cx.weak_entity();
+            let choices: Vec<_> = choices.into_iter().map(|(v, l)| (v, self.t(l))).collect();
+            let selected = selected.to_owned();
+            let ready = installed.is_some_and(|s| {
+                let statuses: Vec<_> = s
+                    .runtimes
+                    .iter()
+                    .filter(|r| {
+                        r.kind
+                            == match feature {
+                                AddedFeature::Sr => "sr",
+                                AddedFeature::Fg => "encorefg",
+                                AddedFeature::Nr => "",
+                            }
+                    })
+                    .collect();
+                match feature {
+                    AddedFeature::Nr => {
+                        !s.neural.is_empty()
+                            && s.neural.iter().all(|n| n.present && n.warning.is_none())
+                    }
+                    _ => !statuses.is_empty() && statuses.iter().all(|r| r.present),
+                }
+            });
+            let message = if selected == "off" {
+                ""
+            } else if installed.is_none_or(|s| s.installed == 0) {
+                "请先安装 Encore 2.0+"
+            } else if matches!(selected.as_str(), "xess" | "xefg") {
+                "随 Encore 提供"
+            } else if ready {
+                "组件已就绪"
+            } else {
+                "需安装运行库"
+            };
+            let picker = Button::new(SharedString::from(format!("added-{}", feature.key())))
+                .focus_ring(crate::ui_focus::visible(cx))
+                .small()
+                .w(rems(10.))
+                .label(self.t(choice_label))
+                .icon(IconName::ChevronDown)
+                .disabled(locked)
+                .dropdown_menu(move |mut menu, _, _| {
+                    for (value, label) in &choices {
+                        let owner = owner.clone();
+                        let edits = feature.edits(value);
+                        menu = menu.item(
+                            PopupMenuItem::new(label.clone())
+                                .checked(*value == selected)
+                                .on_click(move |_, _, cx| {
+                                    let _ = owner.update(cx, |this, cx| this.set_edits(&edits, cx));
+                                }),
+                        );
+                    }
+                    menu
+                });
+            rows = rows.child(
+                div()
+                    .h_flex()
+                    .flex_wrap()
+                    .gap_2()
+                    .min_w_0()
+                    .child(
+                        div()
+                            .w(rems(10.))
+                            .flex_shrink_0()
+                            .text_sm()
+                            .child(self.t(label)),
+                    )
+                    .child(picker)
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(self.t(message)),
+                    ),
+            );
         }
+        div()
+            .v_flex()
+            .gap_2()
+            .p_3()
+            .border_1()
+            .border_color(cx.theme().border)
+            .rounded_md()
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(self.t("为游戏补充 DLSS / 帧生成")),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(
+                        self.t(
+                            "若游戏原本没有 DLSS 或帧生成，可使用以下功能。实验功能，默认关闭。",
+                        ),
+                    ),
+            )
+            .child(rows)
+            .when(
+                values
+                    .get("frameGenerationWithoutGameFg")
+                    .is_some_and(|v| v == "1")
+                    && values.get("smoothMotionEnabled").is_some_and(|v| v == "1"),
+                |view| {
+                    view.child(
+                        div().text_xs().text_color(cx.theme().warning).child(
+                            self.t("新增帧生成不能与 Smooth Motion 同时开启，请关闭其中一项"),
+                        ),
+                    )
+                },
+            )
+            .into_any_element()
     }
 
     fn text_input(
@@ -187,7 +415,8 @@ impl EncoreEditor {
                     .tooltip(self.t("恢复此项默认值"))
                     .disabled(locked)
                     .on_click(cx.listener(move |this, _, _, cx| {
-                        this.set(&key, &field.default, cx);
+                        let defaults = encore::defaults_for_version(this.version.as_deref());
+                        this.set(&key, &defaults[&key], cx);
                     })),
             );
         if encore::requires_restart(field, self.version.as_deref()) {
@@ -366,6 +595,7 @@ impl Render for EncoreEditor {
             .deployments
             .get(&self.exe)
             .is_some_and(|d| d.incompatible_protocol);
+        let installed = installed.cloned();
         if self.tr.language != language {
             self.tr = i18n::Translator::new(&language);
         }
@@ -389,7 +619,12 @@ impl Render for EncoreEditor {
                     })),
             );
         }
-        let mut panel = div().v_flex().w_full().min_w_0().gap_3()
+        let added = encore::supports_200(self.version.as_deref());
+        let mut panel = div().v_flex().w_full().min_w_0().gap_3();
+        if added && self.query.is_empty() {
+            panel = panel.child(self.added_section(&values, installed.as_ref(), locked, cx));
+        }
+        panel = panel
             .child(div().text_xs().text_color(cx.theme().muted_foreground)
                 .child(self.t("游戏内默认按 Insert 打开菜单；禁用游戏内菜单后不可呼出。管理器中的修改须完全退出游戏后应用。")))
             .child(div().text_xs().child(self.t("搜索参数名称或说明")))
@@ -414,7 +649,7 @@ impl Render for EncoreEditor {
             .filter(|field| encore::field_visible(field, &values))
             .filter(|field| {
                 if self.query.is_empty() {
-                    field.group == self.group
+                    field.group == self.group && !(added && in_added_section(&field.key, &values))
                 } else {
                     format!(
                         "{} {} {}",
@@ -479,5 +714,39 @@ impl EncoreEditor {
                     .on_click(move |_, _, cx| all.update(cx, |this, cx| this.reset(false, cx))),
             )
             .into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[::core::prelude::v1::test]
+    fn added_controls_map_only_their_fields_and_keep_native_choices() {
+        let mut values = encore::defaults_for_version(Some("2.0.1"));
+        for (feature, choice) in [
+            (AddedFeature::Sr, "xess"),
+            (AddedFeature::Nr, "on"),
+            (AddedFeature::Fg, "xefg"),
+        ] {
+            assert_eq!(feature.selected(&values), "off");
+            let edits = feature.edits(choice);
+            encore::validate_values(&edits).unwrap();
+            values.extend(edits);
+            assert_eq!(feature.selected(&values), choice);
+            let off = feature.edits("off");
+            assert_eq!(
+                off.len(),
+                1,
+                "turning off must not overwrite the native engine"
+            );
+            values.extend(off);
+            assert_eq!(feature.selected(&values), "off");
+        }
+        assert_eq!(values["frameGenerationEngine"], "xefg");
+        assert!(!in_added_section("frameGenerationEngine", &values));
+        values.extend(AddedFeature::Fg.edits("dlss-fg"));
+        assert!(in_added_section("frameGenerationEngine", &values));
+        assert!(in_added_section("nrWithoutGameDlss", &values));
+        assert!(!in_added_section("nrEnabled", &values));
     }
 }

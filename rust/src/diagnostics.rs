@@ -374,7 +374,7 @@ pub fn export(
     cancel: &AtomicBool,
     progress: impl Fn(String),
 ) -> Result<()> {
-    use zip::{ZipWriter, write::FileOptions};
+    use zip::{ZipWriter, write::SimpleFileOptions};
     let target = core::no_links(target)?;
     ensure!(
         target
@@ -401,7 +401,7 @@ pub fn export(
             .any(|p| core::key(p) == core::key(&target)),
         "导出文件不能覆盖日志源文件"
     );
-    let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     let mut temp = tempfile::NamedTempFile::new_in(parent)?;
     let mut archive = ZipWriter::new(temp.as_file_mut());
     let mut files = BTreeSet::new();
@@ -659,7 +659,6 @@ pub fn export(
     );
     archive.write_all(&manifest)?;
     archive.finish()?;
-    drop(archive);
     temp.as_file().sync_all()?;
     temp.persist(target)?;
     Ok(())

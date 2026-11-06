@@ -91,6 +91,17 @@ pub fn policy_for_version(
     version: Option<&str>,
 ) -> crate::cloud::Policy {
     let mut policy = policy.clone();
+    if policy.parameter_profile == crate::encore::PROFILE && version.is_some() {
+        policy.defaults.insert(
+            "flipMeteringBypass".into(),
+            if crate::encore::supports_200(version) {
+                "auto"
+            } else {
+                "0"
+            }
+            .into(),
+        );
+    }
     if crate::upstream040::is_profile(&policy.parameter_profile) && version.is_some() {
         let profile = crate::upstream040::profile_for_version(version);
         if policy.parameter_profile != profile {

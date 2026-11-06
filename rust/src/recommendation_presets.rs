@@ -192,6 +192,18 @@ pub fn execute(
                         || crate::runtime_files::inspect(target, "xemfg").managed,
                     "缺少 XeSS 运行库，请使用安装并应用或先安装运行库"
                 );
+                for kind in settings.added_runtime_dependencies() {
+                    ensure!(
+                        crate::runtime_files::inspect(target, kind).present,
+                        "缺少 {}，请勾选运行库或先安装运行库",
+                        crate::runtime_files::label(kind)
+                    );
+                }
+            }
+        }
+        if settings.added_runtime_dependencies().contains(&"encorefg") && action.runtimes() {
+            for target in &targets {
+                crate::runtime_files::preflight_added_fg(target, None)?;
             }
         }
     }
@@ -237,10 +249,11 @@ pub fn execute(
             .runtimes
             .as_ref()
             .is_some_and(|r| r.components.iter().any(|c| c.kind == "nr"));
-        let shared_xess = recipe
-            .runtimes
-            .as_ref()
-            .is_some_and(|r| r.components.iter().any(|c| c.source == "managed"));
+        let shared_xess = recipe.runtimes.as_ref().is_some_and(|r| {
+            r.components
+                .iter()
+                .any(|c| c.source == "managed" && c.kind != "encorefg")
+        });
         if !shared_nr
             && (settings.is_some_and(|s| s.requires_nr()) || recipe.neural_runtime == "310.9.16")
         {
@@ -276,6 +289,36 @@ pub fn execute(
                 },
             )
             .context("方案已安装，XeSS 未完成；参数尚未应用，可重试")?;
+        }
+        if let Some(settings) = settings {
+            for kind in settings.added_runtime_dependencies() {
+                let shared = recipe
+                    .runtimes
+                    .as_ref()
+                    .is_some_and(|r| r.components.iter().any(|c| c.kind == kind));
+                if !shared {
+                    crate::runtime_files::install_many(
+                        &targets,
+                        kind,
+                        catalog.prefer_github,
+                        cancel,
+                        &mut |transfer| {
+                            progress(cloud::CloudProgress {
+                                transfer,
+                                proxy: kind.into(),
+                                package_index: 1,
+                                package_count: 1,
+                            })
+                        },
+                    )
+                    .with_context(|| {
+                        format!(
+                            "方案已安装，{} 未完成；参数尚未应用，可重试",
+                            crate::runtime_files::label(kind)
+                        )
+                    })?;
+                }
+            }
         }
         if let Some(runtimes) = &recipe.runtimes {
             runtimes.verify_installed(&targets)?;
@@ -431,12 +474,36 @@ impl Snapshot {
     }
 
     pub fn requires_nr(&self) -> bool {
-        ["nrEnabled", "rtx_nr"]
+        ["nrEnabled", "nrWithoutGameDlss", "rtx_nr"]
             .iter()
             .any(|key| self.values.get(*key).is_some_and(|v| v == "1"))
     }
     pub fn requires_xemfg(&self) -> bool {
         self.values.get("rtx_xemfg").is_some_and(|v| v == "1")
+    }
+    pub fn added_runtime_dependencies(&self) -> Vec<&'static str> {
+        if self.profile != encore::PROFILE {
+            return Vec::new();
+        }
+        let on = |k: &str| self.values.get(k).is_some_and(|v| v == "1");
+        let mut kinds = Vec::new();
+        if on("dlssWithoutGameDlss")
+            && self
+                .values
+                .get("dlssWithoutGameDlssEngine")
+                .is_none_or(|v| v == "dlss")
+        {
+            kinds.push("sr");
+        }
+        if on("frameGenerationWithoutGameFg")
+            && self
+                .values
+                .get("frameGenerationEngine")
+                .is_none_or(|v| v != "xefg")
+        {
+            kinds.push("encorefg");
+        }
+        kinds
     }
 }
 

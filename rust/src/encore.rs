@@ -102,6 +102,13 @@ pub fn defaults() -> Values {
         .map(|f| (f.key.clone(), f.default.clone()))
         .collect()
 }
+pub fn defaults_for_version(version: Option<&str>) -> Values {
+    let mut values = defaults();
+    if supports_200(version) {
+        values.insert("flipMeteringBypass".into(), "auto".into());
+    }
+    values
+}
 pub fn default_config() -> &'static [u8] {
     DEFAULT_CONFIG
 }
@@ -117,6 +124,11 @@ pub fn supports_130(version: Option<&str>) -> bool {
     version
         .and_then(|v| semver::Version::parse(v).ok())
         .is_some_and(|v| v >= semver::Version::new(1, 3, 0))
+}
+pub fn supports_200(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(2, 0, 0))
 }
 fn removed_open_field(key: &str) -> bool {
     key == "nrEngine" || key.starts_with("nrOpen")
@@ -169,7 +181,9 @@ pub fn value_available(key: &str, value: &str, version: Option<&str>) -> bool {
 }
 pub fn requires_restart(field: &Field, version: Option<&str>) -> bool {
     field.restart
-        && !(supports_120(version) && matches!(field.key.as_str(), "dlssSrPreset" | "dlssRrPreset"))
+        && !(supports_120(version)
+            && !supports_200(version)
+            && matches!(field.key.as_str(), "dlssSrPreset" | "dlssRrPreset"))
 }
 
 pub fn valid_hotkey(value: &str) -> bool {
@@ -295,6 +309,12 @@ pub fn field_enabled(key: &str, values: &Values, _gpu: Option<i32>) -> bool {
                 .is_some_and(|(a, b)| a >= b)
         } else if let Some((k, v)) = dep.split_once('=') {
             get(k) == Some(v)
+                || k == "nrEnabled" && v == "1" && get("nrWithoutGameDlss") == Some("1")
+                || key == "xessTensorCores"
+                    && k == "reconstructionEngine"
+                    && v == "xess"
+                    && get("dlssWithoutGameDlss") == Some("1")
+                    && get("dlssWithoutGameDlssEngine") == Some("xess")
         } else {
             false
         }
@@ -492,6 +512,11 @@ fn decode(f: &Field, value: &Value) -> Result<String> {
             .as_f64()
             .context("Invalid Encore decimal type")?
             .to_string(),
+        FieldKind::Choice if f.key == "flipMeteringBypass" => match value {
+            Value::Bool(v) => if *v { "1" } else { "0" }.into(),
+            Value::String(v) if v == "auto" => v.clone(),
+            _ => bail!("Invalid Encore flip metering value"),
+        },
         FieldKind::Choice if matches!(f.key.as_str(), "nrStyle" | "nrPreset") => value
             .as_u64()
             .context("Invalid Encore numeric choice")?
@@ -518,6 +543,13 @@ fn encode(f: &Field, value: &str) -> Result<Value> {
         FieldKind::Bool => json!(value == "1"),
         FieldKind::Integer => json!(value.parse::<u64>()?),
         FieldKind::Decimal => json!(value.parse::<f64>()?),
+        FieldKind::Choice if f.key == "flipMeteringBypass" => {
+            if value == "auto" {
+                json!("auto")
+            } else {
+                json!(value == "1")
+            }
+        }
         FieldKind::Choice if matches!(f.key.as_str(), "nrStyle" | "nrPreset") => {
             json!(value.parse::<u64>()?)
         }
@@ -687,6 +719,17 @@ fn vsync_value(doc: &Document) -> Result<Option<String>> {
 /// in the caller's upgrade journal; repeated migration is byte-for-byte stable.
 fn migrate_version_fields(bytes: &[u8], version: Option<&str>) -> Result<Vec<u8>> {
     let mut out = bytes.to_vec();
+    let pacing = path(&["frameGeneration", "flipMeteringBypass"]);
+    let value = resolve(&document(&out)?, &pacing)?.0;
+    if supports_200(version) && value.is_none() {
+        // Existing explicit booleans retain their meaning; only absent settings
+        // acquire the new upstream default. Learned state stays local and intact.
+        out = document(&out)?.set(&pacing, json!("auto"))?;
+    } else if version.is_some() && !supports_200(version) && value == Some(json!("auto")) {
+        // The common template also serves old installed versions, whose parser
+        // accepts booleans only. Explicit unsupported overrides are rejected below.
+        out = document(&out)?.set(&pacing, json!(false))?;
+    }
     if at_least(version, 5, 1) {
         let mut candidates = Vec::new();
         locations(
@@ -858,6 +901,9 @@ pub fn validate_cloud_config(bytes: &[u8]) -> Result<()> {
         ("smoothMotionEnabled", "0"),
         ("nrEnabled", "0"),
         ("nrFoveation", "0"),
+        ("dlssWithoutGameDlss", "0"),
+        ("nrWithoutGameDlss", "0"),
+        ("frameGenerationWithoutGameFg", "0"),
     ] {
         ensure!(
             values.get(key).is_some_and(|v| v == value),

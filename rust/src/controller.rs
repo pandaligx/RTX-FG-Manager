@@ -1164,6 +1164,11 @@ impl Controller {
         )
     }
     pub fn set_game_option(&mut self, exe: &str, key: &str, value: &str) {
+        self.set_game_options(exe, &BTreeMap::from([(key.into(), value.into())]));
+    }
+    /// Apply one logical choice as a single validated draft change. Composite
+    /// controls must not save or normalize an intermediate engine/enable state.
+    pub fn set_game_options(&mut self, exe: &str, edits: &BTreeMap<String, String>) {
         if self.busy || self.read_only {
             return;
         }
@@ -1179,10 +1184,10 @@ impl Controller {
         self.preset_baselines
             .entry(identity.clone())
             .or_insert_with(|| values.clone());
-        if key == "reset" {
+        if edits.contains_key("reset") {
             values = rtx_fg_manager::presets::defaults(&profile, &policy.defaults);
         } else {
-            values.insert(key.into(), value.into());
+            values.extend(edits.clone());
         }
         self.preset_context(exe).normalize(&mut values);
         if rtx_fg_manager::presets::validate(&profile, &values).is_err() {
@@ -1203,11 +1208,13 @@ impl Controller {
             .into_keys()
             .collect();
         if uses_explicit_edits(&profile) {
-            if key == "reset" {
+            if edits.contains_key("reset") {
                 dirty_keys.extend(values.keys().cloned());
             } else {
-                dirty_keys.insert(key.into());
-                if profile == rtx_fg_manager::upstream040::PROFILE_041 && key == "fg_engine" {
+                dirty_keys.extend(edits.keys().cloned());
+                if profile == rtx_fg_manager::upstream040::PROFILE_041
+                    && edits.contains_key("fg_engine")
+                {
                     dirty_keys.insert("max_generated_frames".into());
                 }
             }
@@ -2239,7 +2246,7 @@ impl Controller {
             for t in &targets { ensure_directory_outside_data(&t.directory, &data)?; }
             if remove { rtx_fg_manager::runtime_files::remove_many(&targets, kind)?; }
             else { rtx_fg_manager::runtime_files::install_version(&targets, kind, &version, github, &cancel, &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress { transfer, proxy: kind.into(), package_index:1, package_count:1 })))?; }
-            c.send(Event::Notice(if remove { "运行库已恢复原件；管理器添加的文件已移除。" } else if kind == "xemfg" { "XeSS 运行库已安装。请在参数设置中启用独立 XeSS 多帧生成，再启动游戏；也可按 Backspace 设置。" } else { "DLSS 运行库已更新并保留原件备份。若游戏出现兼容问题，可在运行库窗口恢复。" }.into()));
+            c.send(Event::Notice(if remove { "运行库已恢复原件；管理器添加的文件已移除。" } else if kind == "encorefg" { "新增帧生成组件已安装，功能默认关闭。请在 Encore 参数中启用新增帧生成并选择引擎，关闭 Smooth Motion 后重启游戏。" } else if kind == "xemfg" { "XeSS 运行库已安装。请在参数设置中启用独立 XeSS 多帧生成，再启动游戏；也可按 Backspace 设置。" } else { "DLSS 运行库已更新并保留原件备份。若游戏出现兼容问题，可在运行库窗口恢复。" }.into()));
             Ok(())
         });
     }
@@ -4123,7 +4130,7 @@ mod tests {
         assert_eq!(parameter_target(&game).directory, render_dir);
         assert_eq!(
             read_json_preset_values(&parameter_target(&game), encore::PROFILE).unwrap(),
-            encore::defaults()
+            encore::read(encore::DEFAULT_CONFIG).unwrap()
         );
         let exe = game.exe.clone();
         c.games = vec![game];
@@ -4214,7 +4221,13 @@ mod tests {
             targets: vec!["A/Game.exe".into(), "B/Game.exe".into()],
             ..Default::default()
         };
-        let full = Some((encore::SCHEME.into(), encore::defaults()));
+        let full = Some((
+            encore::SCHEME.into(),
+            rtx_fg_manager::presets::defaults(
+                encore::PROFILE,
+                &catalog.scheme_policies[encore::SCHEME].defaults,
+            ),
+        ));
         for other in [
             Ok(None),
             Err(anyhow::anyhow!("second directory is locked")),
@@ -4622,6 +4635,48 @@ mod tests {
         assert_eq!(c.preset_values(exe), original);
         assert!(!c.preset_dirty(exe));
         assert!(c.first_pending_preset().is_none());
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn composite_encore_choice_is_atomic_and_draft_only() {
+        let (_dir, mut c) = controller();
+        let exe = "Added.exe";
+        let scheme = rtx_fg_manager::encore::SCHEME;
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        let original = c.preset_values(exe);
+        c.set_game_options(
+            exe,
+            &BTreeMap::from([
+                ("dlssWithoutGameDlss".into(), "1".into()),
+                ("dlssWithoutGameDlssEngine".into(), "invalid".into()),
+            ]),
+        );
+        assert_eq!(c.preset_values(exe), original);
+        assert!(!c.preset_dirty(exe));
+        c.set_game_options(
+            exe,
+            &BTreeMap::from([
+                ("dlssWithoutGameDlss".into(), "1".into()),
+                ("dlssWithoutGameDlssEngine".into(), "xess".into()),
+            ]),
+        );
+        assert_eq!(c.preset_values(exe)["dlssWithoutGameDlss"], "1");
+        assert_eq!(c.preset_values(exe)["dlssWithoutGameDlssEngine"], "xess");
+        assert!(c.preset_dirty(exe));
+        assert_eq!(
+            c.state["games"][0]["preset_options_v2"][scheme]["dlssWithoutGameDlss"],
+            original["dlssWithoutGameDlss"]
+        );
+        c.discard_presets(Some((exe, scheme)));
+        assert_eq!(c.preset_values(exe), original);
+        assert!(!c.preset_dirty(exe));
         c.close();
         c.tick_close();
     }

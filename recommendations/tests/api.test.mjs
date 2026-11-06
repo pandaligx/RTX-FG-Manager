@@ -14,6 +14,29 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('Encore 2 shares stay isolated from old clients and preserve local learning privacy',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...shared(),patchVersion:'2.0.1',presets:{schema:1,profile:'rtx_encore_json_v4',values:{flipMeteringBypass:'auto',frameGenerationWithoutGameFg:'1',dlssRenderScale:'ultra'},defaults:{flipMeteringBypass:'auto',frameGenerationWithoutGameFg:'0',dlssRenderScale:'game'}},runtimes:{schema:1,components:[{kind:'encorefg',source:'managed',versions:['2.14.16','310.9.16'],packageVersion:'2.14.16'}]}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',13);
+  assert.deepEqual(posted.content.presets,c.presets);
+  assert.deepEqual(posted.content.runtimes,c.runtimes);
+  const path='/v1/recipes/'+posted.id;
+  let revision=1;
+  for(const protocol of [8,11,12]){
+    const old=await f.call('GET',path,null,u.token,'test-ip',protocol);
+    assert.equal(old.content.presets,undefined);assert.equal(old.content.runtimes,undefined);
+    old.content.notes='Older client edit '+protocol;
+    await f.call('PUT',path,{revision:revision++,content:old.content},u.token,'test-ip',protocol);
+    const current=await f.call('GET',path,null,u.token,'test-ip',13);
+    assert.deepEqual(current.content.presets,c.presets);assert.deepEqual(current.content.runtimes,c.runtimes);
+  }
+  assert.throws(()=>recipe({...c,patchVersion:'1.6.0'}));
+  const bad=structuredClone(c);bad.presets.values.flipMeteringLearned='bypass';bad.presets.defaults.flipMeteringLearned='bypass';
+  assert.throws(()=>recipe(bad));
+  const partial=structuredClone(c);partial.runtimes.components[0].versions.pop();assert.throws(()=>recipe(partial));
+  assert.equal((await f.call('GET','/v1/capabilities')).encore200,1);
+});
+
 test('Encore 1.5.3 sharing gates V-Sync, RR2 and retired Turing; old editors preserve unseen settings',async t=>{
   const f=fixture(t),u=await f.login();
   const c={...shared(),patchVersion:'1.5.3',presets:{schema:1,profile:'rtx_encore_json_v4',values:{vsync:'on',dlssRrPreset:'f'},defaults:{vsync:'game',dlssRrPreset:'game'}}};

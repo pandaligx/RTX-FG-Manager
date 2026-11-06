@@ -22,7 +22,7 @@ fn fixture(config: &[u8]) -> Result<(cloud::Catalog, Vec<u8>)> {
     let mut archive = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let mut files = Vec::new();
     for (name, bytes) in entries {
-        archive.start_file(name, zip::write::FileOptions::default())?;
+        archive.start_file(name, zip::write::SimpleFileOptions::default())?;
         archive.write_all(bytes)?;
         files.push(cloud::File {
             name: name.into(),
@@ -93,7 +93,7 @@ fn encore120_shared_dependencies_are_exact_and_extract_with_the_selected_proxy()
     for (name, data) in &contents {
         let shared = encore::INTEL_FILES.contains(&name.as_str());
         let path = format!("{}/{}", if shared { "shared" } else { "selected" }, name);
-        zip.start_file(&path, zip::write::FileOptions::default())?;
+        zip.start_file(&path, zip::write::SimpleFileOptions::default())?;
         zip.write_all(data)?;
         p.files.push(cloud::File {
             name: name.clone(),

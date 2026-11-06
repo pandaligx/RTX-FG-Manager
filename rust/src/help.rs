@@ -193,7 +193,7 @@ pub fn install_at(root: &Path, manifest: &Manifest, archive: &[u8]) -> Result<()
     let mut seen = std::collections::BTreeSet::new();
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i)?;
-        let name = entry.name().to_owned();
+        let name = entry.name()?.into_owned();
         let hash = manifest.files.get(&name).context("帮助包含未知文件")?;
         ensure!(
             seen.insert(name.clone())
@@ -328,14 +328,14 @@ mod tests {
         let mut files = BTreeMap::new();
         for (name, content) in FILES {
             writer
-                .start_file(name, zip::write::FileOptions::default())
+                .start_file(name, zip::write::SimpleFileOptions::default())
                 .unwrap();
             writer.write_all(content).unwrap();
             files.insert(name.into(), core::hash(content));
         }
         if unexpected {
             writer
-                .start_file("../escape.js", zip::write::FileOptions::default())
+                .start_file("../escape.js", zip::write::SimpleFileOptions::default())
                 .unwrap();
             writer.write_all(b"bad").unwrap();
         }

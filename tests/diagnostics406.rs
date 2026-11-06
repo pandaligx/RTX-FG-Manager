@@ -252,7 +252,10 @@ fn full_report_is_kept_even_when_log_count_exceeds_cap() -> Result<()> {
     let z = zip::ZipArchive::new(fs::File::open(path)?)?;
     assert!(z.len() <= 256);
     for name in ["report.json", "files.json", "events.jsonl"] {
-        assert!(z.file_names().any(|n| n.ends_with(name)), "missing {name}");
+        assert!(
+            z.file_names().any(|n| n.unwrap().ends_with(name)),
+            "missing {name}"
+        );
     }
     Ok(())
 }

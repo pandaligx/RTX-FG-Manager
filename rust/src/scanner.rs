@@ -504,6 +504,9 @@ pub struct Evidence {
     /// Streamline SR wrapper alone is a clue, not a complete SR runtime.
     pub super_resolution_plugin: bool,
     pub component_paths: Vec<PathBuf>,
+    /// Native FG/Streamline evidence, also used to keep added FG separate from
+    /// a game's existing integration. Patch-private folders remain excluded.
+    pub frame_integration_paths: Vec<PathBuf>,
     pub anti_cheat: bool,
     pub limited: bool,
 }
@@ -592,6 +595,29 @@ pub fn inspect(exe: &Path) -> Evidence {
                 || name == "acesafe.sys"
                 || name == "anticheatexpert";
             if meta.is_file() {
+                if [
+                    "nvngx_dlssg.dll",
+                    "sl.interposer.dll",
+                    "sl.common.dll",
+                    "sl.dlss_g.dll",
+                    "sl.reflex.dll",
+                    "sl.pcl.dll",
+                    "libxess_fg.dll",
+                    "amd_fidelityfx_dx12.dll",
+                    "amd_fidelityfx_vk.dll",
+                    "ffx_fsr3_x64.dll",
+                    "ffx_fsr3upscaler_x64.dll",
+                    "ffx_fsr3frameinterpolation_x64.dll",
+                    "sl.dlss.dll",
+                ]
+                .contains(&name.as_str())
+                {
+                    if result.frame_integration_paths.len() < 128 {
+                        result.frame_integration_paths.push(row.path());
+                    } else {
+                        result.limited = true;
+                    }
+                }
                 let fg = ["nvngx_dlssg.dll", "sl.dlss_g.dll"].contains(&name.as_str());
                 let sr = name == "nvngx_dlss.dll";
                 let plugin = name == "sl.dlss.dll";

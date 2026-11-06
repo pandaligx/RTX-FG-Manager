@@ -120,8 +120,8 @@ fn encore120_inheritance_types_and_version_gates_are_explicit() {
 fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults() {
     encore::validate_cloud_config(encore::DEFAULT_CONFIG).unwrap();
     let read = encore::read(encore::DEFAULT_CONFIG).unwrap();
-    assert_eq!(read, encore::defaults());
-    assert_eq!(encore::fields().len(), 148);
+    assert_eq!(read, encore::defaults_for_version(Some("2.0.1")));
+    assert_eq!(encore::fields().len(), 154);
     assert_eq!(read["menuKey"], "45");
     assert_eq!(read["nrOpenFastProjection"], "1");
     assert_eq!(read["nrFastProcessing"], "1");
@@ -191,12 +191,12 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
             out.insert(path.clone());
         }
     }
-    // The template follows documented defaults through 1.5.3. Retired controls
+    // The template follows documented defaults through 2.0.1. Retired controls
     // remain in the editor metadata for older installs, not in new configs.
     let captured = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG).unwrap();
     let mut actual = std::collections::BTreeSet::new();
     leaves(&captured.value, &mut Vec::new(), &mut actual);
-    assert_eq!(actual.len(), 132);
+    assert_eq!(actual.len(), 139);
     let represented: std::collections::BTreeSet<_> =
         encore::fields().iter().map(|f| f.path.clone()).collect();
     let absent: Vec<_> = actual.difference(&represented).cloned().collect();
@@ -204,9 +204,14 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
         absent,
         vec![
             vec!["configVersion".to_string()],
+            vec![
+                "frameGeneration".to_string(),
+                "flipMeteringLearned".to_string()
+            ],
             vec!["frameGeneration".to_string(), "multiplier".to_string()]
         ]
     );
+    // The learned result is local runtime state, not a preset or shared field.
     // The version is protocol metadata. The physical multiplier is deliberately
     // represented by the existing requested-mode control, including every 2–6X.
     for n in 2..=6 {

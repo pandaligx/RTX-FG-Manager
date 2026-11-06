@@ -98,7 +98,7 @@ fn prepare(
     ensure!(zip.len() == 1, "NR 压缩包内容异常");
     let mut entry = zip.by_index(0)?;
     ensure!(
-        entry.name() == FILE
+        entry.name()? == FILE
             && entry.size() == r.size
             && !entry.is_dir()
             && entry.unix_mode().is_none_or(|m| m & 0o170000 != 0o120000),
@@ -341,7 +341,14 @@ fn preflight_install(target: &core::DeploymentTarget, version: &str) -> Result<(
         );
     }
     ensure!(
-        scanner::inspect(&target.game_exe).neural_input(),
+        record.backend == encore::BACKEND
+            && encore::supports_200(
+                record
+                    .upstream_version
+                    .as_deref()
+                    .or(record.payload_version.as_deref())
+            )
+            || scanner::inspect(&target.game_exe).neural_input(),
         "未发现游戏的 DLSS 超分或光线重建组件；不会添加 NR 运行库"
     );
     let root = core::no_links(&target.directory.join(OWN))?;

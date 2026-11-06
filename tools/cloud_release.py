@@ -218,7 +218,10 @@ def validate_encore_config(config):
     for field in encore_fields():
         value = config
         missing = False
-        for part in field["path"]:
+        field_path = field["path"]
+        if field["key"] == "flipMeteringBypass" and "flipMeteringBypass" in config.get("frameGeneration", {}):
+            field_path = ["frameGeneration", "flipMeteringBypass"]
+        for part in field_path:
             require(isinstance(value, dict), "Invalid Encore section: " + ".".join(field["path"]))
             if part not in value:
                 modern_vsync = field["key"] == "vsyncOff" and "vsync" in config.get("nativeMenuFeatures", {})
@@ -232,7 +235,10 @@ def validate_encore_config(config):
         if field["key"] == "tf_mode":
             require(isinstance(value, str) and value in {"game", "fixed", "dynamic"}, "Invalid Encore mode")
             continue
-        if kind in {"inheritbool", "inheritdecimal"} and value == "inherit":
+        if field["key"] == "flipMeteringBypass":
+            valid_type = type(value) is bool or value == "auto"
+            encoded = ("1" if value else "0") if type(value) is bool else value
+        elif kind in {"inheritbool", "inheritdecimal"} and value == "inherit":
             valid_type, encoded = True, "inherit"
         elif kind in {"bool", "inheritbool"}:
             valid_type = type(value) is bool
@@ -258,6 +264,11 @@ def validate_encore_config(config):
     require(config["neuralRendering"]["core"]["nrEnabled"] is False, "Cloud Encore must not enable Neural Rendering")
     require(config["neuralRendering"].get("experimental", {}).get("nrFoveation", False) is False,
             "Cloud Encore must not enable experimental foveated NR")
+    for section, key in ((fg, "frameGenerationWithoutGameFg"),
+                         (config["dlssSuperResolution"], "dlssWithoutGameDlss"),
+                         (config["neuralRendering"], "nrWithoutGameDlss")):
+        require(section.get(key, False) is False,
+                "Cloud Encore must not enable experimental added features: " + key)
 
 
 def package_from_zip(scheme, item, data):

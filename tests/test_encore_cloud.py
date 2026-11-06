@@ -61,7 +61,7 @@ class EncoreCloudTests(unittest.TestCase):
                 yield path
         paths = {tuple(field["path"]) for field in fields}
         native_paths = set(leaves(config()))
-        self.assertEqual(len(fields), 148)
+        self.assertEqual(len(fields), 154)
         self.assertEqual(
             {field["key"] for field in fields if field.get("since") == "1.5.0"},
             {"xessTensorCores", "xefgTensorCores"},
@@ -75,7 +75,8 @@ class EncoreCloudTests(unittest.TestCase):
         self.assertEqual(len(paths), len(fields))
         # Multiplier is exposed through the composite tf_mode selector. The
         # schema marker is not editable; upstream persists menu settings on demand.
-        self.assertEqual(native_paths - paths, {("configVersion",), ("frameGeneration", "multiplier")})
+        self.assertEqual(native_paths - paths, {("configVersion",), ("frameGeneration", "multiplier"),
+                                               ("frameGeneration", "flipMeteringLearned")})
         retired = {tuple(f["path"]) for f in fields if f["key"] == "nrEngine" or f["key"].startswith("nrOpen")}
         self.assertEqual(paths - native_paths, retired | {("menuState", "menuKey"), ("menuState", "menuLanguage"), ("smoothMotion", "smoothMotionForce"), ("smoothMotion", "smoothMotionTuringVariant"), ("nativeMenuFeatures", "vsyncOff"), ("providerPatchPolicy",), ("overlay", "metrics", "overlayShowLatency")})
         for key in ("menuKey", "menuLanguage"):
@@ -127,13 +128,34 @@ class EncoreCloudTests(unittest.TestCase):
                                       (["general"], "gpuSeries", "rtx30"),
                                       (["smoothMotion"], "smoothMotionEnabled", True),
                                       (["neuralRendering", "core"], "nrEnabled", True),
-                                      (["neuralRendering", "experimental"], "nrFoveation", True)):
+                                      (["neuralRendering", "experimental"], "nrFoveation", True),
+                                      (["frameGeneration"], "frameGenerationWithoutGameFg", True),
+                                      (["dlssSuperResolution"], "dlssWithoutGameDlss", True),
+                                      (["neuralRendering"], "nrWithoutGameDlss", True)):
             value = config()
             owner = value
             for part in section:
                 owner = owner[part]
             owner[key] = changed
             with self.subTest(key=key), self.assertRaises(RuntimeError):
+                package(value)
+
+    def test_flip_metering_accepts_native_booleans_or_auto_without_coercion(self):
+        for accepted in (False, True, "auto"):
+            value = config()
+            value["compatibility"]["flipMeteringBypass"] = accepted
+            package(value)
+            del value["compatibility"]["flipMeteringBypass"]
+            value["frameGeneration"]["flipMeteringBypass"] = accepted
+            package(value)
+        for rejected in (0, 1, "0", "1", "true", None, [], {}):
+            value = config()
+            value["compatibility"]["flipMeteringBypass"] = rejected
+            with self.subTest(value=rejected), self.assertRaises(RuntimeError):
+                package(value)
+            del value["compatibility"]["flipMeteringBypass"]
+            value["frameGeneration"]["flipMeteringBypass"] = rejected
+            with self.subTest(canonical=rejected), self.assertRaises(RuntimeError):
                 package(value)
 
     def test_only_encore_accepts_notices_and_only_canonical_proxy_is_packaged(self):

@@ -196,6 +196,11 @@
         "label": "DLAA"
       },
       {
+        "value": "ultra",
+        "label": "Ultra (75%)",
+        "since": "2.0.0"
+      },
+      {
         "value": "quality",
         "label": "质量"
       },
@@ -1959,9 +1964,9 @@
     "choices": [],
     "restart": true,
     "dependencies": [],
-    "help": "使用NVIDIA App已下载的帧生成模型。",
+    "help": "使用 NVIDIA App 已下载的模型；Encore 2.0+ 涵盖 SR、RR、FG 和 NR。不会下载或改写 OTA 文件，修改后重启游戏。",
     "optional": false,
-    "source_help": "Load the Frame Generation models downloaded by the NVIDIA App. Restart the game to apply."
+    "source_help": "Use locally installed NVIDIA App models. Encore 2.0+ supports SR, RR, FG and NR. No OTA download or file changes. Restart the game."
   },
   {
     "key": "flipMeteringBypass",
@@ -1971,14 +1976,28 @@
     ],
     "label": "平滑 X3 / X4",
     "group": "frames",
-    "kind": "bool",
+    "kind": "choice",
     "default": "0",
     "min": null,
     "max": null,
-    "choices": [],
+    "choices": [
+      {
+        "value": "auto",
+        "label": "自动（按游戏学习）",
+        "since": "2.0.0"
+      },
+      {
+        "value": "1",
+        "label": "开启"
+      },
+      {
+        "value": "0",
+        "label": "关闭"
+      }
+    ],
     "restart": true,
     "dependencies": [],
-    "help": "当 X3/X4 比 X2 更不流畅时可尝试；让 Streamline 安排生成帧的间隔。Encore 1.1.2 支持 DX12/Vulkan，修改后重启游戏。默认关闭。",
+    "help": "Encore 2.0 起默认自动，学习该游戏应由 Streamline 还是驱动安排帧间隔。旧配置的开关保持不变；学习结果只保存在本机，重启游戏生效。",
     "optional": false,
     "source_help": "Smooth out X3 / X4: Streamline spaces generated frames instead of the NVIDIA driver. DX12 and Vulkan in Encore 1.1.2. Restart the game to apply."
   },
@@ -2577,7 +2596,7 @@
     ],
     "restart": true,
     "dependencies": [],
-    "help": "选择模型不会改变分辨率。实际模型取决于 DLL、驱动和游戏；需要重启。",
+    "help": "Encore 2.0 的模型预设修改后请重启游戏。可用预设取决于实际加载的 NVIDIA 运行库；不会自动开启超分或光线重建。",
     "optional": false,
     "source_help": "SR preset: game (no override), default, a-f (legacy), j, k, l or m. Applies to all quality modes; supported models depend on the DLSS DLL. Restart to apply."
   },
@@ -2630,7 +2649,7 @@
     ],
     "restart": true,
     "dependencies": [],
-    "help": "不会自动开启光线重建。Encore 1.5.3 起支持 F（RR2），需要 RR 310.9.1 或更新运行库；旧运行库会忽略 F。Encore 1.2 起可实时切换。",
+    "help": "Encore 2.0 的模型预设修改后请重启游戏。可用预设取决于实际加载的 NVIDIA 运行库；不会自动开启超分或光线重建。",
     "optional": false,
     "source_help": "F (RR2) requires Encore 1.5.3 and Ray Reconstruction DLL 310.9.1 or later. Does not enable RR. Encore 1.2+ applies presets live."
   },
@@ -3949,6 +3968,46 @@
       {
         "value": "zh-CN",
         "label": "简体中文"
+      },
+      {
+        "value": "de",
+        "label": "Deutsch",
+        "since": "2.0.0"
+      },
+      {
+        "value": "es",
+        "label": "Español",
+        "since": "2.0.0"
+      },
+      {
+        "value": "nl",
+        "label": "Nederlands",
+        "since": "2.0.0"
+      },
+      {
+        "value": "pl",
+        "label": "Polski",
+        "since": "2.0.0"
+      },
+      {
+        "value": "pt-BR",
+        "label": "Português (Brasil)",
+        "since": "2.0.0"
+      },
+      {
+        "value": "vi",
+        "label": "Tiếng Việt",
+        "since": "2.0.0"
+      },
+      {
+        "value": "ru",
+        "label": "Русский",
+        "since": "2.0.0"
+      },
+      {
+        "value": "ja",
+        "label": "日本語",
+        "since": "2.0.0"
       }
     ],
     "restart": false,
@@ -3974,7 +4033,7 @@
     "dependencies": [
       "reconstructionEngine=xess"
     ],
-    "help": "默认关闭。Encore 1.5.3 起实验支持 RTX 30/40/50、621.01 或 621.12、DX12；RTX 20 不支持。上游仅验证 RTX 4090 + 621.01。准备失败保留标准 XeSS。",
+    "help": "实验性，默认关闭。需要 RTX 30/40/50、DX12 和受支持驱动 621.01 / 621.12 / 621.14。RTX 20、DX11 和 Vulkan 不使用 Tensor 路径；准备成功不代表实际启用。",
     "optional": true,
     "since": "1.5.0"
   },
@@ -3995,7 +4054,7 @@
     "dependencies": [
       "frameGenerationEngine=xefg"
     ],
-    "help": "默认关闭，独立于 XeSS。Encore 1.5.3 起实验支持 RTX 30/40/50、621.01 或 621.12、DX12；RTX 20 不支持。上游仅验证 RTX 4090 + 621.01。固定 2X–6X 受初始化容量限制；执行异常需重启。",
+    "help": "实验性，默认关闭。需要 RTX 30/40/50、DX12 和受支持驱动 621.01 / 621.12 / 621.14。RTX 20、DX11 和 Vulkan 不使用 Tensor 路径；准备成功不代表实际启用。",
     "optional": true,
     "since": "1.5.0"
   },
@@ -4052,5 +4111,158 @@
     "help": "显示游戏渲染帧的 Reflex/XeLL 报告，不是显示器端到端延迟，不统计生成帧；游戏未提供标记时不显示。",
     "optional": true,
     "since": "1.4.6"
+  },
+  {
+    "key": "dlssWithoutGameDlss",
+    "path": [
+      "dlssSuperResolution",
+      "dlssWithoutGameDlss"
+    ],
+    "label": "添加超分 / DLAA（无原生 DLSS）",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "实验性：仅用于原生不带 DLSS 的游戏，默认关闭。界面文字也会参与处理；以游戏内 Insert 菜单的实际状态为准。",
+    "optional": true,
+    "since": "2.0.0"
+  },
+  {
+    "key": "dlssWithoutGameDlssEngine",
+    "path": [
+      "dlssSuperResolution",
+      "dlssWithoutGameDlssEngine"
+    ],
+    "label": "新增超分引擎",
+    "group": "image",
+    "kind": "choice",
+    "default": "dlss",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "dlss",
+        "label": "DLSS"
+      },
+      {
+        "value": "xess",
+        "label": "XeSS"
+      }
+    ],
+    "restart": true,
+    "dependencies": [
+      "dlssWithoutGameDlss=1"
+    ],
+    "help": "DLSS 需要超分运行库；XeSS 使用方案自带的 Intel 运行库。Vulkan 切换引擎后请重启游戏。",
+    "optional": true,
+    "since": "2.0.0"
+  },
+  {
+    "key": "dlssWithoutGameDlssOutput",
+    "path": [
+      "dlssSuperResolution",
+      "dlssWithoutGameDlssOutput"
+    ],
+    "label": "新增超分输出分辨率",
+    "group": "image",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "游戏分辨率（DLAA）"
+      },
+      {
+        "value": "screen",
+        "label": "屏幕分辨率"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "dlssWithoutGameDlss=1"
+    ],
+    "help": "屏幕分辨率：游戏设为较低分辨率和窗口化；Unity 请使用 Windowed，不能用 Fullscreen Window。",
+    "optional": true,
+    "since": "2.0.0"
+  },
+  {
+    "key": "presentOpticalFlow",
+    "path": [
+      "dlssSuperResolution",
+      "presentOpticalFlow"
+    ],
+    "label": "无 DLSS 游戏的运动估计",
+    "group": "image",
+    "kind": "choice",
+    "default": "encore",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "encore",
+        "label": "RTX Encore"
+      },
+      {
+        "value": "shader",
+        "label": "Shader (vort)"
+      },
+      {
+        "value": "quality",
+        "label": "Optical Flow (Quality)"
+      },
+      {
+        "value": "fast",
+        "label": "Optical Flow (Fast)"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "实验性：仅用于原生不带 DLSS 的游戏，默认关闭。界面文字也会参与处理；以游戏内 Insert 菜单的实际状态为准。",
+    "optional": true,
+    "since": "2.0.0"
+  },
+  {
+    "key": "nrWithoutGameDlss",
+    "path": [
+      "neuralRendering",
+      "nrWithoutGameDlss"
+    ],
+    "label": "添加 DLSSNR（无原生 DLSS）",
+    "group": "image",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "实验性：仅用于原生不带 DLSS 的游戏，默认关闭。界面文字也会参与处理；以游戏内 Insert 菜单的实际状态为准。",
+    "optional": true,
+    "since": "2.0.0"
+  },
+  {
+    "key": "frameGenerationWithoutGameFg",
+    "path": [
+      "frameGeneration",
+      "frameGenerationWithoutGameFg"
+    ],
+    "label": "添加帧生成（无原生帧生成）",
+    "group": "frames",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": true,
+    "dependencies": [],
+    "help": "实验性，默认关闭。DLSS-FG 需要专用完整组件；XeFG 使用自带 Intel 组件。请关闭 Smooth Motion，建议固定倍率；scRGB 和 D3D11-on-12 不支持。",
+    "optional": true,
+    "since": "2.0.0"
   }
 ]

@@ -91,5 +91,52 @@
       "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/runtime-xemfg-3.0.2-9ddb6aaad99b.zip",
       "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/runtime-xemfg-3.0.2-9ddb6aaad99b.zip"
     ]
+  },
+  {
+    "kind": "encorefg",
+    "version": "2.14.16",
+    "bytes": 5011852,
+    "sha256": "971b5212c874c540a443ce013bf2d5845e9f11dcd24e6a50b43282a8c494e247",
+    "urls": [
+      "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/encore-added-fg-2.14.16-971b5212c874.zip",
+      "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/encore-added-fg-2.14.16-971b5212c874.zip"
+    ],
+    "files": [
+      {
+        "name": "nvngx_dlssg.dll",
+        "bytes": 7506544,
+        "sha256": "8d59d49b36410dd6b62fef2503a5871d347415bd85d943fa0848563a95dd50c7"
+      },
+      {
+        "name": "sl.interposer.dll",
+        "bytes": 652928,
+        "sha256": "b1d7395aebd7b9722841d64dcf7433680020b6a8e421f851c16d5ba0c2182edf"
+      },
+      {
+        "name": "sl.common.dll",
+        "bytes": 843904,
+        "sha256": "38eea3b4209afc455636ea372b5933d65fcc13becec6c84d101dcfc4d8648f75"
+      },
+      {
+        "name": "sl.dlss_g.dll",
+        "bytes": 637056,
+        "sha256": "3ed9538df724993bea8a050195a6a78b9c8c8a566d5b05ade477aab3c390e90f"
+      },
+      {
+        "name": "sl.reflex.dll",
+        "bytes": 388736,
+        "sha256": "443577e869352436ff7ec8f4d9c90418d3e95368436ce219261e0f4f07a38122"
+      },
+      {
+        "name": "sl.pcl.dll",
+        "bytes": 360064,
+        "sha256": "5698c38e722318681f215c9fe68e45b9bedd51378acc699d8eee26e961e57770"
+      },
+      {
+        "name": "RTXFG-Streamline-LICENSE.txt",
+        "bytes": 48878,
+        "sha256": "9ef4f16dcd28efe574732c16c259ef934c14d8e02c7eb0609fb461ed9013f5c5"
+      }
+    ]
   }
 ]

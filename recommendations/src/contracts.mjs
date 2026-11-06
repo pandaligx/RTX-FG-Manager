@@ -72,6 +72,7 @@ export function recipe(input) {
   need(['none','310.9.16','unknown'].includes(input.neuralRuntime), 'invalid_neural_runtime');
   need(input.platform===undefined || ['unknown','steam','epic','ea','gog','ubisoft','xbox','battlenet','wegame','hoyo','cube','sonkwo','standalone'].includes(input.platform),'invalid_platform');
   const runtimes=input.runtimes===undefined?undefined:runtimeSnapshot(input.runtimes);
+  if(runtimes?.components.some(c=>c.kind==='encorefg')) need(input.scheme==='dlssg-transfusion-1.4.5.3' && Number(input.patchVersion.split('.')[0])>=2,'unsupported_runtime_for_scheme');
   if(input.scheme==='mfg-unlocker-1.6.1-compat'){
     need(input.patchVersion==='1.6.1','invalid_patch_version');
     need(input.neuralRuntime==='none' && (!runtimes || runtimes.components.every(c=>c.kind!=='nr' && c.source!=='managed')),'unsupported_runtime_for_scheme');

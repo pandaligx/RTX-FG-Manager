@@ -603,6 +603,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     } else {
         crate::neural_runtime::remove_locked(&target)?;
         crate::runtime_files::remove_locked(&target, "xemfg")?;
+        crate::runtime_files::remove_locked(&target, "encorefg")?;
         // Restore only files owned by the manager; remove_locked validates the
         // installed bytes and original backup before touching either file.
         for kind in ["sr", "rr", "fg"] {

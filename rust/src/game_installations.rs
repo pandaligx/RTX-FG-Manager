@@ -270,8 +270,7 @@ pub(crate) fn epic(program_data: &Path, cancel: &AtomicBool) -> Vec<Install> {
 pub(crate) fn ea(root: &Path) -> Option<Install> {
     let data = text(&root.join("__Installer/installerdata.xml"))?;
     let mut r = Reader::from_str(&data);
-    r.config_mut().trim_text(true);
-    let mut stack = Vec::<(String, String)>::new();
+    let mut stack = Vec::<(String, String, String)>::new();
     let mut title = String::new();
     let mut zh = String::new();
     let mut ids = Vec::new();
@@ -291,18 +290,39 @@ pub(crate) fn ea(root: &Path) -> Option<Install> {
                     .attributes()
                     .flatten()
                     .find(|a| a.key.as_ref().eq_ignore_ascii_case(b"locale"))
-                    .and_then(|a| a.unescape_value().ok().map(|s| s.to_string()))
+                    .and_then(|a| {
+                        a.normalized_value(quick_xml::XmlVersion::Implicit1_0)
+                            .ok()
+                            .map(|s| s.to_string())
+                    })
                     .unwrap_or_default();
-                stack.push((name, locale));
+                stack.push((name, locale, String::new()));
             }
             Event::Text(t) => {
-                let s = t.unescape().ok()?.into_owned();
-                if let Some((name, locale)) = stack.last() {
-                    if name == "contentid" && stack.iter().any(|(n, _)| n == "contentids") {
+                if let Some((_, _, value)) = stack.last_mut() {
+                    value.push_str(&t.decode().ok()?);
+                }
+            }
+            Event::CData(t) => {
+                if let Some((_, _, value)) = stack.last_mut() {
+                    value.push_str(&t.decode().ok()?);
+                }
+            }
+            Event::GeneralRef(t) => {
+                let reference = format!("&{};", t.decode().ok()?);
+                let resolved = quick_xml::escape::unescape(&reference).ok()?;
+                if let Some((_, _, value)) = stack.last_mut() {
+                    value.push_str(&resolved);
+                }
+            }
+            Event::End(_) => {
+                if let Some((name, locale, value)) = stack.pop() {
+                    let s = value.trim().to_owned();
+                    if name == "contentid" && stack.iter().any(|(n, _, _)| n == "contentids") {
                         ids.push(s.clone());
                     }
                     if (name == "gametitle"
-                        || name == "title" && stack.iter().any(|(n, _)| n == "gametitles"))
+                        || name == "title" && stack.iter().any(|(n, _, _)| n == "gametitles"))
                         && game_names::valid_title(&s)
                     {
                         if title.is_empty() || locale.eq_ignore_ascii_case("en_US") {
@@ -315,9 +335,6 @@ pub(crate) fn ea(root: &Path) -> Option<Install> {
                         }
                     }
                 }
-            }
-            Event::End(_) => {
-                stack.pop();
             }
             Event::DocType(_) => return None,
             Event::Eof => break,
@@ -628,6 +645,8 @@ mod tests {
         let i = ea(t.path()).unwrap();
         assert_eq!(i.title, "中文游戏");
         assert_eq!(i.keys, ["ea:origin.ofr.50.000000"]);
+        fs::write(&p, r#"<game><contentIDs><contentID>Origin.OFR.50.000000</contentID></contentIDs><gameTitles><title locale="zh_CN">中文 &amp; 游戏 &#50;<![CDATA[：特别版]]></title></gameTitles></game>"#).unwrap();
+        assert_eq!(ea(t.path()).unwrap().title, "中文 & 游戏 2：特别版");
         fs::write(
             p,
             r#"<!DOCTYPE game [<!ENTITY x SYSTEM "file:///secret">]><game>&x;</game>"#,

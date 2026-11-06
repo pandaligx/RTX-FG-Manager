@@ -86,16 +86,21 @@
         "values": [
           "game",
           "dlaa",
+          "ultra",
           "quality",
           "balanced",
           "performance",
           "ultra-performance",
           "custom"
         ],
+        "valueSince": {
+          "ultra": "2.0.0"
+        },
         "label": "DLSS渲染比例",
         "labels": {
           "game": "跟随游戏",
           "dlaa": "DLAA",
+          "ultra": "Ultra (75%)",
           "quality": "质量",
           "balanced": "平衡",
           "performance": "性能",
@@ -734,14 +739,18 @@
       },
       "flipMeteringBypass": {
         "values": [
-          "0",
-          "1"
+          "auto",
+          "1",
+          "0"
         ],
+        "valueSince": {
+          "auto": "2.0.0"
+        },
         "label": "平滑 X3 / X4",
         "labels": {
-          "0": "关闭",
+          "auto": "自动（按游戏学习）",
           "1": "开启",
-          "inherit": "跟随游戏"
+          "0": "关闭"
         }
       },
       "smoothMotionForce": {
@@ -1315,6 +1324,85 @@
           "game": "跟随游戏",
           "on": "开启",
           "on-boost": "开启 + Boost"
+        }
+      },
+      "dlssWithoutGameDlss": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "2.0.0",
+        "label": "添加超分 / DLAA（无原生 DLSS）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "dlssWithoutGameDlssEngine": {
+        "values": [
+          "dlss",
+          "xess"
+        ],
+        "since": "2.0.0",
+        "label": "新增超分引擎",
+        "labels": {
+          "dlss": "DLSS",
+          "xess": "XeSS"
+        }
+      },
+      "dlssWithoutGameDlssOutput": {
+        "values": [
+          "game",
+          "screen"
+        ],
+        "since": "2.0.0",
+        "label": "新增超分输出分辨率",
+        "labels": {
+          "game": "游戏分辨率（DLAA）",
+          "screen": "屏幕分辨率"
+        }
+      },
+      "presentOpticalFlow": {
+        "values": [
+          "encore",
+          "shader",
+          "quality",
+          "fast"
+        ],
+        "since": "2.0.0",
+        "label": "无 DLSS 游戏的运动估计",
+        "labels": {
+          "encore": "RTX Encore",
+          "shader": "Shader (vort)",
+          "quality": "Optical Flow (Quality)",
+          "fast": "Optical Flow (Fast)"
+        }
+      },
+      "nrWithoutGameDlss": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "2.0.0",
+        "label": "添加 DLSSNR（无原生 DLSS）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "frameGenerationWithoutGameFg": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "2.0.0",
+        "label": "添加帧生成（无原生帧生成）",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
         }
       }
     }

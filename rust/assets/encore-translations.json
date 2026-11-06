@@ -2526,10 +2526,10 @@
     "English"
   ],
   "简体中文": [
-    "Simplified Chinese",
-    "Китайский (упрощённый)",
-    "簡体字中国語",
-    "중국어 간체"
+    "简体中文",
+    "简体中文",
+    "简体中文",
+    "简体中文"
   ],
   "NR 第 1 遍模型": [
     "NR pass 1 model",
@@ -2668,5 +2668,203 @@
     "По умолчанию выкл., независимо от XeSS. С Encore 1.5.3 экспериментально: RTX 30/40/50, 621.01 или 621.12, DX12; не RTX 20. Проверено только RTX 4090 + 621.01. Фиксированные 2X–6X зависят от начальной ёмкости; после сбоя нужен перезапуск.",
     "既定はオフ、XeSS とは独立。Encore 1.5.3 以降は RTX 30/40/50、621.01 または 621.12、DX12 を実験的に許可。RTX 20 は非対応。検証は RTX 4090 + 621.01 のみ。固定 2X–6X は初期容量に依存し、実行エラー後は再起動が必要です。",
     "기본값은 꺼짐이며 XeSS와 독립적입니다. Encore 1.5.3부터 RTX 30/40/50, 621.01 또는 621.12, DX12를 실험적으로 허용합니다. RTX 20은 미지원입니다. 검증은 RTX 4090 + 621.01만 완료되었습니다. 고정 2X–6X는 초기화 용량에 따르며 실행 오류 후 재시작이 필요합니다."
+  ],
+  "实验性：仅用于原生不带 DLSS 的游戏，默认关闭。界面文字也会参与处理；以游戏内 Insert 菜单的实际状态为准。": [
+    "Experimental, off by default, for games without native DLSS. HUD text is processed too; check the actual status in the Insert menu.",
+    "Экспериментально, по умолчанию выкл., для игр без DLSS. Обрабатывается и интерфейс; проверяйте состояние в меню Insert.",
+    "実験的機能。DLSS 非搭載ゲーム向けで、既定はオフ。UI の文字も処理されます。Insert メニューで動作状態を確認してください。",
+    "실험적 기능이며 기본값은 꺼짐입니다. DLSS가 없는 게임용으로 UI 텍스트도 처리합니다. Insert 메뉴에서 실제 상태를 확인하세요."
+  ],
+  "添加超分 / DLAA（无原生 DLSS）": [
+    "Add upscaling / DLAA (no native DLSS)",
+    "Добавить масштабирование / DLAA (без DLSS)",
+    "超解像 / DLAA を追加（DLSS 非搭載）",
+    "업스케일링 / DLAA 추가 (DLSS 미탑재)"
+  ],
+  "新增超分引擎": [
+    "Added upscaling engine",
+    "Движок добавленного масштабирования",
+    "追加する超解像エンジン",
+    "추가 업스케일링 엔진"
+  ],
+  "DLSS 需要超分运行库；XeSS 使用方案自带的 Intel 运行库。Vulkan 切换引擎后请重启游戏。": [
+    "DLSS needs the SR runtime; XeSS uses the bundled Intel runtimes. Restart Vulkan games after changing engines.",
+    "DLSS требует SR; XeSS использует комплект Intel. После смены движка в Vulkan перезапустите игру.",
+    "DLSS には SR ランタイム、XeSS には同梱の Intel ランタイムが必要です。Vulkan では切替後に再起動してください。",
+    "DLSS에는 SR 런타임, XeSS에는 동봉된 Intel 런타임이 필요합니다. Vulkan에서 변경 후 게임을 재시작하세요."
+  ],
+  "新增超分输出分辨率": [
+    "Added upscaling output",
+    "Разрешение добавленного масштабирования",
+    "追加する超解像の出力解像度",
+    "추가 업스케일링 출력 해상도"
+  ],
+  "屏幕分辨率：游戏设为较低分辨率和窗口化；Unity 请使用 Windowed，不能用 Fullscreen Window。": [
+    "Screen resolution: use a lower game resolution and windowed mode. For Unity, use Windowed, not Fullscreen Window.",
+    "Для разрешения экрана задайте меньший размер и оконный режим. В Unity выберите Windowed, не Fullscreen Window.",
+    "画面解像度へ拡大する場合、ゲームを低解像度のウィンドウ表示にします。Unity は Fullscreen Window ではなく Windowed を選んでください。",
+    "화면 해상도로 확대하려면 게임을 낮은 해상도의 창 모드로 설정하세요. Unity에서는 Fullscreen Window 대신 Windowed를 선택하세요."
+  ],
+  "游戏分辨率（DLAA）": [
+    "Game resolution (DLAA)",
+    "Разрешение игры (DLAA)",
+    "ゲーム解像度（DLAA）",
+    "게임 해상도 (DLAA)"
+  ],
+  "屏幕分辨率": [
+    "Screen resolution",
+    "Разрешение экрана",
+    "画面解像度",
+    "화면 해상도"
+  ],
+  "无 DLSS 游戏的运动估计": [
+    "Motion estimation (no DLSS)",
+    "Оценка движения (без DLSS)",
+    "DLSS 非搭載ゲームの動き推定",
+    "DLSS 미탑재 게임의 움직임 추정"
+  ],
+  "添加 DLSSNR（无原生 DLSS）": [
+    "Add DLSSNR (no native DLSS)",
+    "Добавить DLSSNR (без DLSS)",
+    "DLSSNR を追加（DLSS 非搭載）",
+    "DLSSNR 추가 (DLSS 미탑재)"
+  ],
+  "添加帧生成（无原生帧生成）": [
+    "Add frame generation (no native FG)",
+    "Добавить генерацию кадров (без штатной FG)",
+    "フレーム生成を追加（FG 非搭載）",
+    "프레임 생성 추가 (FG 미탑재)"
+  ],
+  "实验性，默认关闭。DLSS-FG 需要专用完整组件；XeFG 使用自带 Intel 组件。请关闭 Smooth Motion，建议固定倍率；scRGB 和 D3D11-on-12 不支持。": [
+    "Experimental and off by default. DLSS-FG needs the complete added-FG set; XeFG uses bundled Intel files. Disable Smooth Motion; use a fixed multiplier. No scRGB or D3D11-on-12.",
+    "Экспериментально, по умолчанию выкл. DLSS-FG требует полный комплект; XeFG использует Intel. Выключите Smooth Motion; выберите фиксированный множитель. Без scRGB и D3D11-on-12.",
+    "実験的機能、既定はオフ。DLSS-FG は専用一式、XeFG は同梱 Intel を使用します。Smooth Motion をオフにし固定倍率を推奨。scRGB と D3D11-on-12 は非対応。",
+    "실험적 기능이며 기본값은 꺼짐입니다. DLSS-FG에는 전체 구성 요소가 필요하고 XeFG는 동봉된 Intel 파일을 사용합니다. Smooth Motion을 끄고 고정 배율을 권장합니다. scRGB 및 D3D11-on-12는 미지원입니다."
+  ],
+  "自动（按游戏学习）": [
+    "Automatic (learn per game)",
+    "Авто (обучение для игры)",
+    "自動（ゲームごとに学習）",
+    "자동 (게임별 학습)"
+  ],
+  "Encore 2.0 起默认自动，学习该游戏应由 Streamline 还是驱动安排帧间隔。旧配置的开关保持不变；学习结果只保存在本机，重启游戏生效。": [
+    "Encore 2.0 defaults to Automatic, learning Streamline or driver pacing per game. Existing on/off choices are preserved. Learning stays local; restart to apply.",
+    "С Encore 2.0 по умолчанию авто: выбирает ритм Streamline или драйвера для игры. Старый выбор сохраняется. Результат обучения локальный; нужен перезапуск.",
+    "Encore 2.0 の既定は自動。ゲームごとに Streamline またはドライバーの間隔制御を学習します。旧設定は保持し、学習結果は共有されません。再起動で反映。",
+    "Encore 2.0의 기본값은 자동이며 게임별 Streamline 또는 드라이버 프레임 간격을 학습합니다. 기존 설정은 유지되고 학습 결과는 공유되지 않습니다. 재시작 후 적용됩니다."
+  ],
+  "Ultra (75%)": [
+    "Ultra (75%)",
+    "Ultra (75%)",
+    "Ultra (75%)",
+    "Ultra (75%)"
+  ],
+  "Encore 2.0 的模型预设修改后请重启游戏。可用预设取决于实际加载的 NVIDIA 运行库；不会自动开启超分或光线重建。": [
+    "Restart after changing model presets in Encore 2.0. Available presets depend on the loaded NVIDIA runtimes; this does not enable SR or RR.",
+    "В Encore 2.0 после смены модели перезапустите игру. Доступность зависит от NVIDIA DLL; SR и RR не включаются автоматически.",
+    "Encore 2.0 ではモデル変更後に再起動してください。選択可能なプリセットは読み込まれた NVIDIA ランタイムに依存し、SR や RR は自動で有効になりません。",
+    "Encore 2.0에서는 모델 변경 후 재시작하세요. 사용 가능한 프리셋은 로드된 NVIDIA 런타임에 따라 다르며 SR 또는 RR을 자동으로 켜지 않습니다."
+  ],
+  "实验性，默认关闭。需要 RTX 30/40/50、DX12 和受支持驱动 621.01 / 621.12 / 621.14。RTX 20、DX11 和 Vulkan 不使用 Tensor 路径；准备成功不代表实际启用。": [
+    "Experimental, off by default. Requires RTX 30/40/50, DX12 and supported drivers 621.01 / 621.12 / 621.14. No Tensor path on RTX 20, DX11 or Vulkan. Prepared does not mean active.",
+    "Экспериментально, по умолчанию выкл. RTX 30/40/50, DX12, драйверы 621.01 / 621.12 / 621.14. Tensor не работает на RTX 20, DX11 или Vulkan. Подготовка не означает работу.",
+    "実験的、既定はオフ。RTX 30/40/50、DX12、対応ドライバー 621.01 / 621.12 / 621.14 が必要。RTX 20、DX11、Vulkan は Tensor 非対応。準備完了は動作中を意味しません。",
+    "실험적이며 기본값은 꺼짐입니다. RTX 30/40/50, DX12 및 지원 드라이버 621.01 / 621.12 / 621.14가 필요합니다. RTX 20, DX11, Vulkan은 Tensor 경로를 사용하지 않습니다. 준비 완료가 활성 상태를 뜻하지는 않습니다."
+  ],
+  "使用 NVIDIA App 已下载的模型；Encore 2.0+ 涵盖 SR、RR、FG 和 NR。不会下载或改写 OTA 文件，修改后重启游戏。": [
+    "Use NVIDIA App models already downloaded locally; Encore 2.0+ covers SR, RR, FG and NR. Does not download or modify OTA files. Restart the game.",
+    "Использует уже загруженные модели NVIDIA App; Encore 2.0+ поддерживает SR, RR, FG и NR. Файлы OTA не скачиваются и не меняются. Перезапустите игру.",
+    "NVIDIA App がダウンロード済みのモデルを使用。Encore 2.0+ は SR・RR・FG・NR に対応。OTA ファイルの取得や変更は行いません。ゲームの再起動が必要です。",
+    "NVIDIA App에서 이미 다운로드한 모델을 사용합니다. Encore 2.0+는 SR, RR, FG, NR을 지원합니다. OTA 파일을 다운로드하거나 변경하지 않습니다. 게임을 다시 시작하세요."
+  ],
+  "新增 DLSS 帧生成（无原生帧生成）": [
+    "Added DLSS Frame Generation (no native FG)",
+    "Добавление DLSS FG (без штатной FG)",
+    "DLSS フレーム生成の追加（非対応ゲーム）",
+    "DLSS 프레임 생성 추가 (기본 FG 없음)"
+  ],
+  "Deutsch": [
+    "Deutsch",
+    "Deutsch",
+    "Deutsch",
+    "Deutsch"
+  ],
+  "Español": [
+    "Español",
+    "Español",
+    "Español",
+    "Español"
+  ],
+  "Nederlands": [
+    "Nederlands",
+    "Nederlands",
+    "Nederlands",
+    "Nederlands"
+  ],
+  "Polski": [
+    "Polski",
+    "Polski",
+    "Polski",
+    "Polski"
+  ],
+  "Português (Brasil)": [
+    "Português (Brasil)",
+    "Português (Brasil)",
+    "Português (Brasil)",
+    "Português (Brasil)"
+  ],
+  "Tiếng Việt": [
+    "Tiếng Việt",
+    "Tiếng Việt",
+    "Tiếng Việt",
+    "Tiếng Việt"
+  ],
+  "Русский": [
+    "Русский",
+    "Русский",
+    "Русский",
+    "Русский"
+  ],
+  "日本語": [
+    "日本語",
+    "日本語",
+    "日本語",
+    "日本語"
+  ],
+  "DLSS": [
+    "DLSS",
+    "DLSS",
+    "DLSS",
+    "DLSS"
+  ],
+  "XeSS": [
+    "XeSS",
+    "XeSS",
+    "XeSS",
+    "XeSS"
+  ],
+  "RTX Encore": [
+    "RTX Encore",
+    "RTX Encore",
+    "RTX Encore",
+    "RTX Encore"
+  ],
+  "Shader (vort)": [
+    "Shader (vort)",
+    "Shader (vort)",
+    "Shader (vort)",
+    "Shader (vort)"
+  ],
+  "Optical Flow (Quality)": [
+    "Optical Flow (Quality)",
+    "Optical Flow (Quality)",
+    "Optical Flow (Quality)",
+    "Optical Flow (Quality)"
+  ],
+  "Optical Flow (Fast)": [
+    "Optical Flow (Fast)",
+    "Optical Flow (Fast)",
+    "Optical Flow (Fast)",
+    "Optical Flow (Fast)"
   ]
 }

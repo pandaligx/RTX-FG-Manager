@@ -271,6 +271,17 @@ fn xbox_manifest_rejects_escaping_console_and_developer_entries() {
 }
 
 #[test]
+fn xbox_manifest_preserves_character_references_after_xml_upgrade() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("MicrosoftGame.config");
+    fs::write(&path, r#"<Game><ShellVisuals DisplayName="游戏 &amp; Test"/><ExecutableList><Executable Name="game.exe" TargetDeviceFamily="PC"/></ExecutableList><StoreId>9N&#50;01KQXS5BM</StoreId></Game>"#).unwrap();
+    let games = xbox::manifest(&path).unwrap();
+    assert_eq!(games.len(), 1);
+    assert_eq!(games[0].title, "游戏 & Test");
+    assert_eq!(games[0].store_id, "9n201kqxs5bm");
+}
+
+#[test]
 fn xbox_cod_child_renderer_keeps_its_path_and_separate_deployment_directory() {
     let temp = tempfile::tempdir().unwrap();
     let content = temp.path().join("Xbox/Call of Duty/Content");
