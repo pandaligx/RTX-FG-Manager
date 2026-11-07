@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.23
+
+- Show the selected patch, parameters and runtimes beside the recommendation install button. Lock installation options while processing so the displayed selection stays consistent with the running task.
+- Show the latest edit date on revised player recommendations instead of only the original publication date.
+- Complete Encore 2.x runtime dependencies at their detected game locations. Update native Streamline plugins as a matched set while preserving the game's interposer; keep added frame generation separate from native integrations.
+- Add a runtime repair action for existing Encore installs. Preserve original backups, support missing managed files and multiple deployment folders, and restore owned components on removal.
+- Use a separate bounded installation scan for large games, include native DirectSR plugins, and validate Streamline layouts before updating SR/RR.
+
 ## 4.3.22
 
 - Fix runtime version selection targeting another game after changing the library selection with a runtime window open. Update TLS, certificate, ZIP and XML dependencies with security fixes; remove unused dependencies from the retired community implementation.

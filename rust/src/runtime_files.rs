@@ -1,6 +1,6 @@
 //! Opt-in runtime updates. Existing game files are backed up; later edits win.
 //! Added FG is a separate matched set for Encore 2 games with no native FG.
-//! Native Streamline is never replaced. No arbitrary paths or DLL execution.
+//! Native Streamline plugins update together; the game's interposer stays intact.
 use crate::{assets, core, scanner, transfer, win};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
@@ -24,6 +24,125 @@ pub const ENCORE_FG_FILES: [&str; 7] = [
     "sl.pcl.dll",
     "RTXFG-Streamline-LICENSE.txt",
 ];
+const STREAMLINE_PLUGINS: [&str; 10] = [
+    "sl.common.dll",
+    "sl.deepdvc.dll",
+    "sl.directsr.dll",
+    "sl.dlss.dll",
+    "sl.dlss_d.dll",
+    "sl.dlss_g.dll",
+    "sl.nis.dll",
+    "sl.nvperf.dll",
+    "sl.pcl.dll",
+    "sl.reflex.dll",
+];
+const STREAMLINE_LICENSE: &str = "RTXFG-Streamline-LICENSE.txt";
+
+/// Update the native plugin locations, never add an interposer beside a different
+/// executable. This is independent from Encore's added-FG integration.
+fn native_streamline_paths(target: &core::DeploymentTarget) -> Result<Vec<PathBuf>> {
+    let evidence = scanner::inspect_for_installation(&target.game_exe);
+    native_streamline_paths_from(target, &evidence, |path| {
+        core::pe64(path, true)?;
+        Ok(win::file_version(path)?.0)
+    })
+}
+fn native_streamline_paths_from(
+    target: &core::DeploymentTarget,
+    evidence: &scanner::Evidence,
+    mut version: impl FnMut(&Path) -> Result<String>,
+) -> Result<Vec<PathBuf>> {
+    ensure!(
+        !evidence.limited,
+        "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
+    );
+    let mut folders = BTreeSet::new();
+    let prior = read(target, "fg")?;
+    let mut tracked = BTreeSet::new();
+    if let Some(record) = &prior {
+        for entry in &record.entries {
+            let path = destination(target, "fg", entry)?;
+            if path.file_name().is_some_and(|name| {
+                STREAMLINE_PLUGINS
+                    .iter()
+                    .any(|n| name.eq_ignore_ascii_case(n))
+            }) {
+                folders.insert(path.parent().context("Streamline 目录无效")?.to_path_buf());
+                tracked.insert(core::key(&path));
+            }
+        }
+    }
+    for path in &evidence.frame_integration_paths {
+        if path.file_name().is_some_and(|n| {
+            n.eq_ignore_ascii_case("sl.interposer.dll")
+                || n.eq_ignore_ascii_case("sl.common.dll")
+                || n.eq_ignore_ascii_case("sl.dlss_g.dll")
+        }) {
+            folders.insert(path.parent().context("Streamline 目录无效")?.to_path_buf());
+        }
+    }
+    let mut paths = Vec::new();
+    for folder in folders {
+        // An installed, added-FG set has its own matched-package ownership.
+        if let Some(record) = read(target, "encorefg")?
+            && record.entries.iter().any(|e| {
+                Path::new(&e.path)
+                    .parent()
+                    .is_some_and(|p| core::key(p) == core::key(&folder))
+            })
+        {
+            continue;
+        }
+        for entry in fs::read_dir(&folder)? {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().to_lowercase();
+            ensure!(
+                !name.starts_with("sl.")
+                    || !name.ends_with(".dll")
+                    || name == "sl.interposer.dll"
+                    || STREAMLINE_PLUGINS.contains(&name.as_str()),
+                "发现不在匹配组件包中的 Streamline 插件，保留现有文件：{}",
+                entry.path().display()
+            );
+        }
+        let has_fg = folder.join("sl.dlss_g.dll").is_file();
+        for name in STREAMLINE_PLUGINS {
+            let path = core::no_links(&folder.join(name))?;
+            if path.is_file()
+                || tracked.contains(&core::key(&path))
+                || has_fg && ["sl.common.dll", "sl.pcl.dll", "sl.reflex.dll"].contains(&name)
+            {
+                if path.is_file() {
+                    let v = version(&path)?;
+                    ensure!(
+                        version_numbers(&v) <= version_numbers("2.14.16"),
+                        "游戏已有更新的 Streamline 插件，保留现有文件：{}",
+                        path.display()
+                    );
+                }
+                ensure!(
+                    !protected(target, &scanner::installation_root(&target.game_exe), &path)?,
+                    "Streamline 文件属于其他补丁，保留现有文件：{}",
+                    path.display()
+                );
+                paths.push(path);
+            }
+        }
+        paths.push(core::no_links(&folder.join(STREAMLINE_LICENSE))?);
+    }
+    Ok(paths)
+}
+
+fn version_numbers(version: &str) -> Vec<u32> {
+    let mut parts = version
+        .split('.')
+        .map(|v| v.parse().unwrap_or(0))
+        .collect::<Vec<_>>();
+    while parts.last() == Some(&0) {
+        parts.pop();
+    }
+    parts
+}
 pub fn label(kind: &str) -> &'static str {
     match kind {
         "sr" => "DLSS 超分辨率",
@@ -94,6 +213,87 @@ pub fn versions(kind: &str) -> Vec<String> {
     versions.dedup();
     versions
 }
+
+/// Complete Encore's manual-install dependencies for each real deployment target.
+/// Native runtime locations are updated in place; only games without an existing
+/// frame-generation integration receive the added-FG set. No feature is enabled.
+pub fn complete_encore_runtimes(
+    targets: &[core::DeploymentTarget],
+    github: bool,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(transfer::Progress),
+) -> Result<()> {
+    ensure!(!targets.is_empty(), "未选择游戏");
+    let mut inventories = Vec::with_capacity(targets.len());
+    for target in targets {
+        ensure!(encore_200_installed(target)?, "请先安装 RTX Encore 2.0+");
+        core::assert_target_stopped(target)?;
+        let evidence = scanner::inspect_for_installation(&target.game_exe);
+        ensure!(
+            !evidence.limited,
+            "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
+        );
+        inventories.push(evidence);
+    }
+    let mut planned = Vec::new();
+    for kind in ["sr", "rr", "fg"] {
+        let mut selected = Vec::new();
+        for (target, evidence) in targets.iter().zip(&inventories) {
+            let destinations = candidate_paths(target, kind, Some(evidence))?;
+            if !destinations.is_empty() {
+                let current = destinations
+                    .iter()
+                    .filter(|p| p.is_file())
+                    .map(|p| win::file_version(p).map(|v| v.0))
+                    .collect::<Result<Vec<_>>>()?;
+                // A game update may have provided a newer runtime. Automatic
+                // completion never downgrades it or pairs it with older plugins.
+                if current
+                    .iter()
+                    .any(|v| version_numbers(v) > version_numbers("310.9.16"))
+                {
+                    continue;
+                }
+                if kind == "fg" {
+                    // Validate every native provider before writing any other
+                    // runtime. A known layout conflict must not partially update
+                    // SR/RR before it is reported to the player.
+                    native_streamline_paths_from(target, evidence, |path| {
+                        core::pe64(path, true)?;
+                        Ok(win::file_version(path)?.0)
+                    })?;
+                }
+                selected.push(target.clone());
+            }
+        }
+        if !selected.is_empty() {
+            planned.push((kind, selected));
+        }
+    }
+    let mut added = Vec::new();
+    for (target, evidence) in targets.iter().zip(&inventories) {
+        // Native integrations intentionally do not need an additional FG set.
+        // A broken or externally changed managed set, however, is an error.
+        if evidence.frame_integration_paths.is_empty() || read(target, "encorefg")?.is_some() {
+            preflight_added_fg(target, Some(evidence))?;
+            added.push(target.clone());
+        }
+    }
+    for (kind, selected) in planned {
+        install_version(&selected, kind, "310.9.16", github, cancel, progress)?;
+    }
+    if !added.is_empty() {
+        install_version(&added, "encorefg", "2.14.16", github, cancel, progress)?;
+    }
+    crate::neural_runtime::install_many(
+        targets,
+        crate::neural_runtime::RECOMMENDED,
+        github,
+        cancel,
+        progress,
+    )?;
+    Ok(())
+}
 /// Only when sharing a managed component: verify that its recorded package is
 /// still the installed package. No DLLs are executed or uploaded.
 pub fn installed_package_version(
@@ -132,15 +332,6 @@ pub fn installed_package_version(
         }
     }
     Ok(None)
-}
-fn prepare(
-    kind: &str,
-    github: bool,
-    cancel: &AtomicBool,
-    progress: &mut dyn FnMut(transfer::Progress),
-) -> Result<BTreeMap<String, PathBuf>> {
-    let p = package(kind)?;
-    prepare_package(p, github, cancel, progress)
 }
 fn prepare_package(
     p: Package,
@@ -313,6 +504,19 @@ fn paths_from(
     kind: &str,
     evidence: Option<&scanner::Evidence>,
 ) -> Result<Vec<PathBuf>> {
+    let paths = candidate_paths(target, kind, evidence)?;
+    ensure!(
+        !paths.is_empty(),
+        "没有可更新的游戏运行库；补丁专用文件不在此处更新"
+    );
+    Ok(paths)
+}
+// Absence is distinct from unreadable files or invalid ownership records.
+fn candidate_paths(
+    target: &core::DeploymentTarget,
+    kind: &str,
+    evidence: Option<&scanner::Evidence>,
+) -> Result<Vec<PathBuf>> {
     if kind == "encorefg" {
         return added_fg_paths(target, evidence);
     }
@@ -327,7 +531,14 @@ fn paths_from(
     let root = core::no_links(&scanner::installation_root(&target.game_exe))?;
     let mut found = evidence
         .map(|e| e.component_paths.clone())
-        .unwrap_or_else(|| scanner::inspect(&target.game_exe).component_paths);
+        .unwrap_or_else(|| scanner::inspect_for_installation(&target.game_exe).component_paths);
+    // A removed managed DLL still has a known destination and can be repaired.
+    // Invalid journals are reported instead of being mistaken for absence.
+    if let Some(record) = read(target, kind)? {
+        for entry in &record.entries {
+            found.push(destination(target, kind, entry)?);
+        }
+    }
     let local = target.directory.join(name);
     if local.is_file() {
         found.push(local);
@@ -360,23 +571,17 @@ fn paths_from(
         let e = if let Some(e) = evidence {
             e
         } else {
-            inspected = scanner::inspect(&target.game_exe);
+            inspected = scanner::inspect_for_installation(&target.game_exe);
             &inspected
         };
         ensure!(
             !e.limited,
             "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
         );
-        ensure!(
-            !e.neural_input() && !e.super_resolution_plugin,
-            "发现游戏原生 DLSS 集成；请保留原有运行库位置"
-        );
-        found.push(core::no_links(&target.directory.join(name))?);
+        if !e.neural_input() && !e.super_resolution_plugin {
+            found.push(core::no_links(&target.directory.join(name))?);
+        }
     }
-    ensure!(
-        !found.is_empty(),
-        "没有可更新的游戏运行库；补丁专用文件不在此处更新"
-    );
     Ok(found)
 }
 pub(crate) fn encore_200_installed(target: &core::DeploymentTarget) -> Result<bool> {
@@ -411,7 +616,7 @@ pub(crate) fn preflight_added_fg(
     let e = if let Some(e) = evidence {
         e
     } else {
-        inspected = scanner::inspect(&target.game_exe);
+        inspected = scanner::inspect_for_installation(&target.game_exe);
         &inspected
     };
     ensure!(
@@ -427,7 +632,7 @@ pub(crate) fn preflight_added_fg(
         });
         ensure!(
             own.is_some_and(|entry| matches(p, &entry.installed).unwrap_or(false)),
-            "发现原生帧生成、Streamline 或外部组件，保留现有文件；不添加第二套帧生成"
+            "游戏已有原生帧生成或 Streamline；使用上方 DLSS 帧生成更新，无需添加第二套帧生成。"
         );
     }
     let directory = target.game_exe.parent().context("游戏目录无效")?;
@@ -540,6 +745,12 @@ fn destination(target: &core::DeploymentTarget, kind: &str, entry: &Entry) -> Re
             ["libxess_fg.dll", "libxell.dll", "LICENSE.txt"]
                 .iter()
                 .any(|s| n.eq_ignore_ascii_case(s))
+        } else if kind == "fg" {
+            n.eq_ignore_ascii_case("nvngx_dlssg.dll")
+                || STREAMLINE_PLUGINS
+                    .iter()
+                    .any(|name| n.eq_ignore_ascii_case(name))
+                || n.eq_ignore_ascii_case(STREAMLINE_LICENSE)
         } else {
             n.eq_ignore_ascii_case(filename(kind).unwrap_or(""))
         }
@@ -577,7 +788,7 @@ fn read(target: &core::DeploymentTarget, kind: &str) -> Result<Option<Record>> {
             && same_record_path(&r.directory, &target.directory)?
             && r.kind == kind
             && !r.entries.is_empty()
-            && r.entries.len() <= 32,
+            && r.entries.len() <= 128,
         "运行库记录不属于当前游戏"
     );
     let mut seen = BTreeSet::new();
@@ -665,8 +876,19 @@ fn inspect_with(
         if kind == "encorefg" && s.available && s.warning.is_none() {
             s.warning = Some("实验性组件：仅添加运行库，不自动启用。请在参数设置中选择引擎，并关闭 Smooth Motion。".into());
         }
+        if kind == "fg" && s.available && encore_200_installed(target)? && s.warning.is_none() {
+            s.warning = Some(
+                "更新 DLSS-G 310.9.16 时同步更新配套 Streamline 插件，保留游戏原有 interposer。"
+                    .into(),
+            );
+        }
         for p in &s.paths {
-            if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("dll")) && p.is_file() {
+            if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("dll"))
+                && p.is_file()
+                && (kind != "fg"
+                    || p.file_name()
+                        .is_some_and(|n| n.eq_ignore_ascii_case("nvngx_dlssg.dll")))
+            {
                 s.versions.insert(
                     win::file_version(p)
                         .map(|v| v.0)
@@ -809,7 +1031,7 @@ fn plan_entries(
             }
         }
     }
-    ensure!(entries.len() <= 32, "运行库文件数量超出限制");
+    ensure!(entries.len() <= 128, "运行库文件数量超出限制");
     for e in &entries {
         destination(target, kind, e)?;
     }
@@ -902,9 +1124,7 @@ pub fn install_many(
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<()> {
-    install_many_with(targets, kind, cancel, || {
-        prepare(kind, github, cancel, progress)
-    })
+    install_version(targets, kind, &recommended(kind), github, cancel, progress)
 }
 pub fn install_version(
     targets: &[core::DeploymentTarget],
@@ -917,8 +1137,25 @@ pub fn install_version(
     // Resolve once before starting the operation; a background catalog refresh
     // cannot change the bytes selected by the user midway through a download.
     let selected = version_package(kind, version)?;
+    let native_plugins = kind == "fg"
+        && version == "310.9.16"
+        && targets
+            .iter()
+            .map(encore_200_installed)
+            .collect::<Result<Vec<_>>>()?
+            .iter()
+            .any(|v| *v);
     install_many_with(targets, kind, cancel, || {
-        prepare_package(selected, github, cancel, progress)
+        let mut sources = prepare_package(selected, github, cancel, progress)?;
+        if native_plugins {
+            sources.extend(prepare_package(
+                bundled_package("streamline")?,
+                github,
+                cancel,
+                progress,
+            )?);
+        }
+        Ok(sources)
     })
 }
 fn install_many_with(
@@ -949,6 +1186,17 @@ fn install_many_with(
         }
     }
     let sources = prepare_source()?;
+    if kind == "fg" && sources.contains_key("sl.common.dll") {
+        for (t, ps) in &mut plans {
+            if encore_200_installed(t)? {
+                for path in native_streamline_paths(t)? {
+                    if seen.insert(core::key(&path)) {
+                        ps.push(path);
+                    }
+                }
+            }
+        }
+    }
     // Detect an existing conflict in any directory before changing the first.
     for (t, ps) in &plans {
         plan_entries(t, kind, ps, &sources)?;
@@ -1029,6 +1277,104 @@ pub fn remove_many(targets: &[core::DeploymentTarget], kind: &str) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_streamline_updates_plugins_in_place_and_restores_originals() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        let folder = t
+            .directory
+            .join("Engine/Plugins/NVIDIA/Streamline/Binaries/Win64");
+        fs::create_dir_all(&folder)?;
+        let originals = [
+            "nvngx_dlssg.dll",
+            "sl.interposer.dll",
+            "sl.common.dll",
+            "sl.dlss_g.dll",
+            "sl.deepdvc.dll",
+            "sl.directsr.dll",
+        ];
+        for name in originals {
+            fs::write(folder.join(name), format!("original {name}"))?;
+        }
+        let e = scanner::inspect(&t.game_exe);
+        let mut ps = native_streamline_paths_from(&t, &e, |_| Ok("2.7.30.0".into()))?;
+        assert!(ps.iter().all(|p| p.parent() == Some(folder.as_path())));
+        assert!(!ps.contains(&folder.join("sl.interposer.dll")));
+        assert!(
+            ps.contains(&folder.join("sl.reflex.dll")),
+            "missing dependencies added at the native provider"
+        );
+        ps.push(folder.join("nvngx_dlssg.dll"));
+        let mut src = sources(&tmp.path().join("sources"), "fg")?;
+        for name in STREAMLINE_PLUGINS.into_iter().chain([STREAMLINE_LICENSE]) {
+            let path = tmp.path().join("sources").join(name);
+            fs::write(&path, format!("new {name}"))?;
+            src.insert(name.into(), path);
+        }
+        for boundary in 0..ps.len() {
+            let mut writes = 0;
+            assert!(
+                install_locked_with(&t, "fg", &ps, &src, |s, d| {
+                    if writes == boundary {
+                        anyhow::bail!("injected failure");
+                    }
+                    writes += 1;
+                    replace(s, d)
+                })
+                .is_err()
+            );
+            for name in originals {
+                assert_eq!(
+                    fs::read(folder.join(name))?,
+                    format!("original {name}").as_bytes()
+                );
+            }
+            assert!(!folder.join("sl.reflex.dll").exists());
+        }
+        install_locked(&t, "fg", &ps, &src)?;
+        install_locked(&t, "fg", &ps, &src)?;
+        assert_eq!(
+            fs::read(folder.join("sl.interposer.dll"))?,
+            b"original sl.interposer.dll"
+        );
+        assert!(!t.directory.join("sl.interposer.dll").exists());
+        fs::remove_file(folder.join("sl.common.dll"))?;
+        fs::remove_file(folder.join("nvngx_dlssg.dll"))?;
+        let evidence = scanner::inspect(&t.game_exe);
+        let mut repair = native_streamline_paths_from(&t, &evidence, |_| Ok("2.14.16".into()))?;
+        repair.extend(candidate_paths(&t, "fg", Some(&evidence))?);
+        assert!(repair.contains(&folder.join("sl.common.dll")));
+        assert!(repair.contains(&folder.join("nvngx_dlssg.dll")));
+        install_locked(&t, "fg", &repair, &src)?;
+        remove_locked(&t, "fg")?;
+        for name in originals {
+            assert_eq!(
+                fs::read(folder.join(name))?,
+                format!("original {name}").as_bytes()
+            );
+        }
+        assert!(!folder.join("sl.reflex.dll").exists());
+        assert!(!folder.join(STREAMLINE_LICENSE).exists());
+        Ok(())
+    }
+    #[test]
+    fn native_streamline_refuses_incomplete_scan_unknown_plugins_and_downgrades() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        fs::write(t.directory.join("sl.common.dll"), b"native plugin")?;
+        let mut e = scanner::inspect(&t.game_exe);
+        assert!(native_streamline_paths_from(&t, &e, |_| Ok("3.0.0.0".into())).is_err());
+        fs::write(t.directory.join("sl.custom.dll"), b"unrecognized plugin")?;
+        assert!(native_streamline_paths_from(&t, &e, |_| Ok("2.7.30.0".into())).is_err());
+        fs::remove_file(t.directory.join("sl.custom.dll"))?;
+        e.limited = true;
+        assert!(native_streamline_paths_from(&t, &e, |_| Ok("2.7.30.0".into())).is_err());
+        assert_eq!(
+            fs::read(t.directory.join("sl.common.dll"))?,
+            b"native plugin"
+        );
+        Ok(())
+    }
     #[test]
     #[ignore = "publication smoke test: downloads one small FG ZIP per public source without cache"]
     fn published_runtime_downloads_without_cache() -> Result<()> {

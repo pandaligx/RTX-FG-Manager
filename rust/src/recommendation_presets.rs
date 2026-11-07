@@ -240,6 +240,29 @@ pub fn execute(
         }
     }
     if action.runtimes() {
+        if recipe.scheme == encore::SCHEME
+            && targets
+                .iter()
+                .map(crate::runtime_files::encore_200_installed)
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .all(|installed| installed)
+        {
+            crate::runtime_files::complete_encore_runtimes(
+                &targets,
+                catalog.prefer_github,
+                cancel,
+                &mut |transfer| {
+                    progress(cloud::CloudProgress {
+                        transfer,
+                        proxy: "Encore".into(),
+                        package_index: 1,
+                        package_count: 1,
+                    })
+                },
+            )
+            .context("配套运行库未完成；参数尚未应用，可在运行库窗口补齐后重试")?;
+        }
         if let Some(runtimes) = &recipe.runtimes {
             runtimes
                 .install(&targets, catalog.prefer_github, cancel, &mut progress)

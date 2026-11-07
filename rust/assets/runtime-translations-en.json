@@ -80,5 +80,10 @@
   "游戏仍可选择更低倍率；旧代仅 2X 的 DLSS-G 接口可能不受支持，换新 DLL 不等于更新游戏接口。": "The game can choose a lower multiplier. Legacy 2X-only DLSS-G interfaces may be unsupported; replacing DLLs does not upgrade the game interface.",
   "0.4.1 完整包包含 DLSS / XeSS 后端和超分组件。默认 Optimized=1、Preset=A，超分关闭；升级保留已有设置。": "The complete 0.4.1 bundle includes DLSS / XeSS backends and SR. Defaults: Optimized=1, Preset=A, SR off. Existing settings are preserved on upgrade.",
   "帧生成需要 R580 或更新驱动；XeSS 最高4X，不需另装 Intel DLL。旧代仅2X的 DLSS-G 接口不受支持，游戏仍须自行兼容。": "Frame generation requires R580 or newer. XeSS supports up to 4X with no extra Intel DLLs. Legacy 2X-only DLSS-G interfaces are unsupported; game compatibility is still required.",
-  "M/L 模式会覆盖全部画质档。旧版 On 无等价迁移，请先明确选择；严格无 HUD 模式可能使缺少输入的游戏退出，建议自动。": "M/L overrides all quality modes. Legacy On has no equivalent: select a mode before upgrading. Strict HUD-less mode can terminate games without that input; use Auto."
+  "M/L 模式会覆盖全部画质档。旧版 On 无等价迁移，请先明确选择；严格无 HUD 模式可能使缺少输入的游戏退出，建议自动。": "M/L overrides all quality modes. Legacy On has no equivalent: select a mode before upgrading. Strict HUD-less mode can terminate games without that input; use Auto.",
+  "补齐 Encore 配套运行库": "Complete Encore runtimes",
+  "请先安装 RTX Encore 2.0+": "Install RTX Encore 2.0+ first",
+  "更新 DLSS-G 310.9.16 时同步更新配套 Streamline 插件，保留游戏原有 interposer。": "Updating DLSS-G to 310.9.16 also updates its matched Streamline plugins, keeping the game interposer.",
+  "游戏已有原生帧生成或 Streamline；使用上方 DLSS 帧生成更新，无需添加第二套帧生成。": "This game has native frame generation or Streamline. Update DLSS Frame Generation above; do not add a second integration.",
+  "Encore 配套运行库已补齐，设置未改变。请重新启动游戏。": "Encore runtimes are ready. Settings are unchanged. Restart the game."
 }

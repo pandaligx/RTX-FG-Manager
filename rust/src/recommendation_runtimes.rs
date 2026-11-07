@@ -420,7 +420,13 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
             continue;
         }
         for path in status.paths {
-            add(&status.kind, "game", &path)?;
+            // A native FG transaction also owns its matched Streamline plugins
+            // and license. Those are dependencies, not additional DLSS-G builds.
+            if path.file_name().and_then(|n| n.to_str()).and_then(kind)
+                == Some(status.kind.as_str())
+            {
+                add(&status.kind, "game", &path)?;
+            }
         }
     }
     let nr = neural_runtime::inspect(target);

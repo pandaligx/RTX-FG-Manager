@@ -1067,9 +1067,10 @@ impl Recommendations {
             }))
     }
     fn card_date(&self, card: &rec::Card) -> String {
-        let (label, stamp) = match card.created_at {
-            Some(stamp) => ("分享于 {0}", stamp),
-            None => ("更新于 {0}", card.updated_at),
+        let (label, stamp) = if card.has_update() {
+            ("更新于 {0}", card.updated_at)
+        } else {
+            ("分享于 {0}", card.created_at.unwrap_or(card.updated_at))
         };
         self.t(label)
             .replace("{0}", &rec::date(stamp).unwrap_or_else(|| "—".into()))
@@ -1502,6 +1503,7 @@ impl Render for Recommendations {
         }
         let mut primary = None;
         let mut install_menu: Option<AnyElement> = None;
+        let mut install_selection = None;
         let mut install_notice: Option<AnyElement> = None;
         let body = match self.mode {
             Mode::Browse => self.browse(cx),
@@ -2005,6 +2007,17 @@ impl Render for Recommendations {
                         (1, self.t("参数"), has_parameters),
                         (2, self.t("运行库"), has_runtimes),
                     ];
+                    let selected = choices
+                        .iter()
+                        .filter(|(index, _, visible)| *visible && parts[*index])
+                        .map(|(_, label, _)| label.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" / ");
+                    install_selection = Some(if action.is_empty() {
+                        self.t("未选择安装内容")
+                    } else {
+                        self.t("已选择：{0}").replace("{0}", &selected)
+                    });
                     let view = cx.entity().downgrade();
                     install_menu = Some(
                         DropdownButton::new("recipe-install-options")
@@ -2024,6 +2037,7 @@ impl Render for Recommendations {
                             )
                             .primary()
                             .small()
+                            .disabled(self.busy || self.operation_busy)
                             .menu_accessibility_label(self.t("选择安装内容"))
                             .dropdown_menu_with_anchor(
                                 Anchor::BottomRight,
@@ -2039,6 +2053,9 @@ impl Render for Recommendations {
                                                 .checked(parts[index])
                                                 .on_click(move |_, _, cx| {
                                                     let _ = view.update(cx, |this, cx| {
+                                                        if this.busy || this.operation_busy {
+                                                            return;
+                                                        }
                                                         this.selected_parts[index] =
                                                             !this.selected_parts[index];
                                                         cx.notify();
@@ -2238,11 +2255,28 @@ impl Render for Recommendations {
                     )
                     .child(
                         div()
-                            .h_flex()
-                            .gap_2()
-                            .flex_wrap()
-                            .children(install_menu)
-                            .children(primary),
+                            .v_flex()
+                            .min_w_0()
+                            .max_w_full()
+                            .items_end()
+                            .gap_1()
+                            .when_some(install_selection, |d, selected| {
+                                d.child(
+                                    div()
+                                        .text_sm()
+                                        .text_right()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(selected),
+                                )
+                            })
+                            .child(
+                                div()
+                                    .h_flex()
+                                    .gap_2()
+                                    .flex_wrap()
+                                    .children(install_menu)
+                                    .children(primary),
+                            ),
                     ),
             );
         div()

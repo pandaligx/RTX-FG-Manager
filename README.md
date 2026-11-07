@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.22"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.23"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.22 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.23 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,21 +41,21 @@
 
 ## Download
 
-**Version 4.3.22** · Windows 10 / 11 x64
+**Version 4.3.23** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.22 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.22) | Default domestic source |
-| **GitHub** | [Open 4.3.22 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.22) | Primary project and fallback |
+| **GitCode** | [Open 4.3.23 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.23) | Default domestic source |
+| **GitHub** | [Open 4.3.23 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.23) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
 Download **`RTXManager.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.22 highlights
+## 4.3.23 highlights
 
-- Integrates RTX Encore 2.0.1, with experimental settings and components for games without native DLSS / frame generation.
-- Fixes cross-game runtime version selection and updates security dependencies while retaining existing UI and other schemes.
-- One `RTXManager.exe` per release. Older clients upgrade through 4.3.21 before joining the new update channel.
+- Completes Encore 2.x runtimes at detected game locations, preserving the native Streamline interposer and original-file recovery.
+- Shows recommendation edit dates and selected patch, parameters and runtimes beside the install button.
+- Retains the existing interface, other schemes and permanent update bridge.
 
 [Full changelog →](CHANGELOG.md)
 

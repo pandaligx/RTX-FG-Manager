@@ -465,6 +465,12 @@ pub struct Card {
     pub content: Recipe,
 }
 impl Card {
+    /// The latest content revision is shown even when the publication date exists.
+    pub fn has_update(&self) -> bool {
+        self.created_at
+            .is_none_or(|created| self.updated_at > created)
+    }
+
     fn validate(&self, game: &str, _catalog: &cloud::Catalog) -> Result<()> {
         ensure!(
             self.content.game.id == game
@@ -2126,5 +2132,23 @@ mod tests {
         );
         assert!(date(1792636800).unwrap().starts_with("2026-10-"));
         assert!(date(u64::MAX).is_none());
+    }
+    #[test]
+    fn revised_cards_show_update_instead_of_original_publication() {
+        let mut c = card("RTX 3060", "581.80", 0);
+        c.updated_at = 1794000000;
+        assert!(
+            c.has_update(),
+            "old responses without createdAt show their known update"
+        );
+        c.created_at = Some(c.updated_at);
+        assert!(!c.has_update(), "a new share retains the publication label");
+        c.updated_at += 60;
+        assert!(c.has_update(), "an edit on the same day must show updated");
+        c.created_at = Some(c.updated_at + 60);
+        assert!(
+            !c.has_update(),
+            "inconsistent timestamps must not invent an update"
+        );
     }
 }

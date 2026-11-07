@@ -210,6 +210,14 @@ impl Manager {
             .focus
             .as_ref()
             .and_then(|e| self.c.deployments.get(e));
+        let encore_complete = snapshot.is_some_and(|s| {
+            let entries = s
+                .runtimes
+                .iter()
+                .filter(|s| s.kind == "encorefg")
+                .collect::<Vec<_>>();
+            !entries.is_empty() && entries.iter().all(|s| s.applicable)
+        });
         let mut rows = div()
             .id("runtime-file-scroll")
             .v_flex()
@@ -241,6 +249,12 @@ impl Manager {
             let paths = statuses
                 .iter()
                 .flat_map(|s| &s.paths)
+                .filter(|path| {
+                    kind != "fg"
+                        || path
+                            .file_name()
+                            .is_some_and(|n| n.eq_ignore_ascii_case("nvngx_dlssg.dll"))
+                })
                 .collect::<std::collections::BTreeSet<_>>();
             let versions = statuses
                 .iter()
@@ -515,7 +529,21 @@ impl Manager {
                             .child(self.t(
                                 "DLSS 更新保留原件，可随时恢复；游戏共用文件可能影响其他方案。",
                             )),
-                    ),
+                    )
+                    .when(encore_complete, |header| {
+                        header.child(
+                            div().h_flex().justify_end().child(
+                                self.button(
+                                    "runtime-encore-complete",
+                                    "补齐 Encore 配套运行库",
+                                    Command::RuntimeOperation("encore-complete", false),
+                                    cx,
+                                )
+                                .small()
+                                .disabled(self.c.busy || self.c.read_only),
+                            ),
+                        )
+                    }),
             )
             .child(rows)
             .when(self.c.busy || self.runtime_feedback.is_some(), |view| {

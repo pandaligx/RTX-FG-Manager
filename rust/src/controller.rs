@@ -2244,9 +2244,12 @@ impl Controller {
         self.channel.operation(move |c| {
             if defer_if_running(c, &targets, retry)? { return Ok(()); }
             for t in &targets { ensure_directory_outside_data(&t.directory, &data)?; }
-            if remove { rtx_fg_manager::runtime_files::remove_many(&targets, kind)?; }
+            if kind == "encore-complete" {
+                rtx_fg_manager::runtime_files::complete_encore_runtimes(&targets, github, &cancel, &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress { transfer, proxy: "Encore".into(), package_index:1, package_count:1 })))?;
+            }
+            else if remove { rtx_fg_manager::runtime_files::remove_many(&targets, kind)?; }
             else { rtx_fg_manager::runtime_files::install_version(&targets, kind, &version, github, &cancel, &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress { transfer, proxy: kind.into(), package_index:1, package_count:1 })))?; }
-            c.send(Event::Notice(if remove { "运行库已恢复原件；管理器添加的文件已移除。" } else if kind == "encorefg" { "新增帧生成组件已安装，功能默认关闭。请在 Encore 参数中启用新增帧生成并选择引擎，关闭 Smooth Motion 后重启游戏。" } else if kind == "xemfg" { "XeSS 运行库已安装。请在参数设置中启用独立 XeSS 多帧生成，再启动游戏；也可按 Backspace 设置。" } else { "DLSS 运行库已更新并保留原件备份。若游戏出现兼容问题，可在运行库窗口恢复。" }.into()));
+            c.send(Event::Notice(if remove { "运行库已恢复原件；管理器添加的文件已移除。" } else if kind == "encore-complete" { "Encore 配套运行库已补齐，设置未改变。请重新启动游戏。" } else if kind == "encorefg" { "新增帧生成组件已安装，功能默认关闭。请在 Encore 参数中启用新增帧生成并选择引擎，关闭 Smooth Motion 后重启游戏。" } else if kind == "xemfg" { "XeSS 运行库已安装。请在参数设置中启用独立 XeSS 多帧生成，再启动游戏；也可按 Backspace 设置。" } else { "DLSS 运行库已更新并保留原件备份。若游戏出现兼容问题，可在运行库窗口恢复。" }.into()));
             Ok(())
         });
     }
@@ -2827,8 +2830,7 @@ impl Controller {
                                 payload.upstream_version.as_deref(),
                             )
                             .map(|message| cleanup::CleanOutcome {
-                                message,
-                                complete: true,
+                                message, complete: true,
                             })
                         })()
                     } else {
@@ -2861,6 +2863,20 @@ impl Controller {
                     ));
                 }
                 if all_ok && !clean {
+                    if prepared.as_ref().is_some_and(|payload| payload.backend == rtx_fg_manager::encore::BACKEND
+                        && rtx_fg_manager::encore::supports_200(payload.upstream_version.as_deref().or(Some(&payload.version)))) {
+                        if let Err(error) = rtx_fg_manager::runtime_files::complete_encore_runtimes(
+                            &game.deployment_targets(), catalog.prefer_github, &cancel,
+                            &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
+                                transfer, proxy: "Encore".into(), package_index: 1, package_count: 1,
+                            })),
+                        ) {
+                            errors.push(format!("补丁已安装，配套运行库未完成；请在运行库窗口点击补齐后重试：{error:#}"));
+                        }
+                        for target in game.deployment_targets() {
+                            c.send(Event::Status(target.game_exe.display().to_string(), core::status_at(&target)));
+                        }
+                    }
                     let profile = &catalog.scheme_policies[&scheme].parameter_profile;
                     let actual = if uses_explicit_edits(profile) {
                         read_target

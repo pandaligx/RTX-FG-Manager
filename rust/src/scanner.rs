@@ -535,6 +535,22 @@ pub(crate) fn patch_runtime_directory(name: &str) -> bool {
     .contains(&name.to_ascii_lowercase().as_str())
 }
 pub fn inspect(exe: &Path) -> Evidence {
+    inspect_with_limits(exe, 1024, 50_000, 1000)
+}
+
+/// Installation runs in a worker and needs a complete inventory, including
+/// large asset trees that exceed the lightweight UI scan. Limits still fail
+/// closed; reaching one must never be interpreted as a missing integration.
+pub(crate) fn inspect_for_installation(exe: &Path) -> Evidence {
+    inspect_with_limits(exe, 32_768, 500_000, 15_000)
+}
+
+fn inspect_with_limits(
+    exe: &Path,
+    max_directories: usize,
+    max_entries: usize,
+    max_millis: u128,
+) -> Evidence {
     use std::{
         cmp::Reverse,
         collections::{BinaryHeap, HashSet},
@@ -563,7 +579,7 @@ pub fn inspect(exe: &Path) -> Evidence {
         if !visited.insert(core::key(&dir)) {
             continue;
         }
-        if visited.len() > 1024 || started.elapsed().as_millis() > 1000 {
+        if visited.len() > max_directories || started.elapsed().as_millis() > max_millis {
             result.limited = true;
             break;
         }
@@ -573,7 +589,7 @@ pub fn inspect(exe: &Path) -> Evidence {
         };
         for row in rows {
             entries += 1;
-            if entries > 50000 || started.elapsed().as_millis() > 1000 {
+            if entries > max_entries || started.elapsed().as_millis() > max_millis {
                 result.limited = true;
                 return result;
             }
@@ -624,10 +640,12 @@ pub fn inspect(exe: &Path) -> Evidence {
                 result.frame_generation |= fg;
                 result.super_resolution |= sr;
                 result.super_resolution_plugin |= plugin;
-                if (fg || sr || plugin || name == "nvngx_dlssd.dll")
-                    && result.component_paths.len() < 32
-                {
-                    result.component_paths.push(row.path());
+                if fg || sr || plugin || name == "nvngx_dlssd.dll" {
+                    if result.component_paths.len() < 32 {
+                        result.component_paths.push(row.path());
+                    } else {
+                        result.limited = true;
+                    }
                 }
             } else if meta.is_dir()
                 && (name == "thirdparty" || !SKIP.contains(&name.as_str()))
@@ -672,6 +690,52 @@ pub fn inspect(exe: &Path) -> Evidence {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod component_inventory_tests {
+    use super::*;
+
+    #[test]
+    fn installation_inventory_completes_a_truncated_preview_without_crossing_games() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let root = tmp.path().join("Game");
+        let exe = root.join("Game.exe");
+        let runtime = root.join("render/provider/nvngx_dlssg.dll");
+        fs::create_dir_all(runtime.parent().unwrap())?;
+        fs::write(&exe, b"fixture")?;
+        fs::write(&runtime, b"native runtime")?;
+        let backup = root.join(".rtx-fg-runtimes/fg");
+        fs::create_dir_all(&backup)?;
+        fs::write(backup.join("nvngx_dlss.dll"), b"backup")?;
+        let neighbor = tmp.path().join("OtherGame");
+        fs::create_dir(&neighbor)?;
+        fs::write(neighbor.join("nvngx_dlss.dll"), b"other game")?;
+        let preview = inspect_with_limits(&exe, 1, 50_000, 15_000);
+        assert!(preview.limited);
+        assert!(!preview.frame_generation);
+        let installed = inspect_for_installation(&exe);
+        assert!(!installed.limited);
+        assert_eq!(installed.component_paths, vec![runtime]);
+        assert!(!installed.super_resolution);
+        Ok(())
+    }
+
+    #[test]
+    fn component_capacity_is_reported_as_incomplete_not_a_complete_subset() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let exe = tmp.path().join("Game.exe");
+        fs::write(&exe, b"fixture")?;
+        for i in 0..33 {
+            let dir = tmp.path().join(format!("provider{i}"));
+            fs::create_dir(&dir)?;
+            fs::write(dir.join("nvngx_dlss.dll"), b"native runtime")?;
+        }
+        let evidence = inspect_for_installation(&exe);
+        assert_eq!(evidence.component_paths.len(), 32);
+        assert!(evidence.limited);
+        Ok(())
+    }
 }
 
 fn is_name(p: &Path, names: &[&str]) -> bool {
