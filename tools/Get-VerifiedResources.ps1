@@ -54,17 +54,7 @@ function Download-Resource($Spec, [string]$Path) {
         $temp = "$Path.$([Guid]::NewGuid().ToString('N')).part"
         try {
             Write-Host "Downloading pinned resource: $($uri.Host)/$([IO.Path]::GetFileName($uri.AbsolutePath))"
-            $aria = Join-Path $PSScriptRoot '../app/tools/aria2c.exe'
-            if (Test-Path -LiteralPath $aria -PathType Leaf) {
-                # Only execute the exact downloader pinned by this checkout.
-                $toolManifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'build-resources.json') -Raw | ConvertFrom-Json
-                if (-not (Is-Verified $aria $toolManifest.resources[0])) { throw 'The existing aria2 binary does not match the pinned tool manifest' }
-                & $aria '--no-conf=true' '--check-certificate=true' '--enable-rpc=false' '--allow-overwrite=false' '--auto-file-renaming=false' '--file-allocation=none' '--connect-timeout=15' '--timeout=30' '--max-tries=2' '--split=8' '--max-connection-per-server=8' '--min-split-size=1M' "--dir=$([IO.Path]::GetDirectoryName($temp))" "--out=$([IO.Path]::GetFileName($temp))" $url
-                if ($LASTEXITCODE -ne 0) { throw "aria2 exited $LASTEXITCODE" }
-            } else {
-                # Bootstrap only: aria2 cannot download itself before it exists.
-                Invoke-WebRequest -Uri $url -OutFile $temp -UseBasicParsing -TimeoutSec 90
-            }
+            Invoke-WebRequest -Uri $url -OutFile $temp -UseBasicParsing -TimeoutSec 90
             if (-not (Is-Verified $temp $Spec)) { throw 'Downloaded resource differs from its pinned size/hash' }
             [IO.File]::Move($temp, $Path)
             return
@@ -72,7 +62,6 @@ function Download-Resource($Spec, [string]$Path) {
             $lastError = $_.Exception.Message
         } finally {
             if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force }
-            if (Test-Path -LiteralPath "$temp.aria2") { Remove-Item -LiteralPath "$temp.aria2" -Force }
         }
     }
     throw "All resource mirrors failed: $lastError"

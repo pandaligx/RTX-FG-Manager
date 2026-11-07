@@ -476,7 +476,7 @@ fn normal_build_resources_and_proxy_selection_are_explicit() {
             .iter()
             .map(|r| r.name)
             .collect::<Vec<_>>(),
-        ["app/tools/aria2c.exe", "app/tools/aria2.conf"]
+        Vec::<&str>::new()
     );
 }
 #[test]
@@ -506,7 +506,7 @@ fn manifest() -> updater::Manifest {
     updater::Manifest{notes:Default::default(),schema:1,version:"4.0.0".into(),file:"RTXManager-v4.0.0-x64.exe".into(),bytes:1048576,sha256:"a".repeat(64),source:"github".into(),url:"https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.0.0/RTXManager-v4.0.0-x64.exe".into()}
 }
 #[test]
-fn malicious_updates_and_aria_options_rejected() {
+fn malicious_updates_rejected() {
     for url in [
         "http://github.com/a",
         "https://evil.test/a",
@@ -526,14 +526,6 @@ fn malicious_updates_and_aria_options_rejected() {
     for v in ["4.0", "4.0.0.1", "4.-1.2", "4.00000.0", "4.0.0/x"] {
         assert!(updater::version(v).is_err())
     }
-    let opts = updater::aria_options(
-        "enable-rpc=true\ncheck-certificate=false\ndir=C:\\Windows\non-download-complete=evil\nsplit=99\nasync-dns-server=127.0.0.1,8.8.8.8",
-    );
-    assert!(opts.contains(&"--split=30".into()));
-    assert!(!opts.iter().any(|s| s.contains("evil")
-        || s.contains("certificate")
-        || s.contains("rpc")
-        || s.contains("Windows")));
 }
 #[test]
 fn update_rename_rolls_back_without_overwriting_changed_target() -> Result<()> {

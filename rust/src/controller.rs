@@ -3924,7 +3924,7 @@ impl Controller {
             && !self.critical
             && !self.hags_writing
             // A cancelled update download touches its private cache only and
-            // aria2 watches this process. Never wait for a network callback
+            // its HTTP requests stop with this process. Never wait for a network callback
             // (or signature service) to allow the application to close.
             && !self.update_installing
         {

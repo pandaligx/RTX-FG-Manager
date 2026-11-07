@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.25
+
+- Replace the bundled aria2c executable with in-process Rust HTTP transfers, removing the external downloader startup dependency.
+- Use bounded concurrency, resumable blocks and retries for patches, runtimes and manager updates; fall back to a single stream when a server cannot serve ranges.
+- Preserve source preferences, verified cache reuse, size/SHA-256 checks and update signature verification. Cancellation, retries and concurrent requests never treat partial output as installable.
+- Keep the existing UI, game deployment and uninstall behavior, and long-term update channels.
+
 ## 4.3.24
 
 - Show native Streamline plugin versions separately from the preserved game interposer. Clarify the distinction between native frame generation and Encore's optional added engine.

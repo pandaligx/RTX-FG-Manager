@@ -223,68 +223,6 @@ pub fn verify(path: &Path, m: &Manifest) -> Result<()> {
     );
     Ok(())
 }
-pub fn aria_options(text: &str) -> Vec<String> {
-    let size_pattern = regex::Regex::new(r"^[1-9]\d?[KM]$").expect("fixed size pattern");
-    let mut result: std::collections::BTreeMap<String, String> =
-        std::collections::BTreeMap::from([
-            ("max-connection-per-server".into(), "30".into()),
-            ("split".into(), "30".into()),
-        ]);
-    for l in text.lines() {
-        let Some((k, v)) = l.split_once('=') else {
-            continue;
-        };
-        let (k, v) = (k.trim(), v.trim());
-        let value = match k {
-            "async-dns"
-            | "disable-ipv6"
-            | "enable-http2"
-            | "enable-doh-http2"
-            | "enable-http-pipelining"
-                if ["true", "false"].contains(&v) =>
-            {
-                Some(v.into())
-            }
-            "max-connection-per-server" | "split" => {
-                v.parse::<u32>().ok().map(|n| n.clamp(1, 30).to_string())
-            }
-            "min-split-size" | "piece-length" if size_pattern.is_match(v) => Some(v.into()),
-            "async-dns-mode" if ["multi", "single"].contains(&v) => Some(v.into()),
-            "uri-selector" if ["inorder", "feedback", "adaptive"].contains(&v) => Some(v.into()),
-            "async-dns-server" => {
-                let v = v
-                    .split(',')
-                    .map(|s| s.trim().parse::<std::net::IpAddr>())
-                    .collect::<std::result::Result<Vec<_>, _>>();
-                v.ok().filter(|v| !v.is_empty() && v.len() <= 8).map(|v| {
-                    v.iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(",")
-                })
-            }
-            _ => None,
-        };
-        if let Some(v) = value {
-            result.insert(k.into(), v);
-        }
-    }
-    // The bundled customized aria2 accepts 1..1024 connections (verified --help).
-    // Keep its signed configuration unchanged; update-specific settings are explicit.
-    for (key, value) in [
-        ("async-dns", "false"),
-        ("disable-ipv6", "false"),
-        ("split", "30"),
-        ("max-connection-per-server", "30"),
-        ("min-split-size", "1M"),
-    ] {
-        result.insert(key.into(), value.into());
-    }
-    result
-        .into_iter()
-        .map(|(k, v)| format!("--{k}={v}"))
-        .collect()
-}
 pub use crate::transfer::{Phase as DownloadPhase, Progress as DownloadProgress};
 
 pub fn download(
@@ -647,8 +585,6 @@ pub fn apply(ticket: &Path) -> Result<()> {
 #[cfg(test)]
 mod download_tests {
     use super::*;
-    use crate::transfer::Readout;
-    use std::io::Write;
 
     fn checked_github_manifest() -> Manifest {
         Manifest {
@@ -892,34 +828,6 @@ mod download_tests {
     }
 
     #[test]
-    fn readout_tracks_real_bytes_and_speed_with_fragmented_lines() -> Result<()> {
-        let temp = tempfile::tempdir()?;
-        let path = temp.path().join("console.log");
-        fs::write(&path, b"old session should not be replayed\n")?;
-        let mut readout = Readout::new(&path)?;
-        let mut log = fs::OpenOptions::new().append(true).open(&path)?;
-        // A sparse output can already be full length while only 1 MiB arrived.
-        fs::File::create(temp.path().join("sparse.exe"))?.set_len(90524944)?;
-        log.write_all(b"[#abcdef 1048576B/90524944B(1%) CN:30 DL:123")?;
-        assert!(readout.poll(90524944)?.is_none());
-        log.write_all(b"4567B ETA:1m]\r\n")?;
-        assert_eq!(readout.poll(90524944)?, Some((1048576, 1234567, 30)));
-        assert!(readout.poll(90524944)?.is_none());
-        log.write_all(b"[#abcdef 100/90524944(0%) CN:1 DL:0]\n")?;
-        assert_eq!(readout.poll(90524944)?, Some((100, 0, 1)));
-        // Invalid totals, overflowing integers and diagnostics are not progress.
-        for line in [
-            "[#abcdef 999/1(100%) CN:1 DL:10]",
-            "[#abcdef 1/2(50%) CN:1 DL:10]",
-            "ERROR 123/90524944 DL:1",
-            "[#abcdef 999999999999999999999999999999/90524944(0%) CN:1 DL:0]",
-        ] {
-            assert!(readout.parse(line, 90524944).is_none());
-        }
-        Ok(())
-    }
-
-    #[test]
     fn completion_waits_for_integrity_and_signature_verification() {
         let mut p = DownloadProgress {
             completed: 100,
@@ -932,24 +840,5 @@ mod download_tests {
         assert_eq!(p.percent(), 100.);
         p = DownloadProgress::default();
         assert_eq!(p.percent(), 0.);
-    }
-
-    #[test]
-    fn update_profile_uses_custom_aria30_without_untrusted_execution_options() {
-        let options = aria_options(include_str!("../../app/tools/aria2.conf"));
-        for expected in [
-            "--async-dns=false",
-            "--disable-ipv6=false",
-            "--split=30",
-            "--max-connection-per-server=30",
-            "--min-split-size=1M",
-        ] {
-            assert!(options.iter().any(|s| s == expected), "{expected}");
-        }
-        assert!(
-            !options
-                .iter()
-                .any(|s| s.contains("certificate") || s.contains("dot://"))
-        );
     }
 }

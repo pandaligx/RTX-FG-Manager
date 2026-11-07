@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Destination,
     [switch]$ExcludeCloudMetadata
@@ -66,7 +66,7 @@ foreach ($name in @(
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json', 'rust/ui-translations.json',
     'app/assets/cleanup-catalog.json', 'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',
     'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/GPUI-FAST-LICENSE', 'rust/assets/licenses/LUCIDE-LICENSE',
-    'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json', 'app/tools/aria2.conf',
+    'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json',
     'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1', 'tools/build_scheme_bundles.py',
     'tools/prepare-fixtures.ps1', 'tools/export-source.ps1', 'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', 'tests/test_encore_cloud.py', '.github/workflows/build.yml',
     'vendor/gpui_fast_windows/Cargo.toml', 'vendor/gpui_fast_windows/Cargo.toml.orig',

@@ -46,8 +46,10 @@ Windows and sum-tree patches are not used or included in this source export.
 Native payload notices below apply to
 the separately downloaded game DLLs, not to the Rust manager's source license.
 
-aria2 is a separate command-line downloader, called without an RPC server.
-This package includes the publisher's signed, custom build reporting 1.37.0.
+Historical downloader notice (manager versions up to 4.3.24 only):
+aria2 was a separate command-line downloader, called without an RPC server.
+Those packages included the publisher's signed, custom build reporting 1.37.0.
+Version 4.3.25 uses in-process Rust HTTPS transfers and does not embed or run aria2.
 Copyright (C) 2006-2019 Tatsuhiro Tsujikawa and contributors.
 License: GNU GPL version 2 or later; text: app/assets/licenses/aria2/COPYING.
 Upstream: https://github.com/aria2/aria2
@@ -60,11 +62,9 @@ OpenSSL 1.1.1w, c-ares 1.34.6, libssh2 1.11.1 and nghttp2 1.64.0.
 The exact dependency build/source records are also unavailable. These
 components retain their respective licenses. This release does not claim
 that unavailable corresponding source has been supplied or verified.
-For manager source builds, tools/build-resources.json pins the existing signed
-aria2 binary by file size and SHA-256. This reproduces the manager's downloader
-input; it is not a reproducible build of aria2 and does not resolve the missing
-corresponding-source/build records described above. aria2 is distributed as a
-separate executable resource and is not covered by the manager's MIT license.
+Historical tags up to 4.3.24 retain their original downloader manifest and
+notices. Current builds do not download, embed or execute this component.
+The historical executable is not covered by the manager's MIT license.
 
 The cloud-delivered Native 0.2.6 compatibility schemes are based on Native
 0.2.4 and follow upstream commit

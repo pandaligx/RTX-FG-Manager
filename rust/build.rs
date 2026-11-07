@@ -57,7 +57,6 @@ fn main() {
             names.push(format!("payloads/{folder}/{name}"));
         }
     }
-    names.extend(["app/tools/aria2c.exe", "app/tools/aria2.conf"].map(str::to_owned));
     let mut code = String::from("pub static EMBEDDED: &[Embedded] = &[\n");
     for (index, name) in names.iter().enumerate() {
         let path = if name.starts_with("payloads/") {

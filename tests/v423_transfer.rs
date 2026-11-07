@@ -126,38 +126,6 @@ fn cache_is_not_trusted_by_length_alone_and_limits_are_enforced() -> Result<()> 
 
 #[test]
 fn progress_and_failure_reasons_do_not_invent_completed_bytes() {
-    assert_eq!(
-        transfer::Progress::parse_aria_line("[#abcdef 12B/100B(12%) CN:2 DL:40B ETA:2s]", 100),
-        Some((12, 40, 2))
-    );
-    assert!(
-        transfer::Progress::parse_aria_line("[#abcdef 101/100(100%) CN:2 DL:40]", 100).is_none()
-    );
-    assert!(transfer::Progress::parse_aria_line("[#abcdef 12/200(6%) CN:2 DL:40]", 100).is_none());
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(8), ""),
-        transfer::Failure::Range
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(22), "status=416"),
-        transfer::Failure::Range
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(24), ""),
-        transfer::Failure::Unauthorized
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(32), ""),
-        transfer::Failure::Integrity
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(1), "status=429"),
-        transfer::Failure::RateLimited
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(1), "certificate verification failed"),
-        transfer::Failure::Certificate
-    );
     let progress = transfer::Progress {
         completed: 100,
         total: 100,

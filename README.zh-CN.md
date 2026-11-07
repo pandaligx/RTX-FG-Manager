@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.24"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.25"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.24 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.25 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,21 +41,21 @@
 
 ## 下载
 
-**版本 4.3.24** · Windows 10 / 11 x64
+**版本 4.3.25** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.24 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.24) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.24 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.24) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.25 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.25) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.25 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.25) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
-下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust、CUDA Toolkit 或 aria2。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.24 更新亮点
+## 4.3.25 更新亮点
 
-- 集中显示 Streamline 插件版本，并单独标注游戏原有加载入口。
-- 卸载时完整清理补丁设置、专属日志和管理器空缓存目录，保留未知文件与原件备份。
-- 修复小窗口运行库列表的压缩排版，保持现有方案与长期更新通道。
+- 移除内置 aria2c，补丁、运行库与软件更新统一使用 Rust 原生下载。
+- 支持并发下载、断点续传和失败重试；下载源不支持分段时自动回退。
+- 保留现有界面、缓存复用、文件校验与长期更新通道。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 

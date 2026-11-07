@@ -5738,7 +5738,7 @@ dependencies = [
 
 [[package]]
 name = "rtx-fg-manager"
-version = "4.3.24"
+version = "4.3.25"
 dependencies = [
  "anyhow",
  "base64",
@@ -5759,6 +5759,7 @@ dependencies = [
  "sha2 0.10.9",
  "smol",
  "tempfile",
+ "tokio",
  "uuid",
  "webview2-com",
  "windows 0.62.2",

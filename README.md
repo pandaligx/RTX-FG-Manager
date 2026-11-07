@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.24"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.25"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.24 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.25 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,21 +41,21 @@
 
 ## Download
 
-**Version 4.3.24** · Windows 10 / 11 x64
+**Version 4.3.25** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.24 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.24) | Default domestic source |
-| **GitHub** | [Open 4.3.24 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.24) | Primary project and fallback |
+| **GitCode** | [Open 4.3.25 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.25) | Default domestic source |
+| **GitHub** | [Open 4.3.25 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.25) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
-Download **`RTXManager.exe`** and run it. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
+Download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.24 highlights
+## 4.3.25 highlights
 
-- Shows matched Streamline plugin versions separately from the game-owned interposer.
-- Fully removes patch settings, owned logs and empty manager cache folders while preserving unknown files and backups.
-- Fixes compressed runtime rows in small windows, retaining existing schemes and the permanent update bridge.
+- Removes bundled aria2c; patches, runtimes and app updates use native Rust downloads.
+- Supports concurrent transfers, resume and retries, with a single-stream fallback when needed.
+- Retains the existing interface, verified cache reuse, integrity checks and permanent update bridge.
 
 [Full changelog →](CHANGELOG.md)
 

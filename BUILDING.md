@@ -8,7 +8,7 @@ The manager is a Windows x64 Rust/GPUI application. A normal build does not requ
 
 - Windows 10/11 x64; Visual Studio 2022 Build Tools with **Desktop development with C++**, an x64 MSVC toolset, and Windows SDK.
 - Rustup. `rust-toolchain.toml` pins the compiler, target, Clippy and rustfmt; do not replace this with an untested nightly toolchain.
-- Use a Developer PowerShell for Visual Studio. Network access is needed for Cargo dependencies and the initial pinned downloader resource. Administrator elevation is not required for normal compilation.
+- Use a Developer PowerShell for Visual Studio. Network access is needed for Cargo dependencies. Administrator elevation is not required for normal compilation.
 
 ```powershell
 git clone https://github.com/pandaligx/RTX-FG-Manager.git
@@ -21,9 +21,9 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked --release
 ```
 
-Output: `target/x86_64-pc-windows-msvc/release/RTXManager.exe`. The result is **unsigned**. Release signing is separate; never rebuild over a publisher-signed release. Normal debug and release builds embed only the pinned aria2 executable and its configuration, not game DLLs.
+Output: `target/x86_64-pc-windows-msvc/release/RTXManager.exe`. The result is **unsigned**. Release signing is separate; never rebuild over a publisher-signed release. Normal debug and release builds embed neither a downloader executable nor game DLLs.
 
-`prepare-build.ps1` fetches the unchanged publisher-signed aria2 binary identified by size and SHA-256 in `tools/build-resources.json`. This makes the manager's input reproducible; **it does not claim that this historical aria2 binary can be reproduced from source**. Its original build/source records were not retained; see `THIRD_PARTY_NOTICES.txt`. Bootstrap may use Windows HTTPS download once, because aria2 cannot download itself before it exists. Once prepared, resource downloads use the verified aria2 executable. Existing mismatched files cause a clear error and are not overwritten automatically.
+Downloads use Rust HTTPS requests with a shared 30-connection limit, checked redirects, resumable blocks, and mandatory payload integrity checks. `prepare-build.ps1` remains a no-op compatibility entry point for existing build scripts. Historical aria2 resources are not embedded or executed by the current manager.
 
 ## Optional tests using released, signed binaries
 

@@ -43,9 +43,12 @@ pub fn clean_scoped(runtime: &Path, data: &Path) -> Result<Report> {
     // Never delete runtime/cloud-identities.json or the last valid catalog.
     // Match our filenames as well as the parent: custom --data-dir locations
     // may already contain an unrelated folder named "updates".
-    let archive =
-        regex::Regex::new(r"^[a-f0-9]{64}(\.(domestic|github)\.download)?\.zip(\.aria2)?$")?;
-    let executable = regex::Regex::new(r"^RTXManager-v[0-9]+\.[0-9]+\.[0-9]+-x64\.exe(\.aria2)?$")?;
+    let archive = regex::Regex::new(
+        r"^[a-f0-9]{64}(\.(domestic|github)\.download)?\.zip(\.aria2|\.rtx-part\.json)?$",
+    )?;
+    let executable = regex::Regex::new(
+        r"^RTXManager(-v[0-9]+\.[0-9]+\.[0-9]+-x64)?\.exe(\.aria2|\.rtx-part\.json)?$",
+    )?;
     for (path, updates) in [(runtime.join("cloud"), false), (data.join("updates"), true)] {
         core::no_links(&path)?;
         let exe = std::env::current_exe()?;
@@ -121,6 +124,7 @@ pub fn clean_scoped(runtime: &Path, data: &Path) -> Result<Report> {
                     if [
                         "runtime.zip",
                         "runtime.zip.aria2",
+                        "runtime.zip.rtx-part.json",
                         "nvngx_dlss.dll",
                         "nvngx_dlssd.dll",
                         "nvngx_dlssg.dll",

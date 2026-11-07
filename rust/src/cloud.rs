@@ -1070,18 +1070,7 @@ pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
     Ok(out)
 }
 fn remove_partial(path: &Path) -> Result<()> {
-    let control = path.with_file_name(format!(
-        "{}.aria2",
-        path.file_name()
-            .context("Invalid cloud cache path")?
-            .to_string_lossy()
-    ));
-    for item in [path, control.as_path()] {
-        if item.exists() {
-            fs::remove_file(core::no_links(item)?)?;
-        }
-    }
-    Ok(())
+    crate::transfer::remove_partial(path)
 }
 fn archive(
     c: &Catalog,

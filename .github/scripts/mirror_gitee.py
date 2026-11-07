@@ -51,7 +51,7 @@ ALLOWED = {
     'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/GPUI-FAST-LICENSE',
     'rust/assets/licenses/LUCIDE-LICENSE', 'rust/assets/themes/LICENSE-APACHE',
     'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json',
-    'app/tools/aria2.conf', 'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1',
+    'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1',
     'tools/prepare-build.ps1', 'tools/prepare-fixtures.ps1', 'tools/export-source.ps1',
     'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', 'tests/test_encore_cloud.py',
     'vendor/gpui_fast_windows/Cargo.toml', 'vendor/gpui_fast_windows/Cargo.toml.orig',

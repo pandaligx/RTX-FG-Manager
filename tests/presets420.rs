@@ -124,6 +124,8 @@ fn clear_cache_keeps_library_ini_and_cleanup_identities() -> Result<()> {
         runtime.join("cloud/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.zip"),
         runtime.join("cloud/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.domestic.download.zip.aria2"),
         data.join("updates/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/RTXManager-v4.1.2-x64.exe"),
+        runtime.join("cloud/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.zip.rtx-part.json"),
+        data.join("updates/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/RTXManager.exe.rtx-part.json"),
     ] {
         fs::write(p, b"cache")?;
     }
@@ -136,8 +138,8 @@ fn clear_cache_keeps_library_ini_and_cleanup_identities() -> Result<()> {
         fs::write(p, b"keep")?;
     }
     let r = cache::clean_scoped(&runtime, &data)?;
-    assert_eq!(r.files, 3);
-    assert_eq!(r.bytes, 15);
+    assert_eq!(r.files, 5);
+    assert_eq!(r.bytes, 25);
     assert_eq!(r.skipped, 0);
     assert_eq!(fs::read(data.join("games.json"))?, b"keep");
     assert_eq!(fs::read(runtime.join("cloud-identities.json"))?, b"keep");
