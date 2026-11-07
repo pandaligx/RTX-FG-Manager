@@ -157,6 +157,27 @@ fn stale_residual_action_never_removes_a_reinstalled_patch() {
             .cache_pending
     );
 }
+
+#[test]
+fn legacy_empty_workspace_without_record_is_removed_but_unknown_files_are_kept() {
+    for unknown in [false, true] {
+        let t = tempfile::tempdir().unwrap();
+        let target = game(&t.path().join("Game/game.exe"));
+        let own = target.directory.join(core::OWN);
+        fs::create_dir_all(own.join("cache")).unwrap();
+        fs::create_dir(own.join("logs")).unwrap();
+        if unknown {
+            fs::write(own.join("original.dll.backup"), b"keep").unwrap();
+        }
+        assert!(cleanup::clean_outcome_at(&target).unwrap().complete);
+        assert!(!own.join("cache").exists() && !own.join("logs").exists());
+        assert_eq!(own.exists(), unknown);
+        if unknown {
+            assert_eq!(fs::read(own.join("original.dll.backup")).unwrap(), b"keep");
+        }
+    }
+}
+
 #[test]
 fn restored_original_entry_does_not_block_residual_cleanup() {
     let t = tempfile::tempdir().unwrap();

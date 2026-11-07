@@ -232,6 +232,7 @@ impl Manager {
             if kind == "xemfg" {
                 rows = rows.child(
                     div()
+                        .flex_shrink_0()
                         .pb_2()
                         .border_b_1()
                         .border_color(cx.theme().border)
@@ -317,6 +318,7 @@ impl Manager {
                 });
             let mut card = div()
                 .v_flex()
+                .flex_shrink_0()
                 .gap_2()
                 .pb_2()
                 .border_b_1()
@@ -341,6 +343,56 @@ impl Manager {
                 );
             for path in paths {
                 card = card.child(self.runtime_path(path, cx));
+            }
+            if kind == "fg" {
+                let groups = statuses
+                    .iter()
+                    .flat_map(|s| &s.streamline)
+                    .map(|s| (core::key(&s.directory), s))
+                    .collect::<std::collections::BTreeMap<_, _>>();
+                for group in groups.values() {
+                    let mut table = div()
+                        .v_flex()
+                        .gap_1()
+                        .min_w_0()
+                        .child(
+                            div()
+                                .font_weight(FontWeight::MEDIUM)
+                                .child(self.t("Streamline 原生配套插件")),
+                        )
+                        .child(self.runtime_path(&group.directory, cx));
+                    for (name, version) in &group.plugins {
+                        table = table.child(
+                            div()
+                                .h_flex()
+                                .gap_2()
+                                .flex_wrap()
+                                .justify_between()
+                                .text_xs()
+                                .child(name.clone())
+                                .child(self.t(version)),
+                        );
+                    }
+                    table = table.child(
+                        div()
+                            .h_flex()
+                            .gap_2()
+                            .flex_wrap()
+                            .justify_between()
+                            .text_xs()
+                            .child("sl.interposer.dll")
+                            .child(format!(
+                                "{} ({})",
+                                self.t(&group.interposer),
+                                self.t("保留原件")
+                            )),
+                    );
+                    card = card.child(table);
+                }
+            }
+            if kind == "encorefg" && !available && statuses.iter().any(|s| s.applicable) {
+                card = card.child(div().text_xs().text_color(cx.theme().muted_foreground)
+                    .child(self.t("此项仅为无原生帧生成的游戏添加引擎。原生 Streamline 插件显示在上方 DLSS 帧生成中；Encore 的额外引擎提示不代表原生帧生成失效。")));
             }
             if let Some(warning) = statuses.iter().find_map(|s| s.warning.as_ref()) {
                 card = card.child(

@@ -52,6 +52,57 @@ fn old_install(target: &core::DeploymentTarget) -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn encore_full_uninstall_removes_empty_workspace_and_allows_reinstall() -> Result<()> {
+    for custom in [false, true] {
+        let (_temp, target) = fixture(custom)?;
+        for _ in 0..2 {
+            install_120(&target)?;
+            let own = target.directory.join(core::OWN);
+            assert!(own.join("cache").is_dir() && own.join("logs").is_dir());
+            fs::write(own.join("logs/frame_timing.txt"), b"old managed log")?;
+            let logs = target.directory.join("rtx-encore-logs");
+            fs::create_dir(&logs)?;
+            fs::write(logs.join("rtx-encore.log"), b"session")?;
+            assert!(cleanup::clean_outcome_at(&target)?.complete);
+            assert!(!own.exists(), "empty manager workspace must be removed");
+            assert!(!target.directory.join(encore::CONFIG).exists());
+            assert!(!logs.exists());
+            assert!(!target.directory.join("rtx-encore-runtimes").exists());
+            assert_eq!(core::status_at(&target), "未部署");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn full_uninstall_keeps_unknown_files_and_backups_but_prunes_empty_children() -> Result<()> {
+    let (_temp, target) = fixture(false)?;
+    install_120(&target)?;
+    let own = target.directory.join(core::OWN);
+    fs::write(own.join("original.dll.backup"), b"original backup")?;
+    let logs = target.directory.join("rtx-encore-logs");
+    fs::create_dir(&logs)?;
+    fs::write(logs.join("rtx-encore.log"), b"session")?;
+    fs::write(logs.join("manual-capture.csv"), b"keep capture")?;
+    assert!(cleanup::clean_outcome_at(&target)?.complete);
+    assert!(core::record(&target.directory)?.is_none());
+    assert!(!own.join("cache").exists() && !own.join("logs").exists());
+    assert_eq!(
+        fs::read(own.join("original.dll.backup"))?,
+        b"original backup"
+    );
+    assert_eq!(fs::read(logs.join("manual-capture.csv"))?, b"keep capture");
+    assert!(!target.directory.join(encore::CONFIG).exists());
+    install_120(&target)?;
+    assert!(cleanup::clean_outcome_at(&target)?.complete);
+    assert_eq!(
+        fs::read(own.join("original.dll.backup"))?,
+        b"original backup"
+    );
+    Ok(())
+}
+
 fn encore_files(proxy: &str) -> BTreeMap<String, Vec<u8>> {
     BTreeMap::from([
         (proxy.into(), pe(true, 2)),

@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.24
+
+- Show native Streamline plugin versions separately from the preserved game interposer. Clarify the distinction between native frame generation and Encore's optional added engine.
+- Keep the original full uninstall behavior: remove patch settings and owned logs. Clean empty manager cache folders for all patch schemes, including leftovers from older releases, while preserving unknown files and backups.
+- Keep runtime rows readable in smaller windows and scale the new controls with the application's font setting.
+
 ## 4.3.23
 
 - Show the selected patch, parameters and runtimes beside the recommendation install button. Lock installation options while processing so the displayed selection stays consistent with the running task.

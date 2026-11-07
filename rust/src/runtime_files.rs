@@ -424,6 +424,91 @@ pub struct Status {
     /// a native integration prevents installation.
     pub applicable: bool,
     pub warning: Option<String>,
+    /// Read on the status worker, never from the UI render path.
+    pub streamline: Vec<StreamlineStatus>,
+}
+
+#[derive(Clone, Debug)]
+pub struct StreamlineStatus {
+    pub directory: PathBuf,
+    pub plugins: BTreeMap<String, String>,
+    pub interposer: String,
+}
+
+fn streamline_status(
+    target: &core::DeploymentTarget,
+    evidence: &scanner::Evidence,
+    tracked: &[PathBuf],
+    mut version: impl FnMut(&Path) -> String,
+) -> Result<Vec<StreamlineStatus>> {
+    let added = read(target, "encorefg")?;
+    let mut folders = BTreeSet::new();
+    for path in evidence.frame_integration_paths.iter().chain(tracked) {
+        if path.file_name().is_some_and(|n| {
+            let n = n.to_string_lossy().to_ascii_lowercase();
+            n.starts_with("sl.") && n.ends_with(".dll")
+        }) && let Some(folder) = path.parent()
+        {
+            // This set already has its own "added FG" status below.
+            if !added.as_ref().is_some_and(|r| {
+                r.entries.iter().any(|e| {
+                    Path::new(&e.path)
+                        .parent()
+                        .is_some_and(|p| core::key(p) == core::key(folder))
+                })
+            }) {
+                folders.insert(core::no_links(folder)?);
+            }
+        }
+    }
+    let mut groups = Vec::new();
+    for directory in folders {
+        let mut names = BTreeSet::new();
+        if directory.is_dir() {
+            for entry in fs::read_dir(&directory)? {
+                let entry = entry?;
+                let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+                if name.starts_with("sl.") && name.ends_with(".dll") && name != "sl.interposer.dll"
+                {
+                    names.insert(name);
+                }
+            }
+        }
+        for path in tracked {
+            if path
+                .parent()
+                .is_some_and(|p| core::key(p) == core::key(&directory))
+                && let Some(name) = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_ascii_lowercase())
+                && STREAMLINE_PLUGINS.contains(&name.as_str())
+            {
+                names.insert(name);
+            }
+        }
+        if names.contains("sl.dlss_g.dll") {
+            names.extend(["sl.common.dll", "sl.pcl.dll", "sl.reflex.dll"].map(str::to_owned));
+        }
+        let mut file_version = |name: &str| -> Result<String> {
+            let path = core::no_links(&directory.join(name))?;
+            Ok(if path.is_file() {
+                version(&path)
+            } else {
+                "缺失".into()
+            })
+        };
+        let plugins = names
+            .into_iter()
+            .map(|n| Ok((n.clone(), file_version(&n)?)))
+            .collect::<Result<BTreeMap<_, _>>>()?;
+        let interposer = file_version("sl.interposer.dll")?;
+        groups.push(StreamlineStatus {
+            directory,
+            plugins,
+            interposer,
+        });
+    }
+    Ok(groups)
 }
 
 /// Presentation policy only; Status::available still gates installation.
@@ -896,6 +981,30 @@ fn inspect_with(
                 );
             }
         }
+        if kind == "fg" {
+            let owned_evidence;
+            let evidence = match evidence {
+                Some(e) => e,
+                None => {
+                    owned_evidence = scanner::inspect(&target.game_exe);
+                    &owned_evidence
+                }
+            };
+            let details = streamline_status(target, evidence, &s.paths, |p| {
+                win::file_version(p)
+                    .map(|v| v.0)
+                    .unwrap_or_else(|_| "版本未知".into())
+            });
+            match details {
+                Ok(groups) => s.streamline = groups,
+                Err(error) => {
+                    // Optional detail inspection must not change install policy.
+                    // The existing install-time preflight still checks all paths.
+                    s.warning
+                        .get_or_insert_with(|| format!("Streamline: {error:#}"));
+                }
+            }
+        }
         Ok(())
     })();
     if let Err(e) = result {
@@ -1277,6 +1386,33 @@ pub fn remove_many(targets: &[core::DeploymentTarget], kind: &str) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_status_distinguishes_plugins_missing_dependencies_and_interposer() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        let folder = t.directory.join("Engine/Plugins/Streamline/Binaries/Win64");
+        fs::create_dir_all(&folder)?;
+        for name in ["sl.interposer.dll", "sl.common.dll", "sl.dlss_g.dll"] {
+            fs::write(folder.join(name), b"original")?;
+        }
+        let evidence = scanner::inspect(&t.game_exe);
+        let groups = streamline_status(&t, &evidence, &[], |p| {
+            if p.ends_with("sl.interposer.dll") {
+                "2.7.30"
+            } else {
+                "2.14.16"
+            }
+            .into()
+        })?;
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].interposer, "2.7.30");
+        assert_eq!(groups[0].plugins["sl.common.dll"], "2.14.16");
+        assert_eq!(groups[0].plugins["sl.reflex.dll"], "缺失");
+        assert_eq!(groups[0].plugins["sl.pcl.dll"], "缺失");
+        assert!(!groups[0].plugins.contains_key("sl.interposer.dll"));
+        assert_eq!(fs::read(folder.join("sl.interposer.dll"))?, b"original");
+        Ok(())
+    }
     #[test]
     fn native_streamline_updates_plugins_in_place_and_restores_originals() -> Result<()> {
         let tmp = tempfile::tempdir()?;

@@ -564,6 +564,35 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
 pub fn retry_pending_at(target: &core::DeploymentTarget) -> Result<CleanOutcome> {
     clean_outcome(target, true)
 }
+/// Old releases could leave these empty directories after removing the marker.
+/// Without a record, remove only the fixed empty directories, never their files
+/// or unknown siblings. In particular, don't recursively erase backup folders.
+fn prune_empty_manager_dirs(root: &Path) -> Result<bool> {
+    let root = core::no_links(root)?;
+    if !root.is_dir() {
+        return Ok(false);
+    }
+    let mut changed = false;
+    for name in ["cache", "logs"] {
+        let child = root.join(name);
+        match fs::symlink_metadata(&child) {
+            Ok(meta) if !core::is_link(&meta) && meta.is_dir() => {
+                if fs::read_dir(&child)?.next().is_none() {
+                    fs::remove_dir(&child)?;
+                    changed = true;
+                }
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    if fs::read_dir(&root)?.next().is_none() {
+        fs::remove_dir(&root)?;
+        changed = true;
+    }
+    Ok(changed)
+}
 fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<CleanOutcome> {
     let target = target.validate(false)?;
     let p = target.game_exe.clone();
@@ -635,8 +664,14 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     } {
         Some(r) => r,
         None => {
+            let pruned = prune_empty_manager_dirs(&root)?;
             return Ok(CleanOutcome {
-                message: "未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留".into(),
+                message: if pruned {
+                    "已清理管理器的空缓存目录；其他文件保持不变"
+                } else {
+                    "未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留"
+                }
+                .into(),
                 complete: true,
             });
         }
@@ -657,6 +692,11 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     } else {
         generated_dirs(dir, &ini)?
     };
+    // core creates these private directories for every backend, including
+    // Encore and MFG. Their cleanup must not depend on an INI-based backend.
+    for (name, kind) in [("cache", "cache"), ("logs", "logs")] {
+        merge(&mut roots, root.join(name), kind);
+    }
     ensure!(record.cleanup_dirs.len() <= 64, "清理目录记录无效");
     for (name, kind) in &record.cleanup_dirs {
         ensure!(
