@@ -14,6 +14,7 @@ impl Render for SettingsView {
         self.owner
             .update(cx, |owner, cx| {
                 div()
+                    .relative()
                     .v_flex()
                     .size_full()
                     .min_w_0()
@@ -50,6 +51,7 @@ impl Render for SettingsView {
                                 )),
                         )
                     })
+                    .child(owner.download_overlay(window, cx))
                     .when(owner.c.closing, |d| {
                         d.child(owner.t(owner.c.close_status()))
                     })
@@ -439,12 +441,11 @@ impl Manager {
                     )
                     .into_any_element()
             })
-            .layout(Axis::Vertical)
-            .description(self.t("即时生效，控件与间距同步缩放")),
+            .layout(Axis::Vertical),
         ]);
         let library = SettingGroup::new().gap_3().items([
             self.setting_toggle("chinese_game_names", "中文界面优先显示中文游戏名", true, cx)
-                .description(self.t("名称优先读取安装记录；无法确认时保留原名，可手动改名。")),
+                .description(self.t("未识别的游戏可手动改名。")),
             self.setting_content(&["游戏库", "更新名称库"], cx, |this, _, cx| {
                 div()
                     .v_flex()
@@ -551,12 +552,48 @@ impl Manager {
                     .into_any_element()
             }),
         ]);
-        let maintenance = SettingGroup::new().gap_3().item(
-            self.setting_field("清理缓存", cx, |this, _, cx| {
-                this.button("clear-cache", "清理缓存", Command::ClearCache, cx)
-                    .disabled(this.c.busy || this.c.update_busy).into_any_element()
-            }).description(self.t("清理下载、更新暂存及未使用的已识别组件缓存；保留游戏列表、参数和归属记录。需要时重新下载或生成缓存。"))
-        );
+        let mut maintenance = SettingGroup::new()
+            .gap_3()
+            .item(
+                self.setting_field("清理缓存", cx, |this, _, cx| {
+                    this.button("clear-cache", "清理缓存", Command::ClearCache, cx)
+                        .disabled(this.c.busy || this.c.update_busy)
+                        .into_any_element()
+                })
+                .description(self.t("删除下载缓存，保留游戏列表、参数和备份。")),
+            )
+            .item(
+                self.setting_field("恢复初始状态", cx, |this, _, cx| {
+                    this.button(
+                        "reset-manager",
+                        "清理缓存并恢复初始状态",
+                        Command::Confirm("reset_manager".into()),
+                        cx,
+                    )
+                    .disabled(
+                        this.c.busy
+                            || this.c.update_busy
+                            || this.c.hags_busy
+                            || !this.c.reset_available,
+                    )
+                    .into_any_element()
+                })
+                .description(self.t(
+                    "卸载已记录的补丁、还原运行库和显卡名称，清空设置与缓存；成功后删除重置备份。",
+                )),
+            );
+        if let Some(path) = self.c.reset_backup.clone() {
+            maintenance =
+                maintenance.item(self.setting_field("重置备份", cx, move |this, _, cx| {
+                    this.button(
+                        "reset-backup",
+                        "打开备份目录",
+                        Command::Open(path.display().to_string()),
+                        cx,
+                    )
+                    .into_any_element()
+                }));
+        }
         let about = SettingGroup::new().gap_3().items([
             self.setting_content(
                 &["关于", "当前版本", "RTX-FG-Manager"],
@@ -626,8 +663,7 @@ impl Manager {
                 .sidebar_size_range(window.rem_size() * 11. ..window.rem_size() * 22.)
                 .with_group_variant(GroupBoxVariant::Outline)
                 .pages([
-                    page("外观", IconName::Palette, appearance)
-                        .description(self.t("外观与偏好更改后自动保存")),
+                    page("外观", IconName::Palette, appearance).description(self.t("更改自动保存")),
                     page("游戏库", IconName::Folder, library),
                     page("软件更新", IconName::RefreshCw, updates),
                     page("缓存维护", IconName::Settings, maintenance),

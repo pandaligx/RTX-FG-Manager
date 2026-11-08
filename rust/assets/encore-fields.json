@@ -2939,6 +2939,28 @@
     "since": "1.2.0-beta.1"
   },
   {
+    "key": "xefgSourcePacing",
+    "path": [
+      "xefg",
+      "xefgSourcePacing"
+    ],
+    "label": "XeFG 源帧稳定节奏",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "frameGenerationEngine=xefg",
+      "xefgMfg4VariablePacing=1"
+    ],
+    "help": "XeFG 3X 及以上：以自适应节奏启动游戏源帧，改善镜头运动平顺性，可能降低少量原生 FPS；即时生效，2X 不受影响。",
+    "optional": true,
+    "since": "2.1.0"
+  },
+  {
     "key": "xefgUiHandling",
     "path": [
       "xefg",
@@ -4033,7 +4055,7 @@
     "dependencies": [
       "reconstructionEngine=xess"
     ],
-    "help": "实验性，默认关闭。需要 RTX 30/40/50、DX12 和受支持驱动 621.01 / 621.12 / 621.14。RTX 20、DX11 和 Vulkan 不使用 Tensor 路径；准备成功不代表实际启用。",
+    "help": "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起支持无 DLSS 游戏的 DX11/Vulkan，以及 DX11 原生 DLSS 替换；Vulkan 原生 DLSS 替换仍使用标准 XeSS。旧版仅支持 DX12；准备成功不代表实际启用。",
     "optional": true,
     "since": "1.5.0"
   },
@@ -4054,7 +4076,7 @@
     "dependencies": [
       "frameGenerationEngine=xefg"
     ],
-    "help": "实验性，默认关闭。需要 RTX 30/40/50、DX12 和受支持驱动 621.01 / 621.12 / 621.14。RTX 20、DX11 和 Vulkan 不使用 Tensor 路径；准备成功不代表实际启用。",
+    "help": "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起扩展到 DX11/Vulkan 无原生帧生成游戏；旧版仅支持 DX12。以游戏菜单中的实际激活状态为准。",
     "optional": true,
     "since": "1.5.0"
   },

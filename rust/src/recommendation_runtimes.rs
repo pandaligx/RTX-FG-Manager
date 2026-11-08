@@ -18,6 +18,25 @@ pub struct Component {
     pub package_version: Option<String>,
 }
 impl Component {
+    fn needs_install(&self, targets: &[core::DeploymentTarget]) -> bool {
+        if self.source == "patch" || self.preserves_game_files() {
+            return false;
+        }
+        !(self.source == "game"
+            && self.kind != "nr"
+            && targets.iter().all(|target| {
+                let current = runtime_files::inspect(target, &self.kind);
+                current.available
+                    && current.present
+                    && current.warning.is_none()
+                    && current
+                        .versions
+                        .iter()
+                        .map(|v| normalized(v))
+                        .collect::<BTreeSet<_>>()
+                        == self.versions.iter().map(|v| normalized(v)).collect()
+            }))
+    }
     /// An old inventory can list several native versions without identifying
     /// their locations. It is reference information, not a safe replacement map.
     pub fn preserves_game_files(&self) -> bool {
@@ -83,6 +102,34 @@ fn normalized(version: &str) -> String {
         .to_owned()
 }
 impl Snapshot {
+    pub(crate) fn download_files(
+        &self,
+        targets: &[core::DeploymentTarget],
+    ) -> Result<Vec<crate::transfer::DownloadFile>> {
+        let mut files = Vec::new();
+        for c in self.components.iter().filter(|c| c.needs_install(targets)) {
+            if c.source == "managed" {
+                files.extend(runtime_files::download_files(
+                    targets,
+                    if c.kind == "encorefg" {
+                        "encorefg"
+                    } else {
+                        "xemfg"
+                    },
+                    c.package_version.as_deref().context("运行库版本未知")?,
+                )?);
+            } else if c.kind == "nr" {
+                files.push(neural_runtime::download_file("310.9.16")?);
+            } else {
+                files.extend(runtime_files::download_files(
+                    targets,
+                    &c.kind,
+                    &normalized(c.versions.first().context("运行库版本未知")?),
+                )?);
+            }
+        }
+        Ok(files)
+    }
     pub fn validate(&self) -> Result<()> {
         ensure!(
             self.schema == 1 && self.components.len() <= 21,
@@ -328,24 +375,7 @@ impl Snapshot {
     ) -> Result<()> {
         let mut intel = false;
         for c in &self.components {
-            if c.source == "patch" || c.preserves_game_files() {
-                continue;
-            }
-            if c.source == "game"
-                && c.kind != "nr"
-                && targets.iter().all(|target| {
-                    let current = runtime_files::inspect(target, &c.kind);
-                    current.available
-                        && current.present
-                        && current.warning.is_none()
-                        && current
-                            .versions
-                            .iter()
-                            .map(|v| normalized(v))
-                            .collect::<BTreeSet<_>>()
-                            == c.versions.iter().map(|v| normalized(v)).collect()
-                })
-            {
+            if !c.needs_install(targets) {
                 continue;
             }
             let mut report = |transfer| {

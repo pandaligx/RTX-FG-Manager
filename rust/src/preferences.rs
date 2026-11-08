@@ -39,7 +39,7 @@ pub fn load(dir: &Path) -> Result<Value> {
     crate::core::no_links(&path)?;
     if !path.exists() {
         return Ok(
-            json!({"schema":3,"games":[],"roots":[],"language":"system","theme":"跟随系统","backend":"native30","proxies":["version.dll"],"welcome_pending":true}),
+            json!({"schema":3,"games":[],"roots":[],"language":"system","theme":"跟随系统","backend":"native30","proxies":["version.dll"],"initial_scan_pending":true}),
         );
     }
     let v = crate::core::read_json(&path, MAX_SETTINGS_BYTES)?;

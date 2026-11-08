@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.25"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.26"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.25 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.26 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,21 +41,21 @@
 
 ## 下载
 
-**版本 4.3.25** · Windows 10 / 11 x64
+**版本 4.3.26** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.25 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.25) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.25 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.25) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.26 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.26) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.26 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.26) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
 下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.25 更新亮点
+## 4.3.26 更新亮点
 
-- 移除内置 aria2c，补丁、运行库与软件更新统一使用 Rust 原生下载。
-- 支持并发下载、断点续传和失败重试；下载源不支持分段时自动回退。
-- 保留现有界面、缓存复用、文件校验与长期更新通道。
+- 适配 RTX Encore 2.1.0，首次安装可独立选择帧生成与超分引擎。
+- 下载进度居中显示，支持多任务状态、取消和完成后自动收起。
+- 修复安装目标错位与 Encore 日志占用导致的卸载残留，完善恢复初始状态。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -69,7 +69,7 @@
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
 | **MFG-Unlocker · 1.7.0** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
-| **RTX Encore · 2.0.1** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion、XeSS/XeFG Tensor 与 Reflex 设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
+| **RTX Encore · 2.1.0** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion、XeSS/XeFG Tensor 与 Reflex 设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
 > MFG-Unlocker 1.6.1 已作为兼容备用方案保留；切换版本请先卸载现有补丁再安装。管理器 4.3.15 起支持该方案的玩家参数分享。
 
@@ -83,7 +83,7 @@
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 保留本项目自定义适配 | 保留本项目自定义适配 | 本项目已提供 SM89 适配；不保证所有游戏 |
 | Dlssg_for_sm86-MFG-version · Vulkan | 上游面向 20/30 系列；以所选 Vulkan 包为准 | 上游主要目标系列 | 上游未明确保证 |
 | MFG-Unlocker · 1.7.0 | 实验性 DLSS MFG；限受支持的 310.9 运行库 | 上游支持 DLSS MFG | 上游支持 DLSS MFG |
-| RTX Encore · 2.0.1 | FG / NR 实验性；Smooth Motion V2 限 621.01、DX12 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
+| RTX Encore · 2.1.0 | FG / NR 实验性；Smooth Motion V2 限 621.01、DX12 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
 
 依据：[Dlssg_for_sm86 运行要求与限制](https://github.com/sdli1995/dlssg_for_sm86#运行要求)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。三角洲方案属于本项目保留的自定义包，不能将其适配范围等同于上游原版。表格用于选型，不代表管理器完成了各显卡和游戏的实机验证。
 

@@ -61,7 +61,7 @@ class EncoreCloudTests(unittest.TestCase):
                 yield path
         paths = {tuple(field["path"]) for field in fields}
         native_paths = set(leaves(config()))
-        self.assertEqual(len(fields), 154)
+        self.assertEqual(len(fields), 155)
         self.assertEqual(
             {field["key"] for field in fields if field.get("since") == "1.5.0"},
             {"xessTensorCores", "xefgTensorCores"},

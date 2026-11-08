@@ -872,7 +872,7 @@ impl Client {
         let mut request = self
             .http(network)?
             .request(method.clone(), format!("{}{route}", self.origin()))
-            .header("X-RTXFG-Feedback", "13")
+            .header("X-RTXFG-Feedback", "14")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
         if method == Method::GET {
@@ -1410,7 +1410,7 @@ mod tests {
         assert!(
             server.join().unwrap()[0]
                 .to_ascii_lowercase()
-                .contains("x-rtxfg-feedback: 13")
+                .contains("x-rtxfg-feedback: 14")
         );
     }
     #[test]

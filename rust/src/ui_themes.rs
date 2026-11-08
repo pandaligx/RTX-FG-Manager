@@ -8,6 +8,42 @@ use std::rc::Rc;
 
 const FONT_FAMILY: &str = "Microsoft YaHei UI";
 
+/// NVIDIA's brand color is an identity token, not an operation/status color.
+pub(crate) fn nvidia_brand() -> gpui::Hsla {
+    gpui::rgb(0x76b900).into()
+}
+
+/// Product accent tokens for the optional community light border. Separate from
+/// status/chart colors: the stock chart palette is monochrome blue. Luminance
+/// follows the surface mode so the thin decorative edge works in both themes.
+pub(crate) fn recommendation_accents(theme: &Theme) -> [gpui::Hsla; 5] {
+    let lightness = if theme.mode.is_dark() { 0.65 } else { 0.43 };
+    [0.52, 0.70, 0.90, 0.10, 0.40].map(|hue| gpui::hsla(hue, 0.64, lightness, 1.))
+}
+
+pub(crate) fn flowing_accent(palette: &[gpui::Hsla; 5], phase: f32) -> gpui::Hsla {
+    use gpui::component::Colorize;
+    let position = phase.rem_euclid(1.) * palette.len() as f32;
+    let index = position.floor() as usize % palette.len();
+    let t = position.fract();
+    // Periodic cubic B-spline: position, velocity and acceleration match at every
+    // color join. Unlike per-segment easing, the ribbon never pauses on a color.
+    let weights = [
+        (1. - t).powi(3) / 6.,
+        (3. * t.powi(3) - 6. * t * t + 4.) / 6.,
+        (-3. * t.powi(3) + 3. * t * t + 3. * t + 1.) / 6.,
+        t.powi(3) / 6.,
+    ];
+    let mut color = palette[(index + palette.len() - 1) % palette.len()];
+    let mut total = weights[0];
+    for (offset, weight) in weights.into_iter().enumerate().skip(1) {
+        let next = total + weight;
+        color = color.mix_oklab(palette[(index + offset - 1) % palette.len()], total / next);
+        total = next;
+    }
+    color
+}
+
 /// A preview is an ephemeral choice; only an explicit confirmation persists it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Choice {
@@ -250,6 +286,18 @@ fn apply_config_with_defaults(
 mod tests {
     use super::*;
     use gpui::px;
+    #[test]
+    fn flowing_border_has_no_color_jump_at_any_seam() {
+        let palette = recommendation_accents(&Theme::default());
+        for step in 0..=5 {
+            let phase = step as f32 / 5.;
+            let left = flowing_accent(&palette, phase - 0.00001).to_rgb();
+            let right = flowing_accent(&palette, phase + 0.00001).to_rgb();
+            assert!((left.r - right.r).abs() < 0.001);
+            assert!((left.g - right.g).abs() < 0.001);
+            assert!((left.b - right.b).abs() < 0.001);
+        }
+    }
     #[test]
     fn theme_changes_keep_the_users_text_scale() {
         for size in [12., 14., 18.] {

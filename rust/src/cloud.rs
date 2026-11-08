@@ -77,6 +77,11 @@ pub struct Package {
     #[serde(default)]
     pub urls: BTreeMap<String, String>,
 }
+impl Package {
+    fn download_file(&self) -> crate::transfer::DownloadFile {
+        crate::transfer::DownloadFile::new(&self.sha256, self.bytes, self.label.clone())
+    }
+}
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Policy {
     pub gpu_paths: Vec<String>,
@@ -1078,6 +1083,12 @@ fn archive(
     cancel: &AtomicBool,
     report: &mut impl FnMut(crate::transfer::Progress),
 ) -> Result<BTreeMap<String, Vec<u8>>> {
+    let file = p.download_file();
+    let mut report = |mut progress: crate::transfer::Progress| {
+        progress.file = Some(file.clone());
+        progress.item = file.name.clone();
+        report(progress);
+    };
     let root = core::no_links(&assets::cache_root()?.join("cloud"))?;
     fs::create_dir_all(&root)?;
     let path = core::no_links(&root.join(format!("{}.zip", p.sha256)))?;
@@ -1130,7 +1141,7 @@ fn archive(
     // Keep the pre-existing owned cache naming format. The source shown in the
     // UI comes from the transfer, never from this local filename.
     let partial = core::no_links(&root.join(format!("{}.{}.download.zip", p.sha256, order[0])))?;
-    crate::transfer::download(&request, &partial, cancel, &mut *report)?;
+    crate::transfer::download(&request, &partial, cancel, &mut report)?;
     let bytes = fs::read(&partial)?;
     let files = unpack(p, &bytes)?;
     ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
@@ -1171,6 +1182,65 @@ pub fn prepare(
             previous = Some(key);
         }
     })
+}
+
+fn selected_package<'a>(
+    c: &'a Catalog,
+    scheme: &str,
+    series: usize,
+    proxy: &str,
+) -> Result<&'a Package> {
+    let policy = c
+        .scheme_policies
+        .get(scheme)
+        .context("Scheme no longer available")?;
+    c.packages
+        .iter()
+        .filter(|p| {
+            p.scheme_id == scheme
+                && !p.component
+                && package_supports_entry(p, policy, proxy)
+                && p.backends.iter().any(|b| {
+                    if crate::upstream040::is_profile(&policy.parameter_profile) {
+                        return b == crate::upstream040::BACKEND;
+                    }
+                    if policy.parameter_profile == crate::rtxmfg::PROFILE {
+                        b == crate::rtxmfg::BACKEND
+                    } else if policy.parameter_profile == crate::transfusion::PROFILE {
+                        b == crate::transfusion::BACKEND
+                    } else if policy.parameter_profile == crate::encore::PROFILE {
+                        b == crate::encore::BACKEND
+                    } else if policy.ini_policy == "upstream_proxy" {
+                        b == "upstream_sm86"
+                    } else {
+                        b.ends_with(if series == 0 { "20" } else { "30" })
+                    }
+                })
+        })
+        .min_by_key(|p| usize::from(p.proxy != proxy))
+        .context("Proxy unavailable in this scheme")
+}
+
+/// Actual archive identities, deduplicated when several entries share a ZIP.
+pub fn download_files(
+    c: &Catalog,
+    scheme: &str,
+    series: usize,
+    proxies: &[String],
+) -> Result<Vec<crate::transfer::DownloadFile>> {
+    let mut files = Vec::new();
+    for proxy in core::normalize_proxies(proxies)? {
+        files.push(selected_package(c, scheme, series, &proxy)?.download_file());
+    }
+    files.extend(
+        c.packages
+            .iter()
+            .filter(|p| p.scheme_id == scheme && p.component)
+            .map(Package::download_file),
+    );
+    let mut seen = BTreeSet::new();
+    files.retain(|file| seen.insert(file.id.clone()));
+    Ok(files)
 }
 
 pub fn prepare_with_progress(
@@ -1215,6 +1285,12 @@ pub fn prepare_with_progress(
         !selected.iter().any(|n| n.ends_with(".asi")) || selected.len() == 1,
         "ASI plugin mode cannot be combined with DLL entries"
     );
+    report(CloudProgress {
+        transfer: crate::transfer::Progress::plan(download_files(c, scheme, series, proxies)?),
+        proxy: String::new(),
+        package_index: 0,
+        package_count: 0,
+    });
     let mut out = BTreeMap::new();
     let mut backend = None;
     let mut version = None;
@@ -1222,32 +1298,7 @@ pub fn prepare_with_progress(
     let package_count = selected.len();
     for (index, proxy) in selected.into_iter().enumerate() {
         ensure!(!cancel.load(Ordering::Relaxed), "Cancelled");
-        let p = c
-            .packages
-            .iter()
-            .filter(|p| {
-                p.scheme_id == scheme
-                    && !p.component
-                    && package_supports_entry(p, policy, &proxy)
-                    && p.backends.iter().any(|b| {
-                        if crate::upstream040::is_profile(&policy.parameter_profile) {
-                            return b == crate::upstream040::BACKEND;
-                        }
-                        if policy.parameter_profile == crate::rtxmfg::PROFILE {
-                            b == crate::rtxmfg::BACKEND
-                        } else if policy.parameter_profile == crate::transfusion::PROFILE {
-                            b == crate::transfusion::BACKEND
-                        } else if policy.parameter_profile == crate::encore::PROFILE {
-                            b == crate::encore::BACKEND
-                        } else if policy.ini_policy == "upstream_proxy" {
-                            b == "upstream_sm86"
-                        } else {
-                            b.ends_with(if series == 0 { "20" } else { "30" })
-                        }
-                    })
-            })
-            .min_by_key(|p| usize::from(p.proxy != proxy))
-            .context("Proxy unavailable in this scheme")?;
+        let p = selected_package(c, scheme, series, &proxy)?;
         let b = p
             .backends
             .iter()
@@ -1371,6 +1422,21 @@ pub fn known_image(image: &str) -> bool {
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn download_plan_counts_a_shared_archive_once_for_multiple_proxies() -> anyhow::Result<()> {
+        let c = bundled();
+        let files = download_files(
+            &c,
+            DELTA_SCHEME,
+            2,
+            &["version.dll".into(), "dxgi.dll".into()],
+        )?;
+        assert_eq!(files.len(), 1);
+        let p = selected_package(&c, DELTA_SCHEME, 2, "version.dll")?;
+        assert_eq!(files[0].bytes, p.bytes);
+        assert_eq!(files[0].id, p.download_file().id);
+        Ok(())
+    }
     #[test]
     fn stale_catalog_retains_reviewed_versions_without_reviving_removed_schemes() {
         let baseline = bundled();

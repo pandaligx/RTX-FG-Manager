@@ -312,6 +312,9 @@ pub fn download_with_preference(
             policy: crate::transfer::UrlPolicy::Official,
         };
         let result = crate::transfer::download(&request, &path, cancel, |mut p| {
+            if let Some(file) = &mut p.file {
+                file.name = "RTXManager.exe".into();
+            }
             // A valid transport checksum is not an Authenticode verification.
             if p.phase == DownloadPhase::Complete {
                 p.phase = DownloadPhase::Verifying;

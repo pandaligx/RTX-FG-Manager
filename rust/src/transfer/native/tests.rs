@@ -25,6 +25,47 @@ enum Mode {
 type RequestedRange = Option<(u64, u64)>;
 type Requests = Arc<Mutex<Vec<RequestedRange>>>;
 
+#[test]
+fn queued_files_follow_real_network_and_verified_cache_completion() -> Result<()> {
+    let a = Server::new(Mode::Range, 16384);
+    let b = Server::new(Mode::Range, 32768);
+    let temp = tempfile::tempdir()?;
+    let files = [&a, &b]
+        .into_iter()
+        .map(|server| {
+            transfer::DownloadFile::new(
+                &core::hash(&server.body),
+                server.body.len() as u64,
+                "runtime.zip".into(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut task = crate::task_progress::Task::new("Fixture".into());
+    task.download(String::new(), transfer::Progress::plan(files));
+    let cancel = AtomicBool::new(false);
+    transfer::download(&a.request(), &temp.path().join("a.zip"), &cancel, |p| {
+        task.download(String::new(), p)
+    })?;
+    assert_eq!(task.completed_files(), 1);
+    assert_eq!(task.files[1].label(), "等待");
+    let requests = a.requests.lock().unwrap().len();
+    transfer::download(&a.request(), &temp.path().join("a.zip"), &cancel, |p| {
+        task.download(String::new(), p)
+    })?;
+    assert_eq!(
+        a.requests.lock().unwrap().len(),
+        requests,
+        "Verified cache must not redownload"
+    );
+    assert_eq!(task.completed_files(), 1);
+    transfer::download(&b.request(), &temp.path().join("b.zip"), &cancel, |p| {
+        task.download(String::new(), p)
+    })?;
+    assert_eq!(task.completed_files(), 2);
+    assert!(!task.is_downloading());
+    Ok(())
+}
+
 struct Server {
     url: String,
     body: Arc<Vec<u8>>,

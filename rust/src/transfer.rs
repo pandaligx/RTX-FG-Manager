@@ -94,6 +94,16 @@ pub enum Phase {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Progress {
+    /// Announced files, before transfer starts. Shared archives have one identity.
+    #[serde(default)]
+    pub queue: Vec<DownloadFile>,
+    #[serde(default)]
+    pub file: Option<DownloadFile>,
+    #[serde(default)]
+    pub item: String,
+    /// Known files in this download stage, not the whole install transaction.
+    #[serde(default)]
+    pub aggregate: Option<(u64, u64)>,
     pub completed: u64,
     pub total: u64,
     pub bytes_per_second: u64,
@@ -104,7 +114,30 @@ pub struct Progress {
     pub detail: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DownloadFile {
+    pub id: String,
+    pub name: String,
+    pub bytes: u64,
+}
+impl DownloadFile {
+    pub fn new(hash: &str, bytes: u64, name: String) -> Self {
+        Self {
+            id: format!("{}:{bytes}", hash.to_ascii_lowercase()),
+            name,
+            bytes,
+        }
+    }
+}
+
 impl Progress {
+    pub fn plan(queue: Vec<DownloadFile>) -> Self {
+        Self {
+            queue,
+            phase: Phase::Waiting,
+            ..Self::default()
+        }
+    }
     pub fn percent(&self) -> f32 {
         if self.phase == Phase::Complete {
             return 100.;
@@ -292,6 +325,20 @@ pub fn download(
     mut progress: impl FnMut(Progress),
 ) -> Result<PathBuf> {
     request.validate()?;
+    let file = (!request.metadata).then(|| {
+        DownloadFile::new(
+            request.sha256.as_deref().unwrap_or_default(),
+            request.bytes.unwrap_or(0),
+            path.file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned(),
+        )
+    });
+    let mut progress = |mut p: Progress| {
+        p.file = file.clone();
+        progress(p);
+    };
     check_cancel(cancel)?;
     let path = core::no_links(path)?;
     let parent = core::no_links(path.parent().context("下载目录无效")?)?;

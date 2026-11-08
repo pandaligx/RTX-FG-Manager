@@ -892,6 +892,19 @@
           "inherit": "跟随游戏"
         }
       },
+      "xefgSourcePacing": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "2.1.0",
+        "label": "XeFG 源帧稳定节奏",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
       "xefgUiHandling": {
         "values": [
           "interpolate",

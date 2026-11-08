@@ -1160,21 +1160,25 @@ fn component_probe_distinguishes_super_resolution_and_frame_generation() {
 }
 
 #[test]
-fn welcome_only_for_new_users_and_dismissal_persists() -> Result<()> {
+fn initial_scan_only_for_new_users_and_dismissal_persists() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let mut state = preferences::load(dir.path())?;
-    assert_eq!(state["welcome_pending"], true);
-    state["welcome_pending"] = serde_json::json!(false);
+    assert_eq!(state["initial_scan_pending"], true);
+    state["initial_scan_pending"] = serde_json::json!(false);
     let store = preferences::Store::new(dir.path().into());
     store.save(state)?;
     store.finish()?;
-    assert_eq!(preferences::load(dir.path())?["welcome_pending"], false);
+    assert_eq!(
+        preferences::load(dir.path())?["initial_scan_pending"],
+        false
+    );
     core::atomic_json(
         &dir.path().join("games.json"),
-        &serde_json::json!({"schema":3,"games":[],"language":"ja"}),
+        &serde_json::json!({"schema":3,"games":[],"language":"ja","welcome_pending":true}),
     )?;
     let old = preferences::load(dir.path())?;
-    assert!(old.get("welcome_pending").is_none());
+    assert!(old.get("initial_scan_pending").is_none());
+    assert_eq!(old["welcome_pending"], true);
     assert_eq!(old["language"], "ja");
     Ok(())
 }

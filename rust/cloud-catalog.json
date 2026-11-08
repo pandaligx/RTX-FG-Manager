@@ -942,23 +942,23 @@
       "version": "1.7.0"
     },
     {
-      "archive": "rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-      "archive_prefix": "rtx-encore-2.0.1-winhttp-dll-e053f472c31b",
+      "archive": "rtx-encore-2.1.0-complete-f39995447110.zip",
+      "archive_prefix": "rtx-encore-2.1.0-winhttp-dll-cf7a2c43bf62",
       "backends": [
         "encore"
       ],
-      "bytes": 260190090,
+      "bytes": 260544544,
       "component": false,
       "files": [
         {
-          "bytes": 43073128,
+          "bytes": 43202792,
           "name": "winhttp.dll",
-          "sha256": "e053f472c31b90903e9f43117ddf15f093f8f6cf3f30721560440833f22dc80a"
+          "sha256": "cf7a2c43bf62f886e9179d92e55535a18349e51e6a6e274f5008cf237c2a3ebd"
         },
         {
-          "bytes": 16916,
+          "bytes": 16947,
           "name": "rtx-encore.jsonc",
-          "sha256": "65549c48e95513f8d3829fcb5c66d01d3ab5c93777a59b85f7a51aa3cabf588a"
+          "sha256": "3cfcce9fec9097f234c0af5b4c052f6cde4c763447d580cdc87e0ae9f4e4748a"
         },
         {
           "bytes": 19756,
@@ -990,43 +990,43 @@
           "sha256": "784be42c39a4a4d03cf85d88e15e59d75828fca773ce45b8dbfffbd7eaf208df"
         }
       ],
-      "id": "rtx-encore-2.0.1-winhttp-dll-e053f472c31b",
-      "label": "RTX Encore · 2.0.1",
+      "id": "rtx-encore-2.1.0-winhttp-dll-cf7a2c43bf62",
+      "label": "RTX Encore · 2.1.0",
       "labels": {
-        "en": "RTX Encore · 2.0.1",
-        "ja": "RTX Encore · 2.0.1",
-        "ko": "RTX Encore · 2.0.1",
-        "ru": "RTX Encore · 2.0.1",
-        "zh": "RTX Encore · 2.0.1"
+        "en": "RTX Encore · 2.1.0",
+        "ja": "RTX Encore · 2.1.0",
+        "ko": "RTX Encore · 2.1.0",
+        "ru": "RTX Encore · 2.1.0",
+        "zh": "RTX Encore · 2.1.0"
       },
       "proxy": "winhttp.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f5ac1cd091ce6ddc862a78eec32d438520fab82b4e56035a2256a19709bb3dc1",
-      "upstream_version": "2.0.1",
+      "sha256": "f399954471104eb3c0b1c1b8aa022a79d50ce089a30b8ef12a805ef5aad14fb2",
+      "upstream_version": "2.1.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip"
       },
-      "version": "2.0.1"
+      "version": "2.1.0"
     },
     {
-      "archive": "rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-      "archive_prefix": "rtx-encore-2.0.1-version-dll-13c2d0972825",
+      "archive": "rtx-encore-2.1.0-complete-f39995447110.zip",
+      "archive_prefix": "rtx-encore-2.1.0-version-dll-6215eb4f9eca",
       "backends": [
         "encore"
       ],
-      "bytes": 260190090,
+      "bytes": 260544544,
       "component": false,
       "files": [
         {
-          "bytes": 42823192,
+          "bytes": 42952784,
           "name": "version.dll",
-          "sha256": "13c2d097282546324cc24007beee0b8da35ec27d84047c3e6a003d1b473f99d4"
+          "sha256": "6215eb4f9ecaeba03c134a4b372ccb52010e11dcce7650341b10d55fad968490"
         },
         {
-          "bytes": 16916,
+          "bytes": 16947,
           "name": "rtx-encore.jsonc",
-          "sha256": "65549c48e95513f8d3829fcb5c66d01d3ab5c93777a59b85f7a51aa3cabf588a"
+          "sha256": "3cfcce9fec9097f234c0af5b4c052f6cde4c763447d580cdc87e0ae9f4e4748a"
         },
         {
           "bytes": 19756,
@@ -1058,43 +1058,43 @@
           "sha256": "784be42c39a4a4d03cf85d88e15e59d75828fca773ce45b8dbfffbd7eaf208df"
         }
       ],
-      "id": "rtx-encore-2.0.1-version-dll-13c2d0972825",
-      "label": "RTX Encore · 2.0.1",
+      "id": "rtx-encore-2.1.0-version-dll-6215eb4f9eca",
+      "label": "RTX Encore · 2.1.0",
       "labels": {
-        "en": "RTX Encore · 2.0.1",
-        "ja": "RTX Encore · 2.0.1",
-        "ko": "RTX Encore · 2.0.1",
-        "ru": "RTX Encore · 2.0.1",
-        "zh": "RTX Encore · 2.0.1"
+        "en": "RTX Encore · 2.1.0",
+        "ja": "RTX Encore · 2.1.0",
+        "ko": "RTX Encore · 2.1.0",
+        "ru": "RTX Encore · 2.1.0",
+        "zh": "RTX Encore · 2.1.0"
       },
       "proxy": "version.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f5ac1cd091ce6ddc862a78eec32d438520fab82b4e56035a2256a19709bb3dc1",
-      "upstream_version": "2.0.1",
+      "sha256": "f399954471104eb3c0b1c1b8aa022a79d50ce089a30b8ef12a805ef5aad14fb2",
+      "upstream_version": "2.1.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip"
       },
-      "version": "2.0.1"
+      "version": "2.1.0"
     },
     {
-      "archive": "rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-      "archive_prefix": "rtx-encore-2.0.1-winmm-dll-0b557d1e3dc4",
+      "archive": "rtx-encore-2.1.0-complete-f39995447110.zip",
+      "archive_prefix": "rtx-encore-2.1.0-winmm-dll-9255ab50a5bf",
       "backends": [
         "encore"
       ],
-      "bytes": 260190090,
+      "bytes": 260544544,
       "component": false,
       "files": [
         {
-          "bytes": 42827328,
+          "bytes": 42956920,
           "name": "winmm.dll",
-          "sha256": "0b557d1e3dc4e35dc4314502095fad2c0ad88693c9c6946d7f806f5cfe043d80"
+          "sha256": "9255ab50a5bfc50205c850dad1e7447ee419cfa9de4d8bfef3fd417f3f811274"
         },
         {
-          "bytes": 16916,
+          "bytes": 16947,
           "name": "rtx-encore.jsonc",
-          "sha256": "65549c48e95513f8d3829fcb5c66d01d3ab5c93777a59b85f7a51aa3cabf588a"
+          "sha256": "3cfcce9fec9097f234c0af5b4c052f6cde4c763447d580cdc87e0ae9f4e4748a"
         },
         {
           "bytes": 19756,
@@ -1126,43 +1126,43 @@
           "sha256": "784be42c39a4a4d03cf85d88e15e59d75828fca773ce45b8dbfffbd7eaf208df"
         }
       ],
-      "id": "rtx-encore-2.0.1-winmm-dll-0b557d1e3dc4",
-      "label": "RTX Encore · 2.0.1",
+      "id": "rtx-encore-2.1.0-winmm-dll-9255ab50a5bf",
+      "label": "RTX Encore · 2.1.0",
       "labels": {
-        "en": "RTX Encore · 2.0.1",
-        "ja": "RTX Encore · 2.0.1",
-        "ko": "RTX Encore · 2.0.1",
-        "ru": "RTX Encore · 2.0.1",
-        "zh": "RTX Encore · 2.0.1"
+        "en": "RTX Encore · 2.1.0",
+        "ja": "RTX Encore · 2.1.0",
+        "ko": "RTX Encore · 2.1.0",
+        "ru": "RTX Encore · 2.1.0",
+        "zh": "RTX Encore · 2.1.0"
       },
       "proxy": "winmm.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f5ac1cd091ce6ddc862a78eec32d438520fab82b4e56035a2256a19709bb3dc1",
-      "upstream_version": "2.0.1",
+      "sha256": "f399954471104eb3c0b1c1b8aa022a79d50ce089a30b8ef12a805ef5aad14fb2",
+      "upstream_version": "2.1.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip"
       },
-      "version": "2.0.1"
+      "version": "2.1.0"
     },
     {
-      "archive": "rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-      "archive_prefix": "rtx-encore-2.0.1-dxgi-dll-fa9203c06dac",
+      "archive": "rtx-encore-2.1.0-complete-f39995447110.zip",
+      "archive_prefix": "rtx-encore-2.1.0-dxgi-dll-45049ec7cc8c",
       "backends": [
         "encore"
       ],
-      "bytes": 260190090,
+      "bytes": 260544544,
       "component": false,
       "files": [
         {
-          "bytes": 42823192,
+          "bytes": 42952784,
           "name": "dxgi.dll",
-          "sha256": "fa9203c06daca5f1649510f20953e255115217d9a8553565d03744893549686d"
+          "sha256": "45049ec7cc8c7158e3624c54f0f463e42f3dab2ebeb1794e6234773b1dd07151"
         },
         {
-          "bytes": 16916,
+          "bytes": 16947,
           "name": "rtx-encore.jsonc",
-          "sha256": "65549c48e95513f8d3829fcb5c66d01d3ab5c93777a59b85f7a51aa3cabf588a"
+          "sha256": "3cfcce9fec9097f234c0af5b4c052f6cde4c763447d580cdc87e0ae9f4e4748a"
         },
         {
           "bytes": 19756,
@@ -1194,43 +1194,43 @@
           "sha256": "784be42c39a4a4d03cf85d88e15e59d75828fca773ce45b8dbfffbd7eaf208df"
         }
       ],
-      "id": "rtx-encore-2.0.1-dxgi-dll-fa9203c06dac",
-      "label": "RTX Encore · 2.0.1",
+      "id": "rtx-encore-2.1.0-dxgi-dll-45049ec7cc8c",
+      "label": "RTX Encore · 2.1.0",
       "labels": {
-        "en": "RTX Encore · 2.0.1",
-        "ja": "RTX Encore · 2.0.1",
-        "ko": "RTX Encore · 2.0.1",
-        "ru": "RTX Encore · 2.0.1",
-        "zh": "RTX Encore · 2.0.1"
+        "en": "RTX Encore · 2.1.0",
+        "ja": "RTX Encore · 2.1.0",
+        "ko": "RTX Encore · 2.1.0",
+        "ru": "RTX Encore · 2.1.0",
+        "zh": "RTX Encore · 2.1.0"
       },
       "proxy": "dxgi.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f5ac1cd091ce6ddc862a78eec32d438520fab82b4e56035a2256a19709bb3dc1",
-      "upstream_version": "2.0.1",
+      "sha256": "f399954471104eb3c0b1c1b8aa022a79d50ce089a30b8ef12a805ef5aad14fb2",
+      "upstream_version": "2.1.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip"
       },
-      "version": "2.0.1"
+      "version": "2.1.0"
     },
     {
-      "archive": "rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-      "archive_prefix": "rtx-encore-2.0.1-dinput8-dll-1d9e48dc6f11",
+      "archive": "rtx-encore-2.1.0-complete-f39995447110.zip",
+      "archive_prefix": "rtx-encore-2.1.0-dinput8-dll-35dc1e1cadc1",
       "backends": [
         "encore"
       ],
-      "bytes": 260190090,
+      "bytes": 260544544,
       "component": false,
       "files": [
         {
-          "bytes": 42822680,
+          "bytes": 42952272,
           "name": "dinput8.dll",
-          "sha256": "1d9e48dc6f115fd11f4ffcf5f098688718d5663326bbd7318c463342825f6468"
+          "sha256": "35dc1e1cadc1838c7b6f0859a24bef2ad3399ca2209e71524f0f5d64f5c68b08"
         },
         {
-          "bytes": 16916,
+          "bytes": 16947,
           "name": "rtx-encore.jsonc",
-          "sha256": "65549c48e95513f8d3829fcb5c66d01d3ab5c93777a59b85f7a51aa3cabf588a"
+          "sha256": "3cfcce9fec9097f234c0af5b4c052f6cde4c763447d580cdc87e0ae9f4e4748a"
         },
         {
           "bytes": 19756,
@@ -1262,43 +1262,43 @@
           "sha256": "784be42c39a4a4d03cf85d88e15e59d75828fca773ce45b8dbfffbd7eaf208df"
         }
       ],
-      "id": "rtx-encore-2.0.1-dinput8-dll-1d9e48dc6f11",
-      "label": "RTX Encore · 2.0.1",
+      "id": "rtx-encore-2.1.0-dinput8-dll-35dc1e1cadc1",
+      "label": "RTX Encore · 2.1.0",
       "labels": {
-        "en": "RTX Encore · 2.0.1",
-        "ja": "RTX Encore · 2.0.1",
-        "ko": "RTX Encore · 2.0.1",
-        "ru": "RTX Encore · 2.0.1",
-        "zh": "RTX Encore · 2.0.1"
+        "en": "RTX Encore · 2.1.0",
+        "ja": "RTX Encore · 2.1.0",
+        "ko": "RTX Encore · 2.1.0",
+        "ru": "RTX Encore · 2.1.0",
+        "zh": "RTX Encore · 2.1.0"
       },
       "proxy": "dinput8.dll",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f5ac1cd091ce6ddc862a78eec32d438520fab82b4e56035a2256a19709bb3dc1",
-      "upstream_version": "2.0.1",
+      "sha256": "f399954471104eb3c0b1c1b8aa022a79d50ce089a30b8ef12a805ef5aad14fb2",
+      "upstream_version": "2.1.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip"
       },
-      "version": "2.0.1"
+      "version": "2.1.0"
     },
     {
-      "archive": "rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-      "archive_prefix": "rtx-encore-2.0.1-rtx-encore-asi-ba79f1ee6434",
+      "archive": "rtx-encore-2.1.0-complete-f39995447110.zip",
+      "archive_prefix": "rtx-encore-2.1.0-rtx-encore-asi-7661ee5f98ab",
       "backends": [
         "encore"
       ],
-      "bytes": 260190090,
+      "bytes": 260544544,
       "component": false,
       "files": [
         {
-          "bytes": 42822680,
+          "bytes": 42952272,
           "name": "rtx-encore.asi",
-          "sha256": "ba79f1ee64340304317d9cc95311dfb5ce57015e2fe9749afdbe5ac3a3b1a4f0"
+          "sha256": "7661ee5f98ab8b50ab0f6c8feb4df1c99c6de60c2bdf8d821992ca0604bd5219"
         },
         {
-          "bytes": 16916,
+          "bytes": 16947,
           "name": "rtx-encore.jsonc",
-          "sha256": "65549c48e95513f8d3829fcb5c66d01d3ab5c93777a59b85f7a51aa3cabf588a"
+          "sha256": "3cfcce9fec9097f234c0af5b4c052f6cde4c763447d580cdc87e0ae9f4e4748a"
         },
         {
           "bytes": 19756,
@@ -1330,24 +1330,24 @@
           "sha256": "784be42c39a4a4d03cf85d88e15e59d75828fca773ce45b8dbfffbd7eaf208df"
         }
       ],
-      "id": "rtx-encore-2.0.1-rtx-encore-asi-ba79f1ee6434",
-      "label": "RTX Encore · 2.0.1",
+      "id": "rtx-encore-2.1.0-rtx-encore-asi-7661ee5f98ab",
+      "label": "RTX Encore · 2.1.0",
       "labels": {
-        "en": "RTX Encore · 2.0.1",
-        "ja": "RTX Encore · 2.0.1",
-        "ko": "RTX Encore · 2.0.1",
-        "ru": "RTX Encore · 2.0.1",
-        "zh": "RTX Encore · 2.0.1"
+        "en": "RTX Encore · 2.1.0",
+        "ja": "RTX Encore · 2.1.0",
+        "ko": "RTX Encore · 2.1.0",
+        "ru": "RTX Encore · 2.1.0",
+        "zh": "RTX Encore · 2.1.0"
       },
       "proxy": "rtx-encore.asi",
       "scheme_id": "dlssg-transfusion-1.4.5.3",
-      "sha256": "f5ac1cd091ce6ddc862a78eec32d438520fab82b4e56035a2256a19709bb3dc1",
-      "upstream_version": "2.0.1",
+      "sha256": "f399954471104eb3c0b1c1b8aa022a79d50ce089a30b8ef12a805ef5aad14fb2",
+      "upstream_version": "2.1.0",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.0.1-complete-f5ac1cd091ce.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtx-encore-2.1.0-complete-f39995447110.zip"
       },
-      "version": "2.0.1"
+      "version": "2.1.0"
     },
     {
       "archive": "mfg-unlocker-1.6.1-complete-5c17c0d90b07.zip",
@@ -1395,7 +1395,7 @@
       "version": "1.6.1"
     }
   ],
-  "revision": "bundles-4ebab9258f03cf7be028",
+  "revision": "bundles-c5aea81e5af9221a13ea",
   "schema": 3,
   "scheme_policies": {
     "dlssg-transfusion-1.4.5.3": {

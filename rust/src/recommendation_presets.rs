@@ -98,6 +98,11 @@ pub fn execute(
     use std::sync::atomic::Ordering;
     ensure!(!action.is_empty(), "请至少选择一项安装内容");
     let version = recipe.available_version(catalog)?;
+    // Encore's manual-install dependencies are part of the patch installation.
+    // The optional runtimes selection only controls the player's version overrides.
+    let complete_encore = recipe.scheme == encore::SCHEME
+        && encore::supports_200(Some(&version))
+        && (action.installs() || action.runtimes());
     let converted;
     let settings = if action.parameters() {
         let settings = recipe
@@ -181,7 +186,7 @@ pub fn execute(
             !(settings.requires_xemfg() && recipe.entries.iter().any(|p| p.ends_with(".asi"))),
             "此分享启用了独立 XeSS，但选择了插件入口；请先修正分享方案"
         );
-        if !action.runtimes() {
+        if !action.runtimes() && !complete_encore {
             for target in &targets {
                 ensure!(
                     !settings.requires_nr() || crate::neural_runtime::inspect(target).present,
@@ -207,7 +212,81 @@ pub fn execute(
             }
         }
     }
+    let mut queue = Vec::new();
     if action.installs() {
+        queue.extend(cloud::download_files(
+            catalog,
+            &recipe.scheme,
+            series,
+            &recipe.entries,
+        )?);
+    }
+    if complete_encore {
+        queue.extend(crate::runtime_files::encore_download_files(&targets)?);
+    }
+    if action.runtimes() {
+        if let Some(runtimes) = &recipe.runtimes {
+            queue.extend(runtimes.download_files(&targets)?);
+        }
+        let shared_nr = recipe
+            .runtimes
+            .as_ref()
+            .is_some_and(|r| r.components.iter().any(|c| c.kind == "nr"));
+        let shared_xess = recipe.runtimes.as_ref().is_some_and(|r| {
+            r.components
+                .iter()
+                .any(|c| c.source == "managed" && c.kind != "encorefg")
+        });
+        if !shared_nr
+            && (settings.is_some_and(|s| s.requires_nr()) || recipe.neural_runtime == "310.9.16")
+        {
+            queue.push(crate::neural_runtime::download_file("310.9.16")?);
+        }
+        if settings.is_some_and(|s| s.requires_xemfg()) && !shared_xess {
+            queue.extend(crate::runtime_files::download_files(
+                &targets,
+                "xemfg",
+                &crate::runtime_files::recommended("xemfg"),
+            )?);
+        }
+        if let Some(settings) = settings {
+            for kind in settings.added_runtime_dependencies() {
+                let shared = recipe
+                    .runtimes
+                    .as_ref()
+                    .is_some_and(|r| r.components.iter().any(|c| c.kind == kind));
+                if !shared {
+                    queue.extend(crate::runtime_files::download_files(
+                        &targets,
+                        kind,
+                        &crate::runtime_files::recommended(kind),
+                    )?);
+                }
+            }
+        }
+    }
+    progress(cloud::CloudProgress {
+        transfer: crate::transfer::Progress::plan(queue),
+        proxy: String::new(),
+        package_index: 0,
+        package_count: 0,
+    });
+    if action.installs() {
+        if complete_encore {
+            crate::runtime_files::prepare_encore_sources(
+                &targets,
+                catalog.prefer_github,
+                cancel,
+                &mut |transfer| {
+                    progress(cloud::CloudProgress {
+                        transfer,
+                        proxy: "Encore".into(),
+                        package_index: 1,
+                        package_count: 1,
+                    })
+                },
+            )?;
+        }
         let prepared = cloud::prepare_with_progress(
             catalog,
             &recipe.scheme,
@@ -226,12 +305,27 @@ pub fn execute(
             let context = presets::Context::new(&recipe.scheme, &prepared.policy, &target.game_exe);
             // No shared overrides in this phase. Existing user configuration is
             // retained until dependencies are ready and all values validated.
+            let mut files = prepared.files.clone();
+            if complete_encore && core::record(&target.directory)?.is_none() {
+                let defaults = presets::Values::from([
+                    ("dlssWithoutGameDlss".into(), "0".into()),
+                    ("frameGenerationWithoutGameFg".into(), "0".into()),
+                    ("smoothMotionEnabled".into(), "0".into()),
+                    ("frameGenerationEngine".into(), "game".into()),
+                ]);
+                let config = encore::configure_for_version(
+                    &files[encore::CONFIG],
+                    &defaults,
+                    Some(&version),
+                )?;
+                files.insert(encore::CONFIG.into(), config);
+            }
             core::deploy_prepared_context_at_with_overrides(
                 target,
                 &prepared.backend,
                 &recipe.entries,
                 None,
-                prepared.files.clone(),
+                files,
                 Some(&prepared.version),
                 Some(&context),
                 None,
@@ -239,30 +333,30 @@ pub fn execute(
             )?;
         }
     }
+    if complete_encore
+        && targets
+            .iter()
+            .map(crate::runtime_files::encore_200_installed)
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .all(|installed| installed)
+    {
+        crate::runtime_files::complete_encore_runtimes(
+            &targets,
+            catalog.prefer_github,
+            cancel,
+            &mut |transfer| {
+                progress(cloud::CloudProgress {
+                    transfer,
+                    proxy: "Encore".into(),
+                    package_index: 1,
+                    package_count: 1,
+                })
+            },
+        )
+        .context("配套运行库未完成；参数尚未应用，可在运行库窗口补齐后重试")?;
+    }
     if action.runtimes() {
-        if recipe.scheme == encore::SCHEME
-            && targets
-                .iter()
-                .map(crate::runtime_files::encore_200_installed)
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .all(|installed| installed)
-        {
-            crate::runtime_files::complete_encore_runtimes(
-                &targets,
-                catalog.prefer_github,
-                cancel,
-                &mut |transfer| {
-                    progress(cloud::CloudProgress {
-                        transfer,
-                        proxy: "Encore".into(),
-                        package_index: 1,
-                        package_count: 1,
-                    })
-                },
-            )
-            .context("配套运行库未完成；参数尚未应用，可在运行库窗口补齐后重试")?;
-        }
         if let Some(runtimes) = &recipe.runtimes {
             runtimes
                 .install(&targets, catalog.prefer_github, cancel, &mut progress)

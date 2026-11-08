@@ -34,6 +34,8 @@ use std::{
 
 #[path = "ui_encore.rs"]
 mod encore_editor;
+#[path = "ui_encore_install.rs"]
+mod encore_install;
 #[path = "ui_game_name.rs"]
 mod game_name_editor;
 #[path = "ui_recommendation_entry.rs"]
@@ -44,6 +46,8 @@ mod recommendations;
 mod runtime_files;
 #[path = "ui_settings.rs"]
 mod settings;
+#[path = "ui_tasks.rs"]
+mod tasks;
 #[path = "ui_theme_preview.rs"]
 mod theme_preview;
 
@@ -108,6 +112,7 @@ enum Command {
     Confirm(String),
     Commit(String),
     Patch(bool),
+    CheckedPatch(bool),
     Open(String),
 }
 
@@ -149,7 +154,7 @@ impl SelectItem for ChoiceItem {
     }
 }
 struct ChoiceBinding {
-    state: Entity<SelectState<Vec<ChoiceItem>>>,
+    state: Entity<SelectState<gpui::component::select::SearchableVec<ChoiceItem>>>,
     trigger_focus: FocusHandle,
     items: Vec<(SharedString, Command, bool)>,
     _subscription: Subscription,
@@ -220,12 +225,12 @@ pub struct Manager {
     utility_opening: bool,
     runtime_window: Option<AnyWindowHandle>,
     settings_window: Option<AnyWindowHandle>,
+    presentation_window: Option<AnyWindowHandle>,
     recommendation_windows: HashMap<String, AnyWindowHandle>,
     feedback_window: Option<AnyWindowHandle>,
     main_window: AnyWindowHandle,
     runtime_game: Option<String>,
     runtime_versions: HashMap<&'static str, String>,
-    runtime_feedback: Option<(bool, String)>,
     editor_open: bool,
     preset_close: Option<bool>, // true: app exit; false: editor dismissal
     theme_preview: theme_preview::ThemePreview<WindowId>,
@@ -312,6 +317,7 @@ impl Manager {
             theme.font_size = px(font_size * 8. / 7.);
             // Keep a thin focus edge without the outward halo in every window.
             theme.focus_ring = false;
+            theme.notification.max_items = 3;
         });
         let font_slider = cx.new(|_| {
             SliderState::new()
@@ -384,12 +390,12 @@ impl Manager {
             utility_opening: false,
             runtime_window: None,
             settings_window: None,
+            presentation_window: None,
             recommendation_windows: HashMap::new(),
             feedback_window: None,
             main_window: window.window_handle(),
             runtime_game: None,
             runtime_versions: HashMap::new(),
-            runtime_feedback: None,
             drag_gap: None,
             editor_open: false,
             preset_close: None,
@@ -577,7 +583,7 @@ impl Manager {
             && let Err(error) =
                 bind_runtime_game(&mut self.c, &command, self.runtime_game.as_deref())
         {
-            self.runtime_feedback = Some((true, error.to_string()));
+            self.c.warning = Some(error.to_string());
             cx.notify();
             return;
         }
@@ -588,8 +594,10 @@ impl Manager {
                 .borrow()
                 .as_ref()
                 .is_some_and(|(exe, _)| self.c.focus.as_ref() == Some(exe))
-            && (matches!(command, Command::ApplyPreset | Command::Patch(false))
-                || matches!(&command, Command::Commit(action) if action == "deploy_batch"))
+            && (matches!(
+                command,
+                Command::ApplyPreset | Command::Patch(false) | Command::CheckedPatch(false)
+            ) || matches!(&command, Command::Commit(action) if action == "deploy_batch"))
         {
             self.c.warning = Some(
                 self.c
@@ -652,7 +660,6 @@ impl Manager {
                 }
             }
             Command::InstallNeural(version) => {
-                self.runtime_feedback = None;
                 self.c.install_neural_runtime(version);
             }
             Command::RuntimeFiles => self.runtime_dialog(window, cx),
@@ -671,7 +678,6 @@ impl Manager {
                 }
             }
             Command::RuntimeOperation(kind, remove) => {
-                self.runtime_feedback = None;
                 let version = self
                     .runtime_versions
                     .get(kind)
@@ -688,7 +694,6 @@ impl Manager {
                 self.c.recheck_blocked();
             }
             Command::RemoveNeural => {
-                self.runtime_feedback = None;
                 self.c.confirm = Some("remove_nr".into());
             }
             Command::RetryCleanup => {
@@ -873,6 +878,7 @@ impl Manager {
             }
             Command::Commit(action) => self.commit(&action),
             Command::Patch(clean) => self.c.request_patch(clean),
+            Command::CheckedPatch(clean) => self.c.request_checked_patch(clean),
             Command::Open(s) => self.c.channel.job(move |_| win::open(&s)),
         }
         cx.notify();
@@ -924,6 +930,7 @@ impl Manager {
     fn commit(&mut self, action: &str) {
         match action {
             "deploy_batch" | "clean_batch" | "recover_patch" => self.c.confirm_patch(),
+            "reset_manager" => self.c.reset_manager(),
             "remove_nr" => self.c.remove_neural_runtime(),
             "delete_cleanup" => self.c.confirm_cleanup_deletion(),
             "end_processes" => self.c.end_blocked_and_retry(),
@@ -1004,7 +1011,7 @@ impl Manager {
     }
     fn recommendation_entry(&self, exe: String, cx: &Context<Self>) -> AnyElement {
         let theme = cx.theme();
-        let animate = !self.dialog_active && !cx.reduce_motion();
+        let animate = !cx.reduce_motion();
         let button = self
             .button(
                 "game-recommendations",
@@ -1020,16 +1027,13 @@ impl Manager {
                     .active(theme.secondary_active),
             )
             .w_full();
-        // A single animation clock paints the border and icon together. Visible,
-        // unfocused windows keep moving without requiring mouse hover.
-        let entry = recommendation_entry::RecommendationEntry::new(button, animate);
+        // Keep the same clock while menus/dialogs open so motion never resets.
+        let entry = recommendation_entry::RecommendationEntry::new(button);
         if animate {
             entry
                 .with_animation(
                     "recommendation-entry-glow",
-                    Animation::new(Duration::from_millis(4800))
-                        .repeat_synced()
-                        .with_max_fps(30.),
+                    Animation::new(Duration::from_secs(8)).repeat_synced(),
                     |entry, phase| entry.phase(phase),
                 )
                 .into_any_element()
@@ -1065,7 +1069,15 @@ impl Manager {
         let mut choices = self.choices.borrow_mut();
         let key = (window.window_handle().window_id(), id);
         let binding = choices.entry(key).or_insert_with(|| {
-            let state = cx.new(|cx| SelectState::new(options(), selected, window, cx));
+            let state = cx.new(|cx| {
+                SelectState::new(
+                    gpui::component::select::SearchableVec::new(options()),
+                    selected,
+                    window,
+                    cx,
+                )
+                .searchable(id == "gpu-alias")
+            });
             // Capture the closed trigger once. SelectState::focus_handle switches
             // to the popup list while open, which must keep focus until mouse-up
             // confirms an item (the popup lies outside this wrapper's hitbox).
@@ -1101,7 +1113,11 @@ impl Manager {
         });
         if binding.items != items {
             binding.state.update(cx, |state, cx| {
-                state.set_items(options(), window, cx);
+                state.set_items(
+                    gpui::component::select::SearchableVec::new(options()),
+                    window,
+                    cx,
+                );
                 state.set_selected_index(selected, window, cx);
             });
             binding.items = items;
@@ -1595,6 +1611,46 @@ impl Manager {
                                     .min_w(rems(5.))
                                     .disabled(self.c.busy),
                             )
+                            .when(!self.c.selected.is_empty(), |d| {
+                                let view = cx.entity().downgrade();
+                                let install = self.t("安装勾选游戏");
+                                let uninstall = self.t("卸载勾选游戏补丁");
+                                d.child(
+                                    Button::new("batch-patches")
+                                        .label(self.t("批量操作"))
+                                        .icon(IconName::ChevronDown)
+                                        .small()
+                                        .disabled(self.c.busy)
+                                        .dropdown_menu(move |menu, _, _| {
+                                            let owner = view.clone();
+                                            menu.item(PopupMenuItem::new(install.clone()).on_click(
+                                                move |_, window, cx| {
+                                                    let _ = owner.update(cx, |this, cx| {
+                                                        this.act(
+                                                            Command::CheckedPatch(false),
+                                                            window,
+                                                            cx,
+                                                        )
+                                                    });
+                                                },
+                                            ))
+                                            .item(
+                                                PopupMenuItem::new(uninstall.clone()).on_click({
+                                                    let owner = view.clone();
+                                                    move |_, window, cx| {
+                                                        let _ = owner.update(cx, |this, cx| {
+                                                            this.act(
+                                                                Command::CheckedPatch(true),
+                                                                window,
+                                                                cx,
+                                                            )
+                                                        });
+                                                    }
+                                                }),
+                                            )
+                                        }),
+                                )
+                            })
                             .child(
                                 self.button(
                                     "remove-checked",
@@ -1647,59 +1703,8 @@ impl Manager {
                             ),
                     ),
             );
-        if self.c.busy {
-            let activity = if let Some(p) = &self.c.payload_progress {
-                let phase = match p.transfer.phase {
-                    rtx_fg_manager::updater::DownloadPhase::Complete => "下载完成，正在准备安装…",
-                    rtx_fg_manager::updater::DownloadPhase::Verifying => "正在校验补丁…",
-                    rtx_fg_manager::updater::DownloadPhase::Downloading => "正在下载补丁…",
-                    _ => p.transfer.label(),
-                };
-                div()
-                    .h_flex()
-                    .gap_2()
-                    .flex_1()
-                    .min_w_0()
-                    .child(self.progress_ring(22., p.transfer.percent() / 100., cx))
-                    .child(
-                        div()
-                            .v_flex()
-                            .gap_1()
-                            .flex_1()
-                            .min_w_0()
-                            .text_xs()
-                            .child(format!(
-                                "{} {}/{} · {} · {}",
-                                self.c.text(phase),
-                                p.package_index,
-                                p.package_count,
-                                p.proxy,
-                                p.transfer.source
-                            ))
-                            .child(format!(
-                                "{:.1} / {:.1} MB · {:.2} MB/s",
-                                p.transfer.completed as f64 / 1_000_000.,
-                                p.transfer.total as f64 / 1_000_000.,
-                                p.transfer.bytes_per_second as f64 / 1_000_000.
-                            )),
-                    )
-                    .into_any_element()
-            } else {
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .text_sm()
-                    .child(self.c.progress.clone())
-                    .into_any_element()
-            };
-            card = card.child(
-                div()
-                    .h_flex()
-                    .justify_between()
-                    .gap_2()
-                    .child(activity)
-                    .child(self.button("cancel", "取消", Command::Cancel, cx).small()),
-            );
+        if self.c.scan_progress.is_some() {
+            card = card.child(self.scan_banner(cx));
         }
         if self.filtered.indices.is_empty() {
             card = card.child(
@@ -2767,10 +2772,10 @@ impl Manager {
             .and_then(|d| d.original_name.as_deref())
             .unwrap_or(&self.c.gpu)
             .to_owned();
-        let names = std::iter::once(("inspector-gpu-name", self.t("实际型号"), gpu)).chain(
+        let names = std::iter::once(("inspector-gpu-name", self.t("实际"), gpu)).chain(
             device
                 .and_then(|d| d.modified_name.clone())
-                .map(|name| ("inspector-gpu-modified", self.t("修改后型号"), name)),
+                .map(|name| ("inspector-gpu-modified", self.t("伪装"), name)),
         );
         div()
             .v_flex()
@@ -2788,22 +2793,32 @@ impl Manager {
                     .gap_2()
                     .children(names.map(|(id, label, value)| {
                         let full = value.clone();
+                        let (model, nvidia) = gpu_alias::display_model(&value);
                         div()
                             .id(id)
-                            .v_flex()
+                            .h_flex()
+                            .flex_wrap()
                             .w_full()
                             .min_w_0()
-                            .gap_0p5()
+                            .gap_1p5()
                             .text_sm()
-                            .whitespace_normal()
                             .tooltip(move |window, cx| Tooltip::new(full.clone()).build(window, cx))
+                            .when(nvidia, |d| {
+                                d.child(
+                                    Icon::default()
+                                        .path("app/nvidia.svg")
+                                        .size(rems(1.35))
+                                        .text_color(crate::ui_themes::nvidia_brand()),
+                                )
+                            })
+                            .child(div().min_w_0().whitespace_normal().child(model.to_owned()))
                             .child(
                                 div()
+                                    .flex_shrink_0()
                                     .text_xs()
                                     .text_color(cx.theme().muted_foreground)
                                     .child(label),
                             )
-                            .child(value)
                     })),
             )
             .child(
@@ -3256,14 +3271,9 @@ impl Manager {
                 .small(),
             );
         }
-        let target_hint = if self.c.selected.is_empty() {
-            self.c.text("处理当前游戏；勾选复选框可批量处理。")
-        } else {
-            self.c.text(&format!(
-                "将处理勾选的 {0} 款游戏。",
-                self.c.target_game_count()
-            ))
-        };
+        let target_hint = self
+            .c
+            .text("仅处理右侧当前游戏。批量操作请使用游戏库中的按钮。");
         if let Some(exe) = &self.c.focus {
             let game = self.c.games.iter().find(|g| &g.exe == exe);
             let probe = self.c.evidence.get(exe).and_then(Option::as_ref);
@@ -3344,7 +3354,7 @@ impl Manager {
                             .text_xs()
                             .whitespace_normal()
                             .text_color(cx.theme().muted_foreground)
-                            .child(self.t("温馨提示：网络游戏使用任何第三方注入工具，均存在被检测或封禁的可能，请酌情考虑！")),
+                            .child(self.t("网络游戏使用第三方注入工具存在封号风险，请谨慎使用。")),
                     )
                     .child(
                         self.button("deploy", "安装并应用", Command::Patch(false), cx)
@@ -3437,19 +3447,6 @@ impl Manager {
                         .primary()
                         .disabled(self.c.update_busy)
                 });
-            if !self.c.checking && self.c.download_progress.total > 0 {
-                actions = actions.child(
-                    div()
-                        .h_flex()
-                        .flex_shrink_0()
-                        .gap_2()
-                        .child(self.download_ring(22., cx))
-                        .child(div().text_sm().whitespace_nowrap().child(format!(
-                            "{}%",
-                            self.c.download_progress.percent().floor() as u32
-                        ))),
-                );
-            }
             if self.c.update_busy && !self.c.checking {
                 actions = actions.child(
                     self.button("cancel-update", "取消", Command::CancelUpdate, cx)
@@ -3466,41 +3463,6 @@ impl Manager {
                     .child(self.t("点击更新后，下载校验完成将自动替换并重启。")),
             );
         }
-        if !self.c.checking && self.c.download_progress.total > 0 {
-            let p = &self.c.download_progress;
-            // Give statistics a definite full-width row; wrap whole fields,
-            // never measure a shrink-to-fit column that breaks every character.
-            panel = panel.child(
-                div()
-                    .id("download-statistics")
-                    .h_flex()
-                    .w_full()
-                    .flex_shrink_0()
-                    .flex_wrap()
-                    .gap_2()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(div().whitespace_nowrap().child(format!(
-                        "{:.1} / {:.1} MB",
-                        p.completed as f64 / 1_000_000.,
-                        p.total as f64 / 1_000_000.
-                    )))
-                    .child(div().whitespace_nowrap().child(format!(
-                        "· {:.2} MB/s",
-                        p.bytes_per_second as f64 / 1_000_000.
-                    )))
-                    .child(div().whitespace_nowrap().child(format!("· {}", p.source)))
-                    .when(self.c.update_busy && p.bytes_per_second > 0, |d| {
-                        let seconds = p
-                            .total
-                            .saturating_sub(p.completed)
-                            .checked_div(p.bytes_per_second)
-                            .unwrap_or(0);
-                        let label = self.t(&format!("剩余约 {} 秒", seconds));
-                        d.child(div().whitespace_nowrap().child(label))
-                    }),
-            );
-        }
         if self.c.update_busy && self.c.checking {
             panel = panel.child(
                 div().h_flex().child(
@@ -3510,81 +3472,6 @@ impl Manager {
             );
         }
         panel.into_any_element()
-    }
-    fn download_ring(&self, diameter: f32, cx: &App) -> AnyElement {
-        self.progress_ring(diameter, self.c.download_progress.percent() / 100., cx)
-    }
-    fn progress_ring(&self, diameter: f32, progress: f32, cx: &App) -> AnyElement {
-        let foreground = cx.theme().info;
-        let track = cx.theme().border;
-        canvas(
-            |_, _, _| {},
-            move |bounds, _, window, _| {
-                let center = bounds.center();
-                let radius = bounds.size.width / 2. - px(2.);
-                // Split into short arcs: also renders a complete ring without an
-                // ambiguous same-start/end SVG arc. Geometry scales with DPI.
-                for (fraction, color) in [(1., track), (progress, foreground)] {
-                    if fraction <= 0. {
-                        continue;
-                    }
-                    let mut path = PathBuilder::stroke(px(2.));
-                    path.move_to(point(center.x, center.y - radius));
-                    let steps = (fraction * 64.).ceil() as u32;
-                    for step in 1..=steps {
-                        let angle = std::f32::consts::TAU * fraction * step as f32 / steps as f32
-                            - std::f32::consts::FRAC_PI_2;
-                        path.arc_to(
-                            point(radius, radius),
-                            px(0.),
-                            false,
-                            true,
-                            point(
-                                center.x + radius * angle.cos(),
-                                center.y + radius * angle.sin(),
-                            ),
-                        );
-                    }
-                    if let Ok(path) = path.build() {
-                        window.paint_path(path, color);
-                    }
-                }
-            },
-        )
-        .size(px(diameter))
-        .flex_shrink_0()
-        .into_any_element()
-    }
-    fn download_bar(&self, cx: &mut Context<Self>) -> AnyElement {
-        let p = &self.c.download_progress;
-        div()
-            .h_flex()
-            .w_full()
-            .flex_shrink_0()
-            .gap_3()
-            .p_3()
-            .bg(cx.theme().background)
-            .child(self.download_ring(22., cx))
-            .child(
-                div()
-                    .v_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .gap_1()
-                    .text_sm()
-                    .child(self.t(&self.c.update_status))
-                    .child(format!(
-                        "{:.1} / {:.1} MB · {:.2} MB/s",
-                        p.completed as f64 / 1_000_000.,
-                        p.total as f64 / 1_000_000.,
-                        p.bytes_per_second as f64 / 1_000_000.
-                    )),
-            )
-            .child(
-                self.button("view-download", "查看下载", Command::Page(2), cx)
-                    .small(),
-            )
-            .into_any_element()
     }
     fn recommended_gpu_name(&self) -> Option<String> {
         let game = self
@@ -3730,6 +3617,13 @@ impl Manager {
                         cx,
                     ),
                 ),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .whitespace_normal()
+                    .text_color(cx.theme().warning)
+                    .child(self.t("更新显卡驱动前，请务必使用本软件还原显卡名称。")),
             );
         div()
             .v_flex()
@@ -3889,8 +3783,7 @@ impl Manager {
         };
         self.dialog_active = true;
         let title = self.t("发现新版本");
-        let explanation =
-            self.t("下载校验完成后在原位置更新并自动重启，保留现有文件名。启动失败时还原旧版本。");
+        let explanation = self.t("下载后自动重启，保留现有设置。更新失败会还原旧版本。");
         let details = format!(
             "v{VERSION} → v{}\n{}\n{:.1} MB · {}",
             m.version,
@@ -4016,28 +3909,33 @@ impl Manager {
         if self.dialog_active || !self.accepts_feedback(window) {
             return;
         }
+        if self.c.confirm.as_deref() == Some("encore_engines") && self.c.warning.is_none() {
+            self.encore_install_dialog(window, cx);
+            return;
+        }
         if self.c.warning.is_none()
             && self.c.notice.is_none()
             && self.c.confirm.is_none()
             && self.c.update_offer
+            && !self.c.busy
+            && !self.c.update_busy
         {
             self.update_dialog(window, cx);
             return;
         }
-        let (title, text, action, status_icon) = if let Some(s) = self.c.warning.take() {
-            (
-                self.t("操作未完成"),
-                self.t(&s),
-                None,
-                IconName::TriangleAlert,
-            )
-        } else if let Some(s) = self.c.notice.take() {
-            (self.t("操作完成"), self.t(&s), None, IconName::CircleCheck)
-        } else if let Some(a) = self.c.confirm.take() {
+        if self.c.initial_scan_ready()
+            && window.window_handle().window_id() == self.main_window.window_id()
+            && !window.has_active_dialog(cx)
+            && !self.theme_preview.is_active()
+        {
+            self.initial_scan_dialog(window, cx);
+            return;
+        }
+        let (title, text, action, status_icon) = if let Some(a) = self.c.confirm.take() {
             let text = match a.as_str() {
                 "deploy_batch" => "确认向以下游戏安装补丁？请先完全退出这些游戏。",
                 "end_processes" => {
-                    "检测到以下游戏相关进程仍在运行。结束进程会丢失未保存的游戏进度；确认后仅结束列出的进程，再重新检测并重试本次操作。身份无法核实的进程不会结束。"
+                    "以下进程仍在运行或占用补丁文件。结束进程可能丢失未保存的内容；确认后仅结束列出的进程，并自动重试。系统服务和身份无法核实的进程不会结束。"
                 }
                 "clean_batch" => "确认卸载以下游戏的补丁？请先完全退出这些游戏。",
                 "recover_patch" => {
@@ -4053,6 +3951,9 @@ impl Manager {
                 "update" => "更新将关闭管理器并替换程序，成功启动后删除旧版。是否继续？",
                 "rename_manager" => {
                     "将当前程序改为同目录的 RTXManager.exe，并重启。同步迁移桌面、开始菜单和任务栏中可识别的快捷方式；自定义脚本或其他位置的入口需自行调整。遇到同名文件不覆盖，操作失败恢复原文件名。"
+                }
+                "reset_manager" => {
+                    "将卸载游戏库及重置备份中记录的补丁、恢复运行库和显卡名称，再清空设置、登录状态与缓存并重启。成功后删除重置备份；还原失败则保留记录。请先退出所有游戏。"
                 }
                 _ => "仅修改 Windows 显示名称，不改变显卡性能或硬件能力。修改和还原后请重启电脑。",
             };
@@ -4094,6 +3995,10 @@ impl Manager {
                             .map(|v| v.display().to_string())
                             .unwrap_or_else(|| self.c.text("路径无法核实，请在任务管理器中处理"))
                     ));
+                    if p.holds_patch_files() {
+                        message.push('\n');
+                        message.push_str(&self.c.text("占用当前游戏的补丁文件"));
+                    }
                 }
             }
             if a == "deploy_batch" || a == "clean_batch" || a == "recover_patch" {
@@ -4101,7 +4006,12 @@ impl Manager {
                 message.push_str(&self.c.pending_patch_list());
             }
 
-            (self.t("请确认"), message.into(), Some(a), IconName::Info)
+            (
+                self.t("请确认"),
+                SharedString::from(message),
+                Some(a),
+                IconName::Info,
+            )
         } else {
             return;
         };
@@ -4159,6 +4069,8 @@ impl Manager {
             "卸载并恢复"
         } else if action.as_deref() == Some("rename_manager") {
             "统一文件名并重启"
+        } else if action.as_deref() == Some("reset_manager") {
+            "恢复初始状态并重启"
         } else if action.is_some() {
             "继续"
         } else {
@@ -4168,7 +4080,12 @@ impl Manager {
         let ok_variant = if matches!(
             action.as_deref(),
             Some(
-                "clean_batch" | "recover_patch" | "remove_nr" | "end_processes" | "delete_cleanup"
+                "clean_batch"
+                    | "recover_patch"
+                    | "remove_nr"
+                    | "end_processes"
+                    | "delete_cleanup"
+                    | "reset_manager"
             )
         ) {
             ButtonVariant::Danger
@@ -4339,12 +4256,24 @@ impl Manager {
         if !self.update_ready_sent && self.frames > 0 && !self.c.read_only {
             self.update_ready_sent = true;
             let data = self.c.data.clone();
-            self.c
-                .channel
-                .job(move |_| rtx_fg_manager::updater::signal_ready(&data));
+            self.c.channel.job(move |c| {
+                rtx_fg_manager::updater::signal_ready(&data)?;
+                if std::env::var_os("RTXFG_RESET_READY").is_some() {
+                    let result = rtx_fg_manager::reset::finish_startup(&data);
+                    c.send(Event::ResetStartup(
+                        result,
+                        rtx_fg_manager::reset::backup(&data),
+                    ));
+                }
+                Ok(())
+            });
         }
         if self.c.events() {
             self.filter();
+            cx.notify();
+        }
+        self.present_feedback(cx);
+        if self.c.tasks.expire_results() {
             cx.notify();
         }
         if self.c.install_pending && !self.c.busy && !self.c.update_busy && !self.c.closing {
@@ -4525,6 +4454,7 @@ impl Render for Manager {
                     }),
             );
         div()
+            .relative()
             .h_flex()
             .items_stretch()
             .size_full()
@@ -4562,11 +4492,9 @@ impl Render for Manager {
                         )
                     })
                     .child(div().v_flex().flex_1().min_h_0().min_w_0().child(content))
-                    .when(self.c.update_busy && !self.c.checking, |d| {
-                        d.child(self.download_bar(cx))
-                    })
                     .when(self.c.closing, |d| d.child(self.t(self.c.close_status()))),
             )
+            .child(self.download_overlay(window, cx))
     }
 }
 pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {

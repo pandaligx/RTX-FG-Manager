@@ -72,7 +72,6 @@ impl Manager {
 
     pub(super) fn clear_runtime_window(&mut self, cx: &mut Context<Self>) {
         self.runtime_window = None;
-        self.runtime_feedback = None;
         self.runtime_game = None;
         cx.notify();
     }
@@ -95,7 +94,6 @@ impl Manager {
             if !self.c.busy && self.runtime_game != self.c.focus {
                 self.runtime_game = self.c.focus.clone();
                 self.runtime_versions.clear();
-                self.runtime_feedback = None;
                 cx.notify();
             }
             cx.defer(move |cx| {
@@ -108,7 +106,6 @@ impl Manager {
         }
         self.runtime_game = self.c.focus.clone();
         self.runtime_versions.clear();
-        self.runtime_feedback = None;
         let owner = cx.entity();
         let title = self.t("DLSS / XeSS 运行库");
         let work = window
@@ -167,13 +164,6 @@ impl Manager {
                                         let _ = this.owner.update(cx, |owner, cx| {
                                             if owner.c.closing || !owner.accepts_feedback(window) {
                                                 return;
-                                            }
-                                            if let Some(message) = owner.c.warning.take() {
-                                                owner.runtime_feedback = Some((true, message));
-                                                cx.notify();
-                                            } else if let Some(message) = owner.c.notice.take() {
-                                                owner.runtime_feedback = Some((false, message));
-                                                cx.notify();
                                             }
                                             if owner.c.confirm.is_some() {
                                                 owner.dialogs(window, cx);
@@ -476,56 +466,6 @@ impl Manager {
             .and_then(|e| self.c.games.iter().find(|g| &g.exe == e))
             .map(|g| self.c.game_name(g))
             .unwrap_or_default();
-        let mut footer = div()
-            .v_flex()
-            .gap_2()
-            .p_3()
-            .border_t_1()
-            .border_color(cx.theme().border)
-            .flex_shrink_0()
-            .text_xs();
-        if self.c.busy {
-            let progress = self
-                .c
-                .payload_progress
-                .as_ref()
-                .map(|p| {
-                    format!(
-                        "{}  {:.0}%  {:.1} / {:.1} MB",
-                        self.c.text(p.transfer.label()),
-                        p.transfer.percent(),
-                        p.transfer.completed as f64 / 1_000_000.,
-                        p.transfer.total as f64 / 1_000_000.
-                    )
-                })
-                .unwrap_or_else(|| self.c.text("正在处理…"));
-            footer = footer.child(
-                div()
-                    .h_flex()
-                    .gap_2()
-                    .justify_between()
-                    .child(progress)
-                    .child(
-                        self.button("runtime-cancel", "取消", Command::Cancel, cx)
-                            .small(),
-                    ),
-            );
-        } else if let Some((error, message)) = &self.runtime_feedback {
-            footer = footer.child(
-                div()
-                    .whitespace_normal()
-                    .text_color(if *error {
-                        cx.theme().danger
-                    } else {
-                        cx.theme().foreground
-                    })
-                    .child(self.t(if *error && message.starts_with("下载失败") {
-                        "下载失败，已保留现有文件。请检查网络后重试。"
-                    } else {
-                        message
-                    })),
-            );
-        }
         div()
             .v_flex()
             .size_full()
@@ -598,9 +538,8 @@ impl Manager {
                     }),
             )
             .child(rows)
-            .when(self.c.busy || self.runtime_feedback.is_some(), |view| {
-                view.child(footer)
-            })
+            .relative()
+            .child(self.download_overlay(window, cx))
             .into_any_element()
     }
 }

@@ -2866,5 +2866,29 @@
     "Optical Flow (Fast)",
     "Optical Flow (Fast)",
     "Optical Flow (Fast)"
+  ],
+  "XeFG 源帧稳定节奏": [
+    "Steady game pacing for XeFG",
+    "Равномерный ритм исходных кадров XeFG",
+    "XeFG ソースフレームの安定化",
+    "XeFG 소스 프레임 간격 안정화"
+  ],
+  "XeFG 3X 及以上：以自适应节奏启动游戏源帧，改善镜头运动平顺性，可能降低少量原生 FPS；即时生效，2X 不受影响。": [
+    "For XeFG 3X and higher: adaptively spaces source frames to improve camera motion. May cost a few native FPS. Applies live; 2X is unchanged.",
+    "XeFG 3X и выше: адаптивный ритм исходных кадров улучшает плавность камеры. Возможна небольшая потеря исходных FPS. Применяется сразу; 2X не меняется.",
+    "XeFG 3X 以上でソースフレーム間隔を調整し、カメラの動きを滑らかにします。元の FPS が少し低下する場合があります。即時反映、2X は対象外です。",
+    "XeFG 3X 이상에서 소스 프레임 간격을 조정해 카메라 움직임을 개선합니다. 기본 FPS가 조금 줄 수 있습니다. 즉시 적용되며 2X는 변경되지 않습니다."
+  ],
+  "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起支持无 DLSS 游戏的 DX11/Vulkan，以及 DX11 原生 DLSS 替换；Vulkan 原生 DLSS 替换仍使用标准 XeSS。旧版仅支持 DX12；准备成功不代表实际启用。": [
+    "Experimental, off by default. Requires RTX 30/40/50 and a supported driver. Since 2.1.0: added SR in DX11/Vulkan and native DLSS replacement in DX11. Native Vulkan DLSS replacement keeps standard XeSS. Earlier versions require DX12. Successful preparation does not prove activation.",
+    "Экспериментально, по умолчанию выключено. Нужны RTX 30/40/50 и поддерживаемый драйвер. С 2.1.0: добавление SR в DX11/Vulkan и замена DLSS в DX11. Замена нативного DLSS в Vulkan использует обычный XeSS. Ранее только DX12; подготовка не означает активацию.",
+    "実験的機能、既定はオフ。RTX 30/40/50 と対応ドライバーが必要です。2.1.0 以降は DX11/Vulkan への SR 追加と DX11 の DLSS 置換に対応。Vulkan のネイティブ DLSS 置換は標準 XeSS を使用。旧版は DX12 のみ。準備完了は有効化を保証しません。",
+    "실험적 기능이며 기본값은 꺼짐입니다. RTX 30/40/50 및 지원 드라이버가 필요합니다. 2.1.0부터 DX11/Vulkan의 SR 추가와 DX11의 기본 DLSS 교체를 지원합니다. Vulkan 기본 DLSS 교체는 표준 XeSS를 사용합니다. 이전 버전은 DX12 전용입니다."
+  ],
+  "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起扩展到 DX11/Vulkan 无原生帧生成游戏；旧版仅支持 DX12。以游戏菜单中的实际激活状态为准。": [
+    "Experimental, off by default. Requires RTX 30/40/50 and a supported driver. Since 2.1.0: added FG in DX11/Vulkan; earlier versions require DX12. Check actual activation in the in-game menu.",
+    "Экспериментально, по умолчанию выключено. Нужны RTX 30/40/50 и поддерживаемый драйвер. С 2.1.0 доступно добавление FG в DX11/Vulkan; ранее только DX12. Проверяйте фактическую активацию в меню игры.",
+    "実験的機能、既定はオフ。RTX 30/40/50 と対応ドライバーが必要です。2.1.0 から DX11/Vulkan の非ネイティブ FG ゲームにも対応。旧版は DX12 のみ。ゲーム内メニューで実際の有効状態を確認してください。",
+    "실험적 기능이며 기본값은 꺼짐입니다. RTX 30/40/50 및 지원 드라이버가 필요합니다. 2.1.0부터 기본 프레임 생성이 없는 DX11/Vulkan 게임을 지원합니다. 이전 버전은 DX12 전용입니다. 게임 메뉴에서 실제 활성화를 확인하세요."
   ]
 }

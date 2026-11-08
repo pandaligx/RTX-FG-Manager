@@ -8,7 +8,32 @@ use windows::{
     core::{GUID, PCWSTR},
 };
 use winreg::{RegKey, RegValue, enums::*};
-pub const NAMES: [&str; 2] = ["NVIDIA GeForce RTX 4060", "NVIDIA GeForce RTX 5090"];
+#[path = "gpu_models.rs"]
+mod models;
+pub use models::NAMES;
+
+fn action_name(action: &str) -> Result<Option<&'static str>> {
+    match action {
+        "restore" => Ok(None),
+        "4060" => Ok(Some(NAMES[0])),
+        "5090" => Ok(Some(NAMES[1])),
+        _ => action
+            .strip_prefix("model:")
+            .and_then(|value| value.parse::<usize>().ok())
+            .and_then(|index| NAMES.get(index).copied())
+            .map(Some)
+            .context("请选择支持的显示名称"),
+    }
+}
+
+/// Compact presentation only; registry values retain the official vendor name.
+pub fn display_model(name: &str) -> (&str, bool) {
+    if let Some(model) = name.strip_prefix("NVIDIA ") {
+        (model.strip_prefix("GeForce ").unwrap_or(model), true)
+    } else {
+        (name, false)
+    }
+}
 
 /// UAC helper accepts only a serialized device identity and a fixed action.
 /// No caller-supplied output path, registry path or executable is accepted.
@@ -16,12 +41,7 @@ pub fn elevated_action(encoded: &str, action: &str) -> Result<()> {
     ensure!(crate::win::is_admin(), "未获得管理员权限，操作未完成");
     ensure!(encoded.len() <= 8192, "显示设备参数过长");
     let target: Device = serde_json::from_slice(&STANDARD.decode(encoded)?)?;
-    let name = match action {
-        "restore" => None,
-        "4060" => Some(NAMES[0]),
-        "5090" => Some(NAMES[1]),
-        _ => anyhow::bail!("请选择支持的显示名称"),
-    };
+    let name = action_name(action)?;
     let current = enumerate()?
         .into_iter()
         .find(|d| d.instance.eq_ignore_ascii_case(&target.instance))
@@ -35,13 +55,17 @@ pub fn apply_with_elevation(target: Device, name: Option<&str>) -> Result<String
         return apply(target, name);
     }
     let action = match name {
-        None => "restore",
-        Some(n) if n == NAMES[0] => "4060",
-        Some(n) if n == NAMES[1] => "5090",
-        _ => anyhow::bail!("请选择支持的显示名称"),
+        None => "restore".to_owned(),
+        Some(n) => format!(
+            "model:{}",
+            NAMES
+                .iter()
+                .position(|&candidate| candidate == n)
+                .context("请选择支持的显示名称")?
+        ),
     };
     let encoded = STANDARD.encode(serde_json::to_vec(&target)?);
-    crate::win::elevated_gpu_action(&encoded, action)?;
+    crate::win::elevated_gpu_action(&encoded, &action)?;
     Ok(if let Some(n) = name {
         format!("已写入显示名称：{n}")
     } else {
@@ -647,9 +671,86 @@ pub fn apply(target: Device, name: Option<&str>) -> Result<String> {
     change(&mut WindowsBackend(current), name)
 }
 
+/// Restore every display name with a manager-owned backup. Disconnected devices
+/// and corrupt records block reset rather than silently losing recovery data.
+pub fn restore_all() -> Result<()> {
+    ensure!(crate::win::is_admin(), "还原显卡名称需要管理员权限");
+    let _lock = crate::win::game_lock(Path::new("RTXFG-global-gpu-name"))?;
+    let key = match RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey_with_flags(BACKUPS, KEY_READ | KEY_WOW64_64KEY)
+    {
+        Ok(key) => key,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e.into()),
+    };
+    let records = key.enum_values().collect::<std::io::Result<Vec<_>>>()?;
+    if records.is_empty() {
+        return Ok(());
+    }
+    let devices = enumerate()?;
+    let mut backends = Vec::new();
+    for (token, _) in records {
+        let device = devices
+            .iter()
+            .find(|d| crate::core::hash(d.instance.to_uppercase().as_bytes()) == token)
+            .context("有显卡名称备份无法匹配当前设备；请连接原显卡并还原名称后重试")?;
+        let backend = WindowsBackend(device.clone());
+        ensure!(backend.load()?.is_some(), "显卡名称备份已变化，请重试");
+        backends.push(backend);
+    }
+    for backend in &mut backends {
+        change(backend, None)?;
+        ensure!(backend.load()?.is_none(), "显卡名称还原记录尚未清理");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod windows_read_only_tests {
     use super::*;
+    #[test]
+    fn desktop_catalogue_and_helper_reject_unknown_names() {
+        let unique = NAMES.iter().collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(unique.len(), NAMES.len());
+        for n in [
+            "NVIDIA GeForce RTX 5090",
+            "NVIDIA GeForce RTX 4060 Ti",
+            "NVIDIA CMP 30HX",
+            "NVIDIA CMP 70HX",
+            "NVIDIA CMP 90HX",
+            "NVIDIA CMP 170HX",
+        ] {
+            let index = NAMES.iter().position(|&s| s == n).unwrap();
+            assert_eq!(action_name(&format!("model:{index}")).unwrap(), Some(n));
+        }
+        assert_eq!(
+            action_name("4060").unwrap(),
+            Some("NVIDIA GeForce RTX 4060")
+        );
+        assert_eq!(action_name("restore").unwrap(), None);
+        for bad in [
+            "model:-1",
+            "model:99999999",
+            "model:C:\\",
+            "NVIDIA GeForce RTX 5090",
+        ] {
+            assert!(action_name(bad).is_err());
+        }
+        assert!(
+            !NAMES
+                .iter()
+                .any(|n| n.contains("Laptop") || n.contains("Max-Q") || n.ends_with("1000M"))
+        );
+        assert_eq!(
+            display_model("NVIDIA GeForce RTX 4060 Ti"),
+            ("RTX 4060 Ti", true)
+        );
+        assert_eq!(display_model("NVIDIA CMP 90HX"), ("CMP 90HX", true));
+        assert_eq!(
+            display_model("AMD Radeon RX 9070"),
+            ("AMD Radeon RX 9070", false)
+        );
+    }
     #[test]
     #[ignore = "Explicit Windows installed-driver metadata read; no registry writes"]
     fn installed_driver_description_does_not_change_display_names() -> Result<()> {

@@ -263,14 +263,8 @@ impl Recommendations {
     }
     fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let _ = self.owner.update(cx, |owner, cx| {
-            if owner.accepts_feedback(window) {
-                if let Some(message) = owner.c.warning.take().or_else(|| owner.c.notice.take()) {
-                    self.message = owner.c.text(&message);
-                    cx.notify();
-                }
-                if owner.c.confirm.is_some() {
-                    owner.dialogs(window, cx);
-                }
+            if owner.accepts_feedback(window) && owner.c.confirm.is_some() {
+                owner.dialogs(window, cx);
             }
             if self.operation_busy != owner.c.busy {
                 self.operation_busy = owner.c.busy;
@@ -295,7 +289,7 @@ impl Recommendations {
                     if e == "登录已过期，请重新获取邮箱验证码" {
                         self.mode = Mode::Login;
                     }
-                    self.message = self.t(&e);
+                    super::tasks::notify(super::tasks::FeedbackKind::Error, self.t(&e), window, cx);
                 }
                 Ok(Update::Init(client)) => {
                     self.client = Some(client);
@@ -403,6 +397,15 @@ impl Recommendations {
                     self.refresh(false);
                 }
             }
+            cx.notify();
+        }
+        if !self.busy && !self.operation_busy && !self.message.is_empty() {
+            super::tasks::notify(
+                super::tasks::FeedbackKind::Info,
+                std::mem::take(&mut self.message),
+                window,
+                cx,
+            );
             cx.notify();
         }
         if self.cooldown && Instant::now() >= self.resend {
@@ -623,7 +626,7 @@ impl Recommendations {
             Ok(Ok(())) => {
                 self.mode = Mode::Preview;
                 self.operation_busy = true;
-                self.message = self.t("正在处理…");
+                self.message.clear();
             }
             Ok(Err(e)) => self.message = self.t(&e.to_string()),
             Err(_) => self.message = self.t("游戏已从库中移除"),
@@ -2183,6 +2186,10 @@ impl Render for Recommendations {
             .entry(scroll_id.clone())
             .or_default()
             .clone();
+        let download_overlay = self
+            .owner
+            .update(cx, |owner, cx| owner.download_overlay(window, cx))
+            .unwrap_or_else(|_| div().into_any_element());
         let content = div()
             .v_flex()
             .gap_3()
@@ -2214,14 +2221,6 @@ impl Render for Recommendations {
                     ),
             )
             .children(install_notice)
-            .when(!self.message.is_empty(), |d| {
-                d.child(
-                    div()
-                        .text_sm()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(self.message.clone()),
-                )
-            })
             .child(
                 div()
                     .h_flex()
@@ -2305,6 +2304,8 @@ impl Render for Recommendations {
                 ),
             )
             .child(content.p_3().flex_1().min_h_0())
+            .relative()
+            .child(download_overlay)
     }
 }
 impl Manager {

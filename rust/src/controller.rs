@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use rtx_fg_manager::{
     cleanup, cloud, core, game_names, gpu_alias, hags, i18n, preferences,
     scanner::{self, Game},
@@ -15,7 +15,15 @@ use std::{
     },
     time::{Duration, Instant},
 };
+#[derive(Clone, Debug, Default)]
+pub struct ScanProgress {
+    pub directories: u64,
+    pub skipped: u64,
+    pub path: String,
+}
+
 pub enum Event {
+    EncorePrepared(Result<EncoreInstallPlan>),
     GameNamesCached(game_names::Catalog),
     GameIdentities(u64, Vec<(String, String, Value)>),
     GameNames(Result<game_names::Catalog>, bool),
@@ -25,6 +33,7 @@ pub enum Event {
     Deployments(u64, String, Box<rtx_fg_manager::deployment::Snapshot>),
     CleanupPreview(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>),
     Scan(scanner::Report),
+    ScanProgress(ScanProgress),
     Progress(String),
     PayloadProgress(cloud::CloudProgress),
     PatchResult(bool),
@@ -50,6 +59,7 @@ pub enum Event {
     Icons(Vec<(String, Option<image::RgbaImage>)>),
     Log(String),
     Warning(String),
+    TaskWarning(bool, String),
     Notice(String),
     Done,
     Blocked(BlockedOperation),
@@ -60,11 +70,14 @@ pub enum Event {
     UpdateDone,
     Installed,
     RenamePrepared(Result<()>),
+    ResetPrepared(Result<()>),
+    ResetStartup(Result<()>, Option<PathBuf>),
     Saved(Result<()>),
     SmokeWritten,
 }
 pub struct Channel {
     tx: mpsc::Sender<Event>,
+    task_scope: Option<bool>,
 }
 struct Completion(Channel);
 struct RefreshCompletion(Channel);
@@ -82,11 +95,16 @@ impl Clone for Channel {
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),
+            task_scope: self.task_scope,
         }
     }
 }
 impl Channel {
     pub fn send(&self, e: Event) {
+        let e = match (self.task_scope, e) {
+            (Some(update), Event::Warning(message)) => Event::TaskWarning(update, message),
+            (_, event) => event,
+        };
         let _ = self.tx.send(e);
     }
     pub fn job(&self, f: impl FnOnce(&Channel) -> Result<()> + Send + 'static) {
@@ -98,11 +116,17 @@ impl Channel {
         });
     }
     pub fn operation(&self, f: impl FnOnce(&Channel) -> Result<()> + Send + 'static) {
-        self.job(move |c| {
+        let mut c = self.clone();
+        c.task_scope = Some(false);
+        std::thread::spawn(move || {
             let _completion = Completion(c.clone());
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(c))) {
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&c))) {
                 Ok(result) => result,
-                Err(_) => anyhow::bail!("后台操作异常终止，请检查操作日志后重试"),
+                Err(_) => Err(anyhow::anyhow!("后台操作异常终止，请检查操作日志后重试")),
+            };
+            // The failure must reach the owning task before Completion emits Done.
+            if let Err(error) = result {
+                c.send(Event::Warning(format!("{error:#}")));
             }
         });
     }
@@ -148,7 +172,19 @@ fn defer_if_running(
 ) -> Result<bool> {
     let mut processes = BTreeMap::new();
     for target in targets {
-        for process in core::blocking_processes(target)? {
+        let detected = if matches!(
+            &request.action,
+            RetryAction::Patch(true, _)
+                | RetryAction::CleanupResiduals(_)
+                | RetryAction::DeleteCleanup(_)
+                | RetryAction::RemoveNr
+                | RetryAction::Runtime(_, true, _)
+        ) {
+            cleanup::blocking_processes(target)?
+        } else {
+            core::blocking_processes(target)?
+        };
+        for process in detected {
             processes.insert(process.pid, process);
         }
     }
@@ -160,6 +196,11 @@ fn defer_if_running(
         processes: processes.into_values().collect(),
     }));
     Ok(true)
+}
+pub struct EncoreInstallPlan {
+    pub fingerprint: String,
+    pub paths: BTreeSet<String>,
+    pub choices: Vec<rtx_fg_manager::encore_install::Choice>,
 }
 struct PatchRequest {
     clean: bool,
@@ -411,6 +452,8 @@ pub struct Controller {
     runtime_catalog_generation: u64,
     runtime_catalog_cancel: Arc<AtomicBool>,
     pub data: PathBuf,
+    pub reset_available: bool,
+    pub reset_backup: Option<PathBuf>,
     pub state: Value,
     pub store: Option<preferences::Store>,
     pub read_only: bool,
@@ -433,6 +476,7 @@ pub struct Controller {
     pub logs: VecDeque<String>,
     pub page: u8,
     pub busy: bool,
+    pub tasks: rtx_fg_manager::task_progress::Tasks,
     pub critical: bool,
     pub status_epoch: u64,
     pub refresh_busy: bool,
@@ -440,6 +484,7 @@ pub struct Controller {
     pub icons: BTreeMap<String, Option<Arc<gpui::RenderImage>>>,
     pub cancel: Arc<AtomicBool>,
     pub progress: String,
+    pub scan_progress: Option<ScanProgress>,
     pub payload_progress: Option<cloud::CloudProgress>,
     pub neural_versions: BTreeMap<String, &'static str>,
     display_cache: DisplayCache,
@@ -474,6 +519,9 @@ pub struct Controller {
     pub confirm: Option<String>,
     pending_cleanup: Option<(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>)>,
     pending_patch: Option<PatchRequest>,
+    pub encore_install: Option<EncoreInstallPlan>,
+    encore_install_values: BTreeMap<String, rtx_fg_manager::presets::Values>,
+    resume_install: Option<BTreeSet<String>>,
     pub search: String,
     pub smoke: Option<PathBuf>,
     pub closing: bool,
@@ -498,7 +546,10 @@ impl Controller {
         }
         let tr = i18n::Translator::new(state["language"].as_str().unwrap_or("system"));
         let (tx, rx) = mpsc::channel();
-        let channel = Channel { tx };
+        let channel = Channel {
+            tx,
+            task_scope: None,
+        };
         let mut games: Vec<Game> = state["games"]
             .as_array()
             .map(|v| {
@@ -524,6 +575,8 @@ impl Controller {
             runtime_catalog_generation: 0,
             runtime_catalog_cancel: Arc::new(AtomicBool::new(false)),
             data: data.clone(),
+            reset_available: rtx_fg_manager::reset::available(&data),
+            reset_backup: rtx_fg_manager::reset::backup(&data),
             state,
             store: (!read_only).then(|| preferences::Store::new(data)),
             read_only,
@@ -545,6 +598,7 @@ impl Controller {
             logs: VecDeque::new(),
             page: 0,
             busy: false,
+            tasks: Default::default(),
             critical: false,
             status_epoch: 0,
             refresh_busy: false,
@@ -552,6 +606,7 @@ impl Controller {
             icons: BTreeMap::new(),
             cancel: Arc::new(AtomicBool::new(false)),
             progress: String::new(),
+            scan_progress: None,
             payload_progress: None,
             neural_versions: BTreeMap::new(),
             display_cache: Arc::new(Mutex::new(BTreeMap::new())),
@@ -586,6 +641,9 @@ impl Controller {
             confirm: None,
             pending_cleanup: None,
             pending_patch: None,
+            encore_install: None,
+            encore_install_values: BTreeMap::new(),
+            resume_install: None,
             search: String::new(),
             smoke,
             closing: false,
@@ -699,6 +757,38 @@ impl Controller {
                 app.update_status = p.label().into();
                 app.download_progress = p;
             }
+        }
+        // Explicit UI smoke fixtures only; no network or game mutations. Use the
+        // normal channel, task owner and cancellation path for overlay checks.
+        if app.smoke.is_some()
+            && let Ok(events) = serde_json::from_value::<Vec<(updater::DownloadProgress, u64)>>(
+                app.state["smoke_downloads"].clone(),
+            )
+            && !events.is_empty()
+            && events.len() <= 64
+        {
+            app.begin_work("下载组件");
+            let cancel = app.cancel.clone();
+            app.channel.operation(move |c| {
+                for (transfer, delay) in events {
+                    if cancel.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    c.send(Event::PayloadProgress(cloud::CloudProgress {
+                        transfer,
+                        proxy: String::new(),
+                        package_index: 0,
+                        package_count: 0,
+                    }));
+                    let start = std::time::Instant::now();
+                    while start.elapsed() < std::time::Duration::from_millis(delay.min(30000))
+                        && !cancel.load(Ordering::Relaxed)
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(25));
+                    }
+                }
+                Ok(())
+            });
         }
         app
     }
@@ -1479,7 +1569,7 @@ impl Controller {
             self.preset_values(&exe)
         };
         let data = self.data.clone();
-        self.busy = true;
+        self.begin_work("应用参数");
         self.critical = true;
         self.status_epoch += 1;
         self.progress = "正在应用参数…".into();
@@ -1580,7 +1670,7 @@ impl Controller {
         if self.busy || self.update_busy || self.read_only || self.closing {
             return;
         }
-        self.busy = true;
+        self.begin_work("清理缓存");
         self.critical = true;
         self.download = None;
         self.download_progress = Default::default();
@@ -1602,6 +1692,23 @@ impl Controller {
                     delta.pending.join("；")
                 )));
             }
+            Ok(())
+        });
+    }
+    pub fn reset_manager(&mut self) {
+        if self.busy || self.update_busy || self.critical || self.hags_busy || self.closing {
+            return;
+        }
+        self.begin_work("恢复初始状态");
+        self.critical = true;
+        let data = self.data.clone();
+        let games = self.games.clone();
+        self.channel.job(move |c| {
+            c.send(Event::ResetPrepared(rtx_fg_manager::reset::prepare(
+                &data,
+                &games,
+                |s| c.send(Event::Progress(s)),
+            )));
             Ok(())
         });
     }
@@ -1947,13 +2054,35 @@ impl Controller {
         self.save();
         self.refresh();
     }
+    /// Only fresh preferences opt in; upgrades and recovered libraries do not.
+    pub fn initial_scan_ready(&self) -> bool {
+        self.boolean("initial_scan_pending", false)
+            && self.games.is_empty()
+            && !self.read_only
+            && !self.closing
+            && !self.busy
+            && !self.checking
+            && !self.update_offer
+            && !self.update_busy
+            && !self.update_installing
+            && !self.install_pending
+            && self.confirm.is_none()
+    }
+
+    pub fn dismiss_initial_scan(&mut self) {
+        self.state["initial_scan_pending"] = json!(false);
+        self.save();
+    }
+
     pub fn scan(&mut self, roots: Vec<PathBuf>) {
         if self.busy {
             return;
         }
         self.state["roots"] = json!(roots);
+        self.state["initial_scan_pending"] = json!(false);
         self.save();
-        self.busy = true;
+        self.begin_work("扫描游戏");
+        self.scan_progress = Some(ScanProgress::default());
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
         self.log(&format!(
@@ -1965,8 +2094,12 @@ impl Controller {
                 .join("；")
         ));
         self.channel.operation(move |c| {
-            let result = scanner::scan(&roots, &cancel, |n, _, p| {
-                c.send(Event::Progress(format!("{n}  ·  {}", p.display())))
+            let result = scanner::scan(&roots, &cancel, |directories, skipped, p| {
+                c.send(Event::ScanProgress(ScanProgress {
+                    directories,
+                    skipped,
+                    path: p.display().to_string(),
+                }))
             });
             match result {
                 Ok(r) => c.send(Event::Scan(r)),
@@ -1979,7 +2112,7 @@ impl Controller {
         if self.busy {
             return;
         }
-        self.busy = true;
+        self.begin_work("添加游戏");
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
         let title = self.text("添加游戏");
@@ -1987,8 +2120,16 @@ impl Controller {
             (|| {
                 if folder {
                     if let Some(p) = rfd::FileDialog::new().pick_folder() {
-                        let r = scanner::scan(&[p], &cancel, |n, _, p| {
-                            c.send(Event::Progress(format!("{n}  ·  {}", p.display())))
+                        c.send(Event::ScanProgress(ScanProgress {
+                            path: p.display().to_string(),
+                            ..Default::default()
+                        }));
+                        let r = scanner::scan(&[p], &cancel, |directories, skipped, p| {
+                            c.send(Event::ScanProgress(ScanProgress {
+                                directories,
+                                skipped,
+                                path: p.display().to_string(),
+                            }))
                         })?;
                         c.send(Event::Scan(r));
                     }
@@ -2047,7 +2188,7 @@ impl Controller {
             ));
         }
         let exe_title = self.text("选择关联的游戏本体 EXE");
-        self.busy = true;
+        self.begin_work("选择部署目录");
         self.channel.operation(move |c| {
             let Some(folder) = rfd::FileDialog::new().set_title(title).pick_folder() else {
                 return Ok(());
@@ -2116,17 +2257,161 @@ impl Controller {
             Ok(())
         });
     }
+    fn begin_work(&mut self, label: &str) {
+        self.busy = true;
+        self.scan_progress = None;
+        self.progress = label.into();
+        self.payload_progress = None;
+        let title = self
+            .focus
+            .as_ref()
+            .and_then(|exe| self.games.iter().find(|g| &g.exe == exe))
+            .map(|g| format!("{}  —  {}", self.game_name(g), self.text(label)))
+            .unwrap_or_else(|| self.text(label));
+        self.tasks.start(false, title);
+    }
+    fn prepare_encore_install(&mut self, paths: BTreeSet<String>) {
+        let jobs = self
+            .games
+            .iter()
+            .filter(|g| {
+                g.deployment_executables()
+                    .iter()
+                    .any(|exe| paths.contains(exe))
+            })
+            .filter(|g| self.scheme_for(Some(&g.exe)) == rtx_fg_manager::encore::SCHEME)
+            .map(|g| (self.game_name(g), g.clone()))
+            .collect::<Vec<_>>();
+        let fingerprint = self.retry_fingerprint();
+        self.begin_work("检查安装内容");
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancel = self.cancel.clone();
+        self.channel.operation(move |c| {
+            let result = (|| -> Result<EncoreInstallPlan> {
+                let mut choices = Vec::new();
+                for (name, game) in jobs {
+                    for target in game.deployment_targets() {
+                        let exe = target.game_exe.display().to_string();
+                        if !paths.contains(&exe) || core::record(&target.directory)?.is_some() {
+                            continue;
+                        }
+                        anyhow::ensure!(!cancel.load(Ordering::Relaxed), "已取消");
+                        let e = scanner::inspect_for_installation(&target.game_exe);
+                        anyhow::ensure!(
+                            !e.limited,
+                            "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
+                        );
+                        let available =
+                            rtx_fg_manager::runtime_files::can_add_encore_fg(&target, &e);
+                        let choice = rtx_fg_manager::encore_install::Choice::new(
+                            exe,
+                            name.clone(),
+                            &e,
+                            available,
+                        );
+                        if choice.needed() {
+                            choices.push(choice);
+                        }
+                    }
+                }
+                Ok(EncoreInstallPlan {
+                    fingerprint,
+                    paths,
+                    choices,
+                })
+            })();
+            c.send(Event::EncorePrepared(result));
+            Ok(())
+        });
+    }
+    pub fn confirm_encore_install(
+        &mut self,
+        choices: Vec<rtx_fg_manager::encore_install::Choice>,
+    ) -> Result<()> {
+        let plan = self
+            .encore_install
+            .take()
+            .context("安装计划已失效，请重试")?;
+        anyhow::ensure!(
+            plan.fingerprint == self.retry_fingerprint(),
+            "游戏或配置已变化，请重新发起操作。"
+        );
+        anyhow::ensure!(choices.len() == plan.choices.len(), "安装选择不完整");
+        let mut values = BTreeMap::new();
+        for (selected, original) in choices.into_iter().zip(plan.choices) {
+            anyhow::ensure!(
+                selected.exe == original.exe
+                    && selected.needs_frames == original.needs_frames
+                    && selected.needs_reconstruction == original.needs_reconstruction
+                    && selected.dlss_fg_available == original.dlss_fg_available,
+                "安装计划已变化"
+            );
+            values.insert(
+                selected.exe.clone(),
+                selected
+                    .values()
+                    .context("请选择帧生成与超分辨率引擎，也可选择不启用")?,
+            );
+        }
+        self.encore_install_values = values;
+        self.perform(false, plan.paths);
+        Ok(())
+    }
     pub fn request_patch(&mut self, clean: bool) {
-        if self.closing || self.busy || self.pending_patch.is_some() || (self.read_only && !clean) {
+        self.request_patch_for(clean, false);
+    }
+    /// Only the library's explicit batch action consumes checked rows.
+    pub fn request_checked_patch(&mut self, clean: bool) {
+        self.request_patch_for(clean, true);
+    }
+    fn request_patch_for(&mut self, clean: bool, checked: bool) {
+        if self.closing
+            || self.busy
+            || self.pending_patch.is_some()
+            || self.encore_install.is_some()
+            || (self.read_only && !clean)
+        {
             return;
         }
-        let targets = self.patch_targets(clean);
-        if self.target_games().len() > 1 {
+        let games = if checked {
+            self.games
+                .iter()
+                .filter(|g| self.selected.contains(&g.exe))
+                .collect()
+        } else {
+            self.target_games()
+        };
+        let targets = self.patch_targets_for(games, clean);
+        if targets.is_empty() {
+            return;
+        }
+        if checked {
             self.pending_patch = Some(PatchRequest { clean, targets });
             self.confirm = Some(if clean { "clean_batch" } else { "deploy_batch" }.into());
         } else {
-            self.perform(clean, targets);
+            self.dispatch_patch(clean, targets);
         }
+    }
+    fn dispatch_patch(&mut self, clean: bool, targets: BTreeSet<String>) {
+        self.encore_install_values.clear();
+        if !clean
+            && self.games.iter().any(|g| {
+                self.scheme_for(Some(&g.exe)) == rtx_fg_manager::encore::SCHEME
+                    && g.deployment_executables()
+                        .iter()
+                        .any(|p| targets.contains(p))
+            })
+            && self.catalog.packages.iter().any(|p| {
+                p.scheme_id == rtx_fg_manager::encore::SCHEME
+                    && rtx_fg_manager::encore::supports_200(
+                        p.upstream_version.as_deref().or(Some(&p.version)),
+                    )
+            })
+        {
+            self.prepare_encore_install(targets);
+            return;
+        }
+        self.perform(clean, targets);
     }
     pub fn pending_patch_list(&self) -> String {
         self.pending_patch
@@ -2143,7 +2428,7 @@ impl Controller {
     }
     fn retry_fingerprint(&self) -> String {
         core::hash(serde_json::to_string(&json!({"games": self.games, "focus": self.focus,
-            "scheme": self.cloud_scheme(), "series": self.cloud_series(), "proxies": self.proxies()})).unwrap_or_default().as_bytes())
+            "scheme": self.cloud_scheme(), "catalog":self.catalog.revision,"series": self.cloud_series(), "proxies": self.proxies()})).unwrap_or_default().as_bytes())
     }
     fn retry_request(&self, action: RetryAction) -> RetryRequest {
         RetryRequest {
@@ -2201,7 +2486,7 @@ impl Controller {
             self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
             return;
         }
-        self.busy = true;
+        self.begin_work("重试操作");
         self.critical = true;
         self.channel.job(move |c| {
             let result = (|| -> Result<()> {
@@ -2235,7 +2520,7 @@ impl Controller {
         let targets = game.deployment_targets();
         self.status_epoch += 1;
         let data = self.data.clone();
-        self.busy = true;
+        self.begin_work("运行库");
         self.critical = true;
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
@@ -2304,7 +2589,7 @@ impl Controller {
         }
         self.save();
         self.status_epoch += 1;
-        self.busy = true;
+        self.begin_work("安装玩家方案");
         self.critical = true;
         self.progress = action.label().into();
         self.cancel = Arc::new(AtomicBool::new(false));
@@ -2381,7 +2666,7 @@ impl Controller {
         let targets = game.deployment_targets();
         self.status_epoch += 1;
         let data = self.data.clone();
-        self.busy = true;
+        self.begin_work("安装 DLSSNR");
         self.critical = true;
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
@@ -2428,7 +2713,7 @@ impl Controller {
         let targets = game.deployment_targets();
         let data = self.data.clone();
         self.status_epoch += 1;
-        self.busy = true;
+        self.begin_work("卸载 DLSSNR");
         self.critical = true;
         let retry = self.retry_request(RetryAction::RemoveNr);
         self.channel.operation(move |c| {
@@ -2460,7 +2745,7 @@ impl Controller {
         let epoch = self.status_epoch;
         let fingerprint = self.retry_fingerprint();
         self.pending_cleanup = None;
-        self.busy = true;
+        self.begin_work("检查清理内容");
         self.channel.operation(move |c| {
             let mut plans = Vec::new();
             let mut directories = BTreeSet::new();
@@ -2517,7 +2802,7 @@ impl Controller {
         }
         self.status_epoch += 1;
         let retry = self.retry_request(RetryAction::DeleteCleanup(plans.clone()));
-        self.busy = true;
+        self.begin_work("清理文件");
         self.critical = true;
         self.channel.operation(move |c| {
             let targets = plans.iter().map(|p| p.target().clone()).collect::<Vec<_>>();
@@ -2568,7 +2853,7 @@ impl Controller {
             return;
         }
         self.status_epoch += 1;
-        self.busy = true;
+        self.begin_work("清理残留");
         self.critical = true;
         let retry = self.retry_request(RetryAction::CleanupResiduals(targets.clone()));
         let data = self.data.clone();
@@ -2638,10 +2923,13 @@ impl Controller {
     }
     pub fn confirm_patch(&mut self) {
         if let Some(p) = self.pending_patch.take() {
-            self.perform(p.clean, p.targets);
+            self.dispatch_patch(p.clean, p.targets);
         }
     }
     pub fn cancel_patch(&mut self) {
+        self.encore_install = None;
+        self.encore_install_values.clear();
+        self.resume_install = None;
         self.pending_patch = None;
         self.pending_cleanup = None;
         if matches!(
@@ -2657,7 +2945,7 @@ impl Controller {
         }
         self.status_epoch += 1;
         self.critical = true;
-        self.busy = true;
+        self.begin_work("安装 / 卸载补丁");
         self.patch_summary = Some(PatchSummary {
             total: paths.len(),
             ..Default::default()
@@ -2704,6 +2992,7 @@ impl Controller {
         let data = self.data.clone();
         catalog.prefer_github = self.choice("download_source", "domestic") == "github";
         let retry = self.retry_request(RetryAction::Patch(clean, paths.clone()));
+        let first_install_values = self.encore_install_values.clone();
         self.channel.operation(move |c| {
             let guards = jobs
                 .iter()
@@ -2716,6 +3005,21 @@ impl Controller {
                 .collect::<Vec<_>>();
             if defer_if_running(c, &guards, retry)? {
                 return Ok(());
+            }
+            if !clean {
+                let mut queue = Vec::new();
+                for (_, targets, game, scheme, series, proxies, _, _) in &jobs {
+                    // Keep invalid destinations out of both downloads and their UI plan.
+                    if targets.iter().any(|exe| ensure_directory_outside_data(&game.deployment_target(std::path::Path::new(exe)).directory,&data).is_err()) { continue; }
+                    if let Ok(files) = cloud::download_files(&catalog, scheme, *series, proxies) {
+                        queue.extend(files);
+                    }
+                    if scheme == rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p| &p.scheme_id == scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version))))
+                        && let Ok(files) = rtx_fg_manager::runtime_files::encore_download_files(&game.deployment_targets()) {
+                        queue.extend(files);
+                    }
+                }
+                if !queue.is_empty() { c.send(Event::PayloadProgress(cloud::CloudProgress { transfer:rtx_fg_manager::transfer::Progress::plan(queue),proxy:String::new(),package_index:0,package_count:0 })); }
             }
             let mut errors = Vec::new();
             for (primary, targets, game, scheme, series, proxies, options, overrides) in jobs {
@@ -2735,6 +3039,9 @@ impl Controller {
                                 &game.deployment_target(std::path::Path::new(exe)),
                                 &proxies,
                             )?;
+                        }
+                        if scheme==rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p|p.scheme_id==scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version)))) {
+                            rtx_fg_manager::runtime_files::prepare_encore_sources(&game.deployment_targets(),catalog.prefer_github,&cancel,&mut|transfer|c.send(Event::PayloadProgress(cloud::CloudProgress{transfer,proxy:"Encore runtimes".into(),package_index:1,package_count:1})))?;
                         }
                         cloud::prepare_with_progress(
                             &catalog,
@@ -2763,6 +3070,9 @@ impl Controller {
                         continue;
                     }
                 };
+                let fresh_targets=targets.iter().filter_map(|exe| {
+                    first_install_values.get(exe).filter(|_|core::record(&game.deployment_target(std::path::Path::new(exe)).directory).is_ok_and(|r|r.is_none())).map(|v|(exe.clone(),v.clone()))
+                }).collect::<Vec<_>>();
                 let mut all_ok = true;
                 let read_target = targets
                     .first()
@@ -2779,6 +3089,7 @@ impl Controller {
                                 &game.deployment_target(&p).directory,
                                 &data,
                             )?;
+                            c.send(Event::Progress("正在备份并安装补丁…".into()));
                             let mut files = payload.files.clone();
                             let context = rtx_fg_manager::presets::Context::new(
                                 &payload.scheme_id,
@@ -2791,7 +3102,7 @@ impl Controller {
                                     .upstream_version
                                     .as_deref()
                                     .or(Some(&payload.version));
-                                let available = options
+                                let mut available: rtx_fg_manager::presets::Values = options
                                     .iter()
                                     .filter(|(key, _)| {
                                         rtx_fg_manager::encore::field(key).is_some_and(|f| {
@@ -2800,6 +3111,10 @@ impl Controller {
                                     })
                                     .map(|(k, v)| (k.clone(), v.clone()))
                                     .collect();
+                                if fresh_targets.iter().any(|(path,_)|path==&exe) {
+                                    for key in ["dlssWithoutGameDlss","frameGenerationWithoutGameFg","smoothMotionEnabled"] {available.insert(key.into(),"0".into());}
+                                    available.insert("frameGenerationEngine".into(),"game".into());
+                                }
                                 rtx_fg_manager::encore::configure_for_version(
                                     &files[name],
                                     &available,
@@ -2834,6 +3149,7 @@ impl Controller {
                             })
                         })()
                     } else {
+                        c.send(Event::Progress("正在恢复原件并清理补丁…".into()));
                         cleanup::clean_outcome_at(&game.deployment_target(&p))
                     };
                     match result {
@@ -2865,6 +3181,7 @@ impl Controller {
                 if all_ok && !clean {
                     if prepared.as_ref().is_some_and(|payload| payload.backend == rtx_fg_manager::encore::BACKEND
                         && rtx_fg_manager::encore::supports_200(payload.upstream_version.as_deref().or(Some(&payload.version)))) {
+                        let previous_errors=errors.len();
                         if let Err(error) = rtx_fg_manager::runtime_files::complete_encore_runtimes(
                             &game.deployment_targets(), catalog.prefer_github, &cancel,
                             &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
@@ -2872,6 +3189,15 @@ impl Controller {
                             })),
                         ) {
                             errors.push(format!("补丁已安装，配套运行库未完成；请在运行库窗口点击补齐后重试：{error:#}"));
+                        }
+                        if errors.len()==previous_errors {
+                            c.send(Event::Progress("正在应用所选引擎…".into()));
+                            for (exe,values) in &fresh_targets {
+                                let target=game.deployment_target(std::path::Path::new(exe));
+                                let policy=&catalog.scheme_policies[&scheme];
+                                let context=rtx_fg_manager::presets::Context::new(&scheme,policy,&target.game_exe);
+                                if let Err(e)=core::apply_parameters_at(&target,&context,values) {errors.push(format!("{exe}：{e:#}"));}
+                            }
                         }
                         for target in game.deployment_targets() {
                             c.send(Event::Status(target.game_exe.display().to_string(), core::status_at(&target)));
@@ -2903,13 +3229,7 @@ impl Controller {
     fn target_games(&self) -> Vec<&Game> {
         self.games
             .iter()
-            .filter(|g| {
-                if self.selected.is_empty() {
-                    self.focus.as_ref() == Some(&g.exe)
-                } else {
-                    self.selected.contains(&g.exe)
-                }
-            })
+            .filter(|g| self.focus.as_ref() == Some(&g.exe))
             .collect()
     }
     /// Installation operates once per verified rendering directory, never on a launcher.
@@ -2944,9 +3264,6 @@ impl Controller {
     }
     pub fn targets(&self) -> BTreeSet<String> {
         self.patch_targets(false)
-    }
-    pub fn target_game_count(&self) -> usize {
-        self.target_games().len()
     }
     pub fn can_forget_focused_without_confirmation(&self) -> bool {
         !self.busy
@@ -3177,6 +3494,7 @@ impl Controller {
         }
         let Some(m) = self.update.clone() else { return };
         let preference = self.choice("download_source", "domestic");
+        self.tasks.start(true, self.text("更新管理器"));
         self.install_requested = install_requested;
         self.update_status = "正在连接下载服务器…".into();
         self.download_progress = updater::DownloadProgress {
@@ -3202,7 +3520,7 @@ impl Controller {
                 Err(_) if cancel.load(Ordering::Relaxed) => {
                     c.send(Event::Log("更新下载已取消".into()))
                 }
-                Err(e) => c.send(Event::Warning(e.to_string())),
+                Err(e) => c.send(Event::TaskWarning(true, e.to_string())),
             }
             c.send(Event::UpdateDone);
             Ok(())
@@ -3219,13 +3537,17 @@ impl Controller {
         self.install_requested = false;
         self.update_busy = true;
         self.update_installing = true;
+        self.tasks.start(true, self.text("更新管理器"));
+        if let Some(t) = &mut self.tasks.update {
+            t.stage("正在安装更新，完成后将自动重启…");
+        }
         self.update_status = "正在安装更新，完成后将自动重启…".into();
         let data = self.data.clone();
         self.channel.job(move |c| {
             match updater::install(&path, &m, &data) {
                 Ok(()) => c.send(Event::Installed),
                 Err(e) => {
-                    c.send(Event::Warning(e.to_string()));
+                    c.send(Event::TaskWarning(true, e.to_string()));
                     c.send(Event::UpdateDone);
                 }
             }
@@ -3240,7 +3562,7 @@ impl Controller {
             self.warning = Some(self.text("请先应用或放弃待修改参数，再统一文件名。"));
             return;
         }
-        self.busy = true;
+        self.begin_work("统一文件名");
         self.critical = true;
         self.update_busy = true;
         self.update_installing = true;
@@ -3393,6 +3715,16 @@ impl Controller {
                     }
                 }
                 Event::Scan(r) => {
+                    self.notice = Some(format!(
+                        "{}：{} {}",
+                        self.text(if r.cancelled {
+                            "扫描已停止"
+                        } else {
+                            "扫描完成"
+                        }),
+                        r.rows.len(),
+                        self.text("个游戏")
+                    ));
                     self.log(&format!(
                         "扫描结束：{} 个目录，{} 个候选。",
                         r.directories, r.candidates
@@ -3417,8 +3749,44 @@ impl Controller {
                         self.merge_scan(r.rows)
                     }
                 }
-                Event::Progress(p) => self.progress = p,
+                Event::EncorePrepared(_) if self.closing || self.cancel.load(Ordering::Relaxed) => {
+                }
+                Event::EncorePrepared(result) => match result {
+                    Ok(plan) if plan.fingerprint == self.retry_fingerprint() => {
+                        if plan.choices.is_empty() {
+                            self.resume_install = Some(plan.paths);
+                        } else {
+                            self.encore_install = Some(plan);
+                            self.confirm = Some("encore_engines".into());
+                        }
+                    }
+                    Ok(_) => self.warning = Some("游戏或配置已变化，请重新发起操作。".into()),
+                    Err(e) => {
+                        let message = format!("{e:#}");
+                        if let Some(task) = &mut self.tasks.work {
+                            task.fail(message.clone());
+                        }
+                        self.warning = Some(message);
+                    }
+                },
+                Event::ScanProgress(p) => {
+                    if self.busy && !self.closing {
+                        self.scan_progress = Some(p);
+                    }
+                }
+                Event::Progress(p) => {
+                    if let Some(task) = &mut self.tasks.work {
+                        task.stage(p.clone());
+                    }
+                    self.progress = p;
+                }
                 Event::PayloadProgress(p) => {
+                    if let Some(task) = &mut self.tasks.work {
+                        task.download(
+                            format!("{}  {}/{}", p.proxy, p.package_index, p.package_count),
+                            p.transfer.clone(),
+                        );
+                    }
                     if !p.transfer.detail.is_empty()
                         && self
                             .payload_progress
@@ -3671,6 +4039,18 @@ impl Controller {
                     self.log(&s);
                     self.warning = Some(s)
                 }
+                Event::TaskWarning(update, s) => {
+                    let task = if update {
+                        &mut self.tasks.update
+                    } else {
+                        &mut self.tasks.work
+                    };
+                    if let Some(t) = task {
+                        t.fail(s.clone());
+                    }
+                    self.log(&s);
+                    self.warning = Some(s)
+                }
                 Event::Catalog(catalog) => {
                     // Keep the newest successful refresh while the active operation
                     // continues with its own catalog/payload snapshot.
@@ -3727,6 +4107,24 @@ impl Controller {
                 }
                 Event::RetryReady(request) => self.retry_operation(request),
                 Event::Done => {
+                    self.scan_progress = None;
+                    if let Some(task) = &mut self.tasks.work {
+                        let was_active = task.active;
+                        if self.blocked.is_some() {
+                            task.fail("文件被占用，请处理列出的进程后重试。".into());
+                        }
+                        task.finish(self.cancel.load(Ordering::Relaxed));
+                        if was_active
+                            && self.notice.is_none()
+                            && self.warning.is_none()
+                            && task.error.is_none()
+                            && self.resume_install.is_none()
+                            && self.blocked.is_none()
+                        {
+                            self.notice =
+                                Some(format!("{}：{}", task.title, self.tr.t(&task.stage)));
+                        }
+                    }
                     self.busy = false;
                     self.critical = false;
                     self.progress.clear();
@@ -3740,7 +4138,13 @@ impl Controller {
                         ));
                     }
                     self.apply_pending_catalog();
-                    self.refresh()
+                    self.refresh();
+                    if let Some(paths) = self.resume_install.take()
+                        && !self.closing
+                        && !self.cancel.load(Ordering::Relaxed)
+                    {
+                        self.perform(false, paths);
+                    }
                 }
                 Event::Checked(result, automatic, token) => {
                     if !Arc::ptr_eq(&token, &self.update_cancel)
@@ -3804,12 +4208,25 @@ impl Controller {
                     self.install_pending = self.install_requested && self.smoke.is_none();
                 }
                 Event::DownloadProgress(p) => {
+                    if let Some(t) = &mut self.tasks.update {
+                        t.download("RTXManager.exe".into(), p.clone());
+                    }
                     if !self.update_cancel.load(Ordering::Relaxed) {
                         self.update_status = p.label().into();
                         self.download_progress = p;
                     }
                 }
                 Event::UpdateDone => {
+                    if let Some(t) = &mut self.tasks.update {
+                        t.finish(self.update_cancel.load(Ordering::Relaxed));
+                        if t.error.is_none() && !self.update_installing && !self.install_pending {
+                            self.notice = Some(if self.update_cancel.load(Ordering::Relaxed) {
+                                "更新下载已取消".into()
+                            } else {
+                                self.update_status.clone()
+                            });
+                        }
+                    }
                     let failed_install = self.update_installing;
                     self.update_busy = false;
                     self.update_installing = false;
@@ -3820,12 +4237,27 @@ impl Controller {
                     }
                 }
                 Event::Installed => {
+                    if let Some(t) = &mut self.tasks.update {
+                        t.finish(false);
+                    }
                     self.update_busy = false;
                     self.update_installing = false;
                     self.closing = true;
                     self.pending_catalog = None;
                 }
-                Event::RenamePrepared(result) => {
+                Event::ResetStartup(result, backup) => {
+                    self.reset_backup = backup;
+                    if let Err(error) = result {
+                        self.warning = Some(format!("{error:#}"));
+                    }
+                }
+                Event::RenamePrepared(result) | Event::ResetPrepared(result) => {
+                    if let Some(t) = &mut self.tasks.work {
+                        if let Err(error) = &result {
+                            t.fail(error.to_string());
+                        }
+                        t.finish(false);
+                    }
                     self.busy = false;
                     self.critical = false;
                     self.update_busy = false;
@@ -3833,7 +4265,10 @@ impl Controller {
                     self.progress.clear();
                     match result {
                         Ok(()) => self.close(),
-                        Err(error) => self.warning = Some(error.to_string()),
+                        Err(error) => {
+                            self.warning = Some(format!("{error:#}"));
+                            self.refresh();
+                        }
                     }
                 }
                 Event::SmokeWritten => self.close(),
@@ -4486,7 +4921,7 @@ mod tests {
                     c.rx.recv_timeout(deadline.saturating_duration_since(Instant::now()))
                         .expect("operation completed");
                 match event {
-                    Event::Warning(message) => {
+                    Event::Warning(message) | Event::TaskWarning(_, message) => {
                         blocked |= message.contains("不能部署到管理器缓存或设置目录");
                     }
                     Event::Log(message) => cleaned |= message.contains("未发现可确认归属的补丁"),
@@ -4743,6 +5178,99 @@ mod tests {
             Some(dir.path().join("test.json")),
         );
         (dir, c)
+    }
+
+    #[test]
+    fn first_scan_waits_for_update_then_prompts_once() {
+        let (dir, mut c) = controller();
+        c.state["welcome_pending"] = json!(true);
+        assert!(
+            !c.initial_scan_ready(),
+            "upgrades must not become first runs"
+        );
+        c.state["initial_scan_pending"] = json!(true);
+        c.checking = true;
+        assert!(
+            !c.initial_scan_ready(),
+            "wait for the startup update result"
+        );
+        c.checking = false;
+        c.update_offer = true;
+        assert!(!c.initial_scan_ready(), "offer the update before scanning");
+        c.update_offer = false;
+        assert!(c.initial_scan_ready());
+        c.update_busy = true;
+        assert!(!c.initial_scan_ready());
+        c.update_busy = false;
+        c.install_pending = true;
+        assert!(!c.initial_scan_ready());
+        c.install_pending = false;
+        c.update_installing = true;
+        assert!(!c.initial_scan_ready());
+        c.update_installing = false;
+        c.busy = true;
+        assert!(!c.initial_scan_ready());
+        c.busy = false;
+        c.read_only = true;
+        assert!(!c.initial_scan_ready());
+        c.read_only = false;
+        c.games.push(Game {
+            exe: "test.exe".into(),
+            ..Default::default()
+        });
+        assert!(!c.initial_scan_ready());
+        c.games.clear();
+        c.dismiss_initial_scan();
+        assert!(!c.initial_scan_ready());
+        assert!(!c.update_offer);
+        c.store.take().unwrap().finish().unwrap();
+        assert_eq!(
+            preferences::load(dir.path()).unwrap()["initial_scan_pending"],
+            false
+        );
+    }
+
+    #[test]
+    fn first_scan_is_not_lost_when_startup_check_is_current_or_offline() {
+        for result in [Ok(None), Err(anyhow::anyhow!("offline"))] {
+            let (_dir, mut c) = controller();
+            c.state["initial_scan_pending"] = json!(true);
+            c.checking = true;
+            c.update_busy = true;
+            assert!(!c.initial_scan_ready());
+            c.channel
+                .send(Event::Checked(result, true, c.update_cancel.clone()));
+            c.events();
+            assert!(c.initial_scan_ready());
+            assert_eq!(c.state["initial_scan_pending"], true);
+        }
+    }
+
+    #[test]
+    fn scan_details_clear_on_cancel_and_do_not_leak_into_other_operations() {
+        let (_dir, mut c) = controller();
+        c.begin_work("扫描游戏");
+        c.channel.send(Event::ScanProgress(ScanProgress {
+            directories: 12,
+            skipped: 2,
+            path: "C:\\Games".into(),
+        }));
+        c.events();
+        assert_eq!(c.scan_progress.as_ref().unwrap().directories, 12);
+        assert_eq!(c.scan_progress.as_ref().unwrap().path, "C:\\Games");
+        c.cancel.store(true, Ordering::Relaxed);
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(!c.busy);
+        assert!(c.scan_progress.is_none());
+        c.channel.send(Event::ScanProgress(ScanProgress::default()));
+        c.events();
+        assert!(
+            c.scan_progress.is_none(),
+            "late scan feedback is ignored while idle"
+        );
+        c.begin_work("运行库");
+        assert!(c.scan_progress.is_none());
     }
     #[test]
     fn game_names_preserve_manual_overrides_across_scan_cache_and_restart() {
@@ -5242,14 +5770,75 @@ mod tests {
     #[test]
     fn failed_operation_always_completes() {
         let (tx, rx) = mpsc::channel();
-        let c = Channel { tx };
+        let c = Channel {
+            tx,
+            task_scope: None,
+        };
         c.operation(|_| anyhow::bail!("fixture error"));
         let events = [
             rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
             rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
         ];
-        assert!(events.iter().any(|e| matches!(e, Event::Done)));
-        assert!(events.iter().any(|e| matches!(e, Event::Warning(_))));
+        assert!(
+            matches!(&events[0], Event::TaskWarning(false, message) if message == "fixture error")
+        );
+        assert!(matches!(&events[1], Event::Done));
+    }
+    #[test]
+    fn panicked_operation_reports_failure_before_completion() {
+        let (tx, rx) = mpsc::channel();
+        Channel {
+            tx,
+            task_scope: None,
+        }
+        .operation(|_| panic!("fixture panic"));
+        assert!(matches!(
+            rx.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Event::TaskWarning(false, _)
+        ));
+        assert!(matches!(
+            rx.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Event::Done
+        ));
+    }
+    #[test]
+    fn concurrent_tasks_receive_only_their_own_failures() {
+        let (_dir, mut c) = controller();
+        c.begin_work("fixture work");
+        c.tasks.start(true, "fixture update".into());
+        c.update_busy = true;
+        c.channel
+            .send(Event::Warning("background catalog unavailable".into()));
+        c.events();
+        assert!(c.tasks.work.as_ref().unwrap().error.is_none());
+        assert!(c.tasks.update.as_ref().unwrap().error.is_none());
+        c.channel
+            .send(Event::TaskWarning(true, "update failed".into()));
+        c.channel.send(Event::UpdateDone);
+        c.events();
+        assert!(c.tasks.work.as_ref().unwrap().active);
+        assert!(c.tasks.work.as_ref().unwrap().error.is_none());
+        assert_eq!(c.tasks.update.as_ref().unwrap().stage, "操作未完成");
+        c.channel
+            .send(Event::TaskWarning(false, "work failed".into()));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.tasks.work.as_ref().unwrap().stage, "操作未完成");
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn completion_feedback_is_not_replayed_by_unrelated_operations() {
+        let (_dir, mut c) = controller();
+        c.begin_work("fixture work");
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(c.notice.take().is_some());
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(c.notice.is_none());
+        c.close();
+        c.tick_close();
     }
     #[test]
     fn only_known_undeployed_single_game_skips_remove_confirmation() {
@@ -5295,11 +5884,60 @@ mod tests {
         assert!(c.selected.is_empty());
         assert_eq!(c.targets(), BTreeSet::from(["a".into()]));
         c.selected = BTreeSet::from(["b".into(), "c".into(), "stale".into()]);
-        assert_eq!(c.targets(), BTreeSet::from(["b".into(), "c".into()]));
+        assert_eq!(c.targets(), BTreeSet::from(["a".into()]));
         c.focus = Some("b".into());
-        assert_eq!(c.targets(), BTreeSet::from(["b".into(), "c".into()]));
+        assert_eq!(c.targets(), BTreeSet::from(["b".into()]));
+        assert_eq!(
+            c.selected,
+            BTreeSet::from(["b".into(), "c".into(), "stale".into()])
+        );
         c.close();
         c.tick_close();
+    }
+    #[test]
+    fn inspector_patch_ignores_checked_rows_and_keeps_each_games_profile() {
+        let (dir, mut c) = controller();
+        let a = dir.path().join("A/A.exe").display().to_string();
+        let b = dir.path().join("B/B.exe").display().to_string();
+        c.games = [&a, &b]
+            .into_iter()
+            .map(|exe| Game {
+                exe: exe.clone(),
+                ..Default::default()
+            })
+            .collect();
+        c.focus = Some(a.clone());
+        c.set_selection(
+            rtx_fg_manager::encore::SCHEME.into(),
+            1,
+            vec!["version.dll".into()],
+        );
+        c.selected.insert(a.clone());
+        c.focus = Some(b.clone());
+        c.set_selection("rtx40mfg-1.3.3-hf2".into(), 1, vec!["winmm.dll".into()]);
+        assert_eq!(c.scheme_for(Some(&a)), rtx_fg_manager::encore::SCHEME);
+        assert_eq!(c.scheme_for(Some(&b)), "rtx40mfg-1.3.3-hf2");
+        assert_eq!(c.proxies_for(Some(&b)), vec!["winmm.dll"]);
+        assert_eq!(c.patch_targets(false), BTreeSet::from([b.clone()]));
+        assert_eq!(c.patch_targets(true), BTreeSet::from([b.clone()]));
+        c.request_patch(false);
+        assert!(c.busy && c.critical);
+        assert_eq!(c.patch_summary.as_ref().unwrap().total, 1);
+        assert_eq!(c.statuses.get(&b).map(String::as_str), Some("正在安装…"));
+        assert!(!c.statuses.contains_key(&a));
+        assert!(
+            c.encore_install.is_none(),
+            "A's Encore selection must not start an Encore plan for B"
+        );
+        c.close();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while c.critical && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+            c.events();
+        }
+        assert!(!c.critical);
+        c.tick_close();
+        assert!(!dir.path().join("A").exists() && !dir.path().join("B").exists());
     }
     #[test]
     fn rescan_folds_legacy_entries_and_keeps_parameters_and_old_cleanup_path() {
@@ -5353,7 +5991,7 @@ mod tests {
         assert_eq!(c.games.len(), 1);
         assert_eq!(c.focus.as_deref(), Some(renderer.as_str()));
         assert_eq!(c.selected, BTreeSet::from([renderer.clone()]));
-        assert_eq!(c.target_game_count(), 1);
+        assert_eq!(c.target_games().len(), 1);
         assert_eq!(c.patch_targets(false), BTreeSet::from([renderer.clone()]));
         assert_eq!(
             c.patch_targets(true),
@@ -5384,7 +6022,7 @@ mod tests {
             ..Default::default()
         }];
         c.focus = Some(c.games[0].exe.clone());
-        assert_eq!(c.target_game_count(), 1);
+        assert_eq!(c.target_games().len(), 1);
         assert_eq!(c.patch_targets(false).len(), 2);
         assert_eq!(c.patch_targets(true).len(), 3);
         c.close();
@@ -5436,8 +6074,14 @@ mod tests {
             },
         ];
         c.selected = BTreeSet::from([first.clone(), second]);
-        assert_eq!(c.patch_targets(false), BTreeSet::from([first.clone()]));
-        assert_eq!(c.patch_targets(true), BTreeSet::from([first]));
+        for clean in [false, true] {
+            c.request_checked_patch(clean);
+            assert_eq!(
+                c.pending_patch.as_ref().unwrap().targets,
+                BTreeSet::from([first.clone()])
+            );
+            c.cancel_patch();
+        }
         c.close();
         c.tick_close();
     }
@@ -5604,7 +6248,7 @@ mod tests {
             .collect();
         c.selected = BTreeSet::from(["A.exe".into(), "B.exe".into()]);
         for clean in [false, true] {
-            c.request_patch(clean);
+            c.request_checked_patch(clean);
             assert!(!c.busy && !c.critical);
             assert_eq!(
                 c.confirm.as_deref(),
@@ -6088,6 +6732,42 @@ mod tests {
         c.busy = false;
         c.inspect(exe.clone());
         assert!(c.preset_reads.contains(&exe));
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn cancelled_encore_probe_never_opens_choices_or_starts_installation() {
+        let (_dir, mut c) = controller();
+        c.begin_work("检查安装内容");
+        let epoch = c.status_epoch;
+        let plan = EncoreInstallPlan {
+            fingerprint: c.retry_fingerprint(),
+            paths: BTreeSet::from(["cancelled.exe".into()]),
+            choices: vec![],
+        };
+        c.cancel.store(true, Ordering::Relaxed);
+        c.channel.send(Event::EncorePrepared(Ok(plan)));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.status_epoch, epoch);
+        assert!(!c.busy && c.encore_install.is_none() && c.resume_install.is_none());
+        assert_eq!(c.tasks.work.as_ref().unwrap().stage, "已取消");
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn changed_catalog_invalidates_a_first_install_plan_before_any_write() {
+        let (_dir, mut c) = controller();
+        c.encore_install = Some(EncoreInstallPlan {
+            fingerprint: c.retry_fingerprint(),
+            paths: BTreeSet::from(["unchanged.exe".into()]),
+            choices: vec![],
+        });
+        c.catalog.revision.push_str("-new");
+        assert!(c.confirm_encore_install(vec![]).is_err());
+        assert!(!c.busy && c.encore_install_values.is_empty());
         c.close();
         c.tick_close();
     }

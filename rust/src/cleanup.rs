@@ -479,6 +479,27 @@ fn scan_generated(
     }
     Ok(())
 }
+fn encore_log_name(name: &str) -> bool {
+    const NAMES: [&str; 8] = [
+        "rtx-encore-status.json",
+        "rtx-encore.log",
+        "rtx-encore.crash.log",
+        "rtx-encore_perf.csv",
+        "rtx-encore_nr.csv",
+        "rtx-encore_nr_open_steps.csv",
+        "rtx-encore.gpu-bootstrap.log",
+        "rtx-encore.log.previous-legacy.log",
+    ];
+    static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
+    let rotated = ROTATED.get_or_init(|| {
+        regex::Regex::new(
+            r"^(rtx-encore_frames_[0-9]{1,10}\.jsonl|rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}((\.(crash|calls))?\.log|\.(dump[0-9]{1,10}|exit|gpu|hang)\.dmp))$",
+        )
+        .expect("fixed Encore session-log pattern")
+    });
+    NAMES.contains(&name) || rotated.is_match(name)
+}
+
 /// The Encore runtime owns fixed outputs in a fixed adjacent directory. Do not
 /// interpret paths in JSONC, recursively erase this directory, or claim arbitrary
 /// .log/.csv/.dmp files placed here by another program.
@@ -506,23 +527,6 @@ fn scan_encore_logs(
         kept.insert(root);
         return Ok(());
     }
-    const NAMES: [&str; 8] = [
-        "rtx-encore-status.json",
-        "rtx-encore.log",
-        "rtx-encore.crash.log",
-        "rtx-encore_perf.csv",
-        "rtx-encore_nr.csv",
-        "rtx-encore_nr_open_steps.csv",
-        "rtx-encore.gpu-bootstrap.log",
-        "rtx-encore.log.previous-legacy.log",
-    ];
-    static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
-    let rotated = ROTATED.get_or_init(|| {
-        regex::Regex::new(
-            r"^(rtx-encore_frames_[0-9]{1,10}\.jsonl|rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}((\.(crash|calls))?\.log|\.(dump[0-9]{1,10}|exit|gpu|hang)\.dmp))$",
-        )
-        .expect("fixed Encore session-log pattern")
-    });
     for entry in fs::read_dir(&root)? {
         let entry = entry?;
         // Treat links as unknown and retain them. Never follow the target while
@@ -534,7 +538,7 @@ fn scan_encore_logs(
         }
         let path = core::no_links(&path)?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if (NAMES.contains(&name.as_str()) || rotated.is_match(&name)) && path.is_file() {
+        if encore_log_name(&name) && path.is_file() {
             targets.insert(path.clone(), core::digest(&path)?);
         } else {
             kept.insert(path);
@@ -545,6 +549,62 @@ fn scan_encore_logs(
 }
 pub fn clean(exe: &Path) -> Result<String> {
     clean_at(&core::DeploymentTarget::for_game(exe))
+}
+/// Check exact manager-owned files as well as the game processes. Driver helpers
+/// may inherit Encore log handles while their executables live outside the game.
+/// This discovery runs before restoring or deleting anything, including retries
+/// after an older release left an incomplete uninstall record.
+pub fn blocking_processes(target: &core::DeploymentTarget) -> Result<Vec<win::BlockingProcess>> {
+    let target = target.validate(false)?;
+    let mut processes = core::blocking_processes(&target)?
+        .into_iter()
+        .map(|p| (p.pid, p))
+        .collect::<BTreeMap<_, _>>();
+    let dir = &target.directory;
+    let record = core::record(dir)?;
+    let Some(record) = record else {
+        return Ok(processes.into_values().collect());
+    };
+    target.validate_record(&record)?;
+    let mut files = BTreeSet::new();
+    let mut add = |path: PathBuf| -> Result<()> {
+        match fs::symlink_metadata(&path) {
+            Ok(meta) if !core::is_link(&meta) && meta.is_file() => {
+                files.insert(core::no_links(&path)?);
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+        ensure!(files.len() <= 4096, "待检查文件过多，请关闭游戏后重试");
+        Ok(())
+    };
+    for name in record.hashes.keys() {
+        add(dir.join(name))?;
+    }
+    add(dir.join(core::config_name(&record.backend)))?;
+    if record.backend == crate::encore::BACKEND {
+        let logs = dir.join("rtx-encore-logs");
+        match fs::symlink_metadata(&logs) {
+            Ok(meta) if !core::is_link(&meta) && meta.is_dir() => {
+                core::no_links(&logs)?;
+                for (index, entry) in fs::read_dir(logs)?.enumerate() {
+                    ensure!(index < 4096, "待检查文件过多，请关闭游戏后重试");
+                    let entry = entry?;
+                    if encore_log_name(&entry.file_name().to_string_lossy()) {
+                        add(entry.path())?;
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    for process in win::processes_holding_files(&files.into_iter().collect::<Vec<_>>())? {
+        processes.insert(process.pid, process);
+    }
+    Ok(processes.into_values().collect())
 }
 pub fn clean_at(target: &core::DeploymentTarget) -> Result<String> {
     Ok(clean_outcome_at(target)?.message)
@@ -598,7 +658,16 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     let p = target.game_exe.clone();
     let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
-    core::assert_target_stopped(&target)?;
+    let blockers = blocking_processes(&target)?;
+    ensure!(
+        blockers.is_empty(),
+        "请先完全退出游戏及占用补丁文件的后台进程，再重试：{}",
+        blockers
+            .iter()
+            .map(|p| format!("{} (PID {})", p.name, p.pid))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     if pending_only {
         let Some(record) = core::record(dir)? else {
             return Ok(CleanOutcome {

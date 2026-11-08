@@ -172,6 +172,41 @@ pub(crate) struct Package {
     pub urls: Vec<String>,
     pub files: Vec<Asset>,
 }
+impl Package {
+    fn download_file(&self) -> transfer::DownloadFile {
+        let name = match self.kind.as_str() {
+            "sr" => "DLSS SR",
+            "rr" => "DLSS RR",
+            "fg" => "DLSS FG",
+            "xemfg" => "XeSS",
+            "encorefg" | "streamline" => "Streamline",
+            name => name,
+        };
+        transfer::DownloadFile::new(&self.sha256, self.bytes, format!("{name} {}", self.version))
+    }
+}
+pub(crate) fn download_file(kind: &str, version: &str) -> Result<transfer::DownloadFile> {
+    Ok(version_package(kind, version)?.download_file())
+}
+pub(crate) fn download_files(
+    targets: &[core::DeploymentTarget],
+    kind: &str,
+    version: &str,
+) -> Result<Vec<transfer::DownloadFile>> {
+    let mut files = vec![download_file(kind, version)?];
+    if kind == "fg"
+        && version == "310.9.16"
+        && targets
+            .iter()
+            .map(encore_200_installed)
+            .collect::<Result<Vec<_>>>()?
+            .iter()
+            .any(|v| *v)
+    {
+        files.push(bundled_package("streamline")?.download_file());
+    }
+    Ok(files)
+}
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Asset {
     pub name: String,
@@ -217,6 +252,92 @@ pub fn versions(kind: &str) -> Vec<String> {
 /// Complete Encore's manual-install dependencies for each real deployment target.
 /// Native runtime locations are updated in place; only games without an existing
 /// frame-generation integration receive the added-FG set. No feature is enabled.
+/// Fetch all applicable components before the first game-file write. Cache hits
+/// reuse verified bytes; interrupted downloads cannot leave a partial patch install.
+fn encore_packages(targets: &[core::DeploymentTarget]) -> Result<Vec<Package>> {
+    let mut native_fg = false;
+    let mut added_fg = false;
+    for target in targets {
+        let e = scanner::inspect_for_installation(&target.game_exe);
+        ensure!(
+            !e.limited,
+            "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
+        );
+        native_fg |= e.frame_generation && read(target, "encorefg")?.is_none();
+        added_fg |= can_add_encore_fg(target, &e);
+    }
+    let mut packages = vec![
+        version_package("sr", "310.9.16")?,
+        version_package("rr", "310.9.16")?,
+    ];
+    if native_fg {
+        packages.push(version_package("fg", "310.9.16")?);
+        packages.push(bundled_package("streamline")?);
+    }
+    if added_fg {
+        packages.push(version_package("encorefg", "2.14.16")?);
+    }
+    Ok(packages)
+}
+pub fn encore_download_files(
+    targets: &[core::DeploymentTarget],
+) -> Result<Vec<transfer::DownloadFile>> {
+    let mut files = encore_packages(targets)?
+        .iter()
+        .map(Package::download_file)
+        .collect::<Vec<_>>();
+    files.push(crate::neural_runtime::download_file(
+        crate::neural_runtime::RECOMMENDED,
+    )?);
+    Ok(files)
+}
+pub fn prepare_encore_sources(
+    targets: &[core::DeploymentTarget],
+    github: bool,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(transfer::Progress),
+) -> Result<()> {
+    let packages = encore_packages(targets)?;
+    let mut files = packages
+        .iter()
+        .map(Package::download_file)
+        .collect::<Vec<_>>();
+    files.push(crate::neural_runtime::download_file(
+        crate::neural_runtime::RECOMMENDED,
+    )?);
+    progress(transfer::Progress::plan(files));
+    let nr_bytes = crate::neural_runtime::archive_size(crate::neural_runtime::RECOMMENDED)?;
+    let total = packages.iter().map(|p| p.bytes).sum::<u64>() + nr_bytes;
+    let count = packages.len() + 1;
+    let mut completed = 0;
+    for (index, p) in packages.into_iter().enumerate() {
+        let bytes = p.bytes;
+        let label = format!("{} {}  {}/{}", p.kind, p.version, index + 1, count);
+        prepare_package(p, github, cancel, &mut |mut p| {
+            p.aggregate = Some((completed + p.completed.min(bytes), total));
+            p.item = label.clone();
+            progress(p);
+        })?;
+        completed += bytes;
+    }
+    crate::neural_runtime::prepare(
+        crate::neural_runtime::RECOMMENDED,
+        github,
+        cancel,
+        &mut |mut p| {
+            p.aggregate = Some((completed + p.completed.min(nr_bytes), total));
+            p.item = format!(
+                "DLSSNR {}  {count}/{count}",
+                crate::neural_runtime::RECOMMENDED
+            );
+            progress(p);
+        },
+    )?;
+    Ok(())
+}
+pub fn can_add_encore_fg(target: &core::DeploymentTarget, e: &scanner::Evidence) -> bool {
+    preflight_added_fg(target, Some(e)).is_ok()
+}
 pub fn complete_encore_runtimes(
     targets: &[core::DeploymentTarget],
     github: bool,
@@ -279,6 +400,8 @@ pub fn complete_encore_runtimes(
             added.push(target.clone());
         }
     }
+    // All downloads succeed before the first runtime replacement.
+    prepare_encore_sources(targets, github, cancel, progress)?;
     for (kind, selected) in planned {
         install_version(&selected, kind, "310.9.16", github, cancel, progress)?;
     }
@@ -339,6 +462,8 @@ fn prepare_package(
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<BTreeMap<String, PathBuf>> {
+    let file = p.download_file();
+    progress(transfer::Progress::plan(vec![file.clone()]));
     let root = core::no_links(
         &assets::cache_root()?
             .join("optional-runtimes")
@@ -361,6 +486,7 @@ fn prepare_package(
         .collect();
     sources.sort_by_key(|s| s.name != if github { "github" } else { "gitcode" });
     let zip_path = root.join("runtime.zip");
+    let item = format!("{} {}", p.kind, p.version);
     transfer::download(
         &transfer::Request {
             sources,
@@ -372,7 +498,11 @@ fn prepare_package(
         },
         &zip_path,
         cancel,
-        progress,
+        |mut p| {
+            p.item = item.clone();
+            p.file = Some(file.clone());
+            progress(p)
+        },
     )?;
     let mut zip = zip::ZipArchive::new(fs::File::open(zip_path)?)?;
     ensure!(zip.len() == p.files.len(), "运行库压缩包内容异常");
@@ -651,7 +781,7 @@ fn candidate_paths(
     }
     found.sort_by_key(|p| core::key(p));
     found.dedup_by_key(|p| core::key(p));
-    if found.is_empty() && kind == "sr" && encore_200_installed(target)? {
+    if found.is_empty() && matches!(kind, "sr" | "rr") && encore_200_installed(target)? {
         let inspected;
         let e = if let Some(e) = evidence {
             e
@@ -663,7 +793,7 @@ fn candidate_paths(
             !e.limited,
             "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
         );
-        if !e.neural_input() && !e.super_resolution_plugin {
+        if kind == "rr" || (!e.neural_input() && !e.super_resolution_plugin) {
             found.push(core::no_links(&target.directory.join(name))?);
         }
     }
@@ -770,11 +900,11 @@ pub(crate) fn validate_encore_features(
             !on("smoothMotionEnabled"),
             "新增帧生成不能与 Smooth Motion 同时开启，请关闭其中一项"
         );
-        preflight_added_fg(target, None)?;
         if values
             .get("frameGenerationEngine")
             .is_none_or(|v| v != "xefg")
         {
+            preflight_added_fg(target, None)?;
             let p = bundled_package("encorefg")?;
             let dir = target.game_exe.parent().context("游戏目录无效")?;
             for f in p.files.iter().filter(|f| f.name.ends_with(".dll")) {
@@ -783,6 +913,28 @@ pub(crate) fn validate_encore_features(
                     "请先安装新增 DLSS 帧生成的完整组件（Streamline 2.14.16 + DLSS-G 310.9.16）"
                 );
             }
+        } else {
+            // XeFG uses Encore's private Intel set, not an extra Streamline
+            // interposer. SR-only Streamline is not native frame generation.
+            let mut e = scanner::inspect_for_installation(&target.game_exe);
+            ensure!(
+                !e.limited,
+                "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
+            );
+            if let Some(own) = read(target, "encorefg")? {
+                e.frame_integration_paths.retain(|p| {
+                    !own.entries.iter().any(|entry| {
+                        entry.original.is_none()
+                            && core::key(Path::new(&entry.path)) == core::key(p)
+                            && matches(p, &entry.installed).unwrap_or(false)
+                    })
+                });
+                e.frame_generation = false;
+            }
+            ensure!(
+                !e.native_frame_generation(),
+                "游戏已有原生帧生成，请使用原生引擎，不要开启新增帧生成"
+            );
         }
     }
     Ok(())
@@ -1254,6 +1406,11 @@ pub fn install_version(
             .collect::<Result<Vec<_>>>()?
             .iter()
             .any(|v| *v);
+    let mut files = vec![selected.download_file()];
+    if native_plugins {
+        files.push(bundled_package("streamline")?.download_file());
+    }
+    progress(transfer::Progress::plan(files));
     install_many_with(targets, kind, cancel, || {
         let mut sources = prepare_package(selected, github, cancel, progress)?;
         if native_plugins {

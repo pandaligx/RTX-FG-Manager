@@ -15,6 +15,8 @@ use windows::{
     },
     core::{PCWSTR, PWSTR, w},
 };
+mod file_locks;
+pub use file_locks::processes_holding_files;
 pub fn wide(s: impl AsRef<OsStr>) -> Vec<u16> {
     s.as_ref().encode_wide().chain(Some(0)).collect()
 }
@@ -190,10 +192,16 @@ pub struct BlockingProcess {
     pub name: String,
     pub path: Option<PathBuf>,
     pub created: Option<u64>,
+    locked_files: Vec<PathBuf>,
+    protected: bool,
 }
 impl BlockingProcess {
+    pub fn holds_patch_files(&self) -> bool {
+        !self.locked_files.is_empty()
+    }
     pub fn can_terminate(&self) -> bool {
-        self.path.is_some()
+        !self.protected
+            && self.path.is_some()
             && self.created.is_some()
             && ![0, 4, std::process::id()].contains(&self.pid)
     }
@@ -226,6 +234,18 @@ pub fn terminate_confirmed(process: &BlockingProcess) -> Result<()> {
         process.can_terminate(),
         "无法核实进程身份，请在任务管理器中处理"
     );
+    // A user may leave the confirmation open. Do not stop a helper which has
+    // already released this game's files, or a service identified by a recheck.
+    if !process.locked_files.is_empty() {
+        let current = processes_holding_files(&process.locked_files)?;
+        let Some(holder) = current.iter().find(|p| p.pid == process.pid) else {
+            return Ok(());
+        };
+        ensure!(
+            holder.can_terminate() && holder.created == process.created,
+            "进程身份已变化，未结束任何新进程；请重新检测"
+        );
+    }
     // SAFETY: Every acquired handle is owned by RAII. Paths, time and wait result
     // are checked before terminating only the user-confirmed process instance.
     unsafe {
@@ -260,6 +280,9 @@ pub fn terminate_confirmed(process: &BlockingProcess) -> Result<()> {
                 && process.created == Some(process_created(handle.0)?),
             "进程身份已变化，未结束任何新进程；请重新检测"
         );
+        let mut critical = windows::core::BOOL::default();
+        IsProcessCritical(handle.0, &mut critical)?;
+        ensure!(!critical.as_bool(), "不能结束系统关键进程");
         TerminateProcess(handle.0, 1)?;
         ensure!(
             WaitForSingleObject(handle.0, 5000) == WAIT_OBJECT_0,
@@ -330,6 +353,8 @@ pub fn processes_in_directory(
                                 name: name.clone(),
                                 path: Some(p),
                                 created: process_created(h.0).ok(),
+                                locked_files: Vec::new(),
+                                protected: false,
                             });
                         }
                     }
@@ -340,6 +365,8 @@ pub fn processes_in_directory(
                         name,
                         path: None,
                         created: None,
+                        locked_files: Vec::new(),
+                        protected: true,
                     });
                 }
             }

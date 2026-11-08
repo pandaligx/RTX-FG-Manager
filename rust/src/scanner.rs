@@ -511,6 +511,26 @@ pub struct Evidence {
     pub limited: bool,
 }
 impl Evidence {
+    /// SR wrappers and shared Streamline helpers alone do not prove native FG.
+    /// Ambiguous FidelityFX integrations remain protected conservatively.
+    pub fn native_frame_generation(&self) -> bool {
+        self.frame_generation
+            || self.frame_integration_paths.iter().any(|p| {
+                p.file_name().is_some_and(|n| {
+                    [
+                        "nvngx_dlssg.dll",
+                        "sl.dlss_g.dll",
+                        "libxess_fg.dll",
+                        "amd_fidelityfx_dx12.dll",
+                        "amd_fidelityfx_vk.dll",
+                        "ffx_fsr3_x64.dll",
+                        "ffx_fsr3frameinterpolation_x64.dll",
+                    ]
+                    .iter()
+                    .any(|expected| n.eq_ignore_ascii_case(expected))
+                })
+            })
+    }
     pub fn neural_input(&self) -> bool {
         self.super_resolution
             || self.component_paths.iter().any(|p| {
@@ -541,7 +561,7 @@ pub fn inspect(exe: &Path) -> Evidence {
 /// Installation runs in a worker and needs a complete inventory, including
 /// large asset trees that exceed the lightweight UI scan. Limits still fail
 /// closed; reaching one must never be interpreted as a missing integration.
-pub(crate) fn inspect_for_installation(exe: &Path) -> Evidence {
+pub fn inspect_for_installation(exe: &Path) -> Evidence {
     inspect_with_limits(exe, 32_768, 500_000, 15_000)
 }
 

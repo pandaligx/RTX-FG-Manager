@@ -35,6 +35,17 @@ fn runtime(version: &str) -> Result<Runtime> {
         .find(|r| r.version == version)
         .context("不支持的 NR 运行库版本")
 }
+pub(crate) fn archive_size(version: &str) -> Result<u64> {
+    Ok(runtime(version)?.archive_size)
+}
+pub(crate) fn download_file(version: &str) -> Result<transfer::DownloadFile> {
+    let r = runtime(version)?;
+    Ok(transfer::DownloadFile::new(
+        &r.archive_sha256,
+        r.archive_size,
+        format!("DLSSNR {version}"),
+    ))
+}
 
 fn download_sources(runtime: &Runtime, prefer_github: bool) -> Vec<transfer::Source> {
     let mut sources: Vec<_> = runtime
@@ -65,18 +76,29 @@ fn download_sources(runtime: &Runtime, prefer_github: bool) -> Vec<transfer::Sou
     sources
 }
 
-fn prepare(
+pub(crate) fn prepare(
     version: &str,
     prefer_github: bool,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<PathBuf> {
     let r = runtime(version)?;
+    let file = download_file(version)?;
+    progress(transfer::Progress::plan(vec![file.clone()]));
     let root = core::no_links(&assets::cache_root()?.join("neural-rendering"))?;
     fs::create_dir_all(&root)?;
     let _lock = win::game_lock(&root)?;
     let destination = core::no_links(&root.join(format!("{}-{}.dll", version, r.sha256)))?;
     if matches_file(&destination, &r.sha256)? {
+        progress(transfer::Progress {
+            file: Some(file),
+            item: format!("DLSSNR {version}"),
+            completed: r.archive_size,
+            total: r.archive_size,
+            source: "cache".into(),
+            phase: transfer::Phase::Complete,
+            ..Default::default()
+        });
         return Ok(destination);
     }
     ensure!(!destination.exists(), "NR 缓存已变化，请移除损坏缓存后重试");
@@ -92,7 +114,11 @@ fn prepare(
         },
         &archive,
         cancel,
-        progress,
+        |mut p| {
+            p.item = format!("DLSSNR {version}");
+            p.file = Some(file.clone());
+            progress(p)
+        },
     )?;
     let mut zip = zip::ZipArchive::new(fs::File::open(&archive)?)?;
     ensure!(zip.len() == 1, "NR 压缩包内容异常");

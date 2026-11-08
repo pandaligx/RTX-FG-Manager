@@ -7,6 +7,7 @@
   },
   "xefg": {
     "xefgMfg4VariablePacing": true,
+    "xefgSourcePacing": true,
     "xefgUiHandling": "interpolate",
     "xefgUiAlpha": "unknown"
   },

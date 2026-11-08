@@ -14,6 +14,25 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('Encore 2.1 source pacing is gated and retained when older clients edit metadata',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...shared(),patchVersion:'2.1.0',presets:{schema:1,profile:'rtx_encore_json_v4',values:{xefgSourcePacing:'0'},defaults:{xefgSourcePacing:'1'}}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',14);
+  assert.deepEqual(posted.content.presets,c.presets);
+  let revision=posted.revision;
+  for(const protocol of [8,12,13]) {
+    const path='/v1/recipes/'+posted.id;
+    const old=await f.call('GET',path,null,u.token,'test-ip',protocol);
+    assert.equal(old.content.presets,undefined);
+    old.content.notes='Edited with protocol '+protocol;
+    await f.call('PUT',path,{revision:revision++,content:old.content},u.token,'test-ip',protocol);
+    const current=await f.call('GET',path,null,u.token,'test-ip',14);
+    assert.deepEqual(current.content.presets,c.presets);
+  }
+  assert.throws(()=>recipe({...c,patchVersion:'2.0.1'}));
+  assert.equal((await f.call('GET','/v1/capabilities')).encore210,1);
+});
+
 test('Encore 2 shares stay isolated from old clients and preserve local learning privacy',async t=>{
   const f=fixture(t),u=await f.login();
   const c={...shared(),patchVersion:'2.0.1',presets:{schema:1,profile:'rtx_encore_json_v4',values:{flipMeteringBypass:'auto',frameGenerationWithoutGameFg:'1',dlssRenderScale:'ultra'},defaults:{flipMeteringBypass:'auto',frameGenerationWithoutGameFg:'0',dlssRenderScale:'game'}},runtimes:{schema:1,components:[{kind:'encorefg',source:'managed',versions:['2.14.16','310.9.16'],packageVersion:'2.14.16'}]}};

@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.3.26
+
+- Detect actual patch-file holders before uninstall, including external helpers retaining Encore logs. Confirm once to end the listed processes and retry; recover older incomplete uninstall records while preserving other games, unknown files and system services.
+- Fix installation targeting when checked games differ from the game shown in the inspector. Inspector actions target only that game; checked rows use explicit batch actions.
+- Add the NVIDIA mark with compact Actual/Alias tags, searchable desktop and CMP display names, and a reminder to restore the GPU name before driver updates. Thicken the recommendation border.
+- Reset by uninstalling recorded patches and restoring runtimes and GPU names before clearing app data. Delete reset backups after a successful restart; retain recovery records on failure.
+- Support RTX Encore 2.1.0, including live XeFG source pacing and version-gated parameter sharing. Preserve existing settings, comments and unknown fields.
+- Ask for independent added frame-generation and reconstruction engines on first install, with no preselection; keep settings on updates. Distinguish native super resolution from frame generation, complete runtimes at their actual locations and preserve the game's interposer.
+- Show a centered, cancellable download overlay with completed counts and a compact waiting/downloading/completed file list. Count shared ZIPs once and hide after all downloads finish; keep installation results and errors in top-right Alert notifications.
+- Move recommendation border colors smoothly around an antialiased rounded path over 8 seconds, with continuous color joins and no animation restart when opening menus. Respect reduced motion.
+- Restore live scan paths, directory counts and cancellation above the game list. On first launch, handle available updates first, then offer a one-time full scan in a centered dialog; shorten redundant interface copy.
+- Preserve native Rust downloads, other patch schemes, original-file restoration and long-term update channels.
+
 ## 4.3.25
 
 - Replace the bundled aria2c executable with in-process Rust HTTP transfers, removing the external downloader startup dependency.

@@ -18,7 +18,8 @@ pub(crate) fn command(path: &Path) -> Command {
     // never inherit the previous operation's ticket or verified file hash.
     command
         .env_remove(READY_ENV)
-        .env_remove("RTXFG_UPDATE_READY");
+        .env_remove("RTXFG_UPDATE_READY")
+        .env_remove("RTXFG_RESET_READY");
     command
 }
 

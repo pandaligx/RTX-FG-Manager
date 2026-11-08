@@ -2,7 +2,7 @@
 use gpui::{AssetSource, SharedString};
 use std::borrow::Cow;
 // The default component bundle excludes catalog-only icons.
-gpui::assets::icon_assets!(RecommendationAssets, [UsersRound]);
+gpui::assets::icon_assets!(RecommendationAssets, [UsersRound, Download]);
 pub struct Assets;
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
@@ -28,6 +28,9 @@ impl AssetSource for Assets {
                 "../assets/bilibili.svg"
             ))));
         }
+        if path == "app/nvidia.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!("../assets/nvidia.svg"))));
+        }
         gpui::assets::Assets.load(path)
     }
     fn list(&self, path: &str) -> anyhow::Result<Vec<SharedString>> {
@@ -39,6 +42,7 @@ impl AssetSource for Assets {
             "app/refresh.svg",
             "app/trash.svg",
             "app/bilibili.svg",
+            "app/nvidia.svg",
         ] {
             if name.starts_with(path) {
                 files.push(name.into());
