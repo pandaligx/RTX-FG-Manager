@@ -59,7 +59,7 @@ Download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolk
 
 [Full changelog →](CHANGELOG.md)
 
-> **Dlssg_for_sm86 0.4.1** requires manager **4.3.14**; use **4.3.18 or later** for **Encore 1.6.0** settings and preset sharing. Upgrade games explicitly; manager updates do not automatically replace installed patches.
+> **Dlssg_for_sm86 0.4.1** requires manager **4.3.14**; use **4.3.26 or later** for **Encore 2.1.0** settings and preset sharing. Upgrade games explicitly; manager updates do not automatically replace installed patches.
 
 ## Choose a patch
 
