@@ -15,6 +15,8 @@ use std::{
     },
     time::{Duration, Instant},
 };
+#[cfg(test)]
+mod preset_regressions;
 #[derive(Clone, Debug, Default)]
 pub struct ScanProgress {
     pub directories: u64,
@@ -31,6 +33,7 @@ pub enum Event {
     RuntimeCatalogCached(u64, rtx_fg_manager::runtime_catalog::Catalog),
     RuntimeCatalog(u64, Result<rtx_fg_manager::runtime_catalog::Catalog>),
     Deployments(u64, String, Box<rtx_fg_manager::deployment::Snapshot>),
+    Uninstalled(u64, String),
     CleanupPreview(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>),
     Scan(scanner::Report),
     ScanProgress(ScanProgress),
@@ -1082,6 +1085,9 @@ impl Controller {
             .and_then(|v| v.get(scheme))
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        if !legacy_dirty {
+            return Default::default();
+        }
         let names: Vec<&str> = if let Some(keys) = keys.and_then(Value::as_array) {
             keys.iter().filter_map(Value::as_str).collect()
         } else if legacy_dirty
@@ -1096,9 +1102,9 @@ impl Controller {
                 "rtx_reflex_limit",
             ]
         } else if legacy_dirty
-            && rtx_fg_manager::upstream040::is_profile(
+            && (rtx_fg_manager::upstream040::is_profile(
                 &self.parameter_policy(exe, scheme).parameter_profile,
-            )
+            ) || !uses_explicit_edits(&self.parameter_policy(exe, scheme).parameter_profile))
         {
             saved
                 .and_then(Value::as_object)
@@ -1196,12 +1202,11 @@ impl Controller {
     }
     /// A cached installation snapshot is not a choice for a fresh installation.
     /// Only call after every deployment directory is confirmed uninstalled.
-    fn reset_uninstalled_upstream_presets(&mut self, exe: &str) {
+    fn reset_uninstalled_presets(&mut self, exe: &str) {
         let schemes: Vec<_> = self
             .catalog
             .scheme_policies
             .iter()
-            .filter(|(_, p)| rtx_fg_manager::upstream040::is_profile(&p.parameter_profile))
             .map(|(id, p)| (id.clone(), p.clone()))
             .collect();
         let mut changed = false;
@@ -1244,6 +1249,23 @@ impl Controller {
         if changed {
             self.save();
         }
+    }
+    /// A completed explicit uninstall also ends drafts from that installation.
+    /// Ordinary status refreshes keep edits made for the next installation.
+    fn forget_uninstalled_presets(&mut self, exe: &str) {
+        self.preset_baselines.retain(|(path, _), _| path != exe);
+        if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
+            for field in [
+                "preset_options_v2",
+                "preset_options",
+                "upstream_options",
+                "preset_dirty",
+                "preset_dirty_keys",
+            ] {
+                game.extra.remove(field);
+            }
+        }
+        self.reset_uninstalled_presets(exe);
     }
     pub fn preset_context(&self, exe: &str) -> rtx_fg_manager::presets::Context {
         let scheme = self.scheme_for(Some(exe));
@@ -1309,6 +1331,12 @@ impl Controller {
                 }
             }
             dirty_keys.retain(|key| baseline.get(key) != values.get(key));
+        } else {
+            dirty_keys = values
+                .iter()
+                .filter(|(key, value)| baseline.get(*key) != Some(*value))
+                .map(|(key, _)| key.clone())
+                .collect();
         }
         if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
             let entry = game
@@ -1329,15 +1357,15 @@ impl Controller {
             dirty[&scheme] = json!(changed);
             if uses_explicit_edits(&profile) {
                 dirty[&scheme] = json!(!dirty_keys.is_empty());
-                let keys = game
-                    .extra
-                    .entry("preset_dirty_keys")
-                    .or_insert_with(|| json!({}));
-                if !keys.is_object() {
-                    *keys = json!({});
-                }
-                keys[&scheme] = json!(dirty_keys);
             }
+            let keys = game
+                .extra
+                .entry("preset_dirty_keys")
+                .or_insert_with(|| json!({}));
+            if !keys.is_object() {
+                *keys = json!({});
+            }
+            keys[&scheme] = json!(dirty_keys);
             self.save();
         }
     }
@@ -2946,6 +2974,7 @@ impl Controller {
         self.status_epoch += 1;
         self.critical = true;
         self.begin_work("安装 / 卸载补丁");
+        let epoch = self.status_epoch;
         self.patch_summary = Some(PatchSummary {
             total: paths.len(),
             ..Default::default()
@@ -3097,6 +3126,24 @@ impl Controller {
                                 &p,
                             );
                             let name = core::config_name(&payload.backend);
+                            // Applied snapshots belong to the removed installation.
+                            // Check disk here too: refresh may still be in flight after
+                            // uninstall, or an older manager may have left stale state.
+                            let fresh_options;
+                            let options = if core::record(&game.deployment_target(&p).directory)?
+                                .is_none()
+                            {
+                                let mut values = rtx_fg_manager::presets::defaults(
+                                    &payload.policy.parameter_profile,
+                                    &payload.policy.defaults,
+                                );
+                                values.extend(overrides.clone());
+                                context.normalize(&mut values);
+                                fresh_options = values;
+                                &fresh_options
+                            } else {
+                                &options
+                            };
                             let configured = if payload.backend == rtx_fg_manager::encore::BACKEND {
                                 let version = payload
                                     .upstream_version
@@ -3130,7 +3177,7 @@ impl Controller {
                                     context.configure(&files[name], &overrides)?
                                 }
                             } else {
-                                context.configure(&files[name], &options)?
+                                context.configure(&files[name], options)?
                             };
                             files.insert(name.into(), configured);
                             core::deploy_prepared_context_at_with_overrides(
@@ -3178,6 +3225,12 @@ impl Controller {
                         core::status_at(&game.deployment_target(&p)),
                     ));
                 }
+                if all_ok && clean {
+                    let snapshot = rtx_fg_manager::deployment::inspect(&game, &catalog);
+                    if snapshot.status == "未部署" && snapshot.installed == 0 {
+                        c.send(Event::Uninstalled(epoch, primary.clone()));
+                    }
+                }
                 if all_ok && !clean {
                     if prepared.as_ref().is_some_and(|payload| payload.backend == rtx_fg_manager::encore::BACKEND
                         && rtx_fg_manager::encore::supports_200(payload.upstream_version.as_deref().or(Some(&payload.version)))) {
@@ -3203,15 +3256,17 @@ impl Controller {
                             c.send(Event::Status(target.game_exe.display().to_string(), core::status_at(&target)));
                         }
                     }
-                    let profile = &catalog.scheme_policies[&scheme].parameter_profile;
-                    let actual = if uses_explicit_edits(profile) {
-                        read_target
-                            .as_ref()
-                            .ok_or_else(|| anyhow::anyhow!("没有实际部署目录"))
-                            .and_then(|target| read_json_preset_values(target, profile))
-                    } else {
-                        Ok(options)
-                    };
+                    // Cache what was actually written, including a fresh install's
+                    // defaults, rather than the previous installation's input snapshot.
+                    let actual = read_target
+                        .as_ref()
+                        .context("没有实际部署目录")
+                        .and_then(|target| {
+                            rtx_fg_manager::presets::inspect_at(target, &catalog)?
+                                .filter(|(installed, _)| installed == &scheme)
+                                .map(|(_, values)| values)
+                                .context("无法读取已安装方案的参数")
+                        });
                     match actual {
                         Ok(actual) => c.send(Event::PresetApplied(primary, scheme, actual)),
                         Err(error) => {
@@ -4086,8 +4141,13 @@ impl Controller {
                         let uninstalled = snapshot.status == "未部署" && snapshot.installed == 0;
                         self.deployments.insert(exe.clone(), *snapshot);
                         if uninstalled {
-                            self.reset_uninstalled_upstream_presets(&exe);
+                            self.reset_uninstalled_presets(&exe);
                         }
+                    }
+                }
+                Event::Uninstalled(epoch, exe) => {
+                    if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
+                        self.forget_uninstalled_presets(&exe);
                     }
                 }
                 Event::CleanupPreview(epoch, fingerprint, plans) => {
@@ -6369,6 +6429,74 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn uninstalled_all_schemes_forget_applied_snapshots_and_keep_other_games() {
+        let (_dir, mut c) = controller();
+        let exe = "Uninstalled.exe";
+        let other = "StillInstalled.exe";
+        c.games = vec![
+            Game {
+                exe: exe.into(),
+                ..Default::default()
+            },
+            Game {
+                exe: other.into(),
+                ..Default::default()
+            },
+        ];
+        let policies = c.catalog.scheme_policies.clone();
+        for (scheme, policy) in &policies {
+            let mut values =
+                rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            let changed = rtx_fg_manager::presets::parameters(&policy.parameter_profile)
+                .into_iter()
+                .find_map(|p| {
+                    p.choices
+                        .iter()
+                        .find(|(v, _)| values.get(p.key).is_some_and(|old| old != v))
+                        .map(|(v, _)| (p.key.to_owned(), (*v).to_owned()))
+                })
+                .expect("each supported protocol has an editable parameter");
+            values.insert(changed.0, changed.1);
+            for game in [exe, other] {
+                c.channel.send(Event::PresetApplied(
+                    game.into(),
+                    scheme.clone(),
+                    values.clone(),
+                ));
+            }
+        }
+        c.events();
+        let untouched = c.games[1].extra.clone();
+        c.channel.send(Event::Deployments(
+            c.status_epoch,
+            exe.into(),
+            Box::new({
+                let mut snapshot = rtx_fg_manager::deployment::Snapshot::default();
+                snapshot.status = "未部署".into();
+                snapshot.total = 1;
+                snapshot
+            }),
+        ));
+        c.events();
+        for (scheme, policy) in &policies {
+            let mut expected =
+                rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            rtx_fg_manager::presets::Context::new(scheme, policy, std::path::Path::new(exe))
+                .normalize(&mut expected);
+            assert_eq!(
+                c.preset_values_for(exe, scheme),
+                expected,
+                "stale applied snapshot for {scheme}"
+            );
+        }
+        assert_eq!(
+            c.games[1].extra, untouched,
+            "another game's preferences changed"
+        );
+        c.close();
+        c.tick_close();
+    }
+    #[test]
     fn uninstalled_041_uses_new_defaults_without_deleting_preferences() {
         let (_dir, mut c) = controller();
         let scheme = rtx_fg_manager::upstream040::SCHEME;
@@ -6414,7 +6542,7 @@ mod tests {
         assert_eq!(c.games[0].title, "My game");
         assert_eq!(
             c.games[0].extra["preset_options_v2"]["rtxfg-0.3.5-dx12-vulkan"]["optimized"],
-            "2"
+            "1"
         );
         c.save();
         let persisted = c.state.clone();

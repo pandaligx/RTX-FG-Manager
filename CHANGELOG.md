@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.27
+
+- Fix old player-shared parameters being reapplied after uninstalling and manually reinstalling a patch. A complete uninstall clears its saved parameters and drafts; retain new edits made before reinstalling and settings of installations that remain present.
+- Read back the actual settings after installation and guard fresh installs against stale caches, including clicks before the background refresh completes.
+- Allow Encore 2.x to replenish its shared ray-reconstruction runtime after uninstall, while retaining checks for other schemes and original-file restoration.
+
 ## 4.3.26
 
 - Detect actual patch-file holders before uninstall, including external helpers retaining Encore logs. Confirm once to end the listed processes and retry; recover older incomplete uninstall records while preserving other games, unknown files and system services.

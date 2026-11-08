@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.26"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.27"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.26 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.27 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,25 +41,25 @@
 
 ## Download
 
-**Version 4.3.26** · Windows 10 / 11 x64
+**Version 4.3.27** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.26 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.26) | Default domestic source |
-| **GitHub** | [Open 4.3.26 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.26) | Primary project and fallback |
+| **GitCode** | [Open 4.3.27 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.27) | Default domestic source |
+| **GitHub** | [Open 4.3.27 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.27) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
 Download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.26 highlights
+## 4.3.27 highlights
 
-- Integrates RTX Encore 2.1.0, with independent frame-generation and upscaling choices on first install.
-- Centered download progress shows task status, supports cancellation and closes when downloads finish.
-- Fixes mismatched installation targets and uninstall leftovers caused by locked Encore logs; improves full reset.
+- Fixes shared parameters surviving uninstall and manual reinstall across patch schemes.
+- Preserves settings during in-place updates; fresh installs use defaults or your new edits.
+- Fixes a missing ray-reconstruction runtime warning when reinstalling complete Encore recipes.
 
 [Full changelog →](CHANGELOG.md)
 
-> **Dlssg_for_sm86 0.4.1** requires manager **4.3.14**; use **4.3.26 or later** for **Encore 2.1.0** settings and preset sharing. Upgrade games explicitly; manager updates do not automatically replace installed patches.
+> **Dlssg_for_sm86 0.4.1** requires manager **4.3.14**; use **4.3.27 or later** for **Encore 2.1.0** settings and preset sharing. Upgrade games explicitly; manager updates do not automatically replace installed patches.
 
 ## Choose a patch
 

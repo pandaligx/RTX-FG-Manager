@@ -295,12 +295,15 @@ impl Snapshot {
                 continue;
             }
             for target in targets {
-                if added && c.kind == "sr" {
-                    let evidence = crate::scanner::inspect(&target.game_exe);
+                if added && matches!(c.kind.as_str(), "sr" | "rr") {
+                    let evidence = crate::scanner::inspect_for_installation(&target.game_exe);
                     if !evidence.limited
-                        && !evidence.neural_input()
-                        && !evidence.super_resolution_plugin
+                        && (c.kind == "rr"
+                            || (!evidence.neural_input() && !evidence.super_resolution_plugin))
                     {
+                        // Encore's completion stage supplies a missing RR (and
+                        // eligible SR) beside its DLL. It need not pre-exist in
+                        // a clean game after the previous managed copy was removed.
                         continue;
                     }
                 }
@@ -582,6 +585,36 @@ mod tests {
         let mut s = snapshot("310.9.16");
         s.components[0].source = "patch".into();
         assert!(s.verify_prepared(&BTreeMap::new()).is_err());
+    }
+    #[test]
+    fn encore_reinstall_can_supply_removed_rr_but_other_schemes_cannot() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let exe = dir.path().join("FixtureGame.exe");
+        std::fs::copy(std::env::current_exe()?, &exe)?;
+        let target = core::DeploymentTarget::for_game(&exe);
+        let mut shared = snapshot("310.9.16");
+        shared.components[0].kind = "rr".into();
+        let mut recipe: crate::recommendations::Recipe =
+            serde_json::from_value(serde_json::json!({
+                "schema":1,"game":{"id":"steam:2012510","name":"Fixture"},
+                "title":"Fixture","notes":"","scheme":crate::encore::SCHEME,"patchVersion":"2.1.0",
+                "entries":["version.dll"],"renderer":"dx12","gpuModel":"","driver":"",
+                "gpuAlias":"unchanged","neuralRuntime":"none"
+            }))?;
+        shared.preflight(std::slice::from_ref(&target), &recipe)?;
+        for scheme in [crate::upstream040::SCHEME, "rtx40mfg-1.3.3-hf2"] {
+            recipe.scheme = scheme.into();
+            assert!(
+                shared
+                    .preflight(std::slice::from_ref(&target), &recipe)
+                    .is_err()
+            );
+        }
+        assert!(
+            !dir.path().join("nvngx_dlssd.dll").exists(),
+            "preflight must not write files"
+        );
+        Ok(())
     }
     #[test]
     fn neural_runtime_compatibility_is_checked_before_game_access() -> Result<()> {
