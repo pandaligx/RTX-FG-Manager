@@ -184,6 +184,19 @@ impl Drop for PowerRequest {
 }
 
 impl WindowsPlatform {
+    /// Uses opaque HWND swap chains for windows created by this platform.
+    ///
+    /// Direct3D acceleration and the Fast renderer remain enabled. This avoids
+    /// per-pixel desktop composition for applications whose windows are opaque,
+    /// including overlays that do not preserve premultiplied swap-chain alpha.
+    /// Transparent backdrops and native composition surfaces are unavailable.
+    /// Call this before giving the platform to `Application::with_platform`.
+    #[must_use]
+    pub fn without_direct_composition(mut self) -> Self {
+        self.disable_direct_composition = true;
+        self
+    }
+
     pub fn new(headless: bool) -> Result<Self> {
         unsafe {
             OleInitialize(None).context("unable to initialize Windows OLE")?;

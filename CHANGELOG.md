@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.29
+
+- Fix discoloration across the left game library when GamePP monitoring is enabled.
+- Present the manager's opaque windows through HWND swap chains while retaining Direct3D 11 GPU acceleration and GPUI Fast rendering. Preserve existing themes, child windows and patch operations.
+- Repair cloud build and game-name refresh checks, prevent Windows line-ending conversion from breaking catalog digests, and keep the name catalog and recommendation-service directory in sync.
+
 ## 4.3.28
 
 - Integrate RTX Encore 2.2.0 with NIS, anti-aliasing, automatic frame generation and Overlay Studio controls, including versioned player-preset sharing. Preserve existing settings, comments and unknown fields.

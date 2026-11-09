@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.28"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.29"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.28 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.29 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,21 +41,20 @@
 
 ## 下载
 
-**版本 4.3.28** · Windows 10 / 11 x64
+**版本 4.3.29** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.28 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.28) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.28 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.28) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.29 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.29) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.29 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.29) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
 下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.28 更新亮点
+## 4.3.29 更新亮点
 
-- 适配 RTX Encore 2.2.0，更新 NIS、帧生成与覆盖层参数，中文环境新装默认使用中文菜单。
-- 修复混合显卡电脑的 GPU 调度误报；按需选择 Encore 组件并保留游戏原生 Streamline。
-- 通知顶部居中，更新内容正确显示标题与列表；成功和主动取消提示 2 秒后关闭。
+- 修复开启游戏加加监测时，游戏库左侧大面积变色的问题。
+- 调整窗口呈现方式，保留 Direct3D 11 硬件加速、现有界面及补丁功能。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 

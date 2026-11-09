@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.28"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.29"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.28 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.29 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,21 +41,20 @@
 
 ## Download
 
-**Version 4.3.28** · Windows 10 / 11 x64
+**Version 4.3.29** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.28 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.28) | Default domestic source |
-| **GitHub** | [Open 4.3.28 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.28) | Primary project and fallback |
+| **GitCode** | [Open 4.3.29 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.29) | Default domestic source |
+| **GitHub** | [Open 4.3.29 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.29) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
 Download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.28 highlights
+## 4.3.29 highlights
 
-- Integrates RTX Encore 2.2.0 with NIS, frame-generation and overlay settings, plus Chinese menu defaults for fresh installs in Chinese.
-- Fixes GPU scheduling detection on mixed-GPU PCs; adds selective Encore components while preserving native Streamline.
-- Centers notifications, renders release-note headings and lists, and dismisses success/cancellation notices after 2 seconds.
+- Fixes discoloration across the left game library when GamePP monitoring is enabled.
+- Adjusts window presentation while retaining Direct3D 11 hardware acceleration, the existing UI and patch features.
 
 [Full changelog →](CHANGELOG.md)
 

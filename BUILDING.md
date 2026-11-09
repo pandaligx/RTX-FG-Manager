@@ -63,4 +63,6 @@ The 21 offline theme sets in `rust/assets/themes` remain pinned to Kit commit `4
 
 The GitHub Windows workflow builds an **unsigned test artifact**, never signs, publishes, or replaces the release update manifest. Signed EXE and game DLL releases remain separate from source commits.
 
+The manager's opaque Windows UI explicitly uses the backend's HWND swap-chain path for monitoring-overlay compatibility. D3D11 hardware rendering and GPUI Fast remain enabled. This does not change system environment variables or monitoring settings; native composition surfaces and transparent backdrops would need separate integration before use.
+
 Secrets, certificates/private keys, local logs, game binaries, historical development outputs and runtime caches must not be committed. The published source export uses an explicit file allowlist in addition to `.gitignore`. DLL ownership records used for safe cleanup are required application data and are not disposable build caches.

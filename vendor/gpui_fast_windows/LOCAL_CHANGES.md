@@ -1,5 +1,16 @@
 # Windows manager compatibility patch
 
+For manager 4.3.29, `WindowsPlatform::without_direct_composition` explicitly
+selects the existing opaque HWND swap-chain path before any app window opens.
+The manager uses it for its opaque main and child windows: GamePP monitoring
+was observed to wash out a large region with the premultiplied composition
+swap chain; the same signed EXE using the HWND path rendered normally.
+The GPU device, D3D11 flip model, Fast drawing, resize/recovery, and first-frame
+behavior are unchanged. The default platform constructor and composition
+implementation remain intact. No global environment variable or GamePP
+setting is changed. This app policy does not support transparent backdrops or
+native composition surfaces; revisit it if such a feature is introduced.
+
 Baseline: the published `gpui-fast-windows` **0.1.13** crate from crates.io
 (`gpui-fast-windows-0.1.13.crate` SHA-256
 `088654835f1408e1aaa79afcc316530461a14fa1c4e543d47b1881b6ced63f19`).
