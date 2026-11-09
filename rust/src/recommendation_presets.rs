@@ -93,9 +93,39 @@ pub fn execute(
     action: Action,
     series: usize,
     cancel: &std::sync::atomic::AtomicBool,
+    progress: impl FnMut(cloud::CloudProgress),
+) -> Result<()> {
+    execute_with_options(
+        game,
+        catalog,
+        recipe,
+        action,
+        InstallOptions {
+            series,
+            language: "en",
+        },
+        cancel,
+        progress,
+    )
+}
+
+pub struct InstallOptions<'a> {
+    pub series: usize,
+    /// Resolved manager language. Shared presets never override menu language.
+    pub language: &'a str,
+}
+
+pub fn execute_with_options(
+    game: &crate::scanner::Game,
+    catalog: &cloud::Catalog,
+    recipe: &crate::recommendations::Recipe,
+    action: Action,
+    options: InstallOptions<'_>,
+    cancel: &std::sync::atomic::AtomicBool,
     mut progress: impl FnMut(cloud::CloudProgress),
 ) -> Result<()> {
     use std::sync::atomic::Ordering;
+    let series = options.series;
     ensure!(!action.is_empty(), "请至少选择一项安装内容");
     let version = recipe.available_version(catalog)?;
     // Encore's manual-install dependencies are part of the patch installation.
@@ -307,12 +337,13 @@ pub fn execute(
             // retained until dependencies are ready and all values validated.
             let mut files = prepared.files.clone();
             if complete_encore && core::record(&target.directory)?.is_none() {
-                let defaults = presets::Values::from([
+                let mut defaults = presets::Values::from([
                     ("dlssWithoutGameDlss".into(), "0".into()),
                     ("frameGenerationWithoutGameFg".into(), "0".into()),
                     ("smoothMotionEnabled".into(), "0".into()),
                     ("frameGenerationEngine".into(), "game".into()),
                 ]);
+                encore::localize_defaults(&mut defaults, options.language);
                 let config = encore::configure_for_version(
                     &files[encore::CONFIG],
                     &defaults,

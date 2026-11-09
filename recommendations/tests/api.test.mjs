@@ -458,3 +458,21 @@ test('dlssg 0.4.1 profiles are versioned and hidden from older clients without l
   assert.throws(()=>recipe({...c,presets:{...c.presets,profile:'upstream040'}}));
   assert.equal((await f.call('GET','/v1/capabilities')).dlssg041,1);
 });
+
+test('Encore 2.2 NIS and Auto settings are versioned and hidden from legacy readers without erasing shares',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...shared(),patchVersion:'2.2.0',presets:{schema:1,profile:'rtx_encore_json_v4',values:{dlssWithoutGameDlss:'1',dlssWithoutGameDlssEngine:'nis',spatialAa:'smaa',overrideAutoFrameGeneration:'0'},defaults:{dlssWithoutGameDlss:'0',dlssWithoutGameDlssEngine:'dlss',spatialAa:'off',overrideAutoFrameGeneration:'1'}}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',15);
+  assert.deepEqual(posted.content.presets,c.presets);
+  let revision=posted.revision;
+  for(const protocol of [12,13,14]) {
+    const path='/v1/recipes/'+posted.id;
+    const old=await f.call('GET',path,null,u.token,'test-ip',protocol);
+    assert.equal(old.content.presets,undefined);
+    old.content.notes='Legacy edit '+protocol;
+    await f.call('PUT',path,{revision:revision++,content:old.content},u.token,'test-ip',protocol);
+    assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',15)).content.presets,c.presets);
+  }
+  assert.throws(()=>recipe({...c,patchVersion:'2.1.0'}));
+  assert.equal((await f.call('GET','/v1/capabilities')).encore220,1);
+});

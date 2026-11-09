@@ -1618,7 +1618,8 @@
     ],
     "help": "修改此项会调整显示GPU信息；不确定时保留上游默认。",
     "optional": false,
-    "source_help": "Extra line: GPU load, temperature, power and clocks (NVML)."
+    "source_help": "Extra line: GPU load, temperature, power and clocks (NVML).",
+    "until": "2.2.0"
   },
   {
     "key": "overlayShowVram",
@@ -4076,7 +4077,7 @@
     "dependencies": [
       "frameGenerationEngine=xefg"
     ],
-    "help": "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起扩展到 DX11/Vulkan 无原生帧生成游戏；旧版仅支持 DX12。以游戏菜单中的实际激活状态为准。",
+    "help": "实验性，默认关闭。2.2.0 起增加 RTX 20；此前支持 RTX 30/40/50。2.1.0 起扩展到 DX11/Vulkan 无原生帧生成游戏，旧版仅 DX12。以游戏菜单中的激活状态为准。",
     "optional": true,
     "since": "1.5.0"
   },
@@ -4173,13 +4174,18 @@
       {
         "value": "xess",
         "label": "XeSS"
+      },
+      {
+        "value": "nis",
+        "label": "NIS",
+        "since": "2.2.0"
       }
     ],
     "restart": true,
     "dependencies": [
       "dlssWithoutGameDlss=1"
     ],
-    "help": "DLSS 需要超分运行库；XeSS 使用方案自带的 Intel 运行库。Vulkan 切换引擎后请重启游戏。",
+    "help": "DLSS 或 XeSS；2.2.0 起可选择无需额外运行库的 NIS 空间缩放。不代表游戏拥有原生 DLSS 输入。",
     "optional": true,
     "since": "2.0.0"
   },
@@ -4286,5 +4292,437 @@
     "help": "实验性，默认关闭。DLSS-FG 需要专用完整组件；XeFG 使用自带 Intel 组件。请关闭 Smooth Motion，建议固定倍率；scRGB 和 D3D11-on-12 不支持。",
     "optional": true,
     "since": "2.0.0"
+  },
+  {
+    "key": "overrideAutoFrameGeneration",
+    "path": [
+      "frameGeneration",
+      "overrideAutoFrameGeneration"
+    ],
+    "label": "保持游戏 Auto 帧生成",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "tf_mode=game"
+    ],
+    "help": "仅在跟随游戏模式生效：游戏请求 Auto 时保持帧生成开启；关闭则交由游戏决定。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "spatialSharpness",
+    "path": [
+      "superResolutionSharpening",
+      "spatialSharpness"
+    ],
+    "label": "NIS 锐化强度",
+    "group": "image",
+    "kind": "integer",
+    "default": "30",
+    "min": 0,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "dlssWithoutGameDlss=1",
+      "dlssWithoutGameDlssEngine=nis"
+    ],
+    "help": "NIS 锐化强度，0–100%。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "spatialAa",
+    "path": [
+      "superResolutionSharpening",
+      "spatialAa"
+    ],
+    "label": "NIS 抗锯齿",
+    "group": "image",
+    "kind": "choice",
+    "default": "off",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "off",
+        "label": "关闭"
+      },
+      {
+        "value": "smaa",
+        "label": "SMAA"
+      },
+      {
+        "value": "fxaa",
+        "label": "FXAA"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "dlssWithoutGameDlss=1",
+      "dlssWithoutGameDlssEngine=nis"
+    ],
+    "help": "仅处理 SDR 颜色，包含界面；无需额外运行库。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "spatialAaPlacement",
+    "path": [
+      "superResolutionSharpening",
+      "spatialAaPlacement"
+    ],
+    "label": "抗锯齿位置",
+    "group": "image",
+    "kind": "choice",
+    "default": "before",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "before",
+        "label": "NIS 之前"
+      },
+      {
+        "value": "after",
+        "label": "NIS 之后"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "dlssWithoutGameDlss=1",
+      "dlssWithoutGameDlssEngine=nis"
+    ],
+    "help": "在 NIS 前按输入分辨率处理，或在 NIS 后按输出分辨率处理。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "spatialAaQuality",
+    "path": [
+      "superResolutionSharpening",
+      "spatialAaQuality"
+    ],
+    "label": "SMAA 质量",
+    "group": "image",
+    "kind": "choice",
+    "default": "high",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "low",
+        "label": "低"
+      },
+      {
+        "value": "medium",
+        "label": "中"
+      },
+      {
+        "value": "high",
+        "label": "高"
+      },
+      {
+        "value": "ultra",
+        "label": "极高"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "dlssWithoutGameDlss=1",
+      "dlssWithoutGameDlssEngine=nis",
+      "spatialAa=smaa"
+    ],
+    "help": "仅影响 SMAA；FXAA 使用固定预设。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayStyle",
+    "path": [
+      "overlay",
+      "overlayStyle"
+    ],
+    "label": "叠加层样式",
+    "group": "overlay",
+    "kind": "choice",
+    "default": "card",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "minimal",
+        "label": "精简"
+      },
+      {
+        "value": "card",
+        "label": "卡片"
+      },
+      {
+        "value": "dashboard",
+        "label": "仪表板"
+      },
+      {
+        "value": "legacy",
+        "label": "经典"
+      }
+    ],
+    "restart": false,
+    "dependencies": [],
+    "help": "选择性能叠加层的布局。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayLabels",
+    "path": [
+      "overlay",
+      "overlayLabels"
+    ],
+    "label": "显示标签",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "调整游戏内性能叠加层。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayUnits",
+    "path": [
+      "overlay",
+      "overlayUnits"
+    ],
+    "label": "显示单位",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "调整游戏内性能叠加层。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayGraph",
+    "path": [
+      "overlay",
+      "overlayGraph"
+    ],
+    "label": "帧时间曲线",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "调整游戏内性能叠加层。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowFps",
+    "path": [
+      "overlay",
+      "overlayShowFps"
+    ],
+    "label": "输出帧率",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowSourceFps",
+    "path": [
+      "overlay",
+      "overlayShowSourceFps"
+    ],
+    "label": "源帧率",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowGpuLoad",
+    "path": [
+      "overlay",
+      "overlayShowGpuLoad"
+    ],
+    "label": "GPU 使用率",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowGpuTemperature",
+    "path": [
+      "overlay",
+      "overlayShowGpuTemperature"
+    ],
+    "label": "GPU 温度",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowGpuPower",
+    "path": [
+      "overlay",
+      "overlayShowGpuPower"
+    ],
+    "label": "GPU 功耗",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowGpuClock",
+    "path": [
+      "overlay",
+      "overlayShowGpuClock"
+    ],
+    "label": "GPU 核心频率",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowGpuMemoryClock",
+    "path": [
+      "overlay",
+      "overlayShowGpuMemoryClock"
+    ],
+    "label": "GPU 显存频率",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowCpu",
+    "path": [
+      "overlay",
+      "overlayShowCpu"
+    ],
+    "label": "CPU 使用率",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayShowRam",
+    "path": [
+      "overlay",
+      "overlayShowRam"
+    ],
+    "label": "系统内存使用量",
+    "group": "overlay",
+    "kind": "bool",
+    "default": "0",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。",
+    "optional": true,
+    "since": "2.2.0"
+  },
+  {
+    "key": "overlayOpacity",
+    "path": [
+      "overlay",
+      "overlayOpacity"
+    ],
+    "label": "叠加层不透明度",
+    "group": "overlay",
+    "kind": "integer",
+    "default": "75",
+    "min": 0,
+    "max": 100,
+    "choices": [],
+    "restart": false,
+    "dependencies": [],
+    "help": "叠加层背景不透明度，0–100%。",
+    "optional": true,
+    "since": "2.2.0"
   }
 ]

@@ -1102,7 +1102,15 @@ pub fn deploy_prepared_context_at_with_overrides(
 ) -> Result<String> {
     let config = config_name(backend);
     let mut expected = deployment_names(backend, proxies)?;
-    if backend == crate::encore::BACKEND && crate::encore::supports_120(upstream_version) {
+    if backend == crate::encore::BACKEND
+        && crate::encore::INTEL_FILES
+            .iter()
+            .any(|n| data.contains_key(*n))
+    {
+        ensure!(
+            crate::encore::supports_120(upstream_version),
+            "此 Encore 版本不支持 Intel 配套组件"
+        );
         expected.extend(crate::encore::INTEL_FILES.iter().map(|n| (*n).to_owned()));
     }
     if backend == crate::rtxmfg::BACKEND && crate::mfg_plugin::supported(upstream_version) {
@@ -1208,9 +1216,9 @@ pub fn deploy_prepared_context_at_with_overrides(
         && let Some(old) = existing.as_ref().filter(|r| {
             r.backend == crate::transfusion::BACKEND
                 || (r.backend == crate::encore::BACKEND
-                    && selected
-                        .iter()
-                        .any(|n| r.hashes.get(n) != Some(&hash(&data[n]))))
+                    && data.iter().any(|(n, bytes)| {
+                        n != crate::encore::CONFIG && r.hashes.get(n) != Some(&hash(bytes))
+                    }))
         })
     {
         let new = Record {

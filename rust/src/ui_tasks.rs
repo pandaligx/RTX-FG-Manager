@@ -6,21 +6,26 @@ use gpui_component::{notification::Notification, progress::Progress};
 #[derive(Clone, Copy, Debug)]
 pub(super) enum FeedbackKind {
     Info,
+    Cancelled,
     Success,
     Error,
 }
 
-/// Notification owns placement, dismissal and lifetime; Alert supplies content.
+/// Kit owns the surface and dismissal animation; brief results expire after two seconds.
 pub(super) fn notify(kind: FeedbackKind, message: String, window: &mut Window, cx: &mut App) {
+    let brief = matches!(kind, FeedbackKind::Success | FeedbackKind::Cancelled);
+    let previous = brief.then(|| window.notifications(cx));
     window.push_notification(
         Notification::new()
             .id1::<FeedbackKind>(SharedString::from(format!("{kind:?}:{message}")))
-            .placement(Anchor::TopRight)
-            .autohide(!matches!(kind, FeedbackKind::Error))
+            .placement(Anchor::TopCenter)
+            .autohide(matches!(kind, FeedbackKind::Info))
             .p_0()
             .content(move |_, _, _| {
                 let alert = match kind {
-                    FeedbackKind::Info => Alert::info("app-feedback", message.clone()),
+                    FeedbackKind::Info | FeedbackKind::Cancelled => {
+                        Alert::info("app-feedback", message.clone())
+                    }
                     FeedbackKind::Success => Alert::success("app-feedback", message.clone()),
                     FeedbackKind::Error => Alert::error("app-feedback", message.clone()),
                 };
@@ -33,6 +38,26 @@ pub(super) fn notify(kind: FeedbackKind, message: String, window: &mut Window, c
             }),
         cx,
     );
+    if let Some(previous) = previous
+        && let Some(note) = window
+            .notifications(cx)
+            .iter()
+            .find(|note| !previous.contains(note))
+    {
+        // Bind to this instance, so an older timer cannot dismiss a replacement
+        // with the same message. A closed window or manually dismissed note is a no-op.
+        let note = note.downgrade();
+        window
+            .spawn(cx, async move |cx| {
+                cx.background_executor().timer(Duration::from_secs(2)).await;
+                let _ = cx.update(|window, cx| {
+                    if let Some(note) = note.upgrade() {
+                        note.update(cx, |note, cx| note.dismiss(window, cx));
+                    }
+                });
+            })
+            .detach();
+    }
 }
 
 impl Manager {
@@ -181,9 +206,11 @@ impl Manager {
         }
         let warning = self.c.warning.take();
         let notice = self.c.notice.take();
+        let information = self.c.information.take();
         for (kind, text) in [
             (FeedbackKind::Error, warning),
             (FeedbackKind::Success, notice),
+            (FeedbackKind::Cancelled, information),
         ] {
             if let Some(text) = text {
                 let text = self.c.text(&text);

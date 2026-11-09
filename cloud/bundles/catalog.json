@@ -2,11 +2,11 @@
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
     "bytes": 55241,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-c5aea81e5af9221a13ea.json",
-    "sha256": "02f75df5238513664b9b164c2b696174b93f88c77a0f8869ce220d9bf65f61e8",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-c5aea81e5af9221a13ea.json"
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-87b4e476c7bcfcac6911.json",
+    "sha256": "cb2bdf5fc08b60ace73411261a11de23ae39970495683e8857564831792ac13d",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-87b4e476c7bcfcac6911.json"
   },
-  "revision": "bundles-c5aea81e5af9221a13ea",
+  "revision": "bundles-87b4e476c7bcfcac6911",
   "schema": 3,
   "schemes": [
     {
@@ -98,7 +98,7 @@
     },
     {
       "archives": [
-        "rtx-encore-2.1.0-complete-f39995447110.zip"
+        "rtx-encore-2.2.0-complete-6526ca77dd86.zip"
       ],
       "capabilities": [
         "encore_dedicated_entries"
@@ -235,14 +235,14 @@
         "xefgUiHandling": "interpolate"
       },
       "id": "dlssg-transfusion-1.4.5.3",
-      "min_manager_version": "4.3.26",
-      "name": "RTX Encore · 2.1.0",
+      "min_manager_version": "4.3.28",
+      "name": "RTX Encore · 2.2.0",
       "names": {
-        "en": "RTX Encore · 2.1.0",
-        "ja": "RTX Encore · 2.1.0",
-        "ko": "RTX Encore · 2.1.0",
-        "ru": "RTX Encore · 2.1.0",
-        "zh": "RTX Encore · 2.1.0"
+        "en": "RTX Encore · 2.2.0",
+        "ja": "RTX Encore · 2.2.0",
+        "ko": "RTX Encore · 2.2.0",
+        "ru": "RTX Encore · 2.2.0",
+        "zh": "RTX Encore · 2.2.0"
       },
       "profile": "rtx_encore_json_v4",
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"

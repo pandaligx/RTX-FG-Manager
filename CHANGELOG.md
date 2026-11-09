@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.3.28
+
+- Integrate RTX Encore 2.2.0 with NIS, anti-aliasing, automatic frame generation and Overlay Studio controls, including versioned player-preset sharing. Preserve existing settings, comments and unknown fields.
+- Use Chinese in-game menu defaults for fresh/default installations when the manager resolves to Chinese, while preserving an explicitly selected menu language.
+- Select Encore components individually and remember choices per game. Preserve native Streamline; updating only frame generation or Intel components no longer replaces unselected components.
+- Fix an unknown GPU scheduling state on hybrid laptops where scheduling is enabled on the discrete GPU but differs on integrated adapters. Preserve failed-query safeguards and restart notifications.
+- Center notifications at the top and render release-note Markdown headings and lists. Success and user cancellation dismiss after 2 seconds; errors remain until dismissed.
+- Simplify GPU information: show the NVIDIA mark and model normally, or the modified model with an alias icon/label. Preserve other schemes, restoration and long-term update channels.
+
 ## 4.3.27
 
 - Fix old player-shared parameters being reapplied after uninstalling and manually reinstalling a patch. A complete uninstall clears its saved parameters and drafts; retain new edits made before reinstalling and settings of installations that remain present.

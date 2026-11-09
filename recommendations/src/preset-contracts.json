@@ -1355,13 +1355,18 @@
       "dlssWithoutGameDlssEngine": {
         "values": [
           "dlss",
-          "xess"
+          "xess",
+          "nis"
         ],
+        "valueSince": {
+          "nis": "2.2.0"
+        },
         "since": "2.0.0",
         "label": "新增超分引擎",
         "labels": {
           "dlss": "DLSS",
-          "xess": "XeSS"
+          "xess": "XeSS",
+          "nis": "NIS"
         }
       },
       "dlssWithoutGameDlssOutput": {
@@ -1416,6 +1421,71 @@
           "0": "关闭",
           "1": "开启",
           "inherit": "跟随游戏"
+        }
+      },
+      "overrideAutoFrameGeneration": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "2.2.0",
+        "label": "保持游戏 Auto 帧生成",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "spatialSharpness": {
+        "number": true,
+        "min": 0.0,
+        "max": 100.0,
+        "integer": true,
+        "inherit": false,
+        "since": "2.2.0",
+        "label": "NIS 锐化强度",
+        "labels": {}
+      },
+      "spatialAa": {
+        "values": [
+          "off",
+          "smaa",
+          "fxaa"
+        ],
+        "since": "2.2.0",
+        "label": "NIS 抗锯齿",
+        "labels": {
+          "off": "关闭",
+          "smaa": "SMAA",
+          "fxaa": "FXAA"
+        }
+      },
+      "spatialAaPlacement": {
+        "values": [
+          "before",
+          "after"
+        ],
+        "since": "2.2.0",
+        "label": "抗锯齿位置",
+        "labels": {
+          "before": "NIS 之前",
+          "after": "NIS 之后"
+        }
+      },
+      "spatialAaQuality": {
+        "values": [
+          "low",
+          "medium",
+          "high",
+          "ultra"
+        ],
+        "since": "2.2.0",
+        "label": "SMAA 质量",
+        "labels": {
+          "low": "低",
+          "medium": "中",
+          "high": "高",
+          "ultra": "极高"
         }
       }
     }

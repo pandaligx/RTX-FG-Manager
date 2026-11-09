@@ -2772,11 +2772,12 @@ impl Manager {
             .and_then(|d| d.original_name.as_deref())
             .unwrap_or(&self.c.gpu)
             .to_owned();
-        let names = std::iter::once(("inspector-gpu-name", self.t("实际"), gpu)).chain(
-            device
-                .and_then(|d| d.modified_name.clone())
-                .map(|name| ("inspector-gpu-modified", self.t("伪装"), name)),
-        );
+        let modified = device.and_then(|d| d.modified_name.clone());
+        let names = std::iter::once((
+            "inspector-gpu-name",
+            modified.is_some(),
+            modified.unwrap_or(gpu),
+        ));
         div()
             .v_flex()
             .flex_shrink_0()
@@ -2791,7 +2792,7 @@ impl Manager {
                     .w_full()
                     .min_w_0()
                     .gap_2()
-                    .children(names.map(|(id, label, value)| {
+                    .children(names.map(|(id, disguised, value)| {
                         let full = value.clone();
                         let (model, nvidia) = gpu_alias::display_model(&value);
                         div()
@@ -2812,13 +2813,22 @@ impl Manager {
                                 )
                             })
                             .child(div().min_w_0().whitespace_normal().child(model.to_owned()))
-                            .child(
-                                div()
-                                    .flex_shrink_0()
-                                    .text_xs()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(label),
-                            )
+                            .when(disguised, |row| {
+                                row.child(
+                                    div()
+                                        .h_flex()
+                                        .flex_shrink_0()
+                                        .gap_1()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(
+                                            Icon::default()
+                                                .path("app/gpu-disguise.svg")
+                                                .size(rems(1.)),
+                                        )
+                                        .child(self.t("伪装")),
+                                )
+                            })
                     })),
             )
             .child(
@@ -3782,22 +3792,24 @@ impl Manager {
             return;
         };
         self.dialog_active = true;
-        let title = self.t("发现新版本");
-        let explanation = self.t("下载后自动重启，保留现有设置。更新失败会还原旧版本。");
-        let details = format!(
-            "v{VERSION} → v{}\n{}\n{:.1} MB · {}",
-            m.version,
-            m.file,
-            m.bytes as f64 / 1_000_000.,
-            m.source
-        );
+        let title = self.t("更新提醒");
+        let details = format!("v{VERSION} → v{}", m.version);
         let notes = rtx_fg_manager::release_notes::select(&m.notes, &self.language)
             .map(str::to_owned)
             .unwrap_or_else(|| self.c.text("此版本未附更新日志，可在项目发布页查看。"));
-        let accept = self.t("下载并更新");
-        let later = self.t("稍后");
-        let width = (window.viewport_size().width - px(80.)).min(px(520.));
-        let top = ((window.viewport_size().height - px(320.)) / 2.).max(px(40.));
+        let notes = rtx_fg_manager::release_notes::display_markdown(&notes);
+        let accept = self.t("立即更新");
+        let later = self.t("下次再说");
+        let width =
+            (window.viewport_size().width - window.rem_size() * 4.).min(window.rem_size() * 34.);
+        let height = (window.viewport_size().height - window.rem_size() * 15.)
+            .max(window.rem_size() * 8.)
+            .min(window.rem_size() * 24.);
+        let top = ((window.viewport_size().height
+            - height.min(window.rem_size() * 24.)
+            - window.rem_size() * 10.)
+            / 2.)
+            .max(window.rem_size() * 3.);
         let view = cx.entity().downgrade();
         window.open_dialog(cx, move |dialog, _, cx| {
             let ok_view = view.clone();
@@ -3839,17 +3851,43 @@ impl Manager {
                         .gap_3()
                         .child(
                             div()
-                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_xs()
+                                .text_color(cx.theme().muted_foreground)
                                 .child(details.clone()),
                         )
-                        .child(explanation.clone())
                         .child(
                             div()
                                 .id("update-notes-scroll")
-                                .max_h(px(210.))
+                                .max_h(height)
                                 .overflow_y_scroll()
                                 .text_sm()
-                                .child(notes.clone()),
+                                .child(
+                                    gpui_component::text::TextView::markdown(
+                                        "update-notes",
+                                        notes.clone(),
+                                    )
+                                    .scrollable(false)
+                                    .style(
+                                        gpui_component::text::TextViewStyle {
+                                            heading_base_font_size: cx.theme().font_size,
+                                            ..Default::default()
+                                        }
+                                        .paragraph_gap(rems(0.5))
+                                        .heading_font_size(|_, base| base),
+                                    )
+                                    .on_link_click(
+                                        |url, _, _, cx| {
+                                            if reqwest::Url::parse(url).is_ok_and(|u| {
+                                                u.scheme() == "https"
+                                                    && u.host_str().is_some()
+                                                    && u.username().is_empty()
+                                                    && u.password().is_none()
+                                            }) {
+                                                cx.open_url(url);
+                                            }
+                                        },
+                                    ),
+                                ),
                         ),
                 )
                 .on_ok(move |_, _, cx| {

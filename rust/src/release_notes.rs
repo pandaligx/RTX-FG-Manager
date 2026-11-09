@@ -1,4 +1,4 @@
-//! Plain text release notes. No remote HTML, scripts, or executable links are rendered.
+//! Localized release notes, rendered as text-only Markdown without remote media.
 use std::collections::BTreeMap;
 
 #[derive(serde::Deserialize)]
@@ -32,9 +32,28 @@ pub fn select<'a>(notes: &'a BTreeMap<String, String>, language: &str) -> Option
         .filter_map(|key| notes.get(key).map(String::as_str))
         .find(|s| !s.trim().is_empty())
 }
+
+/// Keep headings, lists and emphasis while disabling HTML and automatic images.
+/// Link activation is separately restricted by the view to HTTPS browser URLs.
+pub fn display_markdown(notes: &str) -> String {
+    notes
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace("![", "[")
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn markdown_keeps_structure_without_loading_remote_media() {
+        let text = display_markdown(
+            "## 更新\n- **修复** `DLL`\n![track](https://example.com/pixel)\n<img src=x>\n![ref][id]",
+        );
+        assert!(text.starts_with("## 更新\n- **修复** `DLL`"));
+        assert!(!text.contains("!["));
+        assert!(!text.contains('<'));
+        assert!(text.contains("&lt;img src=x&gt;"));
+    }
     #[test]
     fn notes_have_all_five_languages_and_legacy_fallback() {
         for language in ["zh-CN", "en", "ru", "ja", "ko"] {

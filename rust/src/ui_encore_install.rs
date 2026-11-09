@@ -1,4 +1,4 @@
-//! First install selection, separate from the existing preset editor.
+//! Per-install components and first-install engines, separate from the preset editor.
 use super::*;
 use rtx_fg_manager::encore_install::{Frames, Reconstruction};
 impl Manager {
@@ -35,7 +35,8 @@ impl Manager {
                 } else {row=row.child(div().text_xs().child(tr.t("保留游戏原生帧生成")));}
                 if choice.needs_reconstruction {
                     let mut buttons=div().h_flex().flex_wrap().gap_1();
-                    for (n,sr,label) in [(0,Reconstruction::None,"不启用"),(1,Reconstruction::Dlss,"DLSS"),(2,Reconstruction::Xess,"XeSS")] {
+                    for (n,sr,label) in [(0,Reconstruction::None,"不启用"),(1,Reconstruction::Dlss,"DLSS"),(2,Reconstruction::Xess,"XeSS"),(3,Reconstruction::Nis,"NIS")] {
+                        if sr == Reconstruction::Nis && !choice.nis_available { continue; }
                         let selections=choices.clone();
                         buttons=buttons.child(Button::new(SharedString::from(format!("engine-sr-{index}-{n}"))).small()
                             .focus_ring(crate::ui_focus::visible(cx)).label(tr.t(label)).selected(choice.reconstruction==Some(sr))
@@ -47,13 +48,36 @@ impl Manager {
                             .checked(choice.screen).disabled(choice.reconstruction.is_none_or(|r|r==Reconstruction::None))
                             .on_click(move|checked,window,_|{selections.borrow_mut()[index].screen = *checked;window.refresh();}));
                 } else {row=row.child(div().text_xs().child(tr.t("保留游戏原生超分辨率")));}
+                row = row.child(div().pt_2().font_weight(FontWeight::SEMIBOLD).child(tr.t("安装组件")));
+                for (kind, label, description, enabled) in [
+                    ("patch", "RTX Encore", "补丁与设置文件", choice.installed),
+                    ("sr", "DLSS 超分辨率", "nvngx_dlss.dll  310.9.16", true),
+                    ("rr", "DLSS 光线重建", "nvngx_dlssd.dll  310.9.16", true),
+                    ("fg", "DLSS 帧生成", "nvngx_dlssg.dll  310.9.16", choice.native_fg),
+                    ("nr", "DLSS 神经渲染", "nvngx_dlssnr.dll  310.9.16", true),
+                    ("intel", "Intel XeSS / XeFG / XeLL", "libxess.dll / libxess_fg.dll / libxell.dll", true),
+                    ("streamline", "更新已有 Streamline 插件至 2.14.16", "默认保留现有插件及 sl.interposer.dll", choice.native_streamline),
+                    ("encorefg", "新增 DLSS 帧生成组件", "无原生帧生成时使用，包含匹配的 Streamline 文件", choice.dlss_fg_available),
+                ] {
+                    let selections = choices.clone();
+                    row = row.child(div().h_flex().items_start().gap_2()
+                        .child(div().w(rems(22.)).flex_shrink_0().child(Checkbox::new(SharedString::from(format!("component-{index}-{kind}")))
+                            .checked(choice.components.selected(kind)).disabled(!enabled)
+                            .label(tr.t(label))
+                            .on_click(move |checked, window, _| { selections.borrow_mut()[index].components.set(kind, *checked); window.refresh(); })))
+                        .child(div().flex_1().min_w_0().text_xs().text_color(cx.theme().muted_foreground).child(tr.t(description))));
+                }
+                if choice.components.streamline {
+                    row = row.child(div().text_xs().text_color(cx.theme().warning).child(tr.t("部分游戏需要原版 Streamline。仅更新检测到的插件，原始 interposer 保留。")));
+                }
                 body=body.child(row);
             }
             body=body.child(div().text_xs().text_color(cx.theme().muted_foreground)
-                .child(tr.t("安装内容：Encore 与配套 NVIDIA / Intel 运行库；原生组件按实际路径更新并备份，仅安全适用时补充新增 DLSS-G 文件。新增功能为实验性，安装后重启游戏。")));
+                .child(tr.t("未勾选的现有文件保持不变。恢复原版请使用运行库的恢复按钮。")));
             let ready=choices.borrow().iter().all(|c|c.values().is_some());
+            if !ready { body=body.child(div().text_xs().text_color(cx.theme().warning).child(tr.t("请选择引擎，并勾选其所需组件；也可选择不启用。"))); }
             let accept=owner.clone();let cancel=owner.clone();let selections=choices.clone();
-            dialog.title(crate::ui_focus::dialog_title(tr.t("首次安装 Encore：选择引擎").into(),cx)).width(width).close_button(false)
+            dialog.title(crate::ui_focus::dialog_title(tr.t("Encore 安装选项").into(),cx)).width(width).close_button(false)
                 .child(body)
                 .footer(DialogFooter::new()
                     .child(Button::new("engines-cancel").small().label(tr.t("取消")).on_click(|_,w,cx|w.dispatch_action(Box::new(Cancel),cx)))

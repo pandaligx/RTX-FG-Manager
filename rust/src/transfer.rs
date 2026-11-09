@@ -274,6 +274,18 @@ impl std::fmt::Display for Failure {
 }
 impl std::error::Error for Failure {}
 
+/// Cancellation is a user outcome, even when a caller adds context.
+pub fn is_cancelled(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .downcast_ref::<Failure>()
+            .is_some_and(|failure| matches!(failure, Failure::Cancelled))
+    }) || matches!(
+        error.root_cause().to_string().as_str(),
+        "已取消" | "操作已取消" | "下载已取消"
+    )
+}
+
 fn check_cancel(cancel: &AtomicBool) -> Result<()> {
     if cancel.load(Ordering::Relaxed) {
         return Err(Failure::Cancelled.into());

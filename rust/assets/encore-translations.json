@@ -2890,5 +2890,269 @@
     "Экспериментально, по умолчанию выключено. Нужны RTX 30/40/50 и поддерживаемый драйвер. С 2.1.0 доступно добавление FG в DX11/Vulkan; ранее только DX12. Проверяйте фактическую активацию в меню игры.",
     "実験的機能、既定はオフ。RTX 30/40/50 と対応ドライバーが必要です。2.1.0 から DX11/Vulkan の非ネイティブ FG ゲームにも対応。旧版は DX12 のみ。ゲーム内メニューで実際の有効状態を確認してください。",
     "실험적 기능이며 기본값은 꺼짐입니다. RTX 30/40/50 및 지원 드라이버가 필요합니다. 2.1.0부터 기본 프레임 생성이 없는 DX11/Vulkan 게임을 지원합니다. 이전 버전은 DX12 전용입니다. 게임 메뉴에서 실제 활성화를 확인하세요."
+  ],
+  "保持游戏 Auto 帧生成": [
+    "Keep Auto frame generation on",
+    "Сохранять Auto генерацию кадров",
+    "Auto フレーム生成を維持",
+    "Auto 프레임 생성 유지"
+  ],
+  "NIS 锐化强度": [
+    "NIS sharpness",
+    "Резкость NIS",
+    "NIS シャープネス",
+    "NIS 선명도"
+  ],
+  "NIS 抗锯齿": [
+    "NIS anti-aliasing",
+    "Сглаживание NIS",
+    "NIS アンチエイリアス",
+    "NIS 안티앨리어싱"
+  ],
+  "抗锯齿位置": [
+    "Anti-aliasing order",
+    "Порядок сглаживания",
+    "アンチエイリアスの順序",
+    "안티앨리어싱 순서"
+  ],
+  "NIS 之前": [
+    "Before NIS",
+    "До NIS",
+    "NIS の前",
+    "NIS 이전"
+  ],
+  "NIS 之后": [
+    "After NIS",
+    "После NIS",
+    "NIS の後",
+    "NIS 이후"
+  ],
+  "SMAA 质量": [
+    "SMAA quality",
+    "Качество SMAA",
+    "SMAA 品質",
+    "SMAA 품질"
+  ],
+  "叠加层样式": [
+    "Overlay style",
+    "Стиль оверлея",
+    "オーバーレイのスタイル",
+    "오버레이 스타일"
+  ],
+  "精简": [
+    "Minimal",
+    "Минимальный",
+    "最小",
+    "최소"
+  ],
+  "卡片": [
+    "Card",
+    "Карточка",
+    "カード",
+    "카드"
+  ],
+  "仪表板": [
+    "Dashboard",
+    "Панель",
+    "ダッシュボード",
+    "대시보드"
+  ],
+  "显示标签": [
+    "Show labels",
+    "Показывать подписи",
+    "ラベルを表示",
+    "레이블 표시"
+  ],
+  "显示单位": [
+    "Show units",
+    "Показывать единицы",
+    "単位を表示",
+    "단위 표시"
+  ],
+  "帧时间曲线": [
+    "Frame-time graph",
+    "График времени кадра",
+    "フレーム時間グラフ",
+    "프레임 시간 그래프"
+  ],
+  "输出帧率": [
+    "Output FPS",
+    "Выходной FPS",
+    "出力 FPS",
+    "출력 FPS"
+  ],
+  "源帧率": [
+    "Source FPS",
+    "Исходный FPS",
+    "ソース FPS",
+    "소스 FPS"
+  ],
+  "GPU 使用率": [
+    "GPU load",
+    "Загрузка GPU",
+    "GPU 使用率",
+    "GPU 사용률"
+  ],
+  "GPU 温度": [
+    "GPU temperature",
+    "Температура GPU",
+    "GPU 温度",
+    "GPU 온도"
+  ],
+  "GPU 功耗": [
+    "GPU power",
+    "Мощность GPU",
+    "GPU 消費電力",
+    "GPU 전력"
+  ],
+  "GPU 核心频率": [
+    "GPU core clock",
+    "Частота ядра GPU",
+    "GPU コアクロック",
+    "GPU 코어 클럭"
+  ],
+  "GPU 显存频率": [
+    "GPU memory clock",
+    "Частота памяти GPU",
+    "GPU メモリクロック",
+    "GPU 메모리 클럭"
+  ],
+  "CPU 使用率": [
+    "CPU load",
+    "Загрузка CPU",
+    "CPU 使用率",
+    "CPU 사용률"
+  ],
+  "系统内存使用量": [
+    "System RAM usage",
+    "Использование RAM",
+    "システムメモリ使用量",
+    "시스템 메모리 사용량"
+  ],
+  "叠加层不透明度": [
+    "Overlay opacity",
+    "Непрозрачность оверлея",
+    "オーバーレイの不透明度",
+    "오버레이 불투명도"
+  ],
+  "无需额外运行库": [
+    "No extra runtime needed",
+    "Дополнительные библиотеки не нужны",
+    "追加ランタイム不要",
+    "추가 런타임 불필요"
+  ],
+  "操作已取消": [
+    "Operation cancelled",
+    "Операция отменена",
+    "操作をキャンセルしました",
+    "작업이 취소되었습니다"
+  ],
+  "低": [
+    "Low",
+    "Низкое",
+    "低",
+    "낮음"
+  ],
+  "中": [
+    "Medium",
+    "Среднее",
+    "中",
+    "중간"
+  ],
+  "高": [
+    "High",
+    "Высокое",
+    "高",
+    "높음"
+  ],
+  "极高": [
+    "Ultra",
+    "Ультра",
+    "最高",
+    "최고"
+  ],
+  "仅在跟随游戏模式生效：游戏请求 Auto 时保持帧生成开启；关闭则交由游戏决定。": [
+    "Game mode only: keeps FG on while the game requests Auto. Disable to pass Auto through.",
+    "Game mode only: keeps FG on while the game requests Auto. Disable to pass Auto through.",
+    "Game mode only: keeps FG on while the game requests Auto. Disable to pass Auto through.",
+    "Game mode only: keeps FG on while the game requests Auto. Disable to pass Auto through."
+  ],
+  "NIS 锐化强度，0–100%。": [
+    "NIS sharpness, 0–100%.",
+    "NIS sharpness, 0–100%.",
+    "NIS sharpness, 0–100%.",
+    "NIS sharpness, 0–100%."
+  ],
+  "仅处理 SDR 颜色，包含界面；无需额外运行库。": [
+    "SDR color only, including the HUD. No extra runtime required.",
+    "SDR color only, including the HUD. No extra runtime required.",
+    "SDR color only, including the HUD. No extra runtime required.",
+    "SDR color only, including the HUD. No extra runtime required."
+  ],
+  "在 NIS 前按输入分辨率处理，或在 NIS 后按输出分辨率处理。": [
+    "Apply before NIS at source resolution, or after NIS at output resolution.",
+    "Apply before NIS at source resolution, or after NIS at output resolution.",
+    "Apply before NIS at source resolution, or after NIS at output resolution.",
+    "Apply before NIS at source resolution, or after NIS at output resolution."
+  ],
+  "仅影响 SMAA；FXAA 使用固定预设。": [
+    "Affects SMAA only; FXAA uses a fixed preset.",
+    "Affects SMAA only; FXAA uses a fixed preset.",
+    "Affects SMAA only; FXAA uses a fixed preset.",
+    "Affects SMAA only; FXAA uses a fixed preset."
+  ],
+  "选择性能叠加层的布局。": [
+    "Choose the performance overlay layout.",
+    "Choose the performance overlay layout.",
+    "Choose the performance overlay layout.",
+    "Choose the performance overlay layout."
+  ],
+  "传感器不可用时显示 --；硬件读数为整机或整张显卡数据。": [
+    "Unavailable sensors show --. Hardware readings cover the whole system or GPU.",
+    "Unavailable sensors show --. Hardware readings cover the whole system or GPU.",
+    "Unavailable sensors show --. Hardware readings cover the whole system or GPU.",
+    "Unavailable sensors show --. Hardware readings cover the whole system or GPU."
+  ],
+  "调整游戏内性能叠加层。": [
+    "Customize the in-game performance overlay.",
+    "Customize the in-game performance overlay.",
+    "Customize the in-game performance overlay.",
+    "Customize the in-game performance overlay."
+  ],
+  "叠加层背景不透明度，0–100%。": [
+    "Overlay background opacity, 0–100%.",
+    "Overlay background opacity, 0–100%.",
+    "Overlay background opacity, 0–100%.",
+    "Overlay background opacity, 0–100%."
+  ],
+  "实验性，默认关闭。2.2.0 起增加 RTX 20；此前支持 RTX 30/40/50。2.1.0 起扩展到 DX11/Vulkan 无原生帧生成游戏，旧版仅 DX12。以游戏菜单中的激活状态为准。": [
+    "Experimental, off by default. 2.2 adds RTX 20 to RTX 30/40/50. Since 2.1, DX11/Vulkan games without native FG are supported in addition to DX12. Check the in-game active status.",
+    "Experimental, off by default. 2.2 adds RTX 20 to RTX 30/40/50. Since 2.1, DX11/Vulkan games without native FG are supported in addition to DX12. Check the in-game active status.",
+    "Experimental, off by default. 2.2 adds RTX 20 to RTX 30/40/50. Since 2.1, DX11/Vulkan games without native FG are supported in addition to DX12. Check the in-game active status.",
+    "Experimental, off by default. 2.2 adds RTX 20 to RTX 30/40/50. Since 2.1, DX11/Vulkan games without native FG are supported in addition to DX12. Check the in-game active status."
+  ],
+  "DLSS 或 XeSS；2.2.0 起可选择无需额外运行库的 NIS 空间缩放。不代表游戏拥有原生 DLSS 输入。": [
+    "DLSS or XeSS; 2.2 adds NIS spatial scaling without extra runtimes. This does not provide native DLSS game inputs.",
+    "DLSS or XeSS; 2.2 adds NIS spatial scaling without extra runtimes. This does not provide native DLSS game inputs.",
+    "DLSS or XeSS; 2.2 adds NIS spatial scaling without extra runtimes. This does not provide native DLSS game inputs.",
+    "DLSS or XeSS; 2.2 adds NIS spatial scaling without extra runtimes. This does not provide native DLSS game inputs."
+  ],
+  "NIS": [
+    "NIS",
+    "NIS",
+    "NIS",
+    "NIS"
+  ],
+  "SMAA": [
+    "SMAA",
+    "SMAA",
+    "SMAA",
+    "SMAA"
+  ],
+  "FXAA": [
+    "FXAA",
+    "FXAA",
+    "FXAA",
+    "FXAA"
   ]
 }

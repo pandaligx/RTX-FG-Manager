@@ -82,8 +82,21 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
             .as_ref()
             .or(j.new.payload_version.as_ref())
             .context("新 Encore 缺少版本")?;
+        let component_only = semver::Version::parse(new)? == semver::Version::parse(old)?
+            && j.old
+                .hashes
+                .iter()
+                .filter(|(n, _)| {
+                    n.as_str() != encore::CONFIG && !encore::INTEL_FILES.contains(&n.as_str())
+                })
+                .all(|(n, h)| j.new.hashes.get(n) == Some(h))
+            && j.new
+                .hashes
+                .keys()
+                .filter(|n| !encore::INTEL_FILES.contains(&n.as_str()))
+                .all(|n| j.old.hashes.contains_key(n));
         ensure!(
-            semver::Version::parse(new)? > semver::Version::parse(old)?,
+            semver::Version::parse(new)? > semver::Version::parse(old)? || component_only,
             "Encore 只允许升级到更高版本"
         );
     }
@@ -339,7 +352,18 @@ pub fn upgrade_locked(
         migrated
     };
     ensure!(migrated.len() <= 1024 * 1024, "迁移后配置超过大小限制");
-    files.insert(encore::CONFIG.into(), migrated);
+    let unchanged_patch = old.backend == encore::BACKEND
+        && old.upstream_version == new.upstream_version
+        && old.payload_version == new.payload_version
+        && explicit_overrides.is_none_or(|v| v.is_empty());
+    files.insert(
+        encore::CONFIG.into(),
+        if unchanged_patch {
+            original.clone()
+        } else {
+            migrated
+        },
+    );
     ensure!(
         files.iter().all(|(name, bytes)| !bytes.is_empty()
             && bytes.len() as u64

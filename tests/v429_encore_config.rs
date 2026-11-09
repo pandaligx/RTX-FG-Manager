@@ -120,8 +120,8 @@ fn encore120_inheritance_types_and_version_gates_are_explicit() {
 fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults() {
     encore::validate_cloud_config(encore::DEFAULT_CONFIG).unwrap();
     let read = encore::read(encore::DEFAULT_CONFIG).unwrap();
-    assert_eq!(read, encore::defaults_for_version(Some("2.1.0")));
-    assert_eq!(encore::fields().len(), 155);
+    assert_eq!(read, encore::defaults_for_version(Some("2.2.0")));
+    assert_eq!(encore::fields().len(), 174);
     assert_eq!(read["menuKey"], "45");
     assert_eq!(read["nrOpenFastProjection"], "1");
     assert_eq!(read["nrFastProcessing"], "1");

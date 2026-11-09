@@ -31,6 +31,11 @@ impl AssetSource for Assets {
         if path == "app/nvidia.svg" {
             return Ok(Some(Cow::Borrowed(include_bytes!("../assets/nvidia.svg"))));
         }
+        if path == "app/gpu-disguise.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!(
+                "../assets/gpu-disguise.svg"
+            ))));
+        }
         gpui::assets::Assets.load(path)
     }
     fn list(&self, path: &str) -> anyhow::Result<Vec<SharedString>> {
@@ -43,6 +48,7 @@ impl AssetSource for Assets {
             "app/trash.svg",
             "app/bilibili.svg",
             "app/nvidia.svg",
+            "app/gpu-disguise.svg",
         ] {
             if name.starts_with(path) {
                 files.push(name.into());

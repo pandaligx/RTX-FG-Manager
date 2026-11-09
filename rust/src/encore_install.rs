@@ -1,4 +1,4 @@
-//! Explicit first-install choices; updating an existing JSONC never enters this flow.
+//! Independent first-install engine choices and per-game component selection.
 use crate::{presets::Values, scanner::Evidence};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Frames {
@@ -12,6 +12,7 @@ pub enum Reconstruction {
     None,
     Dlss,
     Xess,
+    Nis,
 }
 #[derive(Clone, Debug)]
 pub struct Choice {
@@ -20,9 +21,14 @@ pub struct Choice {
     pub needs_frames: bool,
     pub needs_reconstruction: bool,
     pub dlss_fg_available: bool,
+    pub nis_available: bool,
     pub frames: Option<Frames>,
     pub reconstruction: Option<Reconstruction>,
     pub screen: bool,
+    pub installed: bool,
+    pub native_streamline: bool,
+    pub native_fg: bool,
+    pub components: crate::encore_components::Components,
 }
 impl Choice {
     pub fn new(exe: String, name: String, e: &Evidence, dlss_fg_available: bool) -> Self {
@@ -32,19 +38,39 @@ impl Choice {
             needs_frames: !e.native_frame_generation(),
             needs_reconstruction: !e.neural_input() && !e.super_resolution_plugin,
             dlss_fg_available,
+            nis_available: false,
             frames: None,
             reconstruction: None,
             screen: false,
+            installed: false,
+            native_streamline: e.frame_integration_paths.iter().any(|p| {
+                p.file_name()
+                    .is_some_and(|n| n.to_string_lossy().to_lowercase().starts_with("sl."))
+            }),
+            components: crate::encore_components::Components {
+                fg: e.frame_generation,
+                added_fg: dlss_fg_available,
+                ..Default::default()
+            },
+            native_fg: e.frame_generation,
         }
     }
     pub fn needed(&self) -> bool {
         self.needs_frames || self.needs_reconstruction
     }
     pub fn values(&self) -> Option<Values> {
+        if !self.installed && !self.components.patch {
+            return None;
+        }
         let mut v = Values::new();
         if self.needs_frames {
             let f = self.frames?;
             if f == Frames::Dlss && !self.dlss_fg_available {
+                return None;
+            }
+            if f == Frames::Dlss && !self.components.added_fg
+                || f == Frames::Xefg && !self.components.intel
+            {
                 return None;
             }
             v.insert(
@@ -67,13 +93,23 @@ impl Choice {
         }
         if self.needs_reconstruction {
             let r = self.reconstruction?;
+            if r == Reconstruction::Nis && !self.nis_available {
+                return None;
+            }
+            if r == Reconstruction::Dlss && !self.components.sr
+                || r == Reconstruction::Xess && !self.components.intel
+            {
+                return None;
+            }
             v.insert(
                 "dlssWithoutGameDlss".into(),
                 if r == Reconstruction::None { "0" } else { "1" }.into(),
             );
             v.insert(
                 "dlssWithoutGameDlssEngine".into(),
-                if r == Reconstruction::Xess {
+                if r == Reconstruction::Nis {
+                    "nis"
+                } else if r == Reconstruction::Xess {
                     "xess"
                 } else {
                     "dlss"

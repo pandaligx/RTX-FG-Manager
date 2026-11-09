@@ -10,6 +10,7 @@ pub mod deployment;
 pub mod diagnostics;
 pub mod elevation;
 pub mod encore;
+pub mod encore_components;
 pub mod encore_install;
 pub mod encore_upgrade;
 pub mod executable_name;

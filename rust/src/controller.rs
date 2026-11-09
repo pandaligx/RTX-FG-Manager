@@ -63,6 +63,7 @@ pub enum Event {
     Log(String),
     Warning(String),
     TaskWarning(bool, String),
+    TaskCancelled(bool),
     Notice(String),
     Done,
     Blocked(BlockedOperation),
@@ -103,6 +104,13 @@ impl Clone for Channel {
     }
 }
 impl Channel {
+    fn report_error(&self, error: anyhow::Error) {
+        if rtx_fg_manager::transfer::is_cancelled(&error) {
+            self.send(Event::TaskCancelled(self.task_scope.unwrap_or(false)));
+        } else {
+            self.send(Event::Warning(format!("{error:#}")));
+        }
+    }
     pub fn send(&self, e: Event) {
         let e = match (self.task_scope, e) {
             (Some(update), Event::Warning(message)) => Event::TaskWarning(update, message),
@@ -129,7 +137,7 @@ impl Channel {
             };
             // The failure must reach the owning task before Completion emits Done.
             if let Err(error) = result {
-                c.send(Event::Warning(format!("{error:#}")));
+                c.report_error(error);
             }
         });
     }
@@ -519,11 +527,13 @@ pub struct Controller {
     pub warning: Option<String>,
     pub blocked: Option<BlockedOperation>,
     pub notice: Option<String>,
+    pub information: Option<String>,
     pub confirm: Option<String>,
     pending_cleanup: Option<(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>)>,
     pending_patch: Option<PatchRequest>,
     pub encore_install: Option<EncoreInstallPlan>,
     encore_install_values: BTreeMap<String, rtx_fg_manager::presets::Values>,
+    encore_components: BTreeMap<String, rtx_fg_manager::encore_components::Components>,
     resume_install: Option<BTreeSet<String>>,
     pub search: String,
     pub smoke: Option<PathBuf>,
@@ -641,11 +651,13 @@ impl Controller {
             warning: error,
             blocked: None,
             notice: None,
+            information: None,
             confirm: None,
             pending_cleanup: None,
             pending_patch: None,
             encore_install: None,
             encore_install_values: BTreeMap::new(),
+            encore_components: BTreeMap::new(),
             resume_install: None,
             search: String::new(),
             smoke,
@@ -982,10 +994,21 @@ impl Controller {
     pub fn preset_values(&self, exe: &str) -> rtx_fg_manager::presets::Values {
         self.preset_values_for(exe, &self.scheme_for(Some(exe)))
     }
+    fn preset_defaults(
+        &self,
+        profile: &str,
+        defaults: &rtx_fg_manager::presets::Values,
+    ) -> rtx_fg_manager::presets::Values {
+        let mut values = rtx_fg_manager::presets::defaults(profile, defaults);
+        if profile == rtx_fg_manager::encore::PROFILE {
+            rtx_fg_manager::encore::localize_defaults(&mut values, &self.tr.language);
+        }
+        values
+    }
     fn preset_values_for(&self, exe: &str, scheme: &str) -> rtx_fg_manager::presets::Values {
         let policy = &self.parameter_policy(exe, scheme);
         let profile = &policy.parameter_profile;
-        let mut values = rtx_fg_manager::presets::defaults(profile, &policy.defaults);
+        let mut values = self.preset_defaults(profile, &policy.defaults);
         if let Some(game) = self.games.iter().find(|g| g.exe == exe) {
             if let Some(saved) = game.extra.get("preset_options").and_then(|v| {
                 v.get(profile).or_else(|| {
@@ -1215,8 +1238,7 @@ impl Controller {
             self.disk_profiles.remove(&identity);
             self.disk_presets.remove(&identity);
             let explicit = self.explicit_preset_values(exe, &scheme);
-            let defaults =
-                rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            let defaults = self.preset_defaults(&policy.parameter_profile, &policy.defaults);
             let mut values = defaults.clone();
             values.extend(explicit);
             rtx_fg_manager::presets::Context::new(&scheme, &policy, std::path::Path::new(exe))
@@ -1297,7 +1319,7 @@ impl Controller {
             .entry(identity.clone())
             .or_insert_with(|| values.clone());
         if edits.contains_key("reset") {
-            values = rtx_fg_manager::presets::defaults(&profile, &policy.defaults);
+            values = self.preset_defaults(&profile, &policy.defaults);
         } else {
             values.extend(edits.clone());
         }
@@ -1305,7 +1327,7 @@ impl Controller {
         if rtx_fg_manager::presets::validate(&profile, &values).is_err() {
             return;
         }
-        let mut baseline = rtx_fg_manager::presets::defaults(&profile, &policy.defaults);
+        let mut baseline = self.preset_defaults(&profile, &policy.defaults);
         baseline.extend(
             self.disk_presets
                 .get(&identity)
@@ -2311,6 +2333,12 @@ impl Controller {
             .map(|g| (self.game_name(g), g.clone()))
             .collect::<Vec<_>>();
         let fingerprint = self.retry_fingerprint();
+        let nis_available = self.catalog.packages.iter().any(|p| {
+            p.scheme_id == rtx_fg_manager::encore::SCHEME
+                && rtx_fg_manager::encore::supports_220(
+                    p.upstream_version.as_deref().or(Some(&p.version)),
+                )
+        });
         self.begin_work("检查安装内容");
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
@@ -2320,7 +2348,7 @@ impl Controller {
                 for (name, game) in jobs {
                     for target in game.deployment_targets() {
                         let exe = target.game_exe.display().to_string();
-                        if !paths.contains(&exe) || core::record(&target.directory)?.is_some() {
+                        if !paths.contains(&exe) {
                             continue;
                         }
                         anyhow::ensure!(!cancel.load(Ordering::Relaxed), "已取消");
@@ -2331,15 +2359,54 @@ impl Controller {
                         );
                         let available =
                             rtx_fg_manager::runtime_files::can_add_encore_fg(&target, &e);
-                        let choice = rtx_fg_manager::encore_install::Choice::new(
-                            exe,
+                        let previous = core::record(&target.directory)?;
+                        let installed = previous.as_ref().is_some_and(|r| {
+                            r.backend == rtx_fg_manager::encore::BACKEND
+                                && !r.cache_pending
+                                && rtx_fg_manager::encore::supports_200(
+                                    r.upstream_version
+                                        .as_deref()
+                                        .or(r.payload_version.as_deref()),
+                                )
+                        });
+                        let mut choice = rtx_fg_manager::encore_install::Choice::new(
+                            exe.clone(),
                             name.clone(),
                             &e,
                             available,
                         );
-                        if choice.needed() {
-                            choices.push(choice);
+                        choice.installed = installed;
+                        choice.nis_available = nis_available;
+                        if rtx_fg_manager::runtime_files::inspect(&target, "encorefg").managed {
+                            choice.native_streamline = false;
+                            choice.native_fg = false;
                         }
+                        if previous.is_some() {
+                            choice.needs_frames = false;
+                            choice.needs_reconstruction = false;
+                        }
+                        if let Some(saved) = game
+                            .extra
+                            .get("encore_components")
+                            .and_then(|v| v.get(&exe))
+                            .cloned()
+                            .and_then(|v| serde_json::from_value(v).ok())
+                        {
+                            choice.components = saved;
+                        }
+                        if !installed {
+                            choice.components.patch = true;
+                        }
+                        if !available {
+                            choice.components.added_fg = false;
+                        }
+                        if !choice.native_streamline {
+                            choice.components.streamline = false;
+                        }
+                        if !choice.native_fg {
+                            choice.components.fg = false;
+                        }
+                        choices.push(choice);
                     }
                 }
                 Ok(EncoreInstallPlan {
@@ -2366,14 +2433,22 @@ impl Controller {
         );
         anyhow::ensure!(choices.len() == plan.choices.len(), "安装选择不完整");
         let mut values = BTreeMap::new();
+        let mut components = BTreeMap::new();
         for (selected, original) in choices.into_iter().zip(plan.choices) {
             anyhow::ensure!(
                 selected.exe == original.exe
                     && selected.needs_frames == original.needs_frames
                     && selected.needs_reconstruction == original.needs_reconstruction
-                    && selected.dlss_fg_available == original.dlss_fg_available,
+                    && selected.nis_available == original.nis_available
+                    && selected.dlss_fg_available == original.dlss_fg_available
+                    && selected.installed == original.installed
+                    && selected.native_streamline == original.native_streamline
+                    && selected.native_fg == original.native_fg
+                    && (!selected.components.added_fg || selected.dlss_fg_available)
+                    && (!selected.components.streamline || selected.native_streamline),
                 "安装计划已变化"
             );
+            components.insert(selected.exe.clone(), selected.components);
             values.insert(
                 selected.exe.clone(),
                 selected
@@ -2381,6 +2456,22 @@ impl Controller {
                     .context("请选择帧生成与超分辨率引擎，也可选择不启用")?,
             );
         }
+        for game in &mut self.games {
+            for exe in game.deployment_executables() {
+                if let Some(selected) = components.get(&exe) {
+                    let saved = game
+                        .extra
+                        .entry("encore_components")
+                        .or_insert_with(|| json!({}));
+                    if !saved.is_object() {
+                        *saved = json!({});
+                    }
+                    saved[&exe] = serde_json::to_value(selected)?;
+                }
+            }
+        }
+        self.save();
+        self.encore_components = components;
         self.encore_install_values = values;
         self.perform(false, plan.paths);
         Ok(())
@@ -2422,6 +2513,7 @@ impl Controller {
     }
     fn dispatch_patch(&mut self, clean: bool, targets: BTreeSet<String>) {
         self.encore_install_values.clear();
+        self.encore_components.clear();
         if !clean
             && self.games.iter().any(|g| {
                 self.scheme_for(Some(&g.exe)) == rtx_fg_manager::encore::SCHEME
@@ -2545,6 +2637,16 @@ impl Controller {
         else {
             return;
         };
+        if kind == "encore-complete" && !remove {
+            if self.scheme_for(Some(&game.exe)) != rtx_fg_manager::encore::SCHEME {
+                self.warning = Some(self.text("请先在右侧选择 RTX Encore 方案，再选择安装组件。"));
+                return;
+            }
+            self.encore_components.clear();
+            self.encore_install_values.clear();
+            self.prepare_encore_install(game.deployment_executables().into_iter().collect());
+            return;
+        }
         let targets = game.deployment_targets();
         self.status_epoch += 1;
         let data = self.data.clone();
@@ -2626,6 +2728,7 @@ impl Controller {
         let mut catalog = self.catalog.clone();
         catalog.prefer_github = self.choice("download_source", "domestic") == "github";
         let series = self.cloud_series();
+        let language = self.tr.language.clone();
         let retry = self.retry_request(RetryAction::Recommendation(
             Box::new(recipe.clone()),
             action,
@@ -2638,12 +2741,15 @@ impl Controller {
             for t in &targets {
                 ensure_directory_outside_data(&t.directory, &data)?;
             }
-            rtx_fg_manager::recommendation_presets::execute(
+            rtx_fg_manager::recommendation_presets::execute_with_options(
                 &game,
                 &catalog,
                 &recipe,
                 action,
-                series,
+                rtx_fg_manager::recommendation_presets::InstallOptions {
+                    series,
+                    language: &language,
+                },
                 &cancel,
                 |p| c.send(Event::PayloadProgress(p)),
             )?;
@@ -2957,6 +3063,7 @@ impl Controller {
     pub fn cancel_patch(&mut self) {
         self.encore_install = None;
         self.encore_install_values.clear();
+        self.encore_components.clear();
         self.resume_install = None;
         self.pending_patch = None;
         self.pending_cleanup = None;
@@ -3022,6 +3129,8 @@ impl Controller {
         catalog.prefer_github = self.choice("download_source", "domestic") == "github";
         let retry = self.retry_request(RetryAction::Patch(clean, paths.clone()));
         let first_install_values = self.encore_install_values.clone();
+        let components = self.encore_components.clone();
+        let language = self.tr.language.clone();
         self.channel.operation(move |c| {
             let guards = jobs
                 .iter()
@@ -3044,8 +3153,11 @@ impl Controller {
                         queue.extend(files);
                     }
                     if scheme == rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p| &p.scheme_id == scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version))))
-                        && let Ok(files) = rtx_fg_manager::runtime_files::encore_download_files(&game.deployment_targets()) {
-                        queue.extend(files);
+                    {
+                        for target in game.deployment_targets() {
+                            let choice = components.get(&target.game_exe.display().to_string()).copied().unwrap_or_default();
+                            if let Ok(files) = rtx_fg_manager::runtime_files::encore_selected_download_files(std::slice::from_ref(&target), choice) { queue.extend(files); }
+                        }
                     }
                 }
                 if !queue.is_empty() { c.send(Event::PayloadProgress(cloud::CloudProgress { transfer:rtx_fg_manager::transfer::Progress::plan(queue),proxy:String::new(),package_index:0,package_count:0 })); }
@@ -3070,7 +3182,10 @@ impl Controller {
                             )?;
                         }
                         if scheme==rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p|p.scheme_id==scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version)))) {
-                            rtx_fg_manager::runtime_files::prepare_encore_sources(&game.deployment_targets(),catalog.prefer_github,&cancel,&mut|transfer|c.send(Event::PayloadProgress(cloud::CloudProgress{transfer,proxy:"Encore runtimes".into(),package_index:1,package_count:1})))?;
+                            for target in game.deployment_targets() {
+                                let choice = components.get(&target.game_exe.display().to_string()).copied().unwrap_or_default();
+                                rtx_fg_manager::runtime_files::prepare_encore_selected_sources(std::slice::from_ref(&target),choice,catalog.prefer_github,&cancel,&mut|transfer|c.send(Event::PayloadProgress(cloud::CloudProgress{transfer,proxy:"Encore runtimes".into(),package_index:1,package_count:1})))?;
+                            }
                         }
                         cloud::prepare_with_progress(
                             &catalog,
@@ -3086,6 +3201,10 @@ impl Controller {
                 let prepared = match prepared {
                     Ok(p) => p,
                     Err(e) => {
+                        if rtx_fg_manager::transfer::is_cancelled(&e) {
+                            c.send(Event::TaskCancelled(false));
+                            break;
+                        }
                         errors.push(format!("{primary}：{e}"));
                         for exe in targets {
                             c.send(Event::PatchResult(false));
@@ -3137,6 +3256,9 @@ impl Controller {
                                     &payload.policy.parameter_profile,
                                     &payload.policy.defaults,
                                 );
+                                if payload.backend == rtx_fg_manager::encore::BACKEND {
+                                    rtx_fg_manager::encore::localize_defaults(&mut values, &language);
+                                }
                                 values.extend(overrides.clone());
                                 context.normalize(&mut values);
                                 fresh_options = values;
@@ -3180,7 +3302,9 @@ impl Controller {
                                 context.configure(&files[name], options)?
                             };
                             files.insert(name.into(), configured);
-                            core::deploy_prepared_context_at_with_overrides(
+                            let deployed = if payload.backend == rtx_fg_manager::encore::BACKEND && rtx_fg_manager::encore::supports_200(payload.upstream_version.as_deref().or(Some(&payload.version))) {
+                                rtx_fg_manager::encore_components::deploy(&game.deployment_target(&p), payload, &proxies, files, &context, &overrides, components.get(&exe).copied().unwrap_or_default())
+                            } else { core::deploy_prepared_context_at_with_overrides(
                                 &game.deployment_target(&p),
                                 &payload.backend,
                                 &proxies,
@@ -3190,8 +3314,8 @@ impl Controller {
                                 Some(&context),
                                 Some(&overrides),
                                 payload.upstream_version.as_deref(),
-                            )
-                            .map(|message| cleanup::CleanOutcome {
+                            ) };
+                            deployed.map(|message| cleanup::CleanOutcome {
                                 message, complete: true,
                             })
                         })()
@@ -3216,6 +3340,10 @@ impl Controller {
                         }
                         Err(e) => {
                             all_ok = false;
+                            if rtx_fg_manager::transfer::is_cancelled(&e) {
+                                c.send(Event::TaskCancelled(false));
+                                break;
+                            }
                             c.send(Event::PatchResult(false));
                             errors.push(format!("{exe}：{e}"));
                         }
@@ -3235,15 +3363,23 @@ impl Controller {
                     if prepared.as_ref().is_some_and(|payload| payload.backend == rtx_fg_manager::encore::BACKEND
                         && rtx_fg_manager::encore::supports_200(payload.upstream_version.as_deref().or(Some(&payload.version)))) {
                         let previous_errors=errors.len();
-                        if let Err(error) = rtx_fg_manager::runtime_files::complete_encore_runtimes(
-                            &game.deployment_targets(), catalog.prefer_github, &cancel,
+                        for target in game.deployment_targets() {
+                        let choice = components.get(&target.game_exe.display().to_string()).copied().unwrap_or_default();
+                        if let Err(error) = rtx_fg_manager::runtime_files::complete_encore_selected(
+                            std::slice::from_ref(&target), choice, catalog.prefer_github, &cancel,
                             &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
                                 transfer, proxy: "Encore".into(), package_index: 1, package_count: 1,
                             })),
                         ) {
+                            if rtx_fg_manager::transfer::is_cancelled(&error) {
+                                c.send(Event::TaskCancelled(false));
+                                all_ok = false;
+                                break;
+                            }
                             errors.push(format!("补丁已安装，配套运行库未完成；请在运行库窗口点击补齐后重试：{error:#}"));
                         }
-                        if errors.len()==previous_errors {
+                        }
+                        if all_ok && errors.len()==previous_errors {
                             c.send(Event::Progress("正在应用所选引擎…".into()));
                             for (exe,values) in &fresh_targets {
                                 let target=game.deployment_target(std::path::Path::new(exe));
@@ -4106,6 +4242,14 @@ impl Controller {
                     self.log(&s);
                     self.warning = Some(s)
                 }
+                Event::TaskCancelled(update) => {
+                    let token = if update {
+                        &self.update_cancel
+                    } else {
+                        &self.cancel
+                    };
+                    token.store(true, Ordering::Relaxed);
+                }
                 Event::Catalog(catalog) => {
                     // Keep the newest successful refresh while the active operation
                     // continues with its own catalog/payload snapshot.
@@ -4181,8 +4325,12 @@ impl Controller {
                             && self.resume_install.is_none()
                             && self.blocked.is_none()
                         {
-                            self.notice =
-                                Some(format!("{}：{}", task.title, self.tr.t(&task.stage)));
+                            if self.cancel.load(Ordering::Relaxed) {
+                                self.information = Some("操作已取消".into());
+                            } else {
+                                self.notice =
+                                    Some(format!("{}：{}", task.title, self.tr.t(&task.stage)));
+                            }
                         }
                     }
                     self.busy = false;
@@ -4280,11 +4428,11 @@ impl Controller {
                     if let Some(t) = &mut self.tasks.update {
                         t.finish(self.update_cancel.load(Ordering::Relaxed));
                         if t.error.is_none() && !self.update_installing && !self.install_pending {
-                            self.notice = Some(if self.update_cancel.load(Ordering::Relaxed) {
-                                "更新下载已取消".into()
+                            if self.update_cancel.load(Ordering::Relaxed) {
+                                self.information = Some("更新下载已取消".into());
                             } else {
-                                self.update_status.clone()
-                            });
+                                self.notice = Some(self.update_status.clone());
+                            }
                         }
                     }
                     let failed_install = self.update_installing;
@@ -5844,6 +5992,63 @@ mod tests {
         );
         assert!(matches!(&events[1], Event::Done));
     }
+
+    #[test]
+    fn cancelled_operation_reports_info_once_and_keeps_genuine_failures() {
+        let (_dir, mut c) = controller();
+        c.begin_work("Download fixture");
+        c.channel.send(Event::TaskCancelled(false));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.information.take().as_deref(), Some("操作已取消"));
+        assert!(c.warning.is_none());
+        assert!(c.tasks.work.as_ref().unwrap().error.is_none());
+        assert!(!c.busy);
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(c.information.is_none());
+        c.begin_work("Failing fixture");
+        c.channel
+            .send(Event::TaskWarning(false, "Checksum mismatch".into()));
+        c.channel.send(Event::TaskCancelled(false));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.warning.as_deref(), Some("Checksum mismatch"));
+        assert!(c.information.is_none());
+        assert_eq!(c.tasks.work.as_ref().unwrap().stage, "操作未完成");
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn encore_default_language_tracks_resolved_manager_locale_but_keeps_game_choice() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::encore::SCHEME;
+        let exe = "LocaleFixture.exe";
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        for (setting, expected) in [("zh-CN", "zh-CN"), ("en", "en"), ("ja", "en")] {
+            c.tr = i18n::Translator::new(setting);
+            assert_eq!(c.preset_values_for(exe, scheme)["menuLanguage"], expected);
+        }
+        c.tr = i18n::Translator::new("system");
+        let expected = if c.tr.language == "zh-CN" {
+            "zh-CN"
+        } else {
+            "en"
+        };
+        assert_eq!(c.preset_values_for(exe, scheme)["menuLanguage"], expected);
+        c.tr = i18n::Translator::new("zh-CN");
+        c.disk_presets.insert(
+            (exe.into(), scheme.into()),
+            BTreeMap::from([("menuLanguage".into(), "fr".into())]),
+        );
+        assert_eq!(c.preset_values_for(exe, scheme)["menuLanguage"], "fr");
+        c.close();
+        c.tick_close();
+    }
     #[test]
     fn panicked_operation_reports_failure_before_completion() {
         let (tx, rx) = mpsc::channel();
@@ -6481,6 +6686,9 @@ mod tests {
         for (scheme, policy) in &policies {
             let mut expected =
                 rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            if policy.parameter_profile == rtx_fg_manager::encore::PROFILE {
+                expected.insert("menuLanguage".into(), "zh-CN".into());
+            }
             rtx_fg_manager::presets::Context::new(scheme, policy, std::path::Path::new(exe))
                 .normalize(&mut expected);
             assert_eq!(

@@ -1,4 +1,18 @@
 {
+  "更新提醒": ["Update available", "Доступно обновление", "更新のお知らせ", "업데이트 알림"],
+  "立即更新": ["Update now", "Обновить сейчас", "今すぐ更新", "지금 업데이트"],
+  "下次再说": ["Later", "Позже", "後で", "나중에"],
+  "Encore 安装选项": ["Encore installation options", "Параметры установки Encore", "Encore のインストール設定", "Encore 설치 옵션"],
+  "安装组件": ["Components", "Компоненты", "コンポーネント", "구성 요소"],
+  "补丁与设置文件": ["Mod and settings", "Мод и настройки", "MOD と設定ファイル", "모드 및 설정 파일"],
+  "更新已有 Streamline 插件至 2.14.16": ["Update native Streamline to 2.14.16", "Обновить плагины Streamline до 2.14.16", "既存の Streamline を 2.14.16 に更新", "기존 Streamline을 2.14.16으로 업데이트"],
+  "默认保留现有插件及 sl.interposer.dll": ["Keep current plugins and sl.interposer.dll by default", "По умолчанию сохранить плагины и sl.interposer.dll", "既定では現在のプラグインと sl.interposer.dll を保持", "현재 플러그인과 sl.interposer.dll을 기본적으로 유지"],
+  "无原生帧生成时使用，包含匹配的 Streamline 文件": ["For games without native FG; includes matching Streamline", "Для игр без генерации кадров; включает согласованные файлы Streamline", "ネイティブ FG のないゲーム用。対応する Streamline を含む", "기본 FG가 없는 게임용. 호환 Streamline 포함"],
+  "部分游戏需要原版 Streamline。仅更新检测到的插件，原始 interposer 保留。": ["Some games require their original Streamline. Update detected plugins only; keep the original interposer.", "Некоторым играм нужен исходный Streamline. Обновляются только найденные плагины, interposer сохраняется.", "元の Streamline が必要なゲームもあります。検出済みプラグインのみ更新し、interposer は保持します。", "일부 게임에는 원본 Streamline이 필요합니다. 감지된 플러그인만 업데이트하고 interposer는 유지합니다."],
+  "未勾选的现有文件保持不变。恢复原版请使用运行库的恢复按钮。": ["Unchecked files stay unchanged. Use Restore in Runtimes to recover originals.", "Неотмеченные файлы сохраняются. Для возврата оригиналов используйте восстановление библиотек.", "未選択のファイルは変更しません。元に戻すにはランタイムの復元を使用してください。", "미선택 파일은 유지합니다. 원본 복구는 런타임의 복원 버튼을 사용하세요."],
+  "请选择引擎，并勾选其所需组件；也可选择不启用。": ["Choose engines and their required components, or choose None.", "Выберите движки и нужные компоненты либо отключите их.", "エンジンと必要なコンポーネントを選ぶか、無効を選択してください。", "엔진과 필요한 구성 요소를 선택하거나 사용 안 함을 선택하세요."],
+  "选择 Encore 安装组件": ["Choose Encore components", "Выбрать компоненты Encore", "Encore コンポーネントを選択", "Encore 구성 요소 선택"],
+  "只更新 DLSS 帧生成，保留现有 Streamline。需要更新插件时，请选择 Encore 安装组件。": ["Updates DLSS FG only, keeping existing Streamline. Use Choose Encore components to update plugins.", "Обновляется только DLSS FG. Для обновления Streamline выберите компоненты Encore.", "DLSS FG のみ更新し Streamline は維持します。プラグインの更新は Encore コンポーネント選択から行います。", "DLSS FG만 업데이트하고 Streamline은 유지합니다. 플러그인 업데이트는 Encore 구성 요소 선택을 사용하세요."],
   "查找已安装的游戏": ["Find installed games", "Найти установленные игры", "インストール済みゲームを検索", "설치된 게임 찾기"],
   "建议先扫描一次全盘，将游戏添加到游戏库。": ["Scan all drives once to add your installed games.", "Просканируйте все диски, чтобы добавить установленные игры.", "全ドライブをスキャンしてゲームをライブラリに追加できます。", "모든 드라이브를 스캔하여 설치된 게임을 추가하세요."],
   "扫描全盘": ["Scan all drives", "Все диски", "全ドライブをスキャン", "모든 드라이브 스캔"],
@@ -4799,11 +4813,11 @@
     "フレーム生成の追加",
     "프레임 생성 추가"
   ],
-  "请先安装 Encore 2.0+": [
-    "Install Encore 2.0+ first",
-    "Сначала установите Encore 2.0+",
-    "先に Encore 2.0+ をインストール",
-    "먼저 Encore 2.0+를 설치하세요"
+  "请先安装 Encore": [
+    "Install Encore first",
+    "Сначала установите Encore",
+    "先に Encore をインストール",
+    "먼저 Encore를 설치하세요"
   ],
   "随 Encore 提供": [
     "Included with Encore",

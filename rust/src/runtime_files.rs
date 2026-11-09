@@ -1,6 +1,6 @@
 //! Opt-in runtime updates. Existing game files are backed up; later edits win.
 //! Added FG is a separate matched set for Encore 2 games with no native FG.
-//! Native Streamline plugins update together; the game's interposer stays intact.
+//! Native Streamline plugins are opt-in; the game's interposer stays intact.
 use crate::{assets, core, scanner, transfer, win};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
@@ -193,19 +193,8 @@ pub(crate) fn download_files(
     kind: &str,
     version: &str,
 ) -> Result<Vec<transfer::DownloadFile>> {
-    let mut files = vec![download_file(kind, version)?];
-    if kind == "fg"
-        && version == "310.9.16"
-        && targets
-            .iter()
-            .map(encore_200_installed)
-            .collect::<Result<Vec<_>>>()?
-            .iter()
-            .any(|v| *v)
-    {
-        files.push(bundled_package("streamline")?.download_file());
-    }
-    Ok(files)
+    let _ = targets; // A DLSS update never silently replaces Streamline.
+    Ok(vec![download_file(kind, version)?])
 }
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Asset {
@@ -254,7 +243,10 @@ pub fn versions(kind: &str) -> Vec<String> {
 /// frame-generation integration receive the added-FG set. No feature is enabled.
 /// Fetch all applicable components before the first game-file write. Cache hits
 /// reuse verified bytes; interrupted downloads cannot leave a partial patch install.
-fn encore_packages(targets: &[core::DeploymentTarget]) -> Result<Vec<Package>> {
+fn encore_packages(
+    targets: &[core::DeploymentTarget],
+    selection: crate::encore_components::Components,
+) -> Result<Vec<Package>> {
     let mut native_fg = false;
     let mut added_fg = false;
     for target in targets {
@@ -266,15 +258,19 @@ fn encore_packages(targets: &[core::DeploymentTarget]) -> Result<Vec<Package>> {
         native_fg |= e.frame_generation && read(target, "encorefg")?.is_none();
         added_fg |= can_add_encore_fg(target, &e);
     }
-    let mut packages = vec![
-        version_package("sr", "310.9.16")?,
-        version_package("rr", "310.9.16")?,
-    ];
-    if native_fg {
+    let mut packages = Vec::new();
+    for kind in ["sr", "rr"] {
+        if selection.selected(kind) {
+            packages.push(version_package(kind, "310.9.16")?);
+        }
+    }
+    if native_fg && selection.fg {
         packages.push(version_package("fg", "310.9.16")?);
+    }
+    if selection.streamline {
         packages.push(bundled_package("streamline")?);
     }
-    if added_fg {
+    if added_fg && selection.added_fg {
         packages.push(version_package("encorefg", "2.14.16")?);
     }
     Ok(packages)
@@ -282,13 +278,21 @@ fn encore_packages(targets: &[core::DeploymentTarget]) -> Result<Vec<Package>> {
 pub fn encore_download_files(
     targets: &[core::DeploymentTarget],
 ) -> Result<Vec<transfer::DownloadFile>> {
-    let mut files = encore_packages(targets)?
+    encore_selected_download_files(targets, crate::encore_components::Components::default())
+}
+pub fn encore_selected_download_files(
+    targets: &[core::DeploymentTarget],
+    selection: crate::encore_components::Components,
+) -> Result<Vec<transfer::DownloadFile>> {
+    let mut files = encore_packages(targets, selection)?
         .iter()
         .map(Package::download_file)
         .collect::<Vec<_>>();
-    files.push(crate::neural_runtime::download_file(
-        crate::neural_runtime::RECOMMENDED,
-    )?);
+    if selection.nr {
+        files.push(crate::neural_runtime::download_file(
+            crate::neural_runtime::RECOMMENDED,
+        )?);
+    }
     Ok(files)
 }
 pub fn prepare_encore_sources(
@@ -297,18 +301,39 @@ pub fn prepare_encore_sources(
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<()> {
-    let packages = encore_packages(targets)?;
+    prepare_encore_selected_sources(
+        targets,
+        crate::encore_components::Components::default(),
+        github,
+        cancel,
+        progress,
+    )
+}
+pub fn prepare_encore_selected_sources(
+    targets: &[core::DeploymentTarget],
+    selection: crate::encore_components::Components,
+    github: bool,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(transfer::Progress),
+) -> Result<()> {
+    let packages = encore_packages(targets, selection)?;
     let mut files = packages
         .iter()
         .map(Package::download_file)
         .collect::<Vec<_>>();
-    files.push(crate::neural_runtime::download_file(
-        crate::neural_runtime::RECOMMENDED,
-    )?);
+    if selection.nr {
+        files.push(crate::neural_runtime::download_file(
+            crate::neural_runtime::RECOMMENDED,
+        )?);
+    }
     progress(transfer::Progress::plan(files));
-    let nr_bytes = crate::neural_runtime::archive_size(crate::neural_runtime::RECOMMENDED)?;
+    let nr_bytes = if selection.nr {
+        crate::neural_runtime::archive_size(crate::neural_runtime::RECOMMENDED)?
+    } else {
+        0
+    };
     let total = packages.iter().map(|p| p.bytes).sum::<u64>() + nr_bytes;
-    let count = packages.len() + 1;
+    let count = packages.len() + usize::from(selection.nr);
     let mut completed = 0;
     for (index, p) in packages.into_iter().enumerate() {
         let bytes = p.bytes;
@@ -320,19 +345,21 @@ pub fn prepare_encore_sources(
         })?;
         completed += bytes;
     }
-    crate::neural_runtime::prepare(
-        crate::neural_runtime::RECOMMENDED,
-        github,
-        cancel,
-        &mut |mut p| {
-            p.aggregate = Some((completed + p.completed.min(nr_bytes), total));
-            p.item = format!(
-                "DLSSNR {}  {count}/{count}",
-                crate::neural_runtime::RECOMMENDED
-            );
-            progress(p);
-        },
-    )?;
+    if selection.nr {
+        crate::neural_runtime::prepare(
+            crate::neural_runtime::RECOMMENDED,
+            github,
+            cancel,
+            &mut |mut p| {
+                p.aggregate = Some((completed + p.completed.min(nr_bytes), total));
+                p.item = format!(
+                    "DLSSNR {}  {count}/{count}",
+                    crate::neural_runtime::RECOMMENDED
+                );
+                progress(p);
+            },
+        )?;
+    }
     Ok(())
 }
 pub fn can_add_encore_fg(target: &core::DeploymentTarget, e: &scanner::Evidence) -> bool {
@@ -340,6 +367,21 @@ pub fn can_add_encore_fg(target: &core::DeploymentTarget, e: &scanner::Evidence)
 }
 pub fn complete_encore_runtimes(
     targets: &[core::DeploymentTarget],
+    github: bool,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(transfer::Progress),
+) -> Result<()> {
+    complete_encore_selected(
+        targets,
+        crate::encore_components::Components::default(),
+        github,
+        cancel,
+        progress,
+    )
+}
+pub fn complete_encore_selected(
+    targets: &[core::DeploymentTarget],
+    selection: crate::encore_components::Components,
     github: bool,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
@@ -358,6 +400,9 @@ pub fn complete_encore_runtimes(
     }
     let mut planned = Vec::new();
     for kind in ["sr", "rr", "fg"] {
+        if !selection.selected(kind) {
+            continue;
+        }
         let mut selected = Vec::new();
         for (target, evidence) in targets.iter().zip(&inventories) {
             let destinations = candidate_paths(target, kind, Some(evidence))?;
@@ -375,15 +420,6 @@ pub fn complete_encore_runtimes(
                 {
                     continue;
                 }
-                if kind == "fg" {
-                    // Validate every native provider before writing any other
-                    // runtime. A known layout conflict must not partially update
-                    // SR/RR before it is reported to the player.
-                    native_streamline_paths_from(target, evidence, |path| {
-                        core::pe64(path, true)?;
-                        Ok(win::file_version(path)?.0)
-                    })?;
-                }
                 selected.push(target.clone());
             }
         }
@@ -395,26 +431,83 @@ pub fn complete_encore_runtimes(
     for (target, evidence) in targets.iter().zip(&inventories) {
         // Native integrations intentionally do not need an additional FG set.
         // A broken or externally changed managed set, however, is an error.
-        if evidence.frame_integration_paths.is_empty() || read(target, "encorefg")?.is_some() {
+        if selection.added_fg
+            && (evidence.frame_integration_paths.is_empty() || read(target, "encorefg")?.is_some())
+        {
             preflight_added_fg(target, Some(evidence))?;
             added.push(target.clone());
         }
     }
     // All downloads succeed before the first runtime replacement.
-    prepare_encore_sources(targets, github, cancel, progress)?;
+    if selection.streamline {
+        for (target, evidence) in targets.iter().zip(&inventories) {
+            native_streamline_paths_from(target, evidence, |path| {
+                core::pe64(path, true)?;
+                Ok(win::file_version(path)?.0)
+            })?;
+        }
+    }
+    prepare_encore_selected_sources(targets, selection, github, cancel, progress)?;
     for (kind, selected) in planned {
         install_version(&selected, kind, "310.9.16", github, cancel, progress)?;
     }
     if !added.is_empty() {
         install_version(&added, "encorefg", "2.14.16", github, cancel, progress)?;
     }
-    crate::neural_runtime::install_many(
-        targets,
-        crate::neural_runtime::RECOMMENDED,
-        github,
-        cancel,
-        progress,
-    )?;
+    if selection.streamline {
+        install_native_streamline(targets, github, cancel, progress)?;
+    }
+    if selection.nr {
+        crate::neural_runtime::install_many(
+            targets,
+            crate::neural_runtime::RECOMMENDED,
+            github,
+            cancel,
+            progress,
+        )?;
+    }
+    Ok(())
+}
+
+/// Explicit Streamline update; keeps original interposers and records restoration
+/// beside the existing FG journal so older installations remain recoverable.
+pub fn install_native_streamline(
+    targets: &[core::DeploymentTarget],
+    github: bool,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(transfer::Progress),
+) -> Result<()> {
+    let _cache = crate::cache::wait_for_operation(cancel, || {})?;
+    let mut ordered = targets
+        .iter()
+        .map(|t| t.validate(true))
+        .collect::<Result<Vec<_>>>()?;
+    ordered.sort_by_key(|t| core::key(&t.directory));
+    ordered.dedup_by_key(|t| core::key(&t.directory));
+    let mut locks = Vec::new();
+    let mut plans = Vec::new();
+    let mut seen = BTreeSet::new();
+    for t in &ordered {
+        ensure!(encore_200_installed(t)?, "请先安装 RTX Encore 2.0+");
+        core::assert_target_stopped(t)?;
+        locks.push(win::game_lock(&t.directory)?);
+        let mut paths = native_streamline_paths(t)?;
+        paths.retain(|p| seen.insert(core::key(p)));
+        if !paths.is_empty() {
+            plans.push((t, paths));
+        }
+    }
+    if plans.is_empty() {
+        return Ok(());
+    }
+    let sources = prepare_package(bundled_package("streamline")?, github, cancel, progress)?;
+    for (t, paths) in &plans {
+        plan_entries(t, "fg", paths, &sources)?;
+    }
+    for (t, paths) in plans {
+        ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
+        install_locked(t, "fg", &paths, &sources)?;
+    }
     Ok(())
 }
 /// Only when sharing a managed component: verify that its recorded package is
@@ -1115,7 +1208,7 @@ fn inspect_with(
         }
         if kind == "fg" && s.available && encore_200_installed(target)? && s.warning.is_none() {
             s.warning = Some(
-                "更新 DLSS-G 310.9.16 时同步更新配套 Streamline 插件，保留游戏原有 interposer。"
+                "只更新 DLSS 帧生成，保留现有 Streamline。需要更新插件时，请选择 Encore 安装组件。"
                     .into(),
             );
         }
@@ -1398,30 +1491,9 @@ pub fn install_version(
     // Resolve once before starting the operation; a background catalog refresh
     // cannot change the bytes selected by the user midway through a download.
     let selected = version_package(kind, version)?;
-    let native_plugins = kind == "fg"
-        && version == "310.9.16"
-        && targets
-            .iter()
-            .map(encore_200_installed)
-            .collect::<Result<Vec<_>>>()?
-            .iter()
-            .any(|v| *v);
-    let mut files = vec![selected.download_file()];
-    if native_plugins {
-        files.push(bundled_package("streamline")?.download_file());
-    }
-    progress(transfer::Progress::plan(files));
+    progress(transfer::Progress::plan(vec![selected.download_file()]));
     install_many_with(targets, kind, cancel, || {
-        let mut sources = prepare_package(selected, github, cancel, progress)?;
-        if native_plugins {
-            sources.extend(prepare_package(
-                bundled_package("streamline")?,
-                github,
-                cancel,
-                progress,
-            )?);
-        }
-        Ok(sources)
+        prepare_package(selected, github, cancel, progress)
     })
 }
 fn install_many_with(
@@ -1543,6 +1615,73 @@ pub fn remove_many(targets: &[core::DeploymentTarget], kind: &str) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_fg_selection_does_not_implicitly_download_streamline() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        fs::write(t.directory.join("nvngx_dlssg.dll"), b"native FG")?;
+        fs::write(t.directory.join("sl.common.dll"), b"original native plugin")?;
+        let targets = std::slice::from_ref(&t);
+        let selected = crate::encore_components::Components::default();
+        assert!(
+            !encore_packages(targets, selected)?
+                .iter()
+                .any(|p| p.kind == "streamline" || p.kind == "encorefg")
+        );
+        let only_patch = crate::encore_components::Components {
+            patch: true,
+            sr: false,
+            rr: false,
+            fg: false,
+            nr: false,
+            intel: false,
+            streamline: false,
+            added_fg: false,
+        };
+        assert!(encore_selected_download_files(targets, only_patch)?.is_empty());
+        assert_eq!(download_files(targets, "fg", "310.9.16")?.len(), 1);
+        assert_eq!(
+            fs::read(t.directory.join("sl.common.dll"))?,
+            b"original native plugin"
+        );
+        Ok(())
+    }
+    #[test]
+    fn fg_only_update_retains_old_plugin_backups_until_restore() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        let folder = &t.directory;
+        for name in ["nvngx_dlssg.dll", "sl.common.dll", "sl.interposer.dll"] {
+            fs::write(folder.join(name), format!("original {name}"))?;
+        }
+        let e = scanner::inspect(&t.game_exe);
+        let mut paths = native_streamline_paths_from(&t, &e, |_| Ok("2.12.128".into()))?;
+        paths.push(folder.join("nvngx_dlssg.dll"));
+        let mut src = sources(&tmp.path().join("sources"), "fg")?;
+        for name in STREAMLINE_PLUGINS.into_iter().chain([STREAMLINE_LICENSE]) {
+            let p = tmp.path().join("sources").join(name);
+            fs::write(&p, format!("new {name}"))?;
+            src.insert(name.into(), p);
+        }
+        install_locked(&t, "fg", &paths, &src)?;
+        let plugins = fs::read(folder.join("sl.common.dll"))?;
+        let fg = folder.join("nvngx_dlssg.dll");
+        install_locked(
+            &t,
+            "fg",
+            &[fg],
+            &sources(&tmp.path().join("fg-only"), "fg")?,
+        )?;
+        assert_eq!(fs::read(folder.join("sl.common.dll"))?, plugins);
+        remove_locked(&t, "fg")?;
+        for name in ["nvngx_dlssg.dll", "sl.common.dll", "sl.interposer.dll"] {
+            assert_eq!(
+                fs::read(folder.join(name))?,
+                format!("original {name}").as_bytes()
+            );
+        }
+        Ok(())
+    }
     #[test]
     fn native_status_distinguishes_plugins_missing_dependencies_and_interposer() -> Result<()> {
         let tmp = tempfile::tempdir()?;

@@ -42,6 +42,13 @@ impl AddedFeature {
             {
                 "xess"
             }
+            Self::Sr
+                if values
+                    .get("dlssWithoutGameDlssEngine")
+                    .is_some_and(|v| v == "nis") =>
+            {
+                "nis"
+            }
             Self::Sr => "dlss",
             Self::Fg
                 if values
@@ -165,7 +172,8 @@ impl EncoreEditor {
     }
 
     fn reset(&mut self, group_only: bool, cx: &mut Context<Self>) {
-        let defaults = encore::defaults_for_version(self.version.as_deref());
+        let mut defaults = encore::defaults_for_version(self.version.as_deref());
+        encore::localize_defaults(&mut defaults, &self.tr.language);
         let current = self
             .owner
             .upgrade()
@@ -189,7 +197,7 @@ impl EncoreEditor {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let mut rows = div().v_flex().gap_2().min_w_0();
-        for (feature, label, choices) in [
+        for (feature, label, mut choices) in [
             (
                 AddedFeature::Sr,
                 "新增超分辨率",
@@ -206,6 +214,10 @@ impl EncoreEditor {
                 vec![("off", "关闭"), ("dlss-fg", "DLSS-FG"), ("xefg", "XeFG")],
             ),
         ] {
+            if matches!(feature, AddedFeature::Sr) && encore::supports_220(self.version.as_deref())
+            {
+                choices.push(("nis", "NIS"));
+            }
             let selected = feature.selected(values);
             let choice_label = choices
                 .iter()
@@ -239,7 +251,9 @@ impl EncoreEditor {
             let message = if selected == "off" {
                 ""
             } else if installed.is_none_or(|s| s.installed == 0) {
-                "请先安装 Encore 2.0+"
+                "请先安装 Encore"
+            } else if selected == "nis" {
+                "无需额外运行库"
             } else if matches!(selected.as_str(), "xess" | "xefg") {
                 "随 Encore 提供"
             } else if ready {

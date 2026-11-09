@@ -527,7 +527,7 @@ impl Manager {
                             div().h_flex().justify_end().child(
                                 self.button(
                                     "runtime-encore-complete",
-                                    "补齐 Encore 配套运行库",
+                                    "选择 Encore 安装组件",
                                     Command::RuntimeOperation("encore-complete", false),
                                     cx,
                                 )

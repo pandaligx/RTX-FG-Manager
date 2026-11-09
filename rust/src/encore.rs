@@ -130,6 +130,25 @@ pub fn supports_200(version: Option<&str>) -> bool {
         .and_then(|v| semver::Version::parse(v).ok())
         .is_some_and(|v| v >= semver::Version::new(2, 0, 0))
 }
+pub fn supports_220(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(2, 2, 0))
+}
+/// Apply the manager's resolved locale only to a fresh default, before explicit
+/// per-game values are merged. Other locales retain the upstream default.
+pub fn localize_defaults(values: &mut Values, language: &str) {
+    if language == "zh-CN" {
+        values.insert("menuLanguage".into(), "zh-CN".into());
+    }
+}
+const GPU_METRICS: [&str; 5] = [
+    "overlayShowGpuLoad",
+    "overlayShowGpuTemperature",
+    "overlayShowGpuPower",
+    "overlayShowGpuClock",
+    "overlayShowGpuMemoryClock",
+];
 fn removed_open_field(key: &str) -> bool {
     key == "nrEngine" || key.starts_with("nrOpen")
 }
@@ -559,6 +578,14 @@ fn encode(f: &Field, value: &str) -> Result<Value> {
 pub fn read(bytes: &[u8]) -> Result<Values> {
     let doc = document(bytes)?;
     let mut values = defaults();
+    // 2.2 inherits each absent sensor from the legacy aggregate switch.
+    if let Some(legacy) = field("overlayShowGpu")
+        && let Some(value) = resolve(&doc, &legacy.path)?.0.and_then(|v| v.as_bool())
+    {
+        for key in GPU_METRICS {
+            values.insert(key.into(), u8::from(value).to_string());
+        }
+    }
     let mult = multiplier(&doc)?;
     for f in fields() {
         if f.key == "vsync" {
@@ -719,6 +746,19 @@ fn vsync_value(doc: &Document) -> Result<Option<String>> {
 /// in the caller's upgrade journal; repeated migration is byte-for-byte stable.
 fn migrate_version_fields(bytes: &[u8], version: Option<&str>) -> Result<Vec<u8>> {
     let mut out = bytes.to_vec();
+    if supports_220(version) {
+        let doc = document(&out)?;
+        if let Some(legacy) = field("overlayShowGpu")
+            && let Some(value) = resolve(&doc, &legacy.path)?.0.and_then(|v| v.as_bool())
+        {
+            for key in GPU_METRICS {
+                let f = field(key).expect("sensor metadata");
+                if resolve(&document(&out)?, &f.path)?.0.is_none() {
+                    out = document(&out)?.set(&f.path, json!(value))?;
+                }
+            }
+        }
+    }
     let pacing = path(&["frameGeneration", "flipMeteringBypass"]);
     let value = resolve(&document(&out)?, &pacing)?.0;
     if supports_200(version) && value.is_none() {

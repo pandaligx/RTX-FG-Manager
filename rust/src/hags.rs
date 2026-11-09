@@ -44,10 +44,13 @@ pub fn classify(adapters: Vec<Adapter>, configured: Option<u32>, build: u32) -> 
         .iter()
         .filter(|a| a.supported == Some(true))
         .collect();
-    let current = eligible
-        .first()
-        .and_then(|a| a.enabled)
-        .filter(|enabled| eligible.iter().all(|a| a.enabled == Some(*enabled)));
+    // WDDM reports scheduling per adapter, while HwSchMode is one system choice.
+    // A hybrid laptop can run HAGS on NVIDIA while its Intel adapters report
+    // supported=true, enabled=false. That is an enabled system, not a failed
+    // query or a pending restart. Require successful queries as before, but do
+    // not require every supported adapter to use the same scheduler.
+    let current = (!eligible.is_empty() && eligible.iter().all(|a| a.enabled.is_some()))
+        .then(|| eligible.iter().any(|a| a.enabled == Some(true)));
     let desired = match configured {
         Some(1) => Some(false),
         Some(2) => Some(true),
@@ -59,13 +62,12 @@ pub fn classify(adapters: Vec<Adapter>, configured: Option<u32>, build: u32) -> 
         "unknown"
     } else if adapters.iter().all(|a| a.supported == Some(false)) {
         "unsupported"
-    } else if !eligible.is_empty() && eligible.iter().all(|a| a.enabled.is_some()) {
-        match desired {
-            Some(true) if eligible.iter().any(|a| a.enabled == Some(false)) => "pending_restart",
-            Some(false) if eligible.iter().any(|a| a.enabled == Some(true)) => "pending_disable",
-            Some(true) => "enabled",
-            Some(false) => "disabled",
-            None => "unknown",
+    } else if let (Some(desired), Some(current)) = (desired, current) {
+        match (desired, current) {
+            (true, false) => "pending_restart",
+            (false, true) => "pending_disable",
+            (true, true) => "enabled",
+            (false, false) => "disabled",
         }
     } else {
         "unknown"
@@ -363,7 +365,7 @@ mod tests {
         );
     }
     #[test]
-    fn hags_multi_adapter_ignores_unsupported_gpu_but_preserves_mixed_state() {
+    fn hags_multi_adapter_ignores_unsupported_gpu_and_accepts_mixed_schedulers() {
         let unsupported = Adapter {
             supported: Some(false),
             enabled: Some(false),
@@ -374,9 +376,83 @@ mod tests {
             Some(true)
         );
         let mixed = vec![adapter(true), adapter(false)];
-        assert_eq!(classify(mixed.clone(), None, 26100).selected(), None);
-        for value in [1, 2] {
-            assert!(classify(mixed.clone(), Some(value), 26100).needs_restart());
+        assert_eq!(classify(mixed.clone(), None, 26100).state, "enabled");
+        assert_eq!(classify(mixed.clone(), Some(2), 26100).state, "enabled");
+        assert_eq!(classify(mixed, Some(1), 26100).state, "pending_disable");
+    }
+    #[test]
+    fn hags_hybrid_laptop_report_and_toggle_roundtrip() -> Result<()> {
+        // Read-only remote reproduction: no HwSchMode override; NVIDIA 3050
+        // Laptop flags=0xb, four Intel Iris Xe adapters flags=0x1. Windows
+        // Settings shows enabled. Repeated Intel entries must not change it.
+        let mut rows = vec![Adapter {
+            name: "NVIDIA GeForce RTX 3050 Laptop GPU".into(),
+            flags: Some(0xb),
+            ..adapter(true)
+        }];
+        rows.extend((0..4).map(|_| Adapter {
+            name: "Intel(R) Iris(R) Xe Graphics".into(),
+            flags: Some(1),
+            ..adapter(false)
+        }));
+        for build in [19041, 19045, 22000, 26100] {
+            for configured in [None, Some(2)] {
+                for reverse in [false, true] {
+                    let mut adapters = rows.clone();
+                    if reverse {
+                        adapters.reverse();
+                    }
+                    let initial = classify(adapters, configured, build);
+                    assert_eq!(initial.state, "enabled");
+                    assert_eq!(initial.selected(), Some(true));
+                    assert!(!initial.needs_restart());
+                    assert!(!prompt(&initial, false));
+
+                    let cancel = AtomicBool::new(false);
+                    let disabled = configure_with(initial, false, &cancel, |value| {
+                        assert_eq!(value, 1);
+                        Ok(())
+                    })?;
+                    assert_eq!(disabled.state, "pending_disable");
+                    let reopened = classify(disabled.adapters, disabled.configured, build);
+                    assert_eq!(reopened.selected(), Some(false));
+                    assert!(reopened.needs_restart());
+                    let restored = configure_with(reopened, true, &cancel, |value| {
+                        assert_eq!(value, 2);
+                        Ok(())
+                    })?;
+                    assert_eq!(restored.state, "enabled");
+                    assert!(!restored.needs_restart());
+                }
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn hags_partial_supported_adapter_query_still_blocks_writes() {
+        // A real query failure remains unknown; it is not the valid mixed
+        // scheduler case reproduced above, and a registry value cannot fix it.
+        for running in [false, true] {
+            for configured in [None, Some(1), Some(2)] {
+                let state = classify(
+                    vec![
+                        adapter(running),
+                        Adapter {
+                            supported: Some(true),
+                            ..Default::default()
+                        },
+                    ],
+                    configured,
+                    26100,
+                );
+                assert_eq!(state.state, "unknown");
+                assert!(
+                    configure_with(state, !running, &AtomicBool::new(false), |_| {
+                        panic!("incomplete query must not write")
+                    })
+                    .is_err()
+                );
+            }
         }
     }
     #[test]
