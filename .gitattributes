@@ -7,3 +7,5 @@
 /cloud/v3/catalog.json -text
 /cloud/help.json -text
 /update.json -text
+/cloud/names/*.json -text
+/rust/assets/game-names.json -text

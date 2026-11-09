@@ -1,6 +1,8 @@
 import copy
 import importlib.util
 import json
+import subprocess
+import tempfile
 import unittest
 from unittest import mock
 from pathlib import Path
@@ -21,7 +23,32 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(data, (ROOT / 'rust/assets/game-names.json').read_bytes())
         self.assertEqual(names.hashlib.sha256(data).hexdigest(), manifest['sha256'])
         self.assertEqual(len(data), manifest['bytes'])
+        directory = json.loads((ROOT / 'recommendations/src/game-directory.json').read_text(encoding='utf-8'))
+        self.assertEqual(directory['entries'], self.catalog['entries'])
         names.validate(self.catalog)
+
+    def test_catalog_bytes_survive_windows_git_checkout(self):
+        # Git for Windows commonly has autocrlf=true. Integrity metadata must
+        # describe the checked-out bytes as well as the repository blobs.
+        with tempfile.TemporaryDirectory(prefix='rtxfg-names-eol-') as folder:
+            root = Path(folder)
+            def git(*args):
+                subprocess.run(['git', *args], cwd=root, check=True, capture_output=True)
+            git('init', '--quiet')
+            git('config', 'core.autocrlf', 'true')
+            (root / '.gitattributes').write_bytes((ROOT / '.gitattributes').read_bytes())
+            paths = ['cloud/names/names-' + 'a' * 20 + '.json', 'rust/assets/game-names.json']
+            data = b'{"entries":[]}\n'
+            for name in paths:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            git('add', '--', '.gitattributes', *paths)
+            for name in paths:
+                (root / name).unlink()
+            git('checkout-index', '--all', '--force')
+            for name in paths:
+                self.assertEqual((root / name).read_bytes(), data, name)
 
     def test_truncated_source_and_mass_renames_are_rejected(self):
         next_catalog = copy.deepcopy(self.catalog)
@@ -57,6 +84,9 @@ class CatalogTests(unittest.TestCase):
         self.assertIn('python tools/gitcode_ci.py', workflow)
         self.assertIn('RELEASE_TAG: \'\'', workflow)
         self.assertIn('git add -- rust/assets/game-names.json cloud/game-names.json cloud/names', workflow)
+        self.assertIn('cloud/names recommendations/src/game-directory.json', workflow)
+        self.assertLess(workflow.index('node recommendations/src/build-games.mjs'), workflow.index('git add --'))
+        self.assertIn('node --test recommendations/tests/games.test.mjs', workflow)
         self.assertNotIn('--force', workflow)
 
     def test_fetch_combines_all_platforms_and_gog_qualifiers(self):
