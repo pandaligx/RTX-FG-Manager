@@ -11,11 +11,11 @@ implementation remain intact. No global environment variable or GamePP
 setting is changed. This app policy does not support transparent backdrops or
 native composition surfaces; revisit it if such a feature is introduced.
 
-Baseline: the published `gpui-fast-windows` **0.1.13** crate from crates.io
-(`gpui-fast-windows-0.1.13.crate` SHA-256
-`088654835f1408e1aaa79afcc316530461a14fa1c4e543d47b1881b6ced63f19`).
+Baseline: the published `gpui-fast-windows` **0.1.14** crate from crates.io
+(`gpui-fast-windows-0.1.14.crate` SHA-256
+`a89bfdc3a922a29f83611fc7f01642533d35260a7f86aa9befb14f2b6dcca093`).
 The crate's Apache-2.0 `LICENSE`, README and original manifest are retained.
-The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.13`
+The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.14`
 and sets `publish = false`.
 
 The manager previously applied equivalent compatibility changes to Zed commit
@@ -85,3 +85,16 @@ the retained `IDWriteFactory3`; it uses APIs available on that interface.
 lookup paths share the same factory. No new minimum Windows version is imposed.
 The manager's application-level tests and GUI checks do not simulate actual
 device removal or establish older Windows 10/mixed-DPI compatibility.
+
+For manager 4.3.30 these changes are rebased onto Fast 0.1.14. The new upstream
+CPU color-glyph bitmap composition and glyph shaping remain intact: only the
+DirectWrite factory, font loader and color-enumerator capability adapter are
+retained. The text system no longer owns a Direct3D device or receives device
+recreation calls; the UI still uses D3D11. The upstream frame-worker wake after
+window registration and texture-size guards are retained. The manager continues
+to select opaque HWND presentation. No higher Windows requirement is introduced
+by these local patches; actual old-Windows validation remains a separate check.
+
+The published native test module writes JSON traces but omits its `serde_json`
+dev dependency. Declare it for test builds only, so the upstream Windows
+regressions can run; normal manager builds do not gain a runtime dependency.

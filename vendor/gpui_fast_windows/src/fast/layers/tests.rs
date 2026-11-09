@@ -1016,3 +1016,78 @@ fn read_back(
     }
     Ok(pixels)
 }
+
+// Core test-support comes from the target dev-dependency. This test does not
+// enable this crate's feature-gated cross-workspace rounded-clip fixture suite.
+#[gpui::test]
+fn composition_whole_scene_matches_replayed_surface_pixels(cx: &mut gpui::TestAppContext) {
+    use crate::fast::composition_scene::whole_scene_layer;
+    struct View;
+    impl gpui::Render for View {
+        fn render(
+            &mut self,
+            _: &mut gpui::Window,
+            _: &mut gpui::Context<Self>,
+        ) -> impl gpui::IntoElement {
+            use gpui::{ParentElement as _, Styled as _};
+            gpui::div().size(gpui::px(64.)).bg(gpui::white()).child(
+                gpui::div()
+                    .size(gpui::px(64.))
+                    .rounded(gpui::px(24.))
+                    .overflow_hidden()
+                    .child(gpui::div().size(gpui::px(64.)).bg(gpui::black())),
+            )
+        }
+    }
+    use gpui::AppContext as _;
+    let window = cx.update(|cx| {
+        cx.open_window(Default::default(), |_, cx| cx.new(|_| View))
+            .unwrap()
+    });
+    let mut harness = Harness::new().expect("composition regression requires Direct3D or WARP");
+    window
+        .update(cx, |_, window, cx| {
+            window.draw(cx).clear(cx);
+            let scene = window.painted_scene();
+            assert!(
+                !scene.layers.frames.is_empty(),
+                "rounded clips were compiled"
+            );
+            let full = gpui::ComposedSceneLayer {
+                surface: gpui::CompositionSurfaceId::default(),
+                ranges: vec![0..scene.len()],
+            };
+            let empty = gpui::ComposedSceneLayer {
+                ranges: vec![],
+                ..full.clone()
+            };
+            for (layers, expected_target) in [
+                (vec![full.clone(), empty.clone()], 0),
+                (vec![empty.clone(), full.clone()], 1),
+                (vec![full.clone()], 0),
+                (vec![empty.clone(), full, empty], 1),
+            ] {
+                let (target_index, borrowed) = whole_scene_layer(scene, &layers).unwrap();
+                assert_eq!(target_index, expected_target);
+                assert!(std::ptr::eq(borrowed, scene));
+                // The former per-surface path: replay the target's ranges
+                // into a fresh scene and finish, independent of selection.
+                let mut replayed = Scene::default();
+                for range in &layers[expected_target].ranges {
+                    replayed.replay_balanced(range.clone(), scene).unwrap();
+                }
+                replayed.finish();
+                let side = (64. * window.scale_factor()) as i32;
+                let extent = size(DevicePixels(side), DevicePixels(side));
+                let expected = harness.render(&replayed, extent, rgba(0xffffffff));
+                let actual = harness.render(borrowed, extent, rgba(0xffffffff));
+                assert_eq!(actual, expected);
+                assert_eq!(pixel(&actual, side as usize, 1, 1), [255, 255, 255, 255]);
+                assert_eq!(
+                    pixel(&actual, side as usize, side as usize / 2, side as usize / 2),
+                    [0, 0, 0, 255]
+                );
+            }
+        })
+        .unwrap();
+}

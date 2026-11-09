@@ -17,13 +17,13 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.29"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.30"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.29 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.30 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -41,20 +41,20 @@
 
 ## 下载
 
-**版本 4.3.29** · Windows 10 / 11 x64
+**版本 4.3.30** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.29 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.29) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.29 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.29) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.30 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.30) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.30 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.30) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
 下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.29 更新亮点
+## 4.3.30 更新亮点
 
-- 修复开启游戏加加监测时，游戏库左侧大面积变色的问题。
-- 调整窗口呈现方式，保留 Direct3D 11 硬件加速、现有界面及补丁功能。
+- 升级 GPUI Kit 0.9.1 与 GPUI Fast 0.1.14，改进输入、文本、滑块及界面绘制。
+- 改善设置语言切换与无障碍支持，保留游戏加加监测兼容修复；新增小黑盒教程作者致谢。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -188,6 +188,8 @@ GitCode 暂时不可用时，切换 GitHub 来源重试，或从上方发行页�
 感谢 [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore)、[GPUI](https://gpui.rs/)、[GPUI Kit](https://github.com/longbridge/gpui-kit)、[GPUI Fast](https://github.com/longbridge/gpui-fast) 与 [aria2](https://github.com/aria2/aria2)。详见 [第三方说明](THIRD_PARTY_NOTICES.txt)。
 
 特别感谢 [大大大怪将军阁下](https://space.bilibili.com/608531525)、[云外逸声](https://space.bilibili.com/256887068)、[坏坏的帅帅啊](https://space.bilibili.com/296225145) 和提供兼容性反馈的用户。本项目与 NVIDIA、游戏厂商及上游项目无官方隶属关系。
+
+感谢小黑盒博主 [落日无序的米莉安](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp) 分享本软件并制作使用教程。
 
 ---
 

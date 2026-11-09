@@ -17,13 +17,13 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.29"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.30"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.29 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.30 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -41,20 +41,20 @@
 
 ## Download
 
-**Version 4.3.29** · Windows 10 / 11 x64
+**Version 4.3.30** · Windows 10 / 11 x64
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.29 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.29) | Default domestic source |
-| **GitHub** | [Open 4.3.29 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.29) | Primary project and fallback |
+| **GitCode** | [Open 4.3.30 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.30) | Default domestic source |
+| **GitHub** | [Open 4.3.30 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.30) | Primary project and fallback |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
 Download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-## 4.3.29 highlights
+## 4.3.30 highlights
 
-- Fixes discoloration across the left game library when GamePP monitoring is enabled.
-- Adjusts window presentation while retaining Direct3D 11 hardware acceleration, the existing UI and patch features.
+- Updates GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, improving input, text, sliders and rendering.
+- Refines settings language switching and accessibility, retains GamePP monitoring compatibility, and adds credits for a HeyBox tutorial creator.
 
 [Full changelog →](CHANGELOG.md)
 
@@ -188,6 +188,8 @@ Bug reports: [GitHub Issues](https://github.com/pandaligx/RTX-FG-Manager/issues)
 Thanks to [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore), [GPUI](https://gpui.rs/), [GPUI Kit](https://github.com/longbridge/gpui-kit), [GPUI Fast](https://github.com/longbridge/gpui-fast) and [aria2](https://github.com/aria2/aria2). See [Third-party notices](THIRD_PARTY_NOTICES.txt).
 
 Special thanks to [大大大怪将军阁下](https://space.bilibili.com/608531525), [云外逸声](https://space.bilibili.com/256887068), [坏坏的帅帅啊](https://space.bilibili.com/296225145) and everyone contributing compatibility feedback. This project is not affiliated with NVIDIA, game publishers or the upstream projects.
+
+Thanks to [落日无序的米莉安](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp) on HeyBox for sharing the manager and creating tutorials.
 
 ---
 

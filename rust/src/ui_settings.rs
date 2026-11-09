@@ -250,6 +250,10 @@ impl Manager {
                     ),
                     ("云外逸声", "https://space.bilibili.com/256887068"),
                     ("坏坏的帅帅啊", "https://space.bilibili.com/296225145"),
+                    (
+                        "落日无序的米莉安（小黑盒分享与教程）",
+                        "https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp",
+                    ),
                 ],
             ),
         ];
@@ -420,7 +424,12 @@ impl Manager {
                                 .tooltip(this.t("缩小字体"))
                                 .disabled(size <= 12),
                             )
-                            .child(Slider::new(&this.font_slider).flex_1().min_w_0())
+                            .child(
+                                Slider::new(&this.font_slider)
+                                    .accessibility_label(this.t("字体大小"))
+                                    .flex_1()
+                                    .min_w_0(),
+                            )
                             .child(
                                 this.button(
                                     "font-larger",
@@ -651,24 +660,21 @@ impl Manager {
             .min_h_0()
             .bg(cx.theme().background)
             .child(
-                // Kit retains the search InputState (including its placeholder).
-                // Give each resolved language its own stable state so switching
-                // language refreshes the prompt and avoids a stale-language filter.
-                Settings::new(SharedString::from(format!(
-                    "manager-settings-pages-{}",
-                    self.c.tr.language
-                )))
-                .small()
-                .sidebar_width(window.rem_size() * 14.)
-                .sidebar_size_range(window.rem_size() * 11. ..window.rem_size() * 22.)
-                .with_group_variant(GroupBoxVariant::Outline)
-                .pages([
-                    page("外观", IconName::Palette, appearance).description(self.t("更改自动保存")),
-                    page("游戏库", IconName::Folder, library),
-                    page("软件更新", IconName::RefreshCw, updates),
-                    page("缓存维护", IconName::Settings, maintenance),
-                    page("关于", IconName::Info, about),
-                ]),
+                // Kit 0.9.1 updates the localized search prompt in place. Keep
+                // one identity so language changes retain the selected page.
+                Settings::new("manager-settings-pages")
+                    .small()
+                    .sidebar_width(window.rem_size() * 14.)
+                    .sidebar_size_range(window.rem_size() * 11. ..window.rem_size() * 22.)
+                    .with_group_variant(GroupBoxVariant::Outline)
+                    .pages([
+                        page("外观", IconName::Palette, appearance)
+                            .description(self.t("更改自动保存")),
+                        page("游戏库", IconName::Folder, library),
+                        page("软件更新", IconName::RefreshCw, updates),
+                        page("缓存维护", IconName::Settings, maintenance),
+                        page("关于", IconName::Info, about),
+                    ]),
             )
             .into_any_element()
     }

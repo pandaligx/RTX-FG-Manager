@@ -82,6 +82,13 @@ impl FrameRequest {
         }
     }
 
+    /// Starts scheduling after the window is added to the worker's tracked list.
+    pub(crate) fn start(&self) {
+        // A creation-time request may have woken the worker before registration.
+        self.pending.store(true, Ordering::Release);
+        self.wake.request();
+    }
+
     pub(crate) fn take(&self) -> bool {
         self.pending.swap(false, Ordering::AcqRel)
     }
@@ -230,6 +237,27 @@ mod tests {
         thread,
         time::Duration,
     };
+
+    #[test]
+    fn window_registration_schedules_initial_frame() {
+        for (requested, consumed) in [(false, false), (true, false), (true, true)] {
+            let wake = Arc::new(FrameWake::default());
+            let request = FrameRequest::new(wake.clone());
+            if requested {
+                request.request();
+                assert!(wake.wait(&AtomicBool::new(false), true));
+            }
+            if consumed {
+                assert!(request.take());
+            }
+            request.start();
+            assert!(*wake.pending.lock());
+            assert!(wake.wait(&AtomicBool::new(false), true));
+            assert!(request.take());
+            assert!(!request.take());
+            assert!(!*wake.pending.lock());
+        }
+    }
 
     #[test]
     fn requests_coalesce_without_invalidating_other_windows() {

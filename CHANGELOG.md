@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.30
+
+- Update GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, incorporating improvements to input, text selection and glyphs, sliders, accessibility and rendering.
+- Refine settings language switching: refresh the search prompt in place while preserving the current page, and add a localized accessibility label to the font-size slider.
+- Retain the GamePP monitoring compatibility fix, Direct3D 11 GPU acceleration, and existing patch and download features.
+- Credit HeyBox creator “落日无序的米莉安” in About and both READMEs for sharing the manager and creating tutorials.
+
 ## 4.3.29
 
 - Fix discoloration across the left game library when GamePP monitoring is enabled.
