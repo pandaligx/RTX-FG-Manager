@@ -18,6 +18,21 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Offline cloud and publication protocol tests
+        shell: pwsh
+        run: |
+          python -B tools/cloud_release.py self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_encore_cloud.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_publication.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_gitcode_publish.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_client_release.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B -m unittest discover -s tests -p test_game_names.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install pinned toolchain
         shell: pwsh
         run: |
@@ -32,19 +47,6 @@ jobs:
         run: cargo check --locked
       - name: Unit and filesystem regression tests
         run: cargo test --locked
-      - name: Offline cloud and publication protocol tests
-        shell: pwsh
-        run: |
-          python -B tools/cloud_release.py self-test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -B -m unittest discover -s tests -p test_encore_cloud.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -B -m unittest discover -s tests -p test_publication.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -B -m unittest discover -s tests -p test_gitcode_publish.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -B -m unittest discover -s tests -p test_client_release.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Build release

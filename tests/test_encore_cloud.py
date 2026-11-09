@@ -61,7 +61,22 @@ class EncoreCloudTests(unittest.TestCase):
                 yield path
         paths = {tuple(field["path"]) for field in fields}
         native_paths = set(leaves(config()))
-        self.assertEqual(len(fields), 155)
+        # The bundled schema-4 fixture remains usable for older Encore versions.
+        # 2.2 adds optional fields which are absent until explicitly configured.
+        new_paths = {
+            "overrideAutoFrameGeneration": ("frameGeneration", "overrideAutoFrameGeneration"),
+            **{key: ("superResolutionSharpening", key) for key in (
+                "spatialSharpness", "spatialAa", "spatialAaPlacement", "spatialAaQuality")},
+            **{key: ("overlay", key) for key in (
+                "overlayStyle", "overlayLabels", "overlayUnits", "overlayGraph",
+                "overlayShowFps", "overlayShowSourceFps", "overlayShowGpuLoad",
+                "overlayShowGpuTemperature", "overlayShowGpuPower", "overlayShowGpuClock",
+                "overlayShowGpuMemoryClock", "overlayShowCpu", "overlayShowRam", "overlayOpacity")},
+        }
+        new_fields = [field for field in fields if field.get("since") == "2.2.0"]
+        self.assertEqual({field["key"]: tuple(field["path"]) for field in new_fields}, new_paths)
+        self.assertTrue(all(field.get("optional") is True for field in new_fields))
+        self.assertEqual(len(fields), 155 + len(new_paths))
         self.assertEqual(
             {field["key"] for field in fields if field.get("since") == "1.5.0"},
             {"xessTensorCores", "xefgTensorCores"},
@@ -78,7 +93,12 @@ class EncoreCloudTests(unittest.TestCase):
         self.assertEqual(native_paths - paths, {("configVersion",), ("frameGeneration", "multiplier"),
                                                ("frameGeneration", "flipMeteringLearned")})
         retired = {tuple(f["path"]) for f in fields if f["key"] == "nrEngine" or f["key"].startswith("nrOpen")}
-        self.assertEqual(paths - native_paths, retired | {("menuState", "menuKey"), ("menuState", "menuLanguage"), ("smoothMotion", "smoothMotionForce"), ("smoothMotion", "smoothMotionTuringVariant"), ("nativeMenuFeatures", "vsyncOff"), ("providerPatchPolicy",), ("overlay", "metrics", "overlayShowLatency")})
+        self.assertEqual(paths - native_paths, retired | set(new_paths.values()) | {
+            ("menuState", "menuKey"), ("menuState", "menuLanguage"),
+            ("smoothMotion", "smoothMotionForce"), ("smoothMotion", "smoothMotionTuringVariant"),
+            ("nativeMenuFeatures", "vsyncOff"), ("providerPatchPolicy",),
+            ("overlay", "metrics", "overlayShowLatency"),
+        })
         for key in ("menuKey", "menuLanguage"):
             self.assertTrue(next(field for field in fields if field["key"] == key)["optional"])
 
