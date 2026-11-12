@@ -50,6 +50,9 @@ class SourceAllowlistTests(unittest.TestCase):
     def test_current_reviewed_export_is_accepted_by_the_source_mirror(self):
         files = current_source_export_files()
         for required in ('Cargo.toml', 'Cargo.lock', 'rust/src/ui_themes.rs',
+                         '.github/workflows/build-linux.yml', 'packaging/AppRun',
+                         'packaging/build-appimage.sh', 'packaging/rtx-fg-manager.desktop',
+                         'packaging/rtx-fg-manager.png',
                          'vendor/gpui_fast_windows/Cargo.toml',
                          'vendor/gpui_fast_windows/Cargo.toml.orig',
                          'vendor/gpui_fast_windows/LICENSE',
@@ -97,6 +100,8 @@ class SourceAllowlistTests(unittest.TestCase):
 
     def test_obsolete_vendor_and_private_inputs_stay_rejected(self):
         for path in ('vendor/gpui_windows/Cargo.toml',
+                     'packaging/private.key', 'packaging/private.exe',
+                     'packaging/../development/private.rs',
                      'vendor/gpui_windows/src/window.rs',
                      'vendor/sum_tree/Cargo.toml', 'vendor/sum_tree/src/sum_tree.rs',
                      'vendor/gpui_fast_windows/src/private.exe',

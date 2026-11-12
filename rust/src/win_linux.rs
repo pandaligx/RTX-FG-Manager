@@ -882,6 +882,18 @@ mod platform_regressions {
             Path::new("/games/Game/save"),
             Path::new("/games/game")
         ));
+        assert_ne!(
+            crate::core::key(Path::new("/games/Game\\save")),
+            crate::core::key(Path::new("/games/Game/save"))
+        );
+        assert!(!crate::core::within(
+            Path::new("/games/Game\\save"),
+            Path::new("/games/Game")
+        ));
+        assert!(crate::core::within(
+            Path::new("/games/Game/save"),
+            Path::new("/games/Game/")
+        ));
     }
     #[test]
     fn own_open_file_is_reported_but_not_terminable() -> Result<()> {
