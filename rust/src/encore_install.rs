@@ -13,6 +13,7 @@ pub enum Reconstruction {
     Dlss,
     Xess,
     Nis,
+    Fsr1,
 }
 #[derive(Clone, Debug)]
 pub struct Choice {
@@ -22,6 +23,7 @@ pub struct Choice {
     pub needs_reconstruction: bool,
     pub dlss_fg_available: bool,
     pub nis_available: bool,
+    pub fsr1_available: bool,
     pub frames: Option<Frames>,
     pub reconstruction: Option<Reconstruction>,
     pub screen: bool,
@@ -39,6 +41,7 @@ impl Choice {
             needs_reconstruction: !e.neural_input() && !e.super_resolution_plugin,
             dlss_fg_available,
             nis_available: false,
+            fsr1_available: false,
             frames: None,
             reconstruction: None,
             screen: false,
@@ -93,7 +96,9 @@ impl Choice {
         }
         if self.needs_reconstruction {
             let r = self.reconstruction?;
-            if r == Reconstruction::Nis && !self.nis_available {
+            if r == Reconstruction::Nis && !self.nis_available
+                || r == Reconstruction::Fsr1 && !self.fsr1_available
+            {
                 return None;
             }
             if r == Reconstruction::Dlss && !self.components.sr
@@ -107,7 +112,9 @@ impl Choice {
             );
             v.insert(
                 "dlssWithoutGameDlssEngine".into(),
-                if r == Reconstruction::Nis {
+                if r == Reconstruction::Fsr1 {
+                    "fsr1"
+                } else if r == Reconstruction::Nis {
                     "nis"
                 } else if r == Reconstruction::Xess {
                     "xess"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.31
+
+- Integrate RTX Encore 2.3.0 NR Final image, game motion vectors, exposure modes, FSR 1 and four XeFG pacing controls. Use updated defaults for fresh installs while preserving explicit settings, JSONC comments and unknown fields during upgrades.
+- Extend player-preset sharing to Encore 2.3.0 while retaining older protocols; install, update and restore companion runtimes according to the game and selected components.
+- Show the Dlssg_for_sm86 0.4.1 engine explanation only for XeSS: the game still needs DLSS super resolution and DLSS frame generation enabled. The default DLSS selection has no extra explanation.
+- Merge experimental Linux / AppImage support for Windows games in an explicitly selected Wine / Proton prefix. Retain Windows rendering, signing, automatic updates and other patch schemes.
+- Update both READMEs with GPU support ranges, Linux limitations and Rust / GPUI badges, retaining the combined download counter.
+
 ## 4.3.30
 
 - Update GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, incorporating improvements to input, text selection and glyphs, sliders, accessibility and rendering.

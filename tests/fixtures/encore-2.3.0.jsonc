@@ -1,0 +1,230 @@
+{
+  "configVersion": 4,                        // Settings apply live unless the comment says to restart the game. Editable in the RTX Encore native menu (Insert).
+  "renderingEngines": {
+    "reconstructionEngine": "game",          // game (default) or xess: replace compatible DLSS Super Resolution with XeSS. Install Intel runtimes through Hub. Applied live: the upscaler is re-created with the other engine; Vulkan XeSS needs xess at game start.
+    "frameGenerationEngine": "game"          // game (default): keep native FG. dlss-fg: replace qualified native Intel XeFG with DLSS FG; FSR and native DLSS FG are retained. xefg: replace compatible DLSS FG with XeSS-FG and XeLL. Install runtimes through Hub. Restart the game to apply.
+  },
+  "xess": {
+    "xessTensorCores": false                 // Experimental NVIDIA Tensor Cores for XeSS Super Resolution. Off by default. Qualified for RTX 4090, NVIDIA 621.01, Direct3D 12 and the XeSS runtime from the Intel 3.0.2 package supplied by Hub; other RTX 40, RTX 30 and RTX 50 adapters, and NVIDIA 621.12/621.14, are admitted without in-game validation yet. Enable or disable live at the next XeSS execution boundary. Unsupported or refused preparation keeps standard XeSS.
+  },
+  "xefg": {
+    "xefgTensorCores": false,                // Experimental NVIDIA Tensor Cores for XeFG. Off by default. On prepared native D3D12 contexts, enable or disable live at command-recording boundaries; factors 2x to 6x remain bounded by admitted capacity. Unsupported or refused work keeps standard XeFG.
+    "xefgMfg4VariablePacing": true,          // XeSS-FG factors above 2x: pace using observed source frame tokens. Off: higher factors stay unavailable without an internal fixed-cadence contract. A frame limit does not establish source cadence. Restart to apply.
+    "xefgSourcePacing": true,                // Automatic: At 3x and above, detects persistent uneven game-frame pacing before trying a correction. Regular pacing stays uncapped. Keeps a correction only when it improves pacing within a small FPS budget. Applies live. On by default.
+    "xefgSourcePacingMode": "auto",          // auto (default): current automatic correction with a 4 percent measured source-FPS loss budget. manual: choose the budget and automatic checks below. Applies live; changes recalibrate the correction.
+    "xefgSourcePacingLossPercent": 4,        // Manual measured source-FPS loss budget, 0 to 30 percent; default 4. A budget, not a fixed FPS penalty while automatic adjustments are enabled. Applies live.
+    "xefgSourcePacingManualDetection": true, // Manual mode only: require persistent uneven pacing before applying a correction. Off: calibrate and apply without waiting for alternation. Applies live.
+    "xefgSourcePacingManualAdjustments": true, // Manual mode only: retain benefit checks, bounded trials and progressive relaxation. Off: use the full chosen loss budget and hold that period until the controls or context change. Presentation errors still cancel the correction. Applies live.
+    "xefgUiHandling": "interpolate",         // interpolate (default) or game: request the game's HUD-less/UI layers. Composition is used only for qualified modes; otherwise UI stays interpolated. Restart to apply.
+    "xefgUiAlpha": "unknown"                 // unknown (default), straight or premultiplied: declare the game's UI alpha convention. Unknown refuses UI layers; it never guesses. Restart to apply.
+  },
+  "frameGeneration": {
+    "mode": "game",                          // fixed (the multiplier below), dynamic (DLSS-G or XeSS-FG adapts toward the target FPS) or game (the game or NVIDIA Profile Inspector decides). XeSS-FG factors above 2x require the exact admitted runtime profile.
+    "multiplier": 4,                         // Fixed mode multiplier: DLSS-G 1 pauses generation live without changing the engine; 2 to 6 generate frames (5 and 6 experimental). XeSS-FG 2 to 6 with an exact admitted runtime profile and reported capacity. Requested multiplier is not proof of displayed frames.
+    "dynamicTargetFrameRate": 0,             // Dynamic mode target FPS. 0 follows the refresh rate of the monitor showing the game.
+    "dynamicExperimental56": false,          // Let Dynamic mode go up to 5x and 6x (needs plenty of VRAM). Off: Dynamic stays at 4x or less.
+    "overrideAutoFrameGeneration": true,     // Only when mode is game. When the game asks for DLSS-G Auto mode, NVIDIA keeps judging whether frame generation is worth it and can switch it off by itself in heavy scenes while the menu shows it on. true (default): RTX Encore asks for On instead, so it stays on while the game wants it (short pauses remain when the game stops providing its inputs: menus, cutscenes). false: Auto is forwarded as is. Fixed and dynamic modes already ask for On or Dynamic. Applies live.
+    "flipMeteringBypass": "auto",            // Flip metering bypass (D3D12 and Vulkan): auto (default), true or false. true: Streamline paces the generated frames itself instead of NVIDIA's flip metering; try it when X3 or X4 looks choppy while X2 is smooth. false: NVIDIA's flip metering. auto: RTX Encore measures how the generated frames reach the driver at X3 and above and learns for this game which one to use (flipMeteringLearned). Restart the game to apply.
+    "flipMeteringLearned": "",               // Written by RTX Encore when flipMeteringBypass is auto: bypass (the driver sent the generated frames in bursts: Streamline paces them) or metering (Streamline paced them unevenly: NVIDIA's flip metering is kept, for good). Empty: nothing learned yet, NVIDIA's flip metering is used. Applies at the next start; empty it to measure again.
+    "frameGenerationWithoutGameFg": false    // Off by default; also in the menu (Frame rate > Frame generation, "Frame generation for games without frame generation") in games that ship no frame generation. Frame generation from the displayed image, with the depth and motion of the games-without-DLSS route, X2 when mode is game, the multiplier when mode is fixed, up to what the loaded components allow. frameGenerationEngine decides the engine: game or dlss-fg run DLSS-G on Direct3D 12 and Vulkan (needs sl.interposer, sl.common, sl.dlss_g, sl.reflex, sl.pcl and nvngx_dlssg.dll of the qualified versions beside the game's executable; a Vulkan game waits up to 10 s at start for it); xefg runs XeSS-FG on Direct3D 12, Vulkan and Direct3D 11 (needs the Intel runtimes installed by Hub). Off with frameGenerationEngine xefg: a game without frame generation keeps its own swap chain, XeSS-FG stays out of it. The HUD is interpolated with the image. Turn NVIDIA Smooth Motion off. Restart the game to apply.
+  },
+  "smoothMotion": {
+    "smoothMotionEnabled": false,            // Driver Smooth Motion: RTX 40/50 use the native driver path from RTX Encore 1.4.5. RTX 20 uses D3D12 on NVIDIA 621.01 / 621.14. RTX 30/40/50 accept NVIDIA 621.14, 621.01, 620.12, 617.42, 617.14, 616.92, 616.64 or 591.86. Restart the game to apply.
+    "smoothMotionApi": "d3d12"               // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
+  },
+  "dlssSuperResolution": {
+    "dlssRenderScale": "game",               // Force the DLSS render resolution: game, dlaa, ultra (75 percent), quality, balanced, performance, ultra-performance or custom. The game must use DLSS already.
+    "dlssCustomScale": 67,                   // Render scale in percent (50 to 100) when dlssRenderScale is custom.
+    "presentOpticalFlow": "game",            // game prefers tagged game vectors for added frame generation and NR Final image (default), with encore as fallback. encore uses RTX Encore's shaders, shader uses vort_Motion, and quality or fast uses NVIDIA Optical Flow.
+    "dlssWithoutGameDlssOutput": "game",     // game: DLAA at the game's resolution. screen: choose a lower resolution and windowed mode in the game; the window becomes borderless over the screen, the swap chain gets the screen's size and DLSS upscales to it (from the next resolution change or restart). Unity games: windowed, not fullscreen window, which scales the image itself.
+    "dlssWithoutGameDlss": false,            // DLSS for games that ship none: DLAA on the displayed image, with motion from NVIDIA Optical Flow and the depth buffer the game draws with, before NR or alone. Uses the SR model preset; needs nvngx_dlss.dll beside the game or the mod. Experimental: Direct3D 11, Direct3D 12 and Vulkan.
+    "dlssWithoutGameDlssEngine": "dlss",     // fsr1: AMD FidelityFX Super Resolution 1; nis: NVIDIA Image Scaling. Spatial upscaling on compatible Direct3D 11/12 and Vulkan paths supports SDR and HDR, the same aspect ratio and a strict upscale up to 2x per axis. Choose a lower windowed resolution in the game. No depth, motion or history. dlss (default) or xess: the upscaler of dlssWithoutGameDlss. xess: Intel XeSS Super Resolution instead of DLSS, from 1x (native anti-aliasing) to 3x, beyond which the game's image is shown stretched; needs the Intel runtimes installed by Hub. xessTensorCores is experimental on the present route in Direct3D 11, Direct3D 12 and Vulkan. Applied live.
+    "fastSuperResolution": false             // RTX 30 only, Direct3D 12: faster DLSS Super Resolution for presets L and M. The image is very close to NVIDIA's but not identical. Off by default. Restart the game to apply.
+  },
+  "superResolutionInputs": {
+    "srHdr": "game",                         // SR/DLAA input color mode: game (follow the game), on (HDR linear input) or off (LDR input). Applies to the selected reconstruction engine. Does not enable display HDR or convert colors. RR/FG unchanged. Restart to apply.
+    "srAutoExposure": "game"                 // SR/DLAA auto exposure: game (follow the game), on or off. Applies to the selected reconstruction engine. DLSS models may impose auto exposure (preset L). XeSS auto exposure has a GPU cost and is not recommended for LDR; Vulkan LDR manual exposure remains refused. Unsupported XeSS initialization retains the original provider. RR/FG unchanged. Restart to apply.
+  },
+  "superResolutionSharpening": {
+    "spatialSharpness": 30,                  // NIS spatial sharpness, 0 to 100, default 30. Applied live.
+    "spatialAa": "off",                      // Optional AA around NIS: off (default), smaa (SMAA 1x), fxaa (FXAA 3.11). Live. Color-only SDR; HUD is included.
+    "spatialAaPlacement": "before",          // AA placement around NIS: before (default, source resolution) or after (output resolution). Live; NR Post and FG remain after AA.
+    "spatialAaQuality": "high",              // SMAA 1x preset: low, medium, high (default), ultra. Search quality, not sample count. FXAA uses fixed PC Quality preset 29.
+    "spatialDiagnostics": false,             // Opt-in asynchronous GPU timestamps for NIS and its output pass. Off by default.
+    "srSharpening": "off",                   // off (default), game (use the game's own sharpness value) or custom. Applied live.
+    "srSharpness": 30                        // Strength in percent (0 to 100) when srSharpening is custom. Applied live.
+  },
+  "dlssPresets": {
+    "dlssSrPreset": "game",                  // SR preset: game (no override), default, a-f (legacy), j, k, l or m. Applies to all quality modes; supported models depend on the DLSS DLL. Applied live: the upscaler is re-created with the new preset.
+    "dlssRrPreset": "game",                  // RR preset: game (no override), default, a-c (legacy), d, e or f (RR2, nvngx_dlssd 310.9.1+). Does not enable RR. Driver/model selection may override SR/RR hints. Applied live: RR is re-created with the new preset.
+    "dlssFgPreset": "game",                  // FG preset: game (no override), a, b or c. A/B use Normal; C automatically enables Lite (faster, with image-quality trade-offs) and needs 310.9.16.0. Fast frame generation remains independent for every preset. Qualified NVIDIA releases 310.6.0.0, 310.7.0.0, 310.7.128.0, 310.7.129.0, 310.8.0.0, 310.9.0.0, 310.9.1.0 and 310.9.16.0; unknown binaries are untouched and logged. B needs compatible HUD-less/UI inputs. Lite keeps NVIDIA's native image policy: frameProtection, protectionTuning and UI recomposition are unavailable. No driver-profile writes. Restart to apply.
+    "dlssFgLite": "game",                    // Diagnostic-only JSON override; not shown as a menu setting. Leave game to follow the preset (A/B Normal, C Lite) or the game/driver. Only for diagnostics with qualified 310.9.16.0: off forces Normal, on forces Lite, taking priority over the preset. Restart to apply.
+    "dlssNrPreset": "b"                      // NR preset, the NVIDIA network of nvngx_dlssnr.dll 310.9.16: b (default; smaller, much faster), a (the larger network of 310.8.0) or auto (the DLL's choice, b). 310.8.0 has one network: every value runs it. Applied live.
+  },
+  "nativeMenuFeatures": {
+    "reflexMode": "game",                    // Reflex mode: game (default), on or on-boost, never lower than the game. Suspended in Dynamic and while XeLL owns latency. Accepted means submitted successfully, not verified driver behavior. Check the latency report; no gain is guaranteed.
+    "reflexFrameLimit": 0,                   // Frame limit request, 1-1000 FPS; 0 removes Encore's cap. The game engine applies it through Reflex (0 restores game settings); XeSS-FG applies it through XeLL at context creation, so changes need a restart. Generated frames may count toward the limit. This is not measured source cadence.
+    "vsync": "game",                         // V-Sync request on the game's own DXGI Present: game (unchanged), off (interval 0) or on (interval 1, tearing flag removed). Driver overrides keep priority; TEST/nested presents and XeSS-FG presentation are preserved. On can add latency with high multipliers on low refresh rates.
+    "hairEnabled": true                      // Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change.
+  },
+  "neuralRendering": {
+    "core": {                                // Activation, engine and NR scaler: the main quality/performance controls.
+      "nrEnabled": false,                    // Enables Neural Rendering at the requested nrPlacement. Needs NVIDIA's nvngx_dlssnr.dll 310.8.0 or 310.9.16. The first launch prepares it in the background.
+      "nrWithoutGameDlss": false,            // Experimental Post-SR route for games without DLSS. Uses the displayed image including the HUD, motion estimated from it and game depth when available. Direct3D 11, Direct3D 12 and Vulkan.
+      "nrPlacement": "after-sr",             // after-sr (default) enhances the reconstructed image. before-sr enhances the render input before DLSS SR and requires uniform input. present enhances the image submitted for display, including any HUD already drawn. Present is experimental and independent of nrWithoutGameDlss. Requires compatible Direct3D 11 or 12 with game DLSS, supported SDR or HDR10/scRGB output and, if enabled, a supported frame generation setup. Disable added upscaling, Smooth Motion, foveation and padding-aware sizing.
+      "nrPasses": 1,                         // Independent temporal NR passes, 1 to 4. Cost and VRAM grow. Only a complete chain is published.
+      "nrLaterPassLocalTone": 0,             // Tone applied after pass one, 0 to 2. Default zero avoids repeated tone accumulation.
+      "nrResolution": "render",              // render, output, quality (67 percent of output), balanced (58), performance (50), ultra-performance (33) or custom. Pre-SR always uses render size. Present uses output size for render when the game's render size is unavailable.
+      "nrResolutionScale": 67                // Percent of the output size (33 to 100) when nrResolution is custom. Kept while Pre-SR is selected.
+    },
+    "appearance": {                          // Artistic controls applied live.
+      "nrIntensity": 1,                      // Strength of the effect, 0 to 2.
+      "nrStyle": 0,                          // Image style: 0 default (the runtime decides), 1 natural, 2 cinematic. Independent of the model profile.
+      "nrLocalTone": 1,                      // Local tone strength, 0 to 2.
+      "nrLocalStructure": 1,                 // Local structure strength, 0 to 2.
+      "nrAutoMask": false,                   // Character mask: lets the model treat skin separately (needed for nrSkinStructure).
+      "nrSkinStructure": 1,                  // Skin structure strength, 0 to 2. Only read with nrAutoMask.
+      "nrHdrExposure": 1,                    // HDR games: brightness given to the model (scene-linear output only).
+      "nrExposureMode": "auto"               // HDR DLSS exposure: game (legacy), auto, measured or manual. Existing files without this key use game.
+    },
+    "passStyles": {                          // Per-pass artistic styles. inherit follows nrStyle, including after a global edit. Applied live with a punctual history reset when the active chain changes.
+      "nrPass1Style": "inherit",             // inherit (default), default, natural or cinematic. Independent of the NVIDIA model profile. Invalid active styles preserve SR.
+      "nrPass2Style": "inherit",             // Style for pass 2, using the global style when inherit. Stored while inactive. Later-pass tone remains nrLaterPassLocalTone.
+      "nrPass3Style": "inherit",             // Style for pass 3: inherit, default, natural or cinematic. Stored while inactive; does not change active history until used.
+      "nrPass4Style": "inherit"              // Style for pass 4: inherit, default, natural or cinematic. Only the complete requested chain is used.
+    },
+    "passModels": {                          // Pre-SR only: independent model profiles for each pass. inherit follows dlssNrPreset. Inactive overrides remain stored. Older one-network runtimes use that network for every valid profile.
+      "nrPass1Preset": "inherit",            // Pass 1 model: inherit, auto, a or b. Separate from artistic style.
+      "nrPass2Preset": "inherit",            // Pass 2 model: inherit, auto, a or b.
+      "nrPass3Preset": "inherit",            // Pass 3 model: inherit, auto, a or b.
+      "nrPass4Preset": "inherit"             // Pass 4 model: inherit, auto, a or b. Invalid active profiles retain original SR.
+    },
+    "passTuning": {                          // Per-pass artistic overrides. Each field defaults to inherit; finite numeric values are 0 to 2 and AutoMask is boolean. Invalid active values preserve SR. Intensity at 0 still evaluates the pass and does not remove its cost.
+      "nrPass1Intensity": "inherit",         // Pass 1 intensity override: inherit or 0 to 2. 1 is normal strength; 0 still evaluates NR.
+      "nrPass1LocalStructure": "inherit",    // Pass 1 local structure override: inherit or 0 to 2.
+      "nrPass1LocalTone": "inherit",         // Pass 1 local tone override: inherit or 0 to 2.
+      "nrPass1SkinStructure": "inherit",     // Pass 1 skin structure override: inherit or 0 to 2.
+      "nrPass1AutoMask": "inherit",          // Pass 1 automatic mask override: inherit, true or false.
+      "nrPass2Intensity": "inherit",         // Pass 2 intensity override: inherit or 0 to 2. 1 is normal strength; 0 still evaluates NR.
+      "nrPass2LocalStructure": "inherit",    // Pass 2 local structure override: inherit or 0 to 2.
+      "nrPass2LocalTone": "inherit",         // Pass 2 local tone override: inherit or 0 to 2. Inherits nrLaterPassLocalTone.
+      "nrPass2SkinStructure": "inherit",     // Pass 2 skin structure override: inherit or 0 to 2.
+      "nrPass2AutoMask": "inherit",          // Pass 2 automatic mask override: inherit, true or false.
+      "nrPass3Intensity": "inherit",         // Pass 3 intensity override: inherit or 0 to 2. 1 is normal strength; 0 still evaluates NR.
+      "nrPass3LocalStructure": "inherit",    // Pass 3 local structure override: inherit or 0 to 2.
+      "nrPass3LocalTone": "inherit",         // Pass 3 local tone override: inherit or 0 to 2. Inherits nrLaterPassLocalTone.
+      "nrPass3SkinStructure": "inherit",     // Pass 3 skin structure override: inherit or 0 to 2.
+      "nrPass3AutoMask": "inherit",          // Pass 3 automatic mask override: inherit, true or false.
+      "nrPass4Intensity": "inherit",         // Pass 4 intensity override: inherit or 0 to 2. 1 is normal strength; 0 still evaluates NR.
+      "nrPass4LocalStructure": "inherit",    // Pass 4 local structure override: inherit or 0 to 2.
+      "nrPass4LocalTone": "inherit",         // Pass 4 local tone override: inherit or 0 to 2. Inherits nrLaterPassLocalTone.
+      "nrPass4SkinStructure": "inherit",     // Pass 4 skin structure override: inherit or 0 to 2.
+      "nrPass4AutoMask": "inherit"           // Pass 4 automatic mask override: inherit, true or false.
+    },
+    "optimizations": {                       // NVIDIA engine speed options; restart to apply.
+      "nrPrecision": "exact",                // RTX 20/30: exact (same output as NVIDIA) or fast (quicker, small image differences). Gain and image differences vary by scene. No effect on RTX 40/50. Restart the game to apply.
+      "nrFastProcessing": true               // Faster NR processing with the same output bit for bit. Restart the game to apply.
+    },
+    "experimental": {                        // Optional size and scheduling experiments; disabled by default.
+      "nrFoveation": false,                  // Foveated NR. Softer image edges for speed. Off by default; applied live.
+      "nrFoveaPreset": "balanced",           // Foveated NR preset: light, balanced, strong or custom. Custom uses the four values below.
+      "nrFoveaWidth": 55,                    // Full-density centre width, 1 to 100 percent.
+      "nrFoveaHeight": 55,                   // Full-density centre height, 1 to 100 percent.
+      "nrFoveaFalloff": 8,                   // Transition length per side, 0 to 100 percent.
+      "nrFoveaEdge": 50,                     // Edge density per axis, 25 to 100 percent of nrResolution.
+      "nrPaddingAware": false,               // Optionally reduce NR's requested dimensions by up to 2 percent per axis to avoid model padding. May change the NR image; applied live. Does not change DLSS-SR render size.
+      "nrMaxInFlight": 0                     // Experimental D3D12 NR run-ahead limit: 0 baseline, 1 or 2 outstanding NR evaluations. Waits before Reflex sleep; active FG uses at least 2 to retain producer overlap. Same NR image and model; applied live.
+    },
+    "advanced": {                            // Model compatibility.
+      "nrUiCorrection": false                // Model UI correction.
+    }
+  },
+  "overlay": {
+    "showOverlay": false,                    // Show the in-game multiplier and FPS overlay.
+    "overlayPosition": "top-left",           // top-left, top-right, bottom-left or bottom-right.
+    "overlayFontSize": 14,                   // Overlay text size in pixels: 10 to 32.
+    "overlayStyle": "card",                  // minimal, card, dashboard or legacy.
+    "overlayLabels": true,                   // Show metric names; independent of units.
+    "overlayUnits": true,                    // Show units. Disable names and units for raw values.
+    "overlayOpacity": 75,                    // HUD background opacity, 0 to 100 percent.
+    "overlayGraph": false,                   // Graph of measured source Present intervals, not GPU time or scanout.
+    "metrics": {
+      "overlayShowFps": true,                // Output FPS derived from source FPS and observed FG factor; Smooth Motion is a nominal estimate.
+      "overlayShowSourceFps": true,          // Rendered source FPS.
+      "overlayShowGpuLoad": false,           // NVIDIA GPU utilization; unavailable sensors show --.
+      "overlayShowGpuTemperature": false,    // NVIDIA GPU temperature.
+      "overlayShowGpuPower": false,          // NVIDIA GPU board power.
+      "overlayShowGpuClock": false,          // NVIDIA graphics clock.
+      "overlayShowGpuMemoryClock": false,    // NVIDIA memory clock.
+      "overlayShowCpu": false,               // Whole-system CPU utilization, not one core.
+      "overlayShowRam": false,               // Physical RAM used / total, whole system.
+      "overlayShowNr": false,                // Extra line when DLSS Neural Rendering is on: its state and the size it runs at.
+      "overlayShowFramePacing": false,       // Source presentation intervals: average, 99th percentile and jitter.
+      "overlayShowLatency": false,           // Extra line: latency report of the engine that owns latency, for rendered frames. NVIDIA Reflex: PCL from simulation start to GPU render end, with the render queue and GPU time. XeLL (XeSS-FG): simulation start to the end of the Present call. Not display latency; generated frames are not timed.
+      "overlayShowGpu": false,               // Legacy GPU bundle: inherited only by individual GPU switches absent from an older file.
+      "overlayShowVram": false,              // Extra line: VRAM used / total on the GPU (all processes).
+      "overlayShowVersions": false           // Extra line: active SR and FG engine versions; RR, NR and Streamline loaded-runtime versions.
+    },
+    "diagnostics": {
+      "overlayShowUiRecomposition": false,   // Extra line: whether DLSS-G UI recomposition (UIR) is on.
+      "overlayShowHudless": false,           // Extra line: where the HUD-less scene comes from (game, UI assist capture or none).
+      "overlayShowUiAlpha": false,           // Extra line: where the UI alpha comes from (game, UI assist injection or none).
+      "overlayShowDebug": false              // Extra line: mode, generated-frame ceiling, Dynamic pacer, last Streamline result, route.
+    }
+  },
+  "imageQuality": {
+    "highMultiplierQuality": true,           // Keeps generated frames clean from 3x to 6x. Leave on. Restart the game to apply.
+    "frameProtection": true,                 // Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). No effect with Lite composition. Restart the game to apply.
+    "fastFrameGeneration": true,             // Lowers the GPU cost of each generated frame, same image. Independent of the FG preset: applies to A/B Normal and C Lite using the optimizations available for each path. Restart the game to apply.
+    "protectionTuning": "refined"            // Protection tuning: refined (default) or classic. Restart the game to apply.
+  },
+  "hudUi": {
+    "autoUiRecomposition": true,             // Turn UI recomposition on when compatible HUD-less inputs are available without the game asking for it. False follows the game. No Man's Sky: use false to avoid generated-frame duplication. See docs/COMPATIBILITY.md.
+    "uiAssist": true,                        // D3D12: capture the HUD-less scene and build the UI layer when the game does not tag them.
+    "forceUiRecomposition": false            // Ask DLSS-G to recompose the HUD separately even when the game does not request it.
+  },
+  "general": {
+    "gpuSeries": "auto"                      // auto, rtx40, rtx30 or rtx20. Leave on auto unless detection fails. Restart the game to apply.
+  },
+  "compatibility": {
+    "disableMenuDetection": false,           // Keep frame generation running in menus and loading screens. Leave false: idling at 1x there avoids device-hang crashes.
+    "disableInGameMenu": false,              // Do not attach the RTX Encore in-game menu, for games that reject it (Star Wars Outlaws). Frame generation keeps working; change settings in this file or with RTX Encore Hub. Restart the game to apply.
+    "forceOTA": false,                       // Use the newest Frame Generation, Super Resolution, Ray Reconstruction and Neural Rendering models the NVIDIA App downloaded when they are newer than the game's, and let Streamline use its downloaded plugins. Nothing is written to disk. Restart the game to apply.
+    "disableMvDilation": false               // Legacy experiment: declare the motion vectors as already dilated. Leave false.
+  },
+  "diagnostics": {
+    "logGraphics": false,                    // Trace graphics creation, COM interface upgrades, swapchain lifetime, initial presentation, resize and XeSS-FG runtime events. Applied live; enable before launch for startup crashes.
+    "logStreamline": false,                  // Extra verbose Streamline and NGX messages. Basic messages and failure reasons are logged automatically. Restart required; disable and restart after collecting the log. May reduce performance.
+    "logDxgiWrappers": false,                // Record every call the game makes on the in-game menu's DXGI factory and swap chain, with the calling module, in the session log and in the exception log. For crashes after the menu attaches. Restart required.
+    "crashDetails": false,                   // Exception logs add the memory each register points to and the raw stack; a fault in the game or in RTX Encore also leaves a minidump (.dmp, up to two per session, often tens of MB) in rtx-encore-logs. For crash reports. Restart required.
+    "logPerformance": false,                 // Write FPS and frame times to rtx-encore_perf.csv, plus one GPU/power diagnostic sample per second in the session log (rtx-encore-logs), with the Reflex or XeLL latency report.
+    "logNr": false,                          // DLSS Neural Rendering: log what DLSS gives each frame and what NR does (10 frames after enabling, then every 300). Applied live.
+    "profileNrGpu": false,                   // Record NR GPU timestamps and source-frame waits to rtx-encore_nr.csv. The files are in rtx-encore-logs. Optional diagnostics; applied live.
+    "profileFrameGpu": false,                // Direct3D 12: record the GPU time of each DLSS Super Resolution, Ray Reconstruction and Frame Generation evaluation to rtx-encore_frames_<pid>.jsonl in rtx-encore-logs. GPU work time only, not displayed FPS or latency. Optional diagnostics; applied live.
+    "logNgxFrameGeneration": false,          // Trace D3D12 NGX feature creation, FG evaluations and DXGI presentation boundaries in the session log. CPU observations only, not displayed FPS. Restart after enabling for complete handle tracking. Off by default; disable after testing.
+    "logNativeFrameGeneration": false,       // Observe native XeSS-FG inputs and public FFX descriptor headers on qualified runtimes. Does not replace frame generation. Off by default; enable before launch and disable after capture.
+    "srCapture": false,                      // Optional diagnostics, applied live. Native D3D12 DLSS: srCaptureFrames input frames to rtx-encore-captures/sr/<game>. D3D11 Present upscaling: one same-frame source/output pair to rtx-encore-captures/present on enable and each hotkeySrCapture press (before FG, UI included). No capture while false.
+    "srCaptureFrames": 96,                   // Frames per srCapture burst: 8 to 512.
+    "logHudUi": false,                       // Trace game HUD-less copies, D3D12 barrier steps and XeSS-FG HUD/UI decisions. Logging never enables composition modes. Applied live.
+    "logMotionTracing": false,               // Very verbose motion-vector diagnostics, for debugging only.
+    "logFilesKept": 3                        // Logs kept in rtx-encore-logs: 1 to 100 sessions plus the same number of exception logs. Active files are preserved. Older closed files are deleted at startup.
+  },
+  "keyboardShortcuts": {
+    "hotkeyFixed2": "Ctrl+Alt+2, Ctrl+Alt+Num2", // Combinations such as Ctrl+Alt+4 or Ctrl+Shift+F5; several separated by commas; empty disables the action.
+    "hotkeyFixed3": "Ctrl+Alt+3, Ctrl+Alt+Num3",
+    "hotkeyFixed4": "Ctrl+Alt+4, Ctrl+Alt+Num4",
+    "hotkeyFixed5": "Ctrl+Alt+5, Ctrl+Alt+Num5",
+    "hotkeyFixed6": "Ctrl+Alt+6, Ctrl+Alt+Num6",
+    "hotkeyMultiplierUp": "Ctrl+Alt+PageUp",
+    "hotkeyMultiplierDown": "Ctrl+Alt+PageDown",
+    "hotkeyToggleDynamic": "Ctrl+Alt+D",
+    "hotkeyTargetFpsUp": "Ctrl+Alt+Up, Ctrl+Alt+Plus, Ctrl+Alt+NumAdd",
+    "hotkeyTargetFpsDown": "Ctrl+Alt+Down, Ctrl+Alt+Minus, Ctrl+Alt+NumSubtract",
+    "hotkeyGameMode": "Ctrl+Alt+G",
+    "hotkeyOverlay": "Ctrl+Alt+O",
+    "hotkeyOverlayPosition": "Ctrl+Alt+P",
+    "hotkeySrCapture": "Ctrl+Alt+F9",
+    "hotkeyToggleNr": "Ctrl+Alt+N",
+    "disableKeybinds": false                 // Legacy JSON-only switch: disable all shortcuts. Intentionally not exposed in the menu.
+  }
+}

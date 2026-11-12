@@ -42,6 +42,7 @@ ALLOWED = {
     'tools/build_game_names.py', 'docs/game-names.md', 'cloud/game-names.json',
     'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tools/build_scheme_bundles.py',
     'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json',
+    'tests/fixtures/encore-2.3.0.jsonc',
     '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md',
     'community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore',
     'community/wrangler.example.jsonc', 'community/README.md', 'cloud/help.json',

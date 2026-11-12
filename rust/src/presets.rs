@@ -102,6 +102,12 @@ pub fn policy_for_version(
             .into(),
         );
     }
+    if policy.parameter_profile == crate::encore::PROFILE && version.is_some() {
+        let defaults = crate::encore::defaults_for_version(version);
+        for key in ["presentOpticalFlow", "nrExposureMode"] {
+            policy.defaults.insert(key.into(), defaults[key].clone());
+        }
+    }
     if crate::upstream040::is_profile(&policy.parameter_profile) && version.is_some() {
         let profile = crate::upstream040::profile_for_version(version);
         if policy.parameter_profile != profile {

@@ -29,7 +29,9 @@ The Linux workflow produces a temporary CI artifact only. It never signs or
 publishes a release and cannot modify update manifests. Windows regressions still
 run independently in `build.yml`; do not skip them when maintaining this port.
 
-The manager is a Windows x64 Rust/GPUI application. A normal build does not require Python, CUDA, Vulkan or NGX SDKs, game files, or the historical `development/` tree. It does require the native Windows compiler and SDK used by GPUI and Windows resources.
+## Windows x64
+
+The Windows build is a Rust/GPUI application. A normal build does not require Python, CUDA, Vulkan or NGX SDKs, game files, or the historical `development/` tree. It does require the native Windows compiler and SDK used by GPUI and Windows resources.
 
 管理器采用 Rust/GPUI。普通编译不依赖 Python、CUDA、Vulkan/NGX SDK、游戏文件或历史开发目录；需要 Visual Studio C++ 生成工具和 Windows SDK。
 

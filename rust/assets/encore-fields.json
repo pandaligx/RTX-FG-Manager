@@ -726,7 +726,7 @@
     "dependencies": [
       "nrEnabled=1"
     ],
-    "help": "HDR输入亮度，默认1；上游未公开稳定范围，通常保留默认。",
+    "help": "兼容场景线性输入的 HDR 曝光倍率，默认 1；2.3.0 可通过 NR 曝光模式选择曝光来源。",
     "optional": false,
     "source_help": "HDR games: brightness given to the model (scene-linear output only)."
   },
@@ -2957,7 +2957,7 @@
       "frameGenerationEngine=xefg",
       "xefgMfg4VariablePacing=1"
     ],
-    "help": "XeFG 3X 及以上：以自适应节奏启动游戏源帧，改善镜头运动平顺性，可能降低少量原生 FPS；即时生效，2X 不受影响。",
+    "help": "XeFG 3X 及以上：只在持续不均匀的源帧间隔出现时尝试校正；正常节奏不限制，2X 不受影响。",
     "optional": true,
     "since": "2.1.0"
   },
@@ -3793,13 +3793,18 @@
       {
         "value": "before-sr",
         "label": "Pre-SR（实验）"
+      },
+      {
+        "value": "present",
+        "label": "Final image（最终画面）",
+        "since": "2.3.0"
       }
     ],
     "restart": false,
     "dependencies": [
       "nrEnabled=1"
     ],
-    "help": "Pre-SR 仅支持普通 DLSS SR、均匀渲染尺寸；不支持 RR、DLAA、中央优先、避开填充和抖动运动输入。不满足条件时保留原始超分画面。",
+    "help": "Final image 在后处理后、帧生成前处理兼容画面；Vulkan 切换后需重启。Pre-SR 为实验路径，不支持 RR/DLAA。是否生效以游戏菜单为准。",
     "optional": true,
     "since": "1.4.0"
   },
@@ -4179,13 +4184,18 @@
         "value": "nis",
         "label": "NIS",
         "since": "2.2.0"
+      },
+      {
+        "value": "fsr1",
+        "label": "FSR 1",
+        "since": "2.3.0"
       }
     ],
     "restart": true,
     "dependencies": [
       "dlssWithoutGameDlss=1"
     ],
-    "help": "DLSS 或 XeSS；2.2.0 起可选择无需额外运行库的 NIS 空间缩放。不代表游戏拥有原生 DLSS 输入。",
+    "help": "NIS / FSR 1 无需额外运行库；游戏需使用较低的窗口分辨率、相同宽高比，每轴严格放大且不超过 2 倍。",
     "optional": true,
     "since": "2.0.0"
   },
@@ -4225,7 +4235,7 @@
       "dlssSuperResolution",
       "presentOpticalFlow"
     ],
-    "label": "无 DLSS 游戏的运动估计",
+    "label": "运动矢量来源",
     "group": "image",
     "kind": "choice",
     "default": "encore",
@@ -4247,11 +4257,16 @@
       {
         "value": "fast",
         "label": "Optical Flow (Fast)"
+      },
+      {
+        "value": "game",
+        "label": "游戏运动矢量",
+        "since": "2.3.0"
       }
     ],
     "restart": false,
     "dependencies": [],
-    "help": "实验性：仅用于原生不带 DLSS 的游戏，默认关闭。界面文字也会参与处理；以游戏内 Insert 菜单的实际状态为准。",
+    "help": "用于新增帧生成与 Final image NR。2.3.0 默认优先游戏运动矢量，不可用时回退 RTX Encore 估计；保留已有选择。",
     "optional": true,
     "since": "2.0.0"
   },
@@ -4320,7 +4335,7 @@
       "superResolutionSharpening",
       "spatialSharpness"
     ],
-    "label": "NIS 锐化强度",
+    "label": "空间缩放锐化",
     "group": "image",
     "kind": "integer",
     "default": "30",
@@ -4332,7 +4347,7 @@
       "dlssWithoutGameDlss=1",
       "dlssWithoutGameDlssEngine=nis"
     ],
-    "help": "NIS 锐化强度，0–100%。",
+    "help": "NIS / FSR 1 锐化强度，0–100%，即时生效。",
     "optional": true,
     "since": "2.2.0"
   },
@@ -4342,7 +4357,7 @@
       "superResolutionSharpening",
       "spatialAa"
     ],
-    "label": "NIS 抗锯齿",
+    "label": "空间缩放抗锯齿",
     "group": "image",
     "kind": "choice",
     "default": "off",
@@ -4367,7 +4382,7 @@
       "dlssWithoutGameDlss=1",
       "dlssWithoutGameDlssEngine=nis"
     ],
-    "help": "仅处理 SDR 颜色，包含界面；无需额外运行库。",
+    "help": "NIS / FSR 1：仅限 DirectX 11 SDR，包含游戏界面；无需额外运行库。",
     "optional": true,
     "since": "2.2.0"
   },
@@ -4386,11 +4401,11 @@
     "choices": [
       {
         "value": "before",
-        "label": "NIS 之前"
+        "label": "缩放前"
       },
       {
         "value": "after",
-        "label": "NIS 之后"
+        "label": "缩放后"
       }
     ],
     "restart": false,
@@ -4398,7 +4413,7 @@
       "dlssWithoutGameDlss=1",
       "dlssWithoutGameDlssEngine=nis"
     ],
-    "help": "在 NIS 前按输入分辨率处理，或在 NIS 后按输出分辨率处理。",
+    "help": "在 NIS / FSR 1 之前按输入分辨率处理，或之后按输出分辨率处理。",
     "optional": true,
     "since": "2.2.0"
   },
@@ -4724,5 +4739,148 @@
     "help": "叠加层背景不透明度，0–100%。",
     "optional": true,
     "since": "2.2.0"
+  },
+  {
+    "key": "xefgSourcePacingMode",
+    "path": [
+      "xefg",
+      "xefgSourcePacingMode"
+    ],
+    "label": "XeFG 节奏模式",
+    "group": "frames",
+    "kind": "choice",
+    "default": "auto",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "auto",
+        "label": "自动"
+      },
+      {
+        "value": "manual",
+        "label": "手动"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "frameGenerationEngine=xefg",
+      "xefgSourcePacing=1",
+      "xefgMfg4VariablePacing=1"
+    ],
+    "help": "自动模式最多使用 4% 源帧率损失预算；手动模式可调整预算和检测。即时生效。",
+    "optional": true,
+    "since": "2.3.0"
+  },
+  {
+    "key": "xefgSourcePacingLossPercent",
+    "path": [
+      "xefg",
+      "xefgSourcePacingLossPercent"
+    ],
+    "label": "源帧率损失预算 (%)",
+    "group": "frames",
+    "kind": "integer",
+    "default": "4",
+    "min": 0,
+    "max": 30,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "frameGenerationEngine=xefg",
+      "xefgSourcePacing=1",
+      "xefgMfg4VariablePacing=1",
+      "xefgSourcePacingMode=manual"
+    ],
+    "help": "范围 0–30%。开启自动调整时是上限，不会固定损失该比例；关闭后使用完整预算保持节奏。",
+    "optional": true,
+    "since": "2.3.0"
+  },
+  {
+    "key": "xefgSourcePacingManualDetection",
+    "path": [
+      "xefg",
+      "xefgSourcePacingManualDetection"
+    ],
+    "label": "检测不均匀节奏",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "frameGenerationEngine=xefg",
+      "xefgSourcePacing=1",
+      "xefgMfg4VariablePacing=1",
+      "xefgSourcePacingMode=manual"
+    ],
+    "help": "开启时等待持续不均匀的帧间隔；关闭时校准后即介入。",
+    "optional": true,
+    "since": "2.3.0"
+  },
+  {
+    "key": "xefgSourcePacingManualAdjustments",
+    "path": [
+      "xefg",
+      "xefgSourcePacingManualAdjustments"
+    ],
+    "label": "自动调整校正",
+    "group": "frames",
+    "kind": "bool",
+    "default": "1",
+    "min": null,
+    "max": null,
+    "choices": [],
+    "restart": false,
+    "dependencies": [
+      "frameGenerationEngine=xefg",
+      "xefgSourcePacing=1",
+      "xefgMfg4VariablePacing=1",
+      "xefgSourcePacingMode=manual"
+    ],
+    "help": "保留改善检查并逐步放松约束；关闭后保持完整预算，直到设置或运行环境变化。",
+    "optional": true,
+    "since": "2.3.0"
+  },
+  {
+    "key": "nrExposureMode",
+    "path": [
+      "neuralRendering",
+      "appearance",
+      "nrExposureMode"
+    ],
+    "label": "NR 曝光模式",
+    "group": "image",
+    "kind": "choice",
+    "default": "game",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "game",
+        "label": "跟随游戏"
+      },
+      {
+        "value": "auto",
+        "label": "自动"
+      },
+      {
+        "value": "measured",
+        "label": "测量"
+      },
+      {
+        "value": "manual",
+        "label": "手动"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1"
+    ],
+    "help": "适用于兼容的场景线性 DLSS 输入。新安装默认自动；旧配置缺少此项时保持游戏曝光。",
+    "optional": true,
+    "since": "2.3.0"
   }
 ]

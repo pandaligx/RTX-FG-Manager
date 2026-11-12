@@ -96,5 +96,7 @@
   "游戏已有原生帧生成，请使用原生引擎，不要开启新增帧生成": "This game has native frame generation. Use its native engine instead of adding frame generation.",
   "XeFG 3X 及以上：以自适应节奏启动游戏源帧，改善镜头运动平顺性，可能降低少量原生 FPS；即时生效，2X 不受影响。": "For XeFG 3X and higher: adaptively spaces source frames to improve camera motion. May cost a few native FPS. Applies live; 2X is unchanged.",
   "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起支持无 DLSS 游戏的 DX11/Vulkan，以及 DX11 原生 DLSS 替换；Vulkan 原生 DLSS 替换仍使用标准 XeSS。旧版仅支持 DX12；准备成功不代表实际启用。": "Experimental, off by default. Requires RTX 30/40/50 and a supported driver. Since 2.1.0: added SR in DX11/Vulkan and native DLSS replacement in DX11. Native Vulkan DLSS replacement keeps standard XeSS. Earlier versions require DX12. Successful preparation does not prove activation.",
-  "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起扩展到 DX11/Vulkan 无原生帧生成游戏；旧版仅支持 DX12。以游戏菜单中的实际激活状态为准。": "Experimental, off by default. Requires RTX 30/40/50 and a supported driver. Since 2.1.0: added FG in DX11/Vulkan; earlier versions require DX12. Check actual activation in the in-game menu."
+  "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起扩展到 DX11/Vulkan 无原生帧生成游戏；旧版仅支持 DX12。以游戏菜单中的实际激活状态为准。": "Experimental, off by default. Requires RTX 30/40/50 and a supported driver. Since 2.1.0: added FG in DX11/Vulkan; earlier versions require DX12. Check actual activation in the in-game menu.",
+  "检测到原生帧生成或文件冲突，新增 DLSS-G 暂不可用；保留原文件，可选择其他引擎。": "Native frame generation or a file conflict was detected. Added DLSS-G is unavailable; existing files are preserved. Choose another engine.",
+  "游戏已有原生帧生成；使用上方 DLSS 帧生成更新，无需添加第二套帧生成。": "The game already has native frame generation. Update DLSS frame generation above; do not add a second integration."
 }

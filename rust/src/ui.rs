@@ -2261,7 +2261,8 @@ impl Manager {
                         )
                     })
                     .when(
-                        context.profile == rtx_fg_manager::upstream040::PROFILE_041,
+                        context.profile == rtx_fg_manager::upstream040::PROFILE_041
+                            && (param.key != "fg_engine" || value == "XeSS"),
                         |d| {
                             d.when_some(rtx_fg_manager::upstream040::help(param.key), |d, help| {
                                 d.child(

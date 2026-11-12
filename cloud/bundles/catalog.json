@@ -2,11 +2,11 @@
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
     "bytes": 55241,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-87b4e476c7bcfcac6911.json",
-    "sha256": "cb2bdf5fc08b60ace73411261a11de23ae39970495683e8857564831792ac13d",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-87b4e476c7bcfcac6911.json"
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-adabe0caa032a775e193.json",
+    "sha256": "5b8fd7fca6f7f6f48ba145c1601f7fd50aa3ecc113b5ef2d06718490ab06797e",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-adabe0caa032a775e193.json"
   },
-  "revision": "bundles-87b4e476c7bcfcac6911",
+  "revision": "bundles-adabe0caa032a775e193",
   "schema": 3,
   "schemes": [
     {
@@ -98,7 +98,7 @@
     },
     {
       "archives": [
-        "rtx-encore-2.2.0-complete-6526ca77dd86.zip"
+        "rtx-encore-2.3.0-complete-8d42266ff443.zip"
       ],
       "capabilities": [
         "encore_dedicated_entries"
@@ -152,6 +152,7 @@
         "menuKey": "45",
         "nrAutoMask": "0",
         "nrEnabled": "0",
+        "nrExposureMode": "auto",
         "nrFastProcessing": "1",
         "nrFoveaEdge": "50",
         "nrFoveaFalloff": "8",
@@ -213,6 +214,7 @@
         "overlayShowUiRecomposition": "0",
         "overlayShowVersions": "0",
         "overlayShowVram": "0",
+        "presentOpticalFlow": "game",
         "profileNrGpu": "0",
         "protectionTuning": "refined",
         "reconstructionEngine": "game",
@@ -235,14 +237,14 @@
         "xefgUiHandling": "interpolate"
       },
       "id": "dlssg-transfusion-1.4.5.3",
-      "min_manager_version": "4.3.28",
-      "name": "RTX Encore · 2.2.0",
+      "min_manager_version": "4.3.31",
+      "name": "RTX Encore · 2.3.0",
       "names": {
-        "en": "RTX Encore · 2.2.0",
-        "ja": "RTX Encore · 2.2.0",
-        "ko": "RTX Encore · 2.2.0",
-        "ru": "RTX Encore · 2.2.0",
-        "zh": "RTX Encore · 2.2.0"
+        "en": "RTX Encore · 2.3.0",
+        "ja": "RTX Encore · 2.3.0",
+        "ko": "RTX Encore · 2.3.0",
+        "ru": "RTX Encore · 2.3.0",
+        "zh": "RTX Encore · 2.3.0"
       },
       "profile": "rtx_encore_json_v4",
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"

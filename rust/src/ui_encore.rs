@@ -49,6 +49,13 @@ impl AddedFeature {
             {
                 "nis"
             }
+            Self::Sr
+                if values
+                    .get("dlssWithoutGameDlssEngine")
+                    .is_some_and(|v| v == "fsr1") =>
+            {
+                "fsr1"
+            }
             Self::Sr => "dlss",
             Self::Fg
                 if values
@@ -218,6 +225,10 @@ impl EncoreEditor {
             {
                 choices.push(("nis", "NIS"));
             }
+            if matches!(feature, AddedFeature::Sr) && encore::supports_230(self.version.as_deref())
+            {
+                choices.push(("fsr1", "FSR 1"));
+            }
             let selected = feature.selected(values);
             let choice_label = choices
                 .iter()
@@ -252,7 +263,7 @@ impl EncoreEditor {
                 ""
             } else if installed.is_none_or(|s| s.installed == 0) {
                 "请先安装 Encore"
-            } else if selected == "nis" {
+            } else if matches!(selected.as_str(), "nis" | "fsr1") {
                 "无需额外运行库"
             } else if matches!(selected.as_str(), "xess" | "xefg") {
                 "随 Encore 提供"

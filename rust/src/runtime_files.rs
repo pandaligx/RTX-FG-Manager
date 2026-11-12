@@ -933,6 +933,15 @@ pub(crate) fn preflight_added_fg(
     );
     let prior = read(target, "encorefg")?;
     for p in &e.frame_integration_paths {
+        // Streamline SR/Reflex files alone do not establish native FG. The
+        // destination preflight below still refuses every unowned collision,
+        // including an existing interposer/common plugin beside the game EXE.
+        if p.file_name().is_some_and(|name| {
+            let name = name.to_string_lossy().to_ascii_lowercase();
+            name.starts_with("sl.") && name != "sl.dlss_g.dll"
+        }) {
+            continue;
+        }
         let own = prior.as_ref().and_then(|r| {
             r.entries
                 .iter()
@@ -940,7 +949,7 @@ pub(crate) fn preflight_added_fg(
         });
         ensure!(
             own.is_some_and(|entry| matches(p, &entry.installed).unwrap_or(false)),
-            "游戏已有原生帧生成或 Streamline；使用上方 DLSS 帧生成更新，无需添加第二套帧生成。"
+            "游戏已有原生帧生成；使用上方 DLSS 帧生成更新，无需添加第二套帧生成。"
         );
     }
     let directory = target.game_exe.parent().context("游戏目录无效")?;
@@ -2042,6 +2051,31 @@ mod tests {
         fs::copy(&s["sl.pcl.dll"], t.directory.join("sl.pcl.dll"))?;
         remove_locked(&t, "encorefg")?;
         assert!(ps.iter().all(|p| !p.exists()));
+        Ok(())
+    }
+    #[test]
+    fn streamline_sr_alone_is_not_native_fg_but_destination_collisions_are_protected() -> Result<()>
+    {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        fs::write(t.directory.join("sl.dlss.dll"), b"original SR integration")?;
+        assert!(preflight_added_fg(&t, None).is_ok());
+        fs::write(t.directory.join("sl.dlss_g.dll"), b"native FG integration")?;
+        assert!(preflight_added_fg(&t, None).is_err());
+        fs::remove_file(t.directory.join("sl.dlss_g.dll"))?;
+        fs::write(
+            t.directory.join("sl.common.dll"),
+            b"original common runtime",
+        )?;
+        assert!(preflight_added_fg(&t, None).is_err());
+        assert_eq!(
+            fs::read(t.directory.join("sl.common.dll"))?,
+            b"original common runtime"
+        );
+        assert_eq!(
+            fs::read(t.directory.join("sl.dlss.dll"))?,
+            b"original SR integration"
+        );
         Ok(())
     }
     #[test]

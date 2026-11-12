@@ -1,4 +1,6 @@
 {
+  "自动": ["Automatic", "Автоматически", "自動", "자동"],
+  "手动": ["Manual", "Вручную", "手動", "수동"],
   "运行库默认": [
     "Runtime default",
     "По умолчанию в библиотеке",
@@ -3154,5 +3156,167 @@
     "FXAA",
     "FXAA",
     "FXAA"
+  ],
+  "FSR 1": [
+    "FSR 1",
+    "FSR 1",
+    "FSR 1",
+    "FSR 1"
+  ],
+  "Final image（最终画面）": [
+    "Final image",
+    "Итоговое изображение",
+    "最終画像",
+    "최종 이미지"
+  ],
+  "游戏运动矢量": [
+    "Game motion vectors",
+    "Векторы движения игры",
+    "ゲームのモーションベクトル",
+    "게임 모션 벡터"
+  ],
+  "运动矢量来源": [
+    "Motion vector source",
+    "Источник векторов движения",
+    "モーションベクトルのソース",
+    "모션 벡터 소스"
+  ],
+  "空间缩放锐化": [
+    "Spatial sharpening",
+    "Пространственная резкость",
+    "空間スケーリングの鮮鋭化",
+    "공간 업스케일링 선명화"
+  ],
+  "空间缩放抗锯齿": [
+    "Spatial anti-aliasing",
+    "Пространственное сглаживание",
+    "空間スケーリングのアンチエイリアス",
+    "공간 업스케일링 안티앨리어싱"
+  ],
+  "缩放前": [
+    "Before upscaling",
+    "До масштабирования",
+    "スケーリング前",
+    "업스케일링 전"
+  ],
+  "缩放后": [
+    "After upscaling",
+    "После масштабирования",
+    "スケーリング後",
+    "업스케일링 후"
+  ],
+  "XeFG 节奏模式": [
+    "XeFG pacing mode",
+    "Режим ритма XeFG",
+    "XeFG ペーシングモード",
+    "XeFG 페이싱 모드"
+  ],
+  "源帧率损失预算 (%)": [
+    "Source FPS loss budget (%)",
+    "Допустимая потеря исходного FPS (%)",
+    "元の FPS 損失の上限 (%)",
+    "원본 FPS 손실 한도 (%)"
+  ],
+  "检测不均匀节奏": [
+    "Detect uneven pacing",
+    "Определять неравномерный ритм",
+    "不均一なペーシングを検出",
+    "불규칙한 페이싱 감지"
+  ],
+  "自动调整校正": [
+    "Adjust pacing automatically",
+    "Автокоррекция ритма",
+    "ペーシングを自動調整",
+    "페이싱 자동 조정"
+  ],
+  "NR 曝光模式": [
+    "NR exposure mode",
+    "Режим экспозиции NR",
+    "NR 露出モード",
+    "NR 노출 모드"
+  ],
+  "测量": [
+    "Measured",
+    "Измеренная",
+    "測定",
+    "측정"
+  ],
+  "兼容场景线性输入的 HDR 曝光倍率，默认 1；2.3.0 可通过 NR 曝光模式选择曝光来源。": [
+    "HDR exposure multiplier for compatible scene-linear inputs, default 1. Since 2.3 the NR exposure mode selects the source.",
+    "HDR exposure multiplier for compatible scene-linear inputs, default 1. Since 2.3 the NR exposure mode selects the source.",
+    "HDR exposure multiplier for compatible scene-linear inputs, default 1. Since 2.3 the NR exposure mode selects the source.",
+    "HDR exposure multiplier for compatible scene-linear inputs, default 1. Since 2.3 the NR exposure mode selects the source."
+  ],
+  "XeFG 3X 及以上：只在持续不均匀的源帧间隔出现时尝试校正；正常节奏不限制，2X 不受影响。": [
+    "XeFG 3X and higher: correction is attempted only for persistently uneven source intervals. Normal pacing is uncapped; 2X is unaffected.",
+    "XeFG 3X and higher: correction is attempted only for persistently uneven source intervals. Normal pacing is uncapped; 2X is unaffected.",
+    "XeFG 3X and higher: correction is attempted only for persistently uneven source intervals. Normal pacing is uncapped; 2X is unaffected.",
+    "XeFG 3X and higher: correction is attempted only for persistently uneven source intervals. Normal pacing is uncapped; 2X is unaffected."
+  ],
+  "Final image 在后处理后、帧生成前处理兼容画面；Vulkan 切换后需重启。Pre-SR 为实验路径，不支持 RR/DLAA。是否生效以游戏菜单为准。": [
+    "Final image processes compatible output after post-processing and before FG. Restart Vulkan games after changing it. Pre-SR is experimental and does not support RR/DLAA. Check the in-game status.",
+    "Final image processes compatible output after post-processing and before FG. Restart Vulkan games after changing it. Pre-SR is experimental and does not support RR/DLAA. Check the in-game status.",
+    "Final image processes compatible output after post-processing and before FG. Restart Vulkan games after changing it. Pre-SR is experimental and does not support RR/DLAA. Check the in-game status.",
+    "Final image processes compatible output after post-processing and before FG. Restart Vulkan games after changing it. Pre-SR is experimental and does not support RR/DLAA. Check the in-game status."
+  ],
+  "NIS / FSR 1 无需额外运行库；游戏需使用较低的窗口分辨率、相同宽高比，每轴严格放大且不超过 2 倍。": [
+    "NIS / FSR 1 need no extra runtime. Use a lower windowed game resolution with the same aspect ratio; both axes must upscale by no more than 2x.",
+    "NIS / FSR 1 need no extra runtime. Use a lower windowed game resolution with the same aspect ratio; both axes must upscale by no more than 2x.",
+    "NIS / FSR 1 need no extra runtime. Use a lower windowed game resolution with the same aspect ratio; both axes must upscale by no more than 2x.",
+    "NIS / FSR 1 need no extra runtime. Use a lower windowed game resolution with the same aspect ratio; both axes must upscale by no more than 2x."
+  ],
+  "用于新增帧生成与 Final image NR。2.3.0 默认优先游戏运动矢量，不可用时回退 RTX Encore 估计；保留已有选择。": [
+    "Used by added FG and Final image NR. 2.3 prefers game motion vectors and falls back to RTX Encore estimates. Existing explicit choices are preserved.",
+    "Used by added FG and Final image NR. 2.3 prefers game motion vectors and falls back to RTX Encore estimates. Existing explicit choices are preserved.",
+    "Used by added FG and Final image NR. 2.3 prefers game motion vectors and falls back to RTX Encore estimates. Existing explicit choices are preserved.",
+    "Used by added FG and Final image NR. 2.3 prefers game motion vectors and falls back to RTX Encore estimates. Existing explicit choices are preserved."
+  ],
+  "NIS / FSR 1 锐化强度，0–100%，即时生效。": [
+    "NIS / FSR 1 sharpness, 0–100%. Applied live.",
+    "NIS / FSR 1 sharpness, 0–100%. Applied live.",
+    "NIS / FSR 1 sharpness, 0–100%. Applied live.",
+    "NIS / FSR 1 sharpness, 0–100%. Applied live."
+  ],
+  "NIS / FSR 1：仅限 DirectX 11 SDR，包含游戏界面；无需额外运行库。": [
+    "NIS / FSR 1: DirectX 11 SDR only, including the HUD. No extra runtime required.",
+    "NIS / FSR 1: DirectX 11 SDR only, including the HUD. No extra runtime required.",
+    "NIS / FSR 1: DirectX 11 SDR only, including the HUD. No extra runtime required.",
+    "NIS / FSR 1: DirectX 11 SDR only, including the HUD. No extra runtime required."
+  ],
+  "在 NIS / FSR 1 之前按输入分辨率处理，或之后按输出分辨率处理。": [
+    "Apply before NIS / FSR 1 at source resolution, or after upscaling at output resolution.",
+    "Apply before NIS / FSR 1 at source resolution, or after upscaling at output resolution.",
+    "Apply before NIS / FSR 1 at source resolution, or after upscaling at output resolution.",
+    "Apply before NIS / FSR 1 at source resolution, or after upscaling at output resolution."
+  ],
+  "自动模式最多使用 4% 源帧率损失预算；手动模式可调整预算和检测。即时生效。": [
+    "Auto allows up to 4% source FPS loss. Manual mode exposes the budget and detection controls. Applied live.",
+    "Auto allows up to 4% source FPS loss. Manual mode exposes the budget and detection controls. Applied live.",
+    "Auto allows up to 4% source FPS loss. Manual mode exposes the budget and detection controls. Applied live.",
+    "Auto allows up to 4% source FPS loss. Manual mode exposes the budget and detection controls. Applied live."
+  ],
+  "范围 0–30%。开启自动调整时是上限，不会固定损失该比例；关闭后使用完整预算保持节奏。": [
+    "0–30%. With automatic adjustments this is a limit, not a fixed FPS loss. Without adjustments the full budget is used for pacing.",
+    "0–30%. With automatic adjustments this is a limit, not a fixed FPS loss. Without adjustments the full budget is used for pacing.",
+    "0–30%. With automatic adjustments this is a limit, not a fixed FPS loss. Without adjustments the full budget is used for pacing.",
+    "0–30%. With automatic adjustments this is a limit, not a fixed FPS loss. Without adjustments the full budget is used for pacing."
+  ],
+  "开启时等待持续不均匀的帧间隔；关闭时校准后即介入。": [
+    "On: wait for persistent uneven intervals. Off: intervene after calibration.",
+    "On: wait for persistent uneven intervals. Off: intervene after calibration.",
+    "On: wait for persistent uneven intervals. Off: intervene after calibration.",
+    "On: wait for persistent uneven intervals. Off: intervene after calibration."
+  ],
+  "保留改善检查并逐步放松约束；关闭后保持完整预算，直到设置或运行环境变化。": [
+    "Keep benefit checks and gradually relax constraints. Off: keep the full budget until settings or runtime conditions change.",
+    "Keep benefit checks and gradually relax constraints. Off: keep the full budget until settings or runtime conditions change.",
+    "Keep benefit checks and gradually relax constraints. Off: keep the full budget until settings or runtime conditions change.",
+    "Keep benefit checks and gradually relax constraints. Off: keep the full budget until settings or runtime conditions change."
+  ],
+  "适用于兼容的场景线性 DLSS 输入。新安装默认自动；旧配置缺少此项时保持游戏曝光。": [
+    "For compatible scene-linear DLSS inputs. Fresh installs use Auto; existing files without this key keep Game exposure.",
+    "For compatible scene-linear DLSS inputs. Fresh installs use Auto; existing files without this key keep Game exposure.",
+    "For compatible scene-linear DLSS inputs. Fresh installs use Auto; existing files without this key keep Game exposure.",
+    "For compatible scene-linear DLSS inputs. Fresh installs use Auto; existing files without this key keep Game exposure."
   ]
 }

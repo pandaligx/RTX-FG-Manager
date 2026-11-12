@@ -14,6 +14,28 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('Encore 2.3 settings round trip and legacy edits retain hidden parameters',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...shared(),patchVersion:'2.3.0',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrPlacement:'present',presentOpticalFlow:'game',dlssWithoutGameDlssEngine:'fsr1',nrExposureMode:'measured',xefgSourcePacingMode:'manual',xefgSourcePacingLossPercent:'6',xefgSourcePacingManualDetection:'0',xefgSourcePacingManualAdjustments:'1'},defaults:{nrPlacement:'after-sr',presentOpticalFlow:'game',dlssWithoutGameDlssEngine:'dlss',nrExposureMode:'auto',xefgSourcePacingMode:'auto',xefgSourcePacingLossPercent:'4',xefgSourcePacingManualDetection:'1',xefgSourcePacingManualAdjustments:'1'}}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',16);
+  assert.deepEqual(posted.content.presets,c.presets);
+  const path='/v1/recipes/'+posted.id;
+  let revision=1;
+  for(const protocol of [8,12,14,15]) {
+    const old=await f.call('GET',path,null,u.token,'test-ip',protocol);
+    assert.equal(old.content.presets,undefined);
+    old.content.notes='Legacy edit '+protocol;
+    await f.call('PUT',path,{revision:revision++,content:old.content},u.token,'test-ip',protocol);
+    assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',16)).content.presets,c.presets);
+  }
+  assert.throws(()=>recipe({...c,patchVersion:'2.2.0'}));
+  for(const invalid of ['-1','31','4.5']) {
+    const bad=structuredClone(c);bad.presets.values.xefgSourcePacingLossPercent=invalid;
+    assert.throws(()=>recipe(bad));
+  }
+  assert.equal((await f.call('GET','/v1/capabilities')).encore230,1);
+});
+
 test('Encore 2.1 source pacing is gated and retained when older clients edit metadata',async t=>{
   const f=fixture(t),u=await f.login();
   const c={...shared(),patchVersion:'2.1.0',presets:{schema:1,profile:'rtx_encore_json_v4',values:{xefgSourcePacing:'0'},defaults:{xefgSourcePacing:'1'}}};

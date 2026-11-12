@@ -2339,6 +2339,12 @@ impl Controller {
                     p.upstream_version.as_deref().or(Some(&p.version)),
                 )
         });
+        let fsr1_available = self.catalog.packages.iter().any(|p| {
+            p.scheme_id == rtx_fg_manager::encore::SCHEME
+                && rtx_fg_manager::encore::supports_230(
+                    p.upstream_version.as_deref().or(Some(&p.version)),
+                )
+        });
         self.begin_work("检查安装内容");
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
@@ -2377,6 +2383,7 @@ impl Controller {
                         );
                         choice.installed = installed;
                         choice.nis_available = nis_available;
+                        choice.fsr1_available = fsr1_available;
                         if rtx_fg_manager::runtime_files::inspect(&target, "encorefg").managed {
                             choice.native_streamline = false;
                             choice.native_fg = false;
@@ -2439,6 +2446,7 @@ impl Controller {
                 selected.exe == original.exe
                     && selected.needs_frames == original.needs_frames
                     && selected.needs_reconstruction == original.needs_reconstruction
+                    && selected.fsr1_available == original.fsr1_available
                     && selected.nis_available == original.nis_available
                     && selected.dlss_fg_available == original.dlss_fg_available
                     && selected.installed == original.installed

@@ -1226,13 +1226,18 @@
       "nrPlacement": {
         "values": [
           "after-sr",
-          "before-sr"
+          "before-sr",
+          "present"
         ],
+        "valueSince": {
+          "present": "2.3.0"
+        },
         "since": "1.4.0",
         "label": "NR 处理位置",
         "labels": {
           "after-sr": "Post-SR（默认）",
-          "before-sr": "Pre-SR（实验）"
+          "before-sr": "Pre-SR（实验）",
+          "present": "Final image（最终画面）"
         }
       },
       "nrPass1Preset": {
@@ -1356,17 +1361,20 @@
         "values": [
           "dlss",
           "xess",
-          "nis"
+          "nis",
+          "fsr1"
         ],
         "valueSince": {
-          "nis": "2.2.0"
+          "nis": "2.2.0",
+          "fsr1": "2.3.0"
         },
         "since": "2.0.0",
         "label": "新增超分引擎",
         "labels": {
           "dlss": "DLSS",
           "xess": "XeSS",
-          "nis": "NIS"
+          "nis": "NIS",
+          "fsr1": "FSR 1"
         }
       },
       "dlssWithoutGameDlssOutput": {
@@ -1386,15 +1394,20 @@
           "encore",
           "shader",
           "quality",
-          "fast"
+          "fast",
+          "game"
         ],
+        "valueSince": {
+          "game": "2.3.0"
+        },
         "since": "2.0.0",
-        "label": "无 DLSS 游戏的运动估计",
+        "label": "运动矢量来源",
         "labels": {
           "encore": "RTX Encore",
           "shader": "Shader (vort)",
           "quality": "Optical Flow (Quality)",
-          "fast": "Optical Flow (Fast)"
+          "fast": "Optical Flow (Fast)",
+          "game": "游戏运动矢量"
         }
       },
       "nrWithoutGameDlss": {
@@ -1443,7 +1456,7 @@
         "integer": true,
         "inherit": false,
         "since": "2.2.0",
-        "label": "NIS 锐化强度",
+        "label": "空间缩放锐化",
         "labels": {}
       },
       "spatialAa": {
@@ -1453,7 +1466,7 @@
           "fxaa"
         ],
         "since": "2.2.0",
-        "label": "NIS 抗锯齿",
+        "label": "空间缩放抗锯齿",
         "labels": {
           "off": "关闭",
           "smaa": "SMAA",
@@ -1468,8 +1481,8 @@
         "since": "2.2.0",
         "label": "抗锯齿位置",
         "labels": {
-          "before": "NIS 之前",
-          "after": "NIS 之后"
+          "before": "缩放前",
+          "after": "缩放后"
         }
       },
       "spatialAaQuality": {
@@ -1486,6 +1499,70 @@
           "medium": "中",
           "high": "高",
           "ultra": "极高"
+        }
+      },
+      "xefgSourcePacingMode": {
+        "values": [
+          "auto",
+          "manual"
+        ],
+        "since": "2.3.0",
+        "label": "XeFG 节奏模式",
+        "labels": {
+          "auto": "自动",
+          "manual": "手动"
+        }
+      },
+      "xefgSourcePacingLossPercent": {
+        "number": true,
+        "min": 0.0,
+        "max": 30.0,
+        "integer": true,
+        "inherit": false,
+        "since": "2.3.0",
+        "label": "源帧率损失预算 (%)",
+        "labels": {}
+      },
+      "xefgSourcePacingManualDetection": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "2.3.0",
+        "label": "检测不均匀节奏",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "xefgSourcePacingManualAdjustments": {
+        "values": [
+          "0",
+          "1"
+        ],
+        "since": "2.3.0",
+        "label": "自动调整校正",
+        "labels": {
+          "0": "关闭",
+          "1": "开启",
+          "inherit": "跟随游戏"
+        }
+      },
+      "nrExposureMode": {
+        "values": [
+          "game",
+          "auto",
+          "measured",
+          "manual"
+        ],
+        "since": "2.3.0",
+        "label": "NR 曝光模式",
+        "labels": {
+          "game": "跟随游戏",
+          "auto": "自动",
+          "measured": "测量",
+          "manual": "手动"
         }
       }
     }

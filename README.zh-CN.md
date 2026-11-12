@@ -10,6 +10,8 @@
 
 <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager?style=flat-square&color=78b93c"></a>
 <img alt="Windows 10 / 11 x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078D6?style=flat-square">
+<a href="BUILDING.md#linux-appimage-experimental--实验性"><img alt="Linux experimental" src="https://img.shields.io/badge/Linux-experimental-FCC624?style=flat-square&logo=linux&logoColor=black"></a>
+<img alt="Rust + GPUI" src="https://img.shields.io/badge/Rust%20%2B%20GPUI-native_UI-8A5A44?style=flat-square&logo=rust&logoColor=white">
 <a href="LICENSE"><img alt="Manager license MIT" src="https://img.shields.io/badge/Manager-MIT-blue?style=flat-square"></a>
 <a href="https://github.com/pandaligx/RTX-FG-Manager/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/pandaligx/RTX-FG-Manager?style=flat-square"></a>
 
@@ -17,21 +19,21 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.30"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.31"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
 </div>
 
 ---
 
-> **4.3.30 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.31 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
 <p align="center"><sub>4.3.6 用户提供截图 · 仅展示界面，不代表游戏兼容性或性能验证</sub></p>
 
-## 一个游戏库，五种补丁方案
+## 一个游戏库，多种补丁方案
 
-**RTX-FG-Manager** 是由 **小南瓜** 维护的 Windows 便携工具，集中管理受支持插帧补丁的安装、配置、升级与卸载。原生 Rust / GPUI 界面以游戏库为中心，在右侧集中展示所选游戏、硬件、补丁和操作。
+**RTX-FG-Manager** 是由 **小南瓜** 维护的 Windows 便携工具，集中管理受支持插帧补丁的安装、配置、升级与卸载。原生 Rust / GPUI 界面以游戏库为中心，在右侧集中展示所选游戏、硬件、补丁和操作。 Windows 为正式支持平台；Linux 为实验性移植，用于 Wine / Proton 下的 Windows 游戏。
 
 | 管理更集中 | 设置更顺手 | 恢复有依据 |
 | :--- | :--- | :--- |
@@ -41,24 +43,31 @@
 
 ## 下载
 
-**版本 4.3.30** · Windows 10 / 11 x64
+**版本 4.3.31** · Windows 10 / 11 x64
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.30 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.30) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.30 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.30) | 主项目与备用源 |
+| **GitCode** | [打开 4.3.31 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.31) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.31 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.31) | 主项目与备用源 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
 下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
-## 4.3.30 更新亮点
+### Linux（实验性）
 
-- 升级 GPUI Kit 0.9.1 与 GPUI Fast 0.1.14，改进输入、文本、滑块及界面绘制。
-- 改善设置语言切换与无障碍支持，保留游戏加加监测兼容修复；新增小黑盒教程作者致谢。
+支持从同一源码构建原生 GPUI / AppImage，参考[构建说明](BUILDING.md#linux-appimage-experimental--实验性)；[Linux CI](https://github.com/pandaligx/RTX-FG-Manager/actions/workflows/build-linux.yml) 提供临时测试产物。需要明确指定 Wine / Proton 前缀，并添加游戏的 Windows EXE；不用于原生 Linux ELF 游戏，也不自动配置 Proton 启动参数。
+
+Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
+
+## 4.3.31 更新亮点
+
+- 适配 RTX Encore 2.3.0 的 NR Final image、曝光模式、FSR 1 和 XeFG 帧节奏参数，同步玩家参数分享，保留已有配置。
+- 0.4.1 的 XeSS 引擎说明仅在选择 XeSS 时显示，默认 DLSS 选项保持简洁。
+- 合入实验性 Linux / AppImage 支持；Windows 的渲染、签名和更新流程保持原有实现。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
-> **Dlssg_for_sm86 0.4.1** 需管理器 **4.3.14**；**Encore 2.2.0** 的参数与分享请使用 **4.3.28 或更高版本**。按需升级游戏，管理器更新不会自动替换已安装补丁。
+> **Dlssg_for_sm86 0.4.1** 需管理器 **4.3.14**；**Encore 2.3.0** 的参数与分享请使用 **4.3.31 或更高版本**。按需升级游戏，管理器更新不会自动替换已安装补丁。
 
 ## 方案怎么选
 
@@ -68,31 +77,35 @@
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
 | **MFG-Unlocker · 1.7.0** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
-| **RTX Encore · 2.2.0** | SR/RR/FG 独立预设、固定/动态插帧、NR、Smooth Motion、XeSS/XeFG Tensor 与 Reflex 设置。 | **Insert**，禁用菜单或修改快捷键后除外 |
+| **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
+| **RTX Encore · 2.3.0** | SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG 与 Frame Pacing；可实验性地为无原生 DLSS 的游戏添加功能。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
 > MFG-Unlocker 1.6.1 已作为兼容备用方案保留；切换版本请先卸载现有补丁再安装。管理器 4.3.15 起支持该方案的玩家参数分享。
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。初始方案与 0.2.6 不再提供新安装入口，旧安装仍保留归属识别、恢复与卸载能力。
 
-### RTX 20 / 30 / 40 系列参考
+### 各方案的显卡支持范围
 
-| 方案 | RTX 20 · Turing | RTX 30 · Ampere | RTX 40 · Ada |
-| :--- | :--- | :--- | :--- |
-| Dlssg_for_sm86 · 0.4.1 | 上游支持；新 FG 内核尚缺真实 Turing 验证 | 上游主要支持与测试系列 | 上游提供 PTX 路径，但未实机验证 |
-| 0.3.5 · 三角洲专用 · DX12/Vulkan | 保留本项目自定义适配 | 保留本项目自定义适配 | 本项目已提供 SM89 适配；不保证所有游戏 |
-| Dlssg_for_sm86-MFG-version · Vulkan | 上游面向 20/30 系列；以所选 Vulkan 包为准 | 上游主要目标系列 | 上游未明确保证 |
-| MFG-Unlocker · 1.7.0 | 实验性 DLSS MFG；限受支持的 310.9 运行库 | 上游支持 DLSS MFG | 上游支持 DLSS MFG |
-| RTX Encore · 2.2.0 | FG / NR 实验性；Smooth Motion V2 限 621.01、DX12 | FG / NR；Smooth Motion 需匹配驱动与 API | FG / NR；Smooth Motion 由 NVIDIA 提供 |
+| 方案 | RTX 20 · Turing | RTX 30 · Ampere | RTX 40 · Ada | RTX 50 · Blackwell |
+| :--- | :--- | :--- | :--- | :--- |
+| Dlssg_for_sm86 · 0.4.1 | 支持；新 FG 内核缺少真实 Turing 验证 | 主要支持与测试系列 | 提供 PTX 路径，未实机验证 | 提供 PTX 路径，未实机验证 |
+| 0.3.5 · 三角洲专用 · DX12/Vulkan | 本项目保留的自定义适配 | 本项目保留的自定义适配 | 本项目提供 SM89 适配 | 未确认支持 |
+| Dlssg_for_sm86-MFG-version · Vulkan | 上游目标系列 | 上游目标系列 | 上游未明确保证 | 上游未明确保证 |
+| MFG-Unlocker · 1.7.0 / 1.6.1 | DLSS MFG 实验性 | 支持 DLSS MFG | 支持 DLSS MFG | 原生 MFG，提供倍率等控制 |
+| RTX Encore · 2.3.0 | FG / NR 实验性；Smooth Motion 受驱动限制 | 支持 FG / NR；有 Fast SR 与 Smooth Motion 路线 | 支持 FG / NR；NVIDIA 原生 Smooth Motion | 按功能支持；Vulkan NR 仍待实机验证 |
 
 依据：[Dlssg_for_sm86 运行要求与限制](https://github.com/sdli1995/dlssg_for_sm86#运行要求)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。三角洲方案属于本项目保留的自定义包，不能将其适配范围等同于上游原版。表格用于选型，不代表管理器完成了各显卡和游戏的实机验证。
 
-MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 310.9.16 运行库。RTX 20 的 DLSS MFG 为实验性，仅支持 310.9.0 / 310.9.1 / 310.9.16；XeMFG 是独立路线：MFG 1.7 独立模式可安装私有 Intel 3.0.2 运行库，插件模式使用已有 OptiScaler。0.4.1 官方路线为 DX12；改名为不同 DLL 不会自动增加 Vulkan 支持。
+MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 310.9.16，RTX 20 限特定 310.9 运行库。**1.7.0 的 XeMFG 是独立实验路线，可用于符合条件的 NVIDIA / AMD / Intel 显卡**，需匹配 Intel 运行库、驱动及 DX12 / Vulkan 游戏；这不代表 AMD / Intel 获得 DLSS 或 DLSSNR 支持。1.6.1 没有 1.7.0 的独立 XeMFG 路线。
+
+Dlssg_for_sm86 的 XeSS 引擎使用自身 CUDA 后端，不等于通用 Intel XeSS DLL，也不因此支持 AMD / Intel。官方 0.4.1 面向 DX12；三角洲和 Vulkan 方案另行选择。Encore 不支持 GTX、AMD 或 Intel 显卡。专业卡、CMP 及未列出的型号未获上游明确保证；修改名称不会改变硬件能力。
 
 ### Encore 功能支持速览
 
 | 功能 | DX11 | DX12 | Vulkan |
 | :--- | :--- | :--- | :--- |
-| X2–X6 帧生成 | — | 支持 | 支持；RTX 20/30 实验性 |
+| 原生 DLSS FG 接入的 X2–X6 帧生成 | — | 支持 | 支持；RTX 20/30 实验性 |
+| 为无原生 DLSS / FG 的游戏添加功能 | 实验性 | 实验性 | 实验性 |
 | UI 辅助 / RTX 30 Fast SR | — | 支持 | — |
 | RTX 30 Smooth Motion | 支持 | 支持 | 支持 |
 | 神经渲染 NR | 实验性 | 实验性 | 实验性 |
@@ -119,17 +132,11 @@ MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 3
 </details>
 
 <details>
-<summary><b>Encore 1.0.0：新增开关与配置保留</b></summary>
+<summary><b>Encore 2.3.0：组件选择与配置保留</b></summary>
 
-三个新增开关位于 **兼容与热键**，默认关闭，修改后都需要重启游戏：
+在 **DLSS / XeSS 运行库** 中按需选择组件，在 **预设参数** 中启用功能。若游戏没有原生 DLSS / 帧生成，可选择 Encore 的对应实验功能；默认不替用户启用。额外 DLSS-G / Streamline 与 Intel 组件按安装条件部署，已有组件按归属备份和恢复。
 
-| 参数 | 用途 |
-| :--- | :--- |
-| `compatibility.disableInGameMenu` | 排查菜单加载冲突，例如上游记录的《星球大战：亡命之徒》。插帧仍可工作；开启后 Insert 无法呼出菜单，需在管理器关闭此项并重启恢复。 |
-| `diagnostics.logDxgiWrappers` | 记录游戏对菜单交换链的调用，帮助排查菜单加载后的崩溃。 |
-| `diagnostics.crashDetails` | 增加寄存器/栈信息和 `.dmp` 崩溃转储，通常数十 MB。收集后关闭；转储可能包含进程内存，分享前请检查。 |
-
-从 rc.3 升级时保留原 JSONC，包括注释、未知字段和菜单状态。仅在明确编辑时写入新增设置，不因升级重置配置。SR/RR/FG 预设、NR 和 Smooth Motion 沿用现有控制；具体要求见 [上游参数文档](https://github.com/SilyNoMeta/rtx-encore/blob/v1.0.0/docs/SETTINGS.md)。
+2.3.0 的 NR Final image、游戏运动矢量、曝光模式、FSR 1 和 XeFG 帧节奏参数已接入管理器及玩家分享。升级保留已有 JSONC 注释、未知字段和菜单状态，旧分享按其协议读取。详见 [2.3.0 参数文档](https://github.com/SilyNoMeta/rtx-encore/blob/v2.3.0/docs/SETTINGS.md)与[无原生 DLSS 游戏说明](https://github.com/SilyNoMeta/rtx-encore/blob/v2.3.0/docs/GAMES-WITHOUT-DLSS.md)。
 
 </details>
 
@@ -145,7 +152,7 @@ MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 3
 
 卸载覆盖 dlssg 帧时间/NGX 日志、MFG 对应该游戏的临时日志、Encore 会话/异常/性能日志，以及符合上游命名规则的崩溃转储。未知文件、手动抓取和其他游戏/插件保留；占用文件或未完成恢复可重试。OptiScaler 只恢复管理器修改、且之后未被用户再次改动的字段。
 
-每个方案一个完整 ZIP，统一放在 [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads)。0.4.1 包含完整分发组件，只部署选中的入口。Encore 完整包超过 Gitee 单附件限制，使用 GitCode / GitHub 下载。
+每个方案一个完整 ZIP，统一放在 [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads)。0.4.1 包含完整分发组件，只部署选中的入口。资源由 GitCode / GitHub 分发，可选运行库单独管理。
 
 ## 常见问题
 
@@ -185,7 +192,7 @@ GitCode 暂时不可用时，切换 GitHub 来源重试，或从上方发行页�
 
 ## 致谢
 
-感谢 [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore)、[GPUI](https://gpui.rs/)、[GPUI Kit](https://github.com/longbridge/gpui-kit)、[GPUI Fast](https://github.com/longbridge/gpui-fast) 与 [aria2](https://github.com/aria2/aria2)。详见 [第三方说明](THIRD_PARTY_NOTICES.txt)。
+感谢 [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore)、[GPUI](https://gpui.rs/)、[GPUI Kit](https://github.com/longbridge/gpui-kit)、[GPUI Fast](https://github.com/longbridge/gpui-fast) 与 [reqwest](https://github.com/seanmonstar/reqwest) / [Tokio](https://github.com/tokio-rs/tokio)。详见 [第三方说明](THIRD_PARTY_NOTICES.txt)。
 
 特别感谢 [大大大怪将军阁下](https://space.bilibili.com/608531525)、[云外逸声](https://space.bilibili.com/256887068)、[坏坏的帅帅啊](https://space.bilibili.com/296225145) 和提供兼容性反馈的用户。本项目与 NVIDIA、游戏厂商及上游项目无官方隶属关系。
 

@@ -107,6 +107,10 @@ pub fn defaults_for_version(version: Option<&str>) -> Values {
     if supports_200(version) {
         values.insert("flipMeteringBypass".into(), "auto".into());
     }
+    if supports_230(version) {
+        values.insert("presentOpticalFlow".into(), "game".into());
+        values.insert("nrExposureMode".into(), "auto".into());
+    }
     values
 }
 pub fn default_config() -> &'static [u8] {
@@ -134,6 +138,11 @@ pub fn supports_220(version: Option<&str>) -> bool {
     version
         .and_then(|v| semver::Version::parse(v).ok())
         .is_some_and(|v| v >= semver::Version::new(2, 2, 0))
+}
+pub fn supports_230(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(2, 3, 0))
 }
 /// Apply the manager's resolved locale only to a fresh default, before explicit
 /// per-game values are merged. Other locales retain the upstream default.
@@ -200,6 +209,7 @@ pub fn value_available(key: &str, value: &str, version: Option<&str>) -> bool {
 }
 pub fn requires_restart(field: &Field, version: Option<&str>) -> bool {
     field.restart
+        && !(supports_230(version) && field.key == "dlssWithoutGameDlssEngine")
         && !(supports_120(version)
             && !supports_200(version)
             && matches!(field.key.as_str(), "dlssSrPreset" | "dlssRrPreset"))
@@ -328,6 +338,7 @@ pub fn field_enabled(key: &str, values: &Values, _gpu: Option<i32>) -> bool {
                 .is_some_and(|(a, b)| a >= b)
         } else if let Some((k, v)) = dep.split_once('=') {
             get(k) == Some(v)
+                || k == "dlssWithoutGameDlssEngine" && v == "nis" && get(k) == Some("fsr1")
                 || k == "nrEnabled" && v == "1" && get("nrWithoutGameDlss") == Some("1")
                 || key == "xessTensorCores"
                     && k == "reconstructionEngine"
@@ -758,6 +769,12 @@ fn migrate_version_fields(bytes: &[u8], version: Option<&str>) -> Result<Vec<u8>
                 }
             }
         }
+    }
+    let motion = path(&["dlssSuperResolution", "presentOpticalFlow"]);
+    if supports_230(version) && resolve(&document(&out)?, &motion)?.0.is_none() {
+        // Upstream changes only an absent motion choice. Exposure is different:
+        // an existing file without nrExposureMode must keep legacy game behavior.
+        out = document(&out)?.set(&motion, json!("game"))?;
     }
     let pacing = path(&["frameGeneration", "flipMeteringBypass"]);
     let value = resolve(&document(&out)?, &pacing)?.0;
