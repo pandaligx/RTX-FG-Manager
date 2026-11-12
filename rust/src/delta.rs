@@ -1,11 +1,11 @@
 //! Ownership of the opt-in Delta Force runtime, never of original game plugins.
+use crate::platform::OpenOptionsExt;
 use crate::{core, win};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fs::{self, File, OpenOptions},
-    os::windows::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     sync::OnceLock,
 };

@@ -1,4 +1,5 @@
 use crate::core;
+use crate::platform::MetadataExt;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -574,7 +575,6 @@ fn inspect_with_limits(
     use std::{
         cmp::Reverse,
         collections::{BinaryHeap, HashSet},
-        os::windows::fs::MetadataExt,
     };
     let mut result = Evidence::default();
     let Ok(root) = core::no_links(&installation_root(exe)) else {

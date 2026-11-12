@@ -1224,6 +1224,11 @@ fn error_message(code: &str) -> &'static str {
         _ => "推荐服务暂时不可用，请稍后再试",
     }
 }
+#[cfg(target_os = "linux")]
+fn unseal(_input: &[u8], _protect: bool) -> Result<Zeroizing<Vec<u8>>> {
+    anyhow::bail!("Linux 暂不支持保存登录凭据；仍可匿名浏览推荐方案")
+}
+#[cfg(windows)]
 fn unseal(input: &[u8], protect: bool) -> Result<Zeroizing<Vec<u8>>> {
     use windows::{
         Win32::{
@@ -1338,6 +1343,7 @@ mod tests {
         });
         (origin, worker)
     }
+    #[cfg(windows)]
     fn save_test_session(data: &Path, token: &str, expires_at: i64) {
         let root = data.join("recommendations");
         fs::create_dir_all(&root).unwrap();
@@ -1446,6 +1452,7 @@ mod tests {
         for status in [200, 401, 403, 502] {
             let data = tempfile::tempdir().unwrap();
             let token = "s".repeat(43);
+            #[cfg(windows)]
             save_test_session(data.path(), &token, chrono::Utc::now().timestamp() + 86400);
             let game = card("RTX 3060", "581.80", 1).content.game;
             let (origin, server) = mock_service(vec![
@@ -1459,7 +1466,7 @@ mod tests {
                 .browse(&game, &cloud::bundled(), 0, false, false)
                 .unwrap_err();
             assert!(allows_offline_cache(&error));
-            assert!(client.logged_in());
+            assert_eq!(client.logged_in(), cfg!(windows));
             assert!(client.cached(&game, &cloud::bundled()).is_none());
             let report = fs::read_to_string(client.root.join("connection-status.json")).unwrap();
             assert!(
@@ -1475,7 +1482,7 @@ mod tests {
                     .browse(&game, &cloud::bundled(), 0, false, false)
                     .is_ok()
             );
-            assert!(client.logged_in());
+            assert_eq!(client.logged_in(), cfg!(windows));
             assert_eq!(server.join().unwrap().len(), 4);
         }
     }
@@ -1771,6 +1778,7 @@ mod tests {
         assert_eq!(requests.iter().filter(|r| r.starts_with("POST")).count(), 1);
     }
     #[test]
+    #[cfg(windows)]
     fn retained_revoked_login_refreshes_public_cards_and_clears_saved_login() {
         let data = tempfile::tempdir().unwrap();
         save_test_session(
@@ -1815,6 +1823,7 @@ mod tests {
         assert!(!requests[2].to_ascii_lowercase().contains("authorization:"));
     }
     #[test]
+    #[cfg(windows)]
     fn valid_login_keeps_personal_feedback_and_saved_session() {
         let data = tempfile::tempdir().unwrap();
         save_test_session(
@@ -1838,6 +1847,7 @@ mod tests {
         assert_eq!(server.join().unwrap().len(), 1);
     }
     #[test]
+    #[cfg(windows)]
     fn private_filters_and_writes_never_retry_anonymously_or_use_cache() {
         for operation in ["mine", "reported", "vote"] {
             let data = tempfile::tempdir().unwrap();
@@ -1872,6 +1882,7 @@ mod tests {
         }
     }
     #[test]
+    #[cfg(windows)]
     fn only_service_outages_allow_offline_cache_without_discarding_login() {
         for (status, body, offline) in [
             (503, json!({"error":"unavailable"}), true),
@@ -1897,6 +1908,7 @@ mod tests {
         }
     }
     #[test]
+    #[cfg(windows)]
     fn local_expiry_and_late_rejection_cannot_restore_or_clear_the_wrong_session() {
         let data = tempfile::tempdir().unwrap();
         save_test_session(
@@ -1929,6 +1941,7 @@ mod tests {
         assert!(!client.root.join("session.json").exists());
     }
     #[test]
+    #[cfg(windows)]
     fn closed_window_request_cannot_delete_a_new_windows_saved_login() {
         let data = tempfile::tempdir().unwrap();
         let expires = chrono::Utc::now().timestamp() + 86400;
@@ -1943,6 +1956,7 @@ mod tests {
         assert!(Client::new(data.path()).unwrap().logged_in());
     }
     #[test]
+    #[cfg(windows)]
     fn logout_removes_local_session_even_if_server_unavailable_or_already_revoked() {
         for status in [503, 401] {
             let data = tempfile::tempdir().unwrap();
@@ -2073,6 +2087,7 @@ mod tests {
         assert!(public_text("https://download.invalid/file.dll", 80, false).is_err());
     }
     #[test]
+    #[cfg(windows)]
     fn saved_session_is_dpapi_protected() {
         let input = b"test-opaque-session";
         let sealed = unseal(input, true).unwrap();

@@ -1,5 +1,34 @@
 # Build the Rust manager / 编译 Rust 管理器
 
+## Linux AppImage (experimental / 实验性)
+
+The Linux port shares the current manager source and uses a native GPUI window.
+Build on Ubuntu 22.04 or newer with the dependencies listed in
+`.github/workflows/build-linux.yml`, then run:
+
+```sh
+cargo build --locked --release --target x86_64-unknown-linux-gnu
+WINEPREFIX=/absolute/path/to/prefix target/x86_64-unknown-linux-gnu/release/RTXManager
+APPIMAGETOOL=/absolute/path/to/appimagetool packaging/build-appimage.sh
+```
+
+Use an explicit Wine/Proton prefix (`WINEPREFIX` or `--wine-prefix`) and add the
+game's Windows EXE or set `RTXFG_ROOTS` to its host installation directory.
+This does not install DLLs into native ELF games or configure Proton launch options.
+The host supplies Vulkan drivers, X11/Wayland, FreeType, Fontconfig and xkbcommon.
+Windows updates, HAGS, native GPU probes, DPAPI login storage and Windows-only
+leftover/handle repair are unavailable. Linux never offers a Windows EXE update
+or claims Windows Authenticode trust. Keep recovery files when an operation is
+unsupported. Community browsing and portable configuration editing remain available.
+
+Linux 构建为实验性独立 AppImage，使用当前源码；需明确选择 Wine/Proton 前缀，
+不代表所有游戏已实测。不自动更新 Windows EXE，不修改宿主系统显卡驱动或 GPU 调度。
+Windows 的签名、渲染、更新通道和发布工作流保持原实现。
+
+The Linux workflow produces a temporary CI artifact only. It never signs or
+publishes a release and cannot modify update manifests. Windows regressions still
+run independently in `build.yml`; do not skip them when maintaining this port.
+
 The manager is a Windows x64 Rust/GPUI application. A normal build does not require Python, CUDA, Vulkan or NGX SDKs, game files, or the historical `development/` tree. It does require the native Windows compiler and SDK used by GPUI and Windows resources.
 
 管理器采用 Rust/GPUI。普通编译不依赖 Python、CUDA、Vulkan/NGX SDK、游戏文件或历史开发目录；需要 Visual Studio C++ 生成工具和 Windows SDK。

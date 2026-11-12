@@ -755,9 +755,22 @@ mod tests {
             b"preserve"
         );
         assert!(core::record(&target.directory)?.unwrap().cache_pending);
-        let plan = crate::cleanup_pending::prepare_at(&target, None)?;
-        assert_eq!(plan.paths().collect::<Vec<_>>(), vec![changed.as_path()]);
-        crate::cleanup_pending::delete_confirmed(&plan)?;
+        #[cfg(windows)]
+        {
+            let plan = crate::cleanup_pending::prepare_at(&target, None)?;
+            assert_eq!(plan.paths().collect::<Vec<_>>(), vec![changed.as_path()]);
+            crate::cleanup_pending::delete_confirmed(&plan)?;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            // Linux cannot offer the Win32 handle-identity cleanup operation.
+            // Refusal must leave the foreign modification and journal intact.
+            let before = snapshot(&target.directory)?;
+            assert!(crate::cleanup_pending::prepare_at(&target, None).is_err());
+            assert_eq!(snapshot(&target.directory)?, before);
+            // Simulate the user removing this one known fixture, then retry.
+            fs::remove_file(&changed)?;
+        }
         assert!(crate::cleanup::clean_outcome_at(&target)?.complete);
         assert!(!changed.exists() && unknown.exists());
         install(&target, false)?;

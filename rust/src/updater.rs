@@ -1,10 +1,10 @@
 pub const PUBLISHER: &str = "BF4DED3827EB26116EAE9E9ACACE0B0791D502BF";
+use crate::platform::CommandExt;
 use crate::{core, win};
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    os::windows::process::CommandExt,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
@@ -174,6 +174,10 @@ fn source_order(choice: &str) -> [&'static str; 2] {
     }
 }
 pub fn check_with_cancel(choice: &str, cancel: &AtomicBool) -> Result<Option<Manifest>> {
+    // No Linux release channel exists yet. Never offer or launch a Windows EXE.
+    if cfg!(target_os = "linux") {
+        return Ok(None);
+    }
     check_with_fetch(choice, cancel, &mut get_json_with_cancel)
 }
 fn check_with_fetch(
@@ -360,6 +364,10 @@ fn launch(path: &Path, args: &[&std::ffi::OsStr]) -> Result<()> {
     Ok(())
 }
 pub fn install(path: &Path, m: &Manifest, data: &Path) -> Result<()> {
+    ensure!(
+        cfg!(windows),
+        "Linux AppImage 请手动更新，不使用 Windows 更新通道"
+    );
     verify(path, m)?;
     let target = core::no_links(&std::env::current_exe()?)?;
     let s = win::verify_signature(&target)?;

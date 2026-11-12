@@ -1,0 +1,18 @@
+#!/bin/sh
+# AppRun for RTXManager (AppImage type 2)
+set -e
+SELF=$(readlink -f "$0")
+HERE=${SELF%/*}
+
+# Prefer bundled binaries/libs, then the host.
+export PATH="${HERE}/usr/bin:${HERE}/bin${PATH:+:$PATH}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/lib/x86_64-linux-gnu:${HERE}/lib:${HERE}/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+# Required for the bundled .desktop + hicolor icon to be found by the desktop
+# environment / desktop-integration tools.
+export XDG_DATA_DIRS="${HERE}/usr/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+
+# GTK-module/GSettings safety (harmless when absent).
+export GSETTINGS_SCHEMA_DIR="${HERE}/usr/share/glib-2.0/schemas${GSETTINGS_SCHEMA_DIR:+:$GSETTINGS_SCHEMA_DIR}"
+
+exec "${HERE}/usr/bin/RTXManager" "$@"

@@ -4552,8 +4552,14 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
     };
     // Every manager window is opaque. HWND presentation keeps monitoring
     // overlays from changing desktop alpha without disabling GPU acceleration.
-    let platform = gpui_windows::WindowsPlatform::new(false)?.without_direct_composition();
-    gpui::Application::with_platform(Rc::new(platform))
+    #[cfg(windows)]
+    let application = {
+        let platform = gpui_windows::WindowsPlatform::new(false)?.without_direct_composition();
+        gpui::Application::with_platform(Rc::new(platform))
+    };
+    #[cfg(target_os = "linux")]
+    let application = gpui::application();
+    application
         .with_assets(crate::ui_assets::Assets)
         .run(move |cx| {
             gpui::init(cx);

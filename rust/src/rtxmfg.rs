@@ -614,6 +614,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
     fn diagnostic_paths_are_scoped_to_the_full_executable_path() {
         let a = log_paths(std::path::Path::new("D:/游戏 A/Game.exe"));
         let a_case = log_paths(std::path::Path::new("d:/游戏 a/game.EXE"));

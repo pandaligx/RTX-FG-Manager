@@ -24,6 +24,11 @@ pub fn bytes(name: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 pub fn cache_root() -> Result<PathBuf> {
+    #[cfg(target_os = "linux")]
+    {
+        Ok(crate::preferences::directory().join("runtime-rust"))
+    }
+    #[cfg(windows)]
     Ok(
         PathBuf::from(std::env::var_os("LOCALAPPDATA").context("LOCALAPPDATA unavailable")?)
             .join("RTXFGManager")

@@ -1,5 +1,11 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// The GUI subsystem flag only applies when linking a Windows binary.
+#![cfg_attr(all(not(debug_assertions), windows), windows_subsystem = "windows")]
 mod controller;
+#[cfg(windows)]
+#[path = "game_icons.rs"]
+mod game_icons;
+#[cfg(not(windows))]
+#[path = "game_icons_linux.rs"]
 mod game_icons;
 mod ui;
 mod ui_assets;
@@ -40,6 +46,11 @@ fn run() -> anyhow::Result<()> {
     use rtx_fg_manager::{core, hags, preferences, scanner, updater, win};
     use std::{path::PathBuf, sync::atomic::AtomicBool};
     let args: Vec<_> = std::env::args().collect();
+    #[cfg(target_os = "linux")]
+    if let Some(index) = args.iter().position(|arg| arg == "--wine-prefix") {
+        let prefix = args.get(index + 1).context("--wine-prefix 缺少目录")?;
+        win::set_prefix(std::path::Path::new(prefix))?;
+    }
     let arg = |n: usize| args.get(n).context("缺少命令参数");
     match args.get(1).map(String::as_str) {
         Some("--reset-manager") => rtx_fg_manager::reset::apply(&PathBuf::from(arg(2)?)),

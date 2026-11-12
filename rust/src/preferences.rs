@@ -28,10 +28,24 @@ fn read_bounded(path: &Path) -> Result<Vec<u8>> {
     );
     Ok(bytes)
 }
+#[cfg(windows)]
 pub fn directory() -> PathBuf {
     std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir)
+        .join("RTXFGManager")
+}
+#[cfg(target_os = "linux")]
+pub fn directory() -> PathBuf {
+    std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .unwrap_or_else(|| {
+            std::env::var_os("HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(std::env::temp_dir)
+                .join(".local/share")
+        })
         .join("RTXFGManager")
 }
 pub fn load(dir: &Path) -> Result<Value> {

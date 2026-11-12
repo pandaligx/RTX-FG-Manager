@@ -1,4 +1,5 @@
 //! Per-game configuration edits and bounded, local-only diagnostic exports.
+use crate::platform::CommandExt;
 use crate::{cleanup, core, selftest, win};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,6 @@ use std::{
     collections::BTreeSet,
     fs,
     io::{Read, Seek, SeekFrom, Write},
-    os::windows::process::CommandExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::atomic::{AtomicBool, Ordering},

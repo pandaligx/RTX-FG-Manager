@@ -1,11 +1,11 @@
 //! Restore managed games and GPU names before resetting local application data.
+use crate::platform::CommandExt;
 use crate::{cleanup, core, executable_name, scanner::Game, win};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fs,
-    os::windows::process::CommandExt,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -579,7 +579,10 @@ mod tests {
         fs::create_dir(&root).unwrap();
         fs::create_dir(&external).unwrap();
         fs::write(external.join("keep"), b"original").unwrap();
+        #[cfg(windows)]
         std::os::windows::fs::symlink_dir(&external, root.join("link")).unwrap();
+        #[cfg(target_os = "linux")]
+        std::os::unix::fs::symlink(&external, root.join("link")).unwrap();
         assert!(check_tree(&root).is_err());
         assert_eq!(fs::read(external.join("keep")).unwrap(), b"original");
     }

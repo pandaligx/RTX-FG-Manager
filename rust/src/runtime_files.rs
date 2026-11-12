@@ -1064,7 +1064,12 @@ fn same_record_path(recorded: &str, current: &Path) -> Result<bool> {
         && core::key(&core::no_links(recorded)?) == core::key(&core::no_links(current)?))
 }
 fn record_path(path: &Path) -> Result<String> {
-    Ok(core::no_links(path)?.to_string_lossy().replace('/', "\\"))
+    let path = core::no_links(path)?.to_string_lossy().into_owned();
+    Ok(if cfg!(windows) {
+        path.replace('/', "\\")
+    } else {
+        path
+    })
 }
 fn destination(target: &core::DeploymentTarget, kind: &str, entry: &Entry) -> Result<PathBuf> {
     let p = core::no_links(Path::new(&entry.path))?;
@@ -2138,6 +2143,7 @@ mod tests {
         Ok(())
     }
     #[test]
+    #[cfg(windows)]
     fn mixed_separators_keep_legacy_ownership_and_restore_originals() -> Result<()> {
         let tmp = tempfile::tempdir()?;
         let t = target(&tmp.path().join("The Witcher 3/bin/x64_dx12"))?;

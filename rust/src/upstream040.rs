@@ -89,7 +89,7 @@ pub fn validate_041(values: &Values) -> Result<()> {
 pub fn help(key: &str) -> Option<&'static str> {
     Some(match key {
         "fg_engine" => {
-            "需要 R580 或更新驱动。XeSS 使用随包后端，无需另装 Intel DLL；RGBA16F 后缓冲不支持，不会自动切回 DLSS。"
+            "游戏内要开启 DLSS + DLSS 帧生成，超分辨率依旧使用 DLSS，DLSS 帧生成内部替换为原生 Xe 多帧生成，因此画质最佳。"
         }
         "sr_mode" => {
             "默认关闭。M/L 会覆盖全部画质档，质量、平衡和 DLAA 下可能更慢。旧版 On 和作用档位已取消。"

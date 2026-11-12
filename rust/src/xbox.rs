@@ -27,7 +27,12 @@ fn logos(
     names
         .iter()
         .filter_map(|name| {
-            let path = Path::new(attrs.get(*name)?);
+            let normalized = if cfg!(windows) {
+                attrs.get(*name)?.clone()
+            } else {
+                attrs.get(*name)?.replace('\\', "/")
+            };
+            let path = Path::new(&normalized);
             (!path.as_os_str().is_empty()
                 && path.components().all(|c| matches!(c, Component::Normal(_)))
                 && !path.to_string_lossy().contains(':')
@@ -129,8 +134,12 @@ fn read_manifest(path: &Path) -> Result<Manifest> {
                         .get("IsDevOnly")
                         .is_some_and(|s| s == "true" || s == "1")
                 {
-                    let relative =
-                        PathBuf::from(attrs.get("Name").map(String::as_str).unwrap_or(""));
+                    let name = attrs.get("Name").map(String::as_str).unwrap_or("");
+                    let relative = if cfg!(windows) {
+                        PathBuf::from(name)
+                    } else {
+                        PathBuf::from(name.replace('\\', "/"))
+                    };
                     if !relative.as_os_str().is_empty()
                         && relative
                             .components()

@@ -85,15 +85,23 @@ pub fn valid_hash(s: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 pub fn key(p: &Path) -> String {
-    p.to_string_lossy().replace('/', "\\").to_lowercase()
+    if cfg!(windows) {
+        p.to_string_lossy().replace('/', "\\").to_lowercase()
+    } else {
+        // Host paths are case-sensitive; a backslash is a filename character.
+        p.to_string_lossy().into_owned()
+    }
 }
 pub fn within(p: &Path, root: &Path) -> bool {
+    if !cfg!(windows) {
+        return p.starts_with(root);
+    }
     let p = key(p);
     let r = key(root).trim_end_matches('\\').to_owned();
     p == r || p.starts_with(&(r + "\\"))
 }
 pub fn is_link(meta: &fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt;
+    use crate::platform::MetadataExt;
     meta.file_type().is_symlink() || meta.file_attributes() & 0x400 != 0
 }
 pub fn no_links(path: &Path) -> Result<PathBuf> {

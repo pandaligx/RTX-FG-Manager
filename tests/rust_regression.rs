@@ -1,3 +1,7 @@
+// These regressions exercise Win32 handles, share modes and CREATE_NO_WINDOW
+// directly, so the whole test binary is Windows-only. It compiles to nothing elsewhere.
+#![cfg(windows)]
+
 use anyhow::Result;
 #[cfg(feature = "fixture-tests")]
 use rtx_fg_manager::assets;

@@ -6,6 +6,10 @@ fn main() {
     println!("cargo:rerun-if-changed=rust/native");
     if env::var_os("CARGO_FEATURE_NATIVE_PROBES").is_some() {
         assert!(
+            env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows"),
+            "native-probes requires Windows; build Linux with default features"
+        );
+        assert!(
             PathBuf::from("rust/native/probe_entry.cpp").is_file(),
             "native-probes is a maintainer-only diagnostic extension; its extra native sources and licensed SDK headers are not part of the public Rust manager. See BUILDING.md"
         );

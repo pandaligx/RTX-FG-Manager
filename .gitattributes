@@ -9,3 +9,5 @@
 /update.json -text
 /cloud/names/*.json -text
 /rust/assets/game-names.json -text
+/packaging/*.sh text eol=lf
+/packaging/AppRun text eol=lf

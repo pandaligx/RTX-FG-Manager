@@ -1,0 +1,124 @@
+name: Build Linux AppImage
+
+# Separate from build.yml so the Windows job stays byte-for-byte unchanged and a
+# Linux packaging failure can never block or alter the signed Windows release.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  appimage:
+    # Build on the OLDEST supported base (Ubuntu 22.04, glibc 2.35). An AppImage
+    # may not run on a distribution older than the one it was built on, so
+    # building on a newer runner would silently drop support for older distros.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Linux build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-pr-${{ github.ref_name }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            linux-pr-${{ github.ref_name }}-${{ hashFiles('Cargo.lock') }}-
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          # clang is intentionally absent: the only bindgen in the dependency
+          # graph is macOS-gated. libvulkan-dev is not needed either (ash's
+          # `linked` feature is off and it dlopens libvulkan.so.1).
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config ca-certificates curl wget file \
+            libfreetype-dev libfontconfig1-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libxcb1-dev libxcb-xkb-dev libwayland-dev \
+            squashfs-tools desktop-file-utils zsync
+
+      - name: Install pinned toolchain
+        run: |
+          rustup show active-toolchain
+          rustup component add rustfmt clippy
+          # rust-toolchain.toml lists only the Windows target, so add the Linux one.
+          rustup target add x86_64-unknown-linux-gnu
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check Linux library and desktop application
+        run: cargo check --locked --target x86_64-unknown-linux-gnu --lib --bin RTXManager
+
+      - name: Portable configuration and Linux regression tests
+        # --target is mandatory here too: .cargo/config.toml pins the Windows
+        # triple, so without it this would try to build for Windows and fail.
+        run: |
+          timeout 15m cargo test --locked --target x86_64-unknown-linux-gnu --lib -- --nocapture --test-threads=2
+          timeout 15m cargo test --locked --target x86_64-unknown-linux-gnu --test v429_encore_config --test v4328_encore220 --test gpu_alias_linux_e2e -- --nocapture --test-threads=2
+
+      - name: Clippy
+        run: cargo clippy --locked --lib --bin RTXManager --target x86_64-unknown-linux-gnu -- -D warnings
+
+      - name: Build release
+        # --target is required: .cargo/config.toml pins the Windows triple, and
+        # only the CLI flag overrides it (documented Cargo precedence).
+        run: cargo build --locked --release --target x86_64-unknown-linux-gnu
+
+      - name: Fetch appimagetool
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/appimagetool" \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          echo "e8c1169c4af66c3184d7ee110713d4be04befe671fa358e2c1591ee840553b03  $RUNNER_TEMP/appimagetool" \
+            | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/appimagetool"
+
+      - name: Build AppImage
+        env:
+          APPIMAGETOOL: ${{ runner.temp }}/appimagetool
+          # GitHub runners do not permit FUSE inside containers.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: packaging/build-appimage.sh
+
+      - name: Smoke-test the AppImage
+        run: |
+          # A headless runner has no display, so only prove the payload extracts
+          # and the entry point is the expected ELF; a real launch is verified on
+          # a desktop machine.
+          ./dist/*.AppImage --appimage-extract >/dev/null
+          test -x squashfs-root/usr/bin/RTXManager
+          file squashfs-root/usr/bin/RTXManager
+          test -f squashfs-root/rtx-fg-manager.desktop
+          desktop-file-validate squashfs-root/rtx-fg-manager.desktop
+          mkdir -p "$RUNNER_TEMP/rtxfg-empty-games"
+          squashfs-root/AppRun --scan "$RUNNER_TEMP/rtxfg-scan.json" "$RUNNER_TEMP/rtxfg-empty-games"
+          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["rows"] == [] and r["directories"] == 1 and r["skipped"] == 0 and not r["cancelled"], r' "$RUNNER_TEMP/rtxfg-scan.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RTXManager-linux-x86_64-appimage
+          path: dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Save Linux build cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-pr-${{ github.ref_name }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}

@@ -359,7 +359,7 @@ fn read_json_preset_values(
 }
 
 fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
-    use std::os::windows::fs::MetadataExt;
+    use rtx_fg_manager::platform::MetadataExt;
     let exe = core::no_links(&target.game_exe)?;
     let dir = &target.directory;
     let mut paths = vec![exe.clone(), dir.join(core::OWN).join(core::MARKER)];

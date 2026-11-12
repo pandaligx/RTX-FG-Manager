@@ -1,7 +1,15 @@
 /target/
 /.workspace/
 /.build-env/
+/dist/
 /runtime/
+# Linux / AppImage packaging output (never commit the mounted tree or artifacts)
+/AppDir/
+/squashfs-root/
+*.AppImage
+*.AppImage.zs
+*.AppImage.part
+appimagetool*.AppImage
 /payloads/
 /log/
 /development/

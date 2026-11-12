@@ -24,6 +24,9 @@ API='https://gitee.com/api/v5/repos/'+REPO
 # Keep in step with tools/export-source.ps1. This is deliberately not a recursive
 # copy of the private checkout, nor an unrestricted mirror of arbitrary commits.
 ALLOWED = {
+    '.github/workflows/build-linux.yml', 'packaging/AppRun',
+    'packaging/build-appimage.sh', 'packaging/rtx-fg-manager.desktop',
+    'packaging/rtx-fg-manager.png',
     'recommendations/package.json', 'recommendations/pnpm-lock.yaml', 'recommendations/.gitignore',
     'recommendations/.dockerignore', 'recommendations/Dockerfile', 'recommendations/compose.yaml',
     'recommendations/config.example', 'recommendations/nginx-location.conf', 'recommendations/README.md',
