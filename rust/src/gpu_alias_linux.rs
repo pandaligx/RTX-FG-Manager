@@ -31,7 +31,17 @@ use std::{collections::BTreeMap, path::Path};
 use crate::wine_reg::{Hive, RegFile, RegValue};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 
-pub const NAMES: [&str; 2] = ["NVIDIA GeForce RTX 4060", "NVIDIA GeForce RTX 5090"];
+#[path = "gpu_models.rs"]
+mod models;
+pub use models::NAMES;
+
+pub fn display_model(name: &str) -> (&str, bool) {
+    if let Some(model) = name.strip_prefix("NVIDIA ") {
+        (model.strip_prefix("GeForce ").unwrap_or(model), true)
+    } else {
+        (name, false)
+    }
+}
 
 pub const FIELDS: [&str; 4] = [
     "FriendlyName",
@@ -56,6 +66,10 @@ pub struct Device {
     pub version: String,
     pub inf: String,
     pub name: String,
+    #[serde(default)]
+    pub original_name: Option<String>,
+    #[serde(default)]
+    pub modified_name: Option<String>,
 }
 impl Device {
     fn identity(&self) -> serde_json::Value {
@@ -146,6 +160,8 @@ pub fn enumerate() -> Result<Vec<Device>> {
                 version,
                 inf,
                 name,
+                original_name: None,
+                modified_name: None,
             });
         }
     }
@@ -498,6 +514,22 @@ pub fn apply(target: Device, name: Option<&str>) -> Result<String> {
 /// On Linux there is no UAC relaunch, so aliasing runs in-process.
 pub fn apply_with_elevation(target: Device, name: Option<&str>) -> Result<String> {
     apply(target, name)
+}
+
+pub fn restore_all() -> Result<()> {
+    let _lock = crate::win::game_lock(Path::new("RTXFG-global-gpu-name"))?;
+    let prefix = crate::win::prefix()?;
+    let file = RegFile::open(&crate::wine_reg::hive_path(&prefix, Hive::Machine))?;
+    let records = file.values(BACKUPS);
+    let devices = enumerate()?;
+    for token in records.keys() {
+        let device = devices
+            .iter()
+            .find(|d| crate::core::hash(d.instance.to_uppercase().as_bytes()) == *token)
+            .context("有显卡名称备份无法匹配当前设备；未清除恢复记录")?;
+        change(&mut WineBackend(device.clone()), None)?;
+    }
+    Ok(())
 }
 
 /// The Windows backend re-executes itself with `--gpu-name-action` under UAC.

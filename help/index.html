@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>RTX FG Manager · Guide</title><link rel="stylesheet" href="style.css">
+  <script src="content.js" defer></script><script src="app.js" defer></script>
+</head>
+<body>
+  <div class="reading-track" aria-hidden="true"><progress id="reading-progress" max="100" value="0"></progress></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header><a class="brand" href="#main"><span class="mark">F<span>G</span></span><span>RTX FG Manager<small id="edition"></small></span></a>
+    <div class="tools"><span class="live-label" id="offline-badge"></span><select id="language" aria-label="Language"><option value="zh">简体中文</option><option value="en">English</option><option value="ru">Русский</option><option value="ja">日本語</option><option value="ko">한국어</option></select><button id="theme" type="button" aria-label="Theme">◐</button></div>
+  </header>
+  <div class="layout"><aside><p id="nav-title" class="eyebrow"></p><nav id="navigation" aria-label="Guide"></nav><div class="aside-note"><span class="mini-mark">↳</span><p class="offline" id="offline"></p></div></aside>
+    <main id="main" tabindex="-1">
+      <section class="hero"><div class="hero-copy"><p class="eyebrow" id="eyebrow"></p><h1 id="title"></h1><p id="intro"></p><div class="hero-actions"><a class="primary-link" id="begin" href="#start"></a><a class="text-link" id="explore" href="#patches"></a></div></div><div class="hero-art" aria-hidden="true"><div class="frame frame-a"></div><div class="frame frame-b"></div><div class="frame frame-c"><span>FRAME GENERATION</span><strong>FG<span>+</span></strong><div class="signal"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><small>CONFIGURE / PLAY / RESTORE</small></div><div class="art-orbit"></div></div></section>
+      <div class="search-row"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" autocomplete="off"><kbd>Ctrl K</kbd></label><span class="search-count" id="search-count" aria-live="polite"></span></div>
+      <p id="fallback" hidden></p><section id="shortcuts" class="shortcuts" aria-label="Shortcuts"></section><div id="sections"></div><p id="empty" hidden></p>
+      <footer><div><strong>RTX FG Manager</strong><span id="content-version"></span></div><a href="https://github.com/pandaligx/RTX-FG-Manager" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="#main" id="top"></a></footer>
+    </main>
+  </div><div id="toast" role="status" aria-live="polite"></div>
+</body></html>

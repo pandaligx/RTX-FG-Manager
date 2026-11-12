@@ -1,8 +1,9 @@
 use crate::core;
+use crate::platform::MetadataExt;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     io::Read,
     path::{Path, PathBuf},
@@ -67,6 +68,33 @@ pub struct Game {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 impl Game {
+    /// Repair the known compiler false positive in saved libraries without a
+    /// disk-wide rescan. Old owned paths remain available only for cleanup.
+    pub fn repair_renderer(&mut self) {
+        if !self.deployment_dir.is_empty() {
+            return;
+        }
+        let root = installation_root(Path::new(&self.exe));
+        let dx12 = root.join("bin/x64_dx12/witcher3.exe");
+        if is_name(&root, &["The Witcher 3"]) && dx12.is_file() && core::pe64(&dx12, false).is_ok()
+        {
+            let old = std::iter::once(self.exe.clone())
+                .chain(self.targets.clone())
+                .collect::<Vec<_>>();
+            for p in old {
+                if let Some(dir) = Path::new(&p).parent()
+                    && core::key(dir) != core::key(dx12.parent().unwrap())
+                    && dir.join(core::OWN).is_dir()
+                    && !self.cleanup_only.contains(&p)
+                {
+                    self.cleanup_only.push(p);
+                }
+            }
+            self.exe = dx12.to_string_lossy().into();
+            self.targets = vec![self.exe.clone()];
+            self.root = root.to_string_lossy().into();
+        }
+    }
     pub fn deployment_target(&self, exe: &Path) -> core::DeploymentTarget {
         let mut target = if self.deployment_dir.is_empty() {
             core::DeploymentTarget::for_game(exe)
@@ -94,6 +122,16 @@ impl Game {
         } else {
             self.targets.clone()
         }
+    }
+    /// One current target per directory, in library order. Cleanup-only paths
+    /// remain process guards, never installation destinations.
+    pub fn deployment_targets(&self) -> Vec<core::DeploymentTarget> {
+        let mut seen = BTreeSet::new();
+        self.deployment_executables()
+            .iter()
+            .map(|exe| self.deployment_target(Path::new(exe)))
+            .filter(|target| seen.insert(core::key(&target.directory)))
+            .collect()
     }
 }
 #[derive(Debug, Serialize, Default)]
@@ -175,7 +213,13 @@ pub fn is_gpu_diagnostic_tool(exe: &Path) -> bool {
             executable_role(&name.to_string_lossy())
                 .to_ascii_lowercase()
                 .as_str(),
-            "vulkaninfo" | "vulkaninfo32" | "vulkaninfo64" | "nvidia-smi" | "nvidia-debugdump"
+            "vulkaninfo"
+                | "vulkaninfo32"
+                | "vulkaninfo64"
+                | "nvidia-smi"
+                | "nvidia-debugdump"
+                | "d3d12stateobjectcompiler"
+                | "d3d12warpcompiler"
         )
     })
 }
@@ -193,6 +237,15 @@ fn auxiliary_exe(name: &str) -> bool {
         "shadercompiler",
         "workshoptool",
         "workshoputility",
+        "updater",
+        "downloader",
+        "webhelper",
+        "subprocess",
+        "helper",
+        "patcher",
+        "crashreporter",
+        "uninstaller",
+        "installer",
     ]
     .iter()
     .any(|suffix| role_suffix(role, suffix))
@@ -207,7 +260,10 @@ fn auxiliary_exe(name: &str) -> bool {
             "crashpad_handler|crashsender[0-9]*|unitycrashhandler(?:32|64)?|",
             "unins[0-9]*|uninstall|uninstaller|",
             "setup(?:32|64)?|install|installer|launcher|updater|",
-            "benchmarkreport|reporter|helper|cefsubprocess|epicwebhelper|",
+            "benchmarkreport|reporter|helper|cefsubprocess|epicwebhelper|qtwebengineprocess|",
+            "steamcmd|hlmv|hammer|vpk|vvis|vrad|vbsp|srcds(?:_win64)?|",
+            "sandbox|shadercachegen|rc|crysbsrenderapp|gameserver|",
+            "iipshostapp|fixdownload|",
             "easyanticheat(?:_eos)?(?:_setup)?|beservice(?:_x64)?|",
             "start_protected_game|startprotectedgame|eaanticheat(?:_game_service_launcher)?|",
             "steamservice|steamerrorreporter|steamwebhelper|",
@@ -222,6 +278,86 @@ fn auxiliary_exe(name: &str) -> bool {
     // Protected launchers also appear with Unreal's Shipping suffix. Match
     // both their original filename and the normalized role above.
     tool.is_match(name) || tool.is_match(&format!("{role}.exe"))
+}
+
+#[cfg(test)]
+mod engine_scan_tests {
+    use super::*;
+    use crate::game_installations::{self as installs, Install};
+    use serde_json::json;
+    fn exe(path: &Path) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let mut bytes = vec![0u8; 512];
+        bytes[..2].copy_from_slice(b"MZ");
+        bytes[60..64].copy_from_slice(&128u32.to_le_bytes());
+        bytes[128..132].copy_from_slice(b"PE\0\0");
+        bytes[132..134].copy_from_slice(&0x8664u16.to_le_bytes());
+        fs::write(path, bytes).unwrap();
+    }
+    #[test]
+    fn epic_declared_entry_does_not_require_engine_or_dlss_and_rejects_helper() {
+        let t = tempfile::tempdir().unwrap();
+        let game = t.path().join("Unusual client/bin/Render.exe");
+        exe(&game);
+        let manifest = t
+            .path()
+            .join("ProgramData/Epic/EpicGamesLauncher/Data/Manifests/game.item");
+        let root = game.parent().unwrap().parent().unwrap();
+        let mut value = json!({"InstallLocation":root,"DisplayName":"Epic Test",
+            "AppName":"title","MainGameAppName":"title","CatalogNamespace":"test","CatalogItemId":"42",
+            "LaunchExecutable":"bin/Render.exe"});
+        core::atomic_json(&manifest, &value).unwrap();
+        let cancel = AtomicBool::new(false);
+        let records = installs::epic(&t.path().join("ProgramData"), &cancel);
+        let report = scan_with_records(&[root.into()], &cancel, |_, _, _| {}, records).unwrap();
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(core::key(Path::new(&report.rows[0].exe)), core::key(&game));
+        assert_eq!(report.rows[0].title, "Epic Test");
+        let helper = root.join("RenderHelper.exe");
+        exe(&helper);
+        value["LaunchExecutable"] = json!("RenderHelper.exe");
+        core::atomic_json(&manifest, &value).unwrap();
+        let records = installs::epic(&t.path().join("ProgramData"), &cancel);
+        assert!(
+            scan_with_records(&[root.into()], &cancel, |_, _, _| {}, records)
+                .unwrap()
+                .rows
+                .is_empty()
+        );
+    }
+    #[test]
+    fn declared_root_bootstrap_does_not_replace_nested_unreal_renderer() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("Epic Game");
+        let launcher = root.join("Start.exe");
+        let game = root.join("Project/Binaries/Win64/Real-Win64-Shipping.exe");
+        exe(&launcher);
+        exe(&game);
+        fs::create_dir(root.join("Engine")).unwrap();
+        let mut record = Install::new(root.clone(), "Epic", "Epic Game");
+        record.executable = Some(launcher);
+        let report =
+            scan_with_records(&[root], &AtomicBool::new(false), |_, _, _| {}, vec![record])
+                .unwrap();
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(report.rows[0].targets.len(), 1);
+        assert_eq!(core::key(Path::new(&report.rows[0].exe)), core::key(&game));
+    }
+    #[test]
+    fn platform_directory_only_admits_matching_game_not_unrelated_programs() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("EA Title");
+        let game = root.join("EATitle.exe");
+        exe(&game);
+        exe(&root.join("Other.exe"));
+        exe(&root.join("EATitleUpdater.exe"));
+        let records = vec![Install::new(root.clone(), "EA", "EA Title")];
+        let report =
+            scan_with_records(&[root], &AtomicBool::new(false), |_, _, _| {}, records).unwrap();
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(report.rows[0].targets.len(), 1);
+        assert_eq!(core::key(Path::new(&report.rows[0].exe)), core::key(&game));
+    }
 }
 
 fn non_rendering_role(exe: &Path) -> bool {
@@ -354,6 +490,7 @@ fn renderer_name(path: &Path, root: &Path) -> bool {
     let stem = compact(&stem);
     let folder = compact(&folder);
     stem == folder
+        || (stem == "witcher3" && folder == "thewitcher3")
         || (!folder.is_empty() && stem.starts_with(&folder))
         || (stem.len() >= 4 && folder.starts_with(&stem))
         || stem.contains("dx12")
@@ -365,24 +502,104 @@ fn renderer_name(path: &Path, root: &Path) -> bool {
 pub struct Evidence {
     pub frame_generation: bool,
     pub super_resolution: bool,
+    /// Streamline SR wrapper alone is a clue, not a complete SR runtime.
+    pub super_resolution_plugin: bool,
+    pub component_paths: Vec<PathBuf>,
+    /// Native FG/Streamline evidence, also used to keep added FG separate from
+    /// a game's existing integration. Patch-private folders remain excluded.
+    pub frame_integration_paths: Vec<PathBuf>,
     pub anti_cheat: bool,
     pub limited: bool,
 }
+impl Evidence {
+    /// SR wrappers and shared Streamline helpers alone do not prove native FG.
+    /// Ambiguous FidelityFX integrations remain protected conservatively.
+    pub fn native_frame_generation(&self) -> bool {
+        self.frame_generation
+            || self.frame_integration_paths.iter().any(|p| {
+                p.file_name().is_some_and(|n| {
+                    [
+                        "nvngx_dlssg.dll",
+                        "sl.dlss_g.dll",
+                        "libxess_fg.dll",
+                        "amd_fidelityfx_dx12.dll",
+                        "amd_fidelityfx_vk.dll",
+                        "ffx_fsr3_x64.dll",
+                        "ffx_fsr3frameinterpolation_x64.dll",
+                    ]
+                    .iter()
+                    .any(|expected| n.eq_ignore_ascii_case(expected))
+                })
+            })
+    }
+    pub fn neural_input(&self) -> bool {
+        self.super_resolution
+            || self.component_paths.iter().any(|p| {
+                p.file_name()
+                    .is_some_and(|n| n.eq_ignore_ascii_case("nvngx_dlssd.dll"))
+            })
+    }
+}
 /// Bounded, read-only component discovery, called only in a background worker.
+pub(crate) fn patch_runtime_directory(name: &str) -> bool {
+    [
+        "dlssg_sm86",
+        "rtx-encore-runtimes",
+        "rtxmfg-xess",
+        "optiscaler",
+        ".rtx-fg-nr",
+        ".rtx-fg-runtimes",
+        ".rtx-fg-v3",
+        "backup",
+        "backups",
+    ]
+    .contains(&name.to_ascii_lowercase().as_str())
+}
 pub fn inspect(exe: &Path) -> Evidence {
-    use crate::platform::MetadataExt;
+    inspect_with_limits(exe, 1024, 50_000, 1000)
+}
+
+/// Installation runs in a worker and needs a complete inventory, including
+/// large asset trees that exceed the lightweight UI scan. Limits still fail
+/// closed; reaching one must never be interpreted as a missing integration.
+pub fn inspect_for_installation(exe: &Path) -> Evidence {
+    inspect_with_limits(exe, 32_768, 500_000, 15_000)
+}
+
+fn inspect_with_limits(
+    exe: &Path,
+    max_directories: usize,
+    max_entries: usize,
+    max_millis: u128,
+) -> Evidence {
+    use std::{
+        cmp::Reverse,
+        collections::{BinaryHeap, HashSet},
+    };
     let mut result = Evidence::default();
-    let Ok(root) = core::no_links(&game_root(exe)) else {
+    let Ok(root) = core::no_links(&installation_root(exe)) else {
         result.limited = true;
         return result;
     };
+    // Component discovery differs from EXE discovery: ThirdParty contains the
+    // actual Unreal DLSS DLLs and must never inherit the launcher's exclusion.
+    // Prioritize executable/plugin paths, then search other folders within this
+    // installation. No title-specific paths and no traversal into other games.
+    let mut pending = BinaryHeap::from([Reverse((0u32, 0u32, root.clone()))]);
+    if let Some(dir) = exe.parent()
+        && let Ok(dir) = core::no_links(dir)
+        && dir.starts_with(&root)
+    {
+        pending.push(Reverse((0, 0, dir)));
+    }
     let started = Instant::now();
-    let mut pending = std::collections::VecDeque::from([(root, 0)]);
+    let mut visited = HashSet::new();
     let mut entries = 0;
-    let mut directories = 0;
-    while let Some((dir, depth)) = pending.pop_front() {
-        directories += 1;
-        if directories > 256 || started.elapsed().as_millis() > 250 {
+    while let Some(Reverse((cost, depth, dir))) = pending.pop() {
+        if !visited.insert(core::key(&dir)) {
+            continue;
+        }
+        if visited.len() > max_directories || started.elapsed().as_millis() > max_millis {
             result.limited = true;
             break;
         }
@@ -392,7 +609,7 @@ pub fn inspect(exe: &Path) -> Evidence {
         };
         for row in rows {
             entries += 1;
-            if entries > 16000 || started.elapsed().as_millis() > 250 {
+            if entries > max_entries || started.elapsed().as_millis() > max_millis {
                 result.limited = true;
                 return result;
             }
@@ -414,12 +631,78 @@ pub fn inspect(exe: &Path) -> Evidence {
                 || name == "acesafe.sys"
                 || name == "anticheatexpert";
             if meta.is_file() {
-                result.frame_generation |=
-                    ["nvngx_dlssg.dll", "sl.dlss_g.dll"].contains(&name.as_str());
-                result.super_resolution |= name == "nvngx_dlss.dll";
-            } else if meta.is_dir() && !SKIP.contains(&name.as_str()) {
-                if depth < 6 {
-                    pending.push_back((row.path(), depth + 1));
+                if [
+                    "nvngx_dlssg.dll",
+                    "sl.interposer.dll",
+                    "sl.common.dll",
+                    "sl.dlss_g.dll",
+                    "sl.reflex.dll",
+                    "sl.pcl.dll",
+                    "libxess_fg.dll",
+                    "amd_fidelityfx_dx12.dll",
+                    "amd_fidelityfx_vk.dll",
+                    "ffx_fsr3_x64.dll",
+                    "ffx_fsr3upscaler_x64.dll",
+                    "ffx_fsr3frameinterpolation_x64.dll",
+                    "sl.dlss.dll",
+                ]
+                .contains(&name.as_str())
+                {
+                    if result.frame_integration_paths.len() < 128 {
+                        result.frame_integration_paths.push(row.path());
+                    } else {
+                        result.limited = true;
+                    }
+                }
+                let fg = ["nvngx_dlssg.dll", "sl.dlss_g.dll"].contains(&name.as_str());
+                let sr = name == "nvngx_dlss.dll";
+                let plugin = name == "sl.dlss.dll";
+                result.frame_generation |= fg;
+                result.super_resolution |= sr;
+                result.super_resolution_plugin |= plugin;
+                if fg || sr || plugin || name == "nvngx_dlssd.dll" {
+                    if result.component_paths.len() < 32 {
+                        result.component_paths.push(row.path());
+                    } else {
+                        result.limited = true;
+                    }
+                }
+            } else if meta.is_dir()
+                && (name == "thirdparty" || !SKIP.contains(&name.as_str()))
+                && !patch_runtime_directory(&name)
+            {
+                if depth < 16 {
+                    let priority = if [
+                        "engine",
+                        "plugins",
+                        "plugin",
+                        "binaries",
+                        "bin",
+                        "bin64",
+                        "x64",
+                        "x86_64",
+                        "win64",
+                        "x64_dx12",
+                        "thirdparty",
+                        "nvidia",
+                        "dlss",
+                        "streamline",
+                        "streamlinecore",
+                        "marketplace",
+                        "runtime",
+                    ]
+                    .contains(&name.as_str())
+                        || name.ends_with("_data")
+                    {
+                        0
+                    } else if ["content", "paks", "movies", "videos", "audio", "textures"]
+                        .contains(&name.as_str())
+                    {
+                        32
+                    } else {
+                        1
+                    };
+                    pending.push(Reverse((cost + priority, depth + 1, row.path())));
                 } else {
                     result.limited = true;
                 }
@@ -428,6 +711,53 @@ pub fn inspect(exe: &Path) -> Evidence {
     }
     result
 }
+
+#[cfg(test)]
+mod component_inventory_tests {
+    use super::*;
+
+    #[test]
+    fn installation_inventory_completes_a_truncated_preview_without_crossing_games() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let root = tmp.path().join("Game");
+        let exe = root.join("Game.exe");
+        let runtime = root.join("render/provider/nvngx_dlssg.dll");
+        fs::create_dir_all(runtime.parent().unwrap())?;
+        fs::write(&exe, b"fixture")?;
+        fs::write(&runtime, b"native runtime")?;
+        let backup = root.join(".rtx-fg-runtimes/fg");
+        fs::create_dir_all(&backup)?;
+        fs::write(backup.join("nvngx_dlss.dll"), b"backup")?;
+        let neighbor = tmp.path().join("OtherGame");
+        fs::create_dir(&neighbor)?;
+        fs::write(neighbor.join("nvngx_dlss.dll"), b"other game")?;
+        let preview = inspect_with_limits(&exe, 1, 50_000, 15_000);
+        assert!(preview.limited);
+        assert!(!preview.frame_generation);
+        let installed = inspect_for_installation(&exe);
+        assert!(!installed.limited);
+        assert_eq!(installed.component_paths, vec![runtime]);
+        assert!(!installed.super_resolution);
+        Ok(())
+    }
+
+    #[test]
+    fn component_capacity_is_reported_as_incomplete_not_a_complete_subset() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let exe = tmp.path().join("Game.exe");
+        fs::write(&exe, b"fixture")?;
+        for i in 0..33 {
+            let dir = tmp.path().join(format!("provider{i}"));
+            fs::create_dir(&dir)?;
+            fs::write(dir.join("nvngx_dlss.dll"), b"native runtime")?;
+        }
+        let evidence = inspect_for_installation(&exe);
+        assert_eq!(evidence.component_paths.len(), 32);
+        assert!(evidence.limited);
+        Ok(())
+    }
+}
+
 fn is_name(p: &Path, names: &[&str]) -> bool {
     p.file_name()
         .is_some_and(|n| names.iter().any(|s| n.eq_ignore_ascii_case(s)))
@@ -441,11 +771,15 @@ fn unreal_binary_dir(dir: &Path) -> bool {
             "win64h",
             "win64rh",
             "win64hr",
+            "wingdk",
             "win64_shipping",
         ],
     ) && dir.parent().is_some_and(|p| is_name(p, &["binaries"]))
 }
 pub fn game_root(exe: &Path) -> PathBuf {
+    if let Some(install) = crate::game_installations::wegame_renderer(exe) {
+        return install.root;
+    }
     let d = exe.parent().unwrap();
     if unreal_binary_dir(d) {
         let project = d.parent().unwrap().parent().unwrap();
@@ -455,8 +789,20 @@ pub fn game_root(exe: &Path) -> PathBuf {
             project.into()
         };
     }
-    if is_name(d, &["x64"]) && d.parent().is_some_and(|p| is_name(p, &["bin"])) {
-        return d.parent().unwrap().parent().unwrap().into();
+    if is_name(
+        d,
+        &["x64", "x64_dx12", "win64", "win_x64", "win_x64_release"],
+    ) && d.parent().is_some_and(|p| is_name(p, &["bin"]))
+    {
+        let root = d.parent().unwrap().parent().unwrap();
+        return if is_name(root, &["game"])
+            && d.join("engine2.dll").is_file()
+            && d.join("tier0.dll").is_file()
+        {
+            root.parent().unwrap_or(root).into()
+        } else {
+            root.into()
+        };
     }
     if is_name(d, &["bin", "bin64", "x64", "win64"]) {
         return d.parent().unwrap_or(d).into();
@@ -528,7 +874,20 @@ fn ancestors_into(p: &Path, set: &mut HashSet<String>) {
 pub fn scan(
     roots: &[PathBuf],
     cancel: &AtomicBool,
+    progress: impl FnMut(u64, u64, &Path),
+) -> Result<Report> {
+    let records = if cancel.load(Ordering::Relaxed) {
+        vec![]
+    } else {
+        crate::game_installations::scan_records(cancel)
+    };
+    scan_with_records(roots, cancel, progress, records)
+}
+fn scan_with_records(
+    roots: &[PathBuf],
+    cancel: &AtomicBool,
     mut progress: impl FnMut(u64, u64, &Path),
+    mut records: Vec<crate::game_installations::Install>,
 ) -> Result<Report> {
     let start = Instant::now();
     let mut report = Report::default();
@@ -538,6 +897,8 @@ pub fn scan(
     let mut anti = HashSet::new();
     let mut candidates = Vec::new();
     let mut steam_dirs = HashSet::new();
+    let mut engine_entries = HashSet::new();
+    let mut platform_entries = HashSet::new();
     for root in roots {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -598,8 +959,8 @@ pub fn scan(
                     continue;
                 }
                 if meta.is_dir() {
+                    subnames.push(lower.clone());
                     if !SKIP.contains(&lower.as_str()) {
-                        subnames.push(lower);
                         stack.push(entry.path());
                     } else {
                         report.skip(&entry.path(), "已跳过系统或缓存目录");
@@ -625,19 +986,79 @@ pub fn scan(
             if report.directories % 100 == 0 {
                 progress(report.directories, report.skipped, &dir);
             }
+            if subnames.iter().any(|n| n == "__installer")
+                && let Some(record) = crate::game_installations::ea(&dir)
+            {
+                records.push(record);
+            }
+            if names.contains(".build.info")
+                && let Some(record) = crate::game_installations::build_info(&dir)
+            {
+                records.push(record);
+            }
+            for (_, path) in files.iter().filter(|(name, _)| {
+                let name = name.to_ascii_lowercase();
+                (name.starts_with("goggame-") || name.starts_with("goggame_"))
+                    && name.ends_with(".info")
+            }) {
+                records.extend(crate::game_installations::gog_entries(path));
+            }
             for (name, path) in files {
+                // Crytek's canonical GameLauncher is the renderer itself, but
+                // only when its project/asset/engine layout is verified.
+                let cry = name
+                    .eq_ignore_ascii_case("GameLauncher.exe")
+                    .then(|| crate::game_engines::cryengine(&path))
+                    .flatten();
                 if !name.to_lowercase().ends_with(".exe")
-                    || auxiliary_exe(&name)
+                    || auxiliary_exe(&name) && cry.is_none()
                     || is_steam_client_binary(&path)
-                    || core::pe64(&path, false).is_err()
                 {
                     continue;
                 }
+                if let Err(error) = core::pe64(&path, false) {
+                    if error.chain().any(|e| {
+                        e.downcast_ref::<std::io::Error>()
+                            .is_some_and(|io| io.kind() == std::io::ErrorKind::PermissionDenied)
+                    }) {
+                        report.skip(&path, &crate::xbox::access_hint(&path));
+                    }
+                    continue;
+                }
+                let xbox = crate::xbox::identified(&path);
+                let wegame = crate::game_installations::wegame_renderer(&path);
+                let engine = cry.or_else(|| crate::game_engines::probe(&path, &names));
                 let mut row = Game {
                     exe: path.to_string_lossy().into(),
-                    root: installation_root(&path).to_string_lossy().into(),
+                    root: xbox
+                        .as_ref()
+                        .map(|g| g.root.clone())
+                        .unwrap_or_else(|| installation_root(&path))
+                        .to_string_lossy()
+                        .into(),
+                    title: xbox.as_ref().map(|g| g.title.clone()).unwrap_or_default(),
                     ..Default::default()
                 };
+                if xbox.is_some() {
+                    row.rank += 40;
+                    row.reasons.push("Xbox PC 安装信息已确认入口".into());
+                }
+                if let Some(install) = wegame {
+                    row.root = install.root.display().to_string();
+                    row.title = install.title;
+                    row.rank += 40;
+                    row.reasons.push("WeGame 安装信息已确认游戏本体".into());
+                }
+                if let Some(entry) = engine {
+                    row.root = entry.root.display().to_string();
+                    if !entry.title.is_empty() {
+                        row.title = entry.title;
+                    }
+                    row.rank += 30;
+                    row.reasons
+                        .push(format!("{} 游戏结构已确认（兼容性待确认）", entry.engine));
+                    engine_entries.insert(core::key(&path));
+                }
                 if names.contains("nvngx_dlssg.dll") || names.contains("sl.dlss_g.dll") {
                     row.rank += 80;
                     row.reasons.push("同目录有 DLSS 帧生成组件".into());
@@ -672,6 +1093,16 @@ pub fn scan(
     let manifests = steam_manifests(&steam_dirs);
     let mut groups: BTreeMap<String, Vec<Game>> = BTreeMap::new();
     for mut row in candidates {
+        if let Some((record, _)) = crate::game_installations::scan_match(&row, &records) {
+            row.root = record.root.display().to_string();
+            if !record.title.is_empty() {
+                row.title = record.title.clone();
+            }
+            row.rank += 40;
+            row.reasons
+                .push(format!("{} 安装记录已确认游戏入口", record.source));
+            platform_entries.insert(core::key(Path::new(&row.exe)));
+        }
         let base = Path::new(&row.root);
         let exe = Path::new(&row.exe);
         if let Some((steam, title)) = steam_root(exe).and_then(|steam| {
@@ -690,6 +1121,18 @@ pub fn scan(
             };
             row.rank += 35;
             row.reasons.push("Steam 已安装游戏".into());
+            if !renderer_name(exe, base)
+                && crate::game_engines::graphics_import(exe)
+                && crate::game_name_windows::products(exe)
+                    .iter()
+                    .any(|product| {
+                        crate::game_engines::normalized(product)
+                            == crate::game_engines::normalized(title)
+                    })
+            {
+                platform_entries.insert(core::key(exe));
+                row.reasons.push("游戏产品信息与图形入口已确认".into());
+            }
         }
         if base.parent().is_some()
             && evidence.contains(&core::key(base))
@@ -720,7 +1163,10 @@ pub fn scan(
         if renderer_name(exe, base) {
             row.rank += 15;
         }
-        if name.contains("dx12") || name.contains("d3d12") {
+        if name.contains("dx12")
+            || name.contains("d3d12")
+            || exe.parent().is_some_and(|dir| is_name(dir, &["x64_dx12"]))
+        {
             row.rank += 10;
         }
         row.anti = anti.contains(&core::key(base));
@@ -747,12 +1193,24 @@ pub fn scan(
         let has_unity = rows
             .iter()
             .any(|g| g.reasons.iter().any(|r| r.contains("Unity 游戏本体")));
+        let has_engine = rows
+            .iter()
+            .any(|g| engine_entries.contains(&core::key(Path::new(&g.exe))));
         let owned = rows.iter().any(|g| {
             Path::new(&g.exe)
                 .parent()
                 .is_some_and(|p| p.join(core::OWN).is_dir())
         });
-        if rows[0].title.is_empty() && !has_unreal && !has_unity && !has_named && !owned {
+        if rows[0].title.is_empty()
+            && !has_unreal
+            && !has_unity
+            && !has_engine
+            && !has_named
+            && !owned
+            && !rows
+                .iter()
+                .any(|g| platform_entries.contains(&core::key(Path::new(&g.exe))))
+        {
             report.skip(
                 Path::new(&rows[0].root),
                 "缺少可确认的游戏身份线索，仍可手动添加",
@@ -770,14 +1228,29 @@ pub fn scan(
             let unity = row.reasons.iter().any(|r| r.contains("Unity 游戏本体"));
             let local_fg = row.reasons.iter().any(|r| r == "同目录有 DLSS 帧生成组件");
             let owned = path.parent().unwrap().join(core::OWN).is_dir();
+            let xbox = row
+                .reasons
+                .iter()
+                .any(|r| r == "Xbox PC 安装信息已确认入口");
+            let wegame = row
+                .reasons
+                .iter()
+                .any(|r| r == "WeGame 安装信息已确认游戏本体");
+            let engine = engine_entries.contains(&core::key(path));
+            let platform = platform_entries.contains(&core::key(path));
             // A Steam manifest identifies the installation, not every EXE in
             // it. Root-wide DLSS evidence likewise cannot identify a sidecar
             // utility in another directory as a rendering process.
-            if (has_unreal && !unreal)
+            if (has_unreal && !unreal && !xbox && !wegame)
+                || ((has_engine || has_unity) && !engine && !unity && !unreal && !owned)
                 || (!unreal
                     && !unity
+                    && !engine
+                    && !platform
                     && !renderer_name(path, Path::new(&row.root))
                     && !local_fg
+                    && !xbox
+                    && !wegame
                     && !owned)
             {
                 continue;
@@ -795,6 +1268,7 @@ pub fn scan(
             .expect("first deployment target belongs to scan group");
         // The first surviving renderer is the display icon and parameter target.
         primary.targets = targets;
+        primary.repair_renderer();
         report.rows.push(primary);
     }
     report.rows.sort_by(|a, b| {

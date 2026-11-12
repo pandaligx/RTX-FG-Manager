@@ -1,8 +1,4 @@
 //! Synthetic filesystem regressions; no game DLL is loaded or executed.
-// These regressions exercise Win32 handles, share modes and CREATE_NO_WINDOW
-// directly, so the whole test binary is Windows-only. It compiles to nothing elsewhere.
-#![cfg(windows)]
-
 use anyhow::Result;
 use rtx_fg_manager::{cleanup, cloud, core, deployment, presets, rtxmfg, rtxmfg_upgrade, scanner};
 use std::{collections::BTreeMap, fs, os::windows::fs::OpenOptionsExt};

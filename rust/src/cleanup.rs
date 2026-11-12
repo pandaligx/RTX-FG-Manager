@@ -238,6 +238,39 @@ fn legacy_identity(journal: &Path) -> Result<Option<String>> {
     );
     Ok(Some(dll.into()))
 }
+/// Only private paths from our directory bundles are eligible. This is cleanup
+/// recognition, never a whitelist for installing a newly signed proxy.
+pub fn private_components(record: &Record) -> &'static [&'static str] {
+    match record.backend.as_str() {
+        crate::upstream040::BACKEND => &crate::upstream040::COMPONENTS,
+        crate::encore::BACKEND => &crate::encore::INTEL_FILES,
+        _ => &[],
+    }
+}
+pub fn known_component(path: &Path, name: &str) -> Result<bool> {
+    let path = core::no_links(path)?;
+    if !path.is_file() || path.metadata()?.len() > 128 * 1024 * 1024 {
+        return Ok(false);
+    }
+    let catalog: Value = serde_json::from_str(include_str!("../assets/component-cleanup.json"))?;
+    let Some(expected) = catalog.get(name) else {
+        return Ok(false);
+    };
+    let (sha, image) = identity(&path)?;
+    Ok(expected["sha256"]
+        .as_array()
+        .is_some_and(|a| a.iter().any(|h| h.as_str() == Some(&sha)))
+        || image.is_some_and(|image| {
+            expected["image_sha256"]
+                .as_array()
+                .is_some_and(|a| a.iter().any(|h| h.as_str() == Some(&image)))
+        }))
+}
+pub fn orphaned_components(dir: &Path) -> bool {
+    crate::upstream040::COMPONENTS
+        .iter()
+        .any(|name| known_component(&dir.join(name), name).unwrap_or(false))
+}
 fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Option<Record>> {
     let mut hashes = BTreeMap::new();
     let mut delta_runtime = false;
@@ -252,7 +285,12 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
         }
     }
     let helper = core::no_links(&dir.join(HELPER))?;
-    if hashes.is_empty() && legacy.is_none() && !(helper.is_file() && known_helper(&helper)?) {
+    let upstream_components = orphaned_components(dir);
+    if hashes.is_empty()
+        && legacy.is_none()
+        && !upstream_components
+        && !(helper.is_file() && known_helper(&helper)?)
+    {
         return Ok(None);
     }
     if hashes.is_empty() {
@@ -298,6 +336,20 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
             core::hash(b"")
         },
     );
+    if upstream_components && !encore && !rtxmfg && !transfusion {
+        for name in crate::upstream040::COMPONENTS {
+            let path = dir.join(name);
+            // A lost old marker must not grant ownership to an unknown neighbor.
+            hashes.insert(
+                name.into(),
+                if known_component(&path, name)? {
+                    core::digest(&path)?
+                } else {
+                    core::hash(b"")
+                },
+            );
+        }
+    }
     if encore {
         let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
         // A manually copied notice is owned only when it is byte-identical to
@@ -325,6 +377,8 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
             crate::rtxmfg::BACKEND
         } else if transfusion {
             crate::transfusion::BACKEND
+        } else if upstream_components {
+            crate::upstream040::BACKEND
         } else {
             "manual"
         }
@@ -345,14 +399,27 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
         },
         delta_legacy_cache: delta_runtime,
         cache_pending: false,
+        cleanup_pending_reasons: Vec::new(),
     }))
 }
 fn is_log(name: &str) -> bool {
-    ["loader_", "backend_", "native_"].iter().any(|p| {
-        name.strip_prefix(p)
-            .and_then(|n| n.strip_suffix(".jsonl"))
-            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
-    })
+    if matches!(name, "dlssg_sm86.log" | "frame_timing.txt") {
+        return true;
+    }
+    if name
+        .strip_prefix("ngx_log_")
+        .and_then(|s| s.strip_suffix(".txt"))
+        .is_some_and(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return true;
+    }
+    ["loader_", "backend_", "native_", "frames_"]
+        .iter()
+        .any(|p| {
+            name.strip_prefix(p)
+                .and_then(|n| n.strip_suffix(".jsonl"))
+                .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        })
 }
 fn cache_owned(path: &Path, name: &str) -> Result<bool> {
     if !path.is_file() || path.metadata()?.len() > 128 * 1024 * 1024 {
@@ -412,9 +479,30 @@ fn scan_generated(
     }
     Ok(())
 }
+fn encore_log_name(name: &str) -> bool {
+    const NAMES: [&str; 8] = [
+        "rtx-encore-status.json",
+        "rtx-encore.log",
+        "rtx-encore.crash.log",
+        "rtx-encore_perf.csv",
+        "rtx-encore_nr.csv",
+        "rtx-encore_nr_open_steps.csv",
+        "rtx-encore.gpu-bootstrap.log",
+        "rtx-encore.log.previous-legacy.log",
+    ];
+    static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
+    let rotated = ROTATED.get_or_init(|| {
+        regex::Regex::new(
+            r"^(rtx-encore_frames_[0-9]{1,10}\.jsonl|rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log|rtx-encore-[0-9]{1,10}-[0-9]{1,20}((\.(crash|calls))?\.log|\.(dump[0-9]{1,10}|exit|gpu|hang)\.dmp))$",
+        )
+        .expect("fixed Encore session-log pattern")
+    });
+    NAMES.contains(&name) || rotated.is_match(name)
+}
+
 /// The Encore runtime owns fixed outputs in a fixed adjacent directory. Do not
 /// interpret paths in JSONC, recursively erase this directory, or claim arbitrary
-/// .log/.csv files placed here by another program.
+/// .log/.csv/.dmp files placed here by another program.
 fn scan_encore_logs(
     dir: &Path,
     kept: &mut BTreeSet<PathBuf>,
@@ -439,20 +527,6 @@ fn scan_encore_logs(
         kept.insert(root);
         return Ok(());
     }
-    const NAMES: [&str; 5] = [
-        "rtx-encore.log",
-        "rtx-encore.crash.log",
-        "rtx-encore_perf.csv",
-        "rtx-encore_nr.csv",
-        "rtx-encore_nr_open_steps.csv",
-    ];
-    static ROTATED: OnceLock<regex::Regex> = OnceLock::new();
-    let rotated = ROTATED.get_or_init(|| {
-        regex::Regex::new(
-            r"^rtx-encore\.log\.previous-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9]{1,10}\.log$",
-        )
-        .expect("fixed Encore session-log pattern")
-    });
     for entry in fs::read_dir(&root)? {
         let entry = entry?;
         // Treat links as unknown and retain them. Never follow the target while
@@ -464,10 +538,7 @@ fn scan_encore_logs(
         }
         let path = core::no_links(&path)?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if (NAMES.contains(&name.as_str()) || rotated.is_match(&name))
-            && path.is_file()
-            && path.metadata()?.len() <= 128 * 1024 * 1024
-        {
+        if encore_log_name(&name) && path.is_file() {
             targets.insert(path.clone(), core::digest(&path)?);
         } else {
             kept.insert(path);
@@ -478,6 +549,62 @@ fn scan_encore_logs(
 }
 pub fn clean(exe: &Path) -> Result<String> {
     clean_at(&core::DeploymentTarget::for_game(exe))
+}
+/// Check exact manager-owned files as well as the game processes. Driver helpers
+/// may inherit Encore log handles while their executables live outside the game.
+/// This discovery runs before restoring or deleting anything, including retries
+/// after an older release left an incomplete uninstall record.
+pub fn blocking_processes(target: &core::DeploymentTarget) -> Result<Vec<win::BlockingProcess>> {
+    let target = target.validate(false)?;
+    let mut processes = core::blocking_processes(&target)?
+        .into_iter()
+        .map(|p| (p.pid, p))
+        .collect::<BTreeMap<_, _>>();
+    let dir = &target.directory;
+    let record = core::record(dir)?;
+    let Some(record) = record else {
+        return Ok(processes.into_values().collect());
+    };
+    target.validate_record(&record)?;
+    let mut files = BTreeSet::new();
+    let mut add = |path: PathBuf| -> Result<()> {
+        match fs::symlink_metadata(&path) {
+            Ok(meta) if !core::is_link(&meta) && meta.is_file() => {
+                files.insert(core::no_links(&path)?);
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+        ensure!(files.len() <= 4096, "待检查文件过多，请关闭游戏后重试");
+        Ok(())
+    };
+    for name in record.hashes.keys() {
+        add(dir.join(name))?;
+    }
+    add(dir.join(core::config_name(&record.backend)))?;
+    if record.backend == crate::encore::BACKEND {
+        let logs = dir.join("rtx-encore-logs");
+        match fs::symlink_metadata(&logs) {
+            Ok(meta) if !core::is_link(&meta) && meta.is_dir() => {
+                core::no_links(&logs)?;
+                for (index, entry) in fs::read_dir(logs)?.enumerate() {
+                    ensure!(index < 4096, "待检查文件过多，请关闭游戏后重试");
+                    let entry = entry?;
+                    if encore_log_name(&entry.file_name().to_string_lossy()) {
+                        add(entry.path())?;
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    for process in win::processes_holding_files(&files.into_iter().collect::<Vec<_>>())? {
+        processes.insert(process.pid, process);
+    }
+    Ok(processes.into_values().collect())
 }
 pub fn clean_at(target: &core::DeploymentTarget) -> Result<String> {
     Ok(clean_outcome_at(target)?.message)
@@ -490,13 +617,101 @@ pub struct CleanOutcome {
     pub complete: bool,
 }
 pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome> {
+    clean_outcome(target, false)
+}
+/// A residual retry must never turn into a fresh uninstall after a reinstall.
+/// Check under the same per-game lock as the mutation.
+pub fn retry_pending_at(target: &core::DeploymentTarget) -> Result<CleanOutcome> {
+    clean_outcome(target, true)
+}
+/// Old releases could leave these empty directories after removing the marker.
+/// Without a record, remove only the fixed empty directories, never their files
+/// or unknown siblings. In particular, don't recursively erase backup folders.
+fn prune_empty_manager_dirs(root: &Path) -> Result<bool> {
+    let root = core::no_links(root)?;
+    if !root.is_dir() {
+        return Ok(false);
+    }
+    let mut changed = false;
+    for name in ["cache", "logs"] {
+        let child = root.join(name);
+        match fs::symlink_metadata(&child) {
+            Ok(meta) if !core::is_link(&meta) && meta.is_dir() => {
+                if fs::read_dir(&child)?.next().is_none() {
+                    fs::remove_dir(&child)?;
+                    changed = true;
+                }
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    if fs::read_dir(&root)?.next().is_none() {
+        fs::remove_dir(&root)?;
+        changed = true;
+    }
+    Ok(changed)
+}
+fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<CleanOutcome> {
     let target = target.validate(false)?;
     let p = target.game_exe.clone();
     let dir = &target.directory;
     let _lock = win::game_lock(dir)?;
-    core::assert_target_stopped(&target)?;
-    crate::encore_upgrade::recover_locked(&target)?;
-    crate::rtxmfg_upgrade::recover_locked(&target)?;
+    let blockers = blocking_processes(&target)?;
+    ensure!(
+        blockers.is_empty(),
+        "请先完全退出游戏及占用补丁文件的后台进程，再重试：{}",
+        blockers
+            .iter()
+            .map(|p| format!("{} (PID {})", p.name, p.pid))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    if pending_only {
+        let Some(record) = core::record(dir)? else {
+            return Ok(CleanOutcome {
+                message: "没有待清理的卸载记录，状态已刷新。".into(),
+                complete: true,
+            });
+        };
+        target.validate_record(&record)?;
+        ensure!(
+            record.cache_pending,
+            "补丁状态已变化，请刷新后重新查看处理选项。"
+        );
+        // A restored Bink original (or another user's replacement DLL) may
+        // occupy the old entry name. It is not a reinstalled manager patch.
+        for name in record.selected() {
+            let entry = core::no_links(&dir.join(&name))?;
+            if entry.is_file() {
+                ensure!(
+                    record.hashes.get(&name) != Some(&core::digest(&entry)?),
+                    "发现补丁文件或恢复记录，已停止残留清理。请刷新后查看详情。"
+                );
+            }
+        }
+        ensure!(
+            !crate::encore_upgrade::has_pending(dir)?
+                && !crate::rtxmfg_upgrade::has_pending(dir)?
+                && !crate::upstream040_upgrade::has_pending(dir)?,
+            "发现补丁文件或恢复记录，已停止残留清理。请刷新后查看详情。"
+        );
+        // NR is independent and may have been installed after the FG uninstall.
+    } else {
+        crate::neural_runtime::remove_locked(&target)?;
+        crate::runtime_files::remove_locked(&target, "xemfg")?;
+        crate::runtime_files::remove_locked(&target, "encorefg")?;
+        // Restore only files owned by the manager; remove_locked validates the
+        // installed bytes and original backup before touching either file.
+        for kind in ["sr", "rr", "fg"] {
+            crate::runtime_files::remove_locked(&target, kind)?;
+        }
+        crate::encore_upgrade::recover_locked(&target)?;
+        crate::rtxmfg_upgrade::recover_locked(&target)?;
+        crate::rtxmfg_settings::recover_locked(&target)?;
+        crate::upstream040_upgrade::recover_locked(&target)?;
+    }
     let root = core::no_links(&dir.join(OWN))?;
     let journal = core::no_links(&dir.join(".rtx-fg-v3-legacy.json"))?;
     let legacy = legacy_identity(&journal)?;
@@ -518,8 +733,14 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     } {
         Some(r) => r,
         None => {
+            let pruned = prune_empty_manager_dirs(&root)?;
             return Ok(CleanOutcome {
-                message: "未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留".into(),
+                message: if pruned {
+                    "已清理管理器的空缓存目录；其他文件保持不变"
+                } else {
+                    "未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留"
+                }
+                .into(),
                 complete: true,
             });
         }
@@ -540,6 +761,11 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     } else {
         generated_dirs(dir, &ini)?
     };
+    // core creates these private directories for every backend, including
+    // Encore and MFG. Their cleanup must not depend on an INI-based backend.
+    for (name, kind) in [("cache", "cache"), ("logs", "logs")] {
+        merge(&mut roots, root.join(name), kind);
+    }
     ensure!(record.cleanup_dirs.len() <= 64, "清理目录记录无效");
     for (name, kind) in &record.cleanup_dirs {
         ensure!(
@@ -550,6 +776,9 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         merge(&mut roots, p, kind);
     }
     for name in PROXIES {
+        if pending_only {
+            break;
+        }
         let q = core::no_links(&dir.join(name))?;
         if !q.exists() {
             continue;
@@ -563,56 +792,108 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         }
         kept.insert(q);
     }
-    let helper = core::no_links(&dir.join(HELPER))?;
-    if helper.exists() {
-        if helper.is_file() && known_helper(&helper)? {
-            targets.insert(helper.clone(), core::digest(&helper)?);
-        } else {
-            kept.insert(helper);
-        }
-    }
-    let logs: Vec<&str> = if record.backend == crate::encore::BACKEND {
-        Vec::new()
-    } else if record.backend == crate::rtxmfg::BACKEND {
-        crate::rtxmfg::SIDECARS.to_vec()
-    } else if record.backend == crate::transfusion::BACKEND {
-        vec!["DLSSG-Transfusion.log", "DLSSG-Transfusion_perf.csv"]
-    } else {
-        VK_LOGS.to_vec()
-    };
-    for name in logs.into_iter().chain([config]) {
-        let q = core::no_links(&dir.join(name))?;
-        if q.exists() {
-            if q.is_file() {
-                targets.insert(q.clone(), core::digest(&q)?);
-            } else {
-                kept.insert(q);
-            }
-        }
-    }
-    if record.backend == crate::encore::BACKEND {
-        let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
-        if notice.exists() {
-            if notice.is_file()
+    let mut component_pending = Vec::new();
+    for &name in private_components(&record) {
+        if record.hashes.contains_key(name) {
+            let path = core::no_links(&dir.join(name))?;
+            if path.is_file()
                 && record
                     .hashes
-                    .get(crate::encore::NOTICES)
-                    .is_some_and(|expected| {
-                        core::digest(&notice).is_ok_and(|actual| &actual == expected)
-                    })
+                    .get(name)
+                    .is_some_and(|h| core::digest(&path).is_ok_and(|actual| &actual == h))
+                || known_component(&path, name)?
             {
-                targets.insert(notice.clone(), core::digest(&notice)?);
-            } else {
-                kept.insert(notice);
+                targets.insert(path.clone(), core::digest(&path)?);
+            } else if path.exists() {
+                kept.insert(path.clone());
+                if record.hashes.get(name) != Some(&core::hash(b"")) {
+                    component_pending
+                        .push(format!("配套文件已变化，打开清理详情确认后可删除：{name}"));
+                }
+            }
+            if let Some(parent) = path.parent() {
+                dirs.insert(parent.to_path_buf());
             }
         }
-        scan_encore_logs(dir, &mut kept, &mut targets, &mut dirs)?;
     }
-    if record.backend == crate::rtxmfg::BACKEND {
-        for path in crate::rtxmfg::log_paths(&p) {
-            let path = core::no_links(&path)?;
-            if path.is_file() && path.metadata()?.len() <= 128 * 1024 * 1024 {
-                targets.insert(path.clone(), core::digest(&path)?);
+    if record.backend == crate::encore::BACKEND
+        && crate::encore::INTEL_FILES
+            .iter()
+            .any(|name| record.hashes.contains_key(*name))
+    {
+        dirs.insert(dir.join("rtx-encore-runtimes/intel"));
+        dirs.insert(dir.join("rtx-encore-runtimes"));
+    }
+    if !pending_only {
+        let helper = core::no_links(&dir.join(HELPER))?;
+        if helper.exists() {
+            if helper.is_file() && known_helper(&helper)? {
+                targets.insert(helper.clone(), core::digest(&helper)?);
+            } else {
+                kept.insert(helper);
+            }
+        }
+        let logs: Vec<&str> = if record.backend == crate::encore::BACKEND {
+            Vec::new()
+        } else if record.backend == crate::rtxmfg::BACKEND {
+            crate::rtxmfg::SIDECARS.to_vec()
+        } else if record.backend == crate::transfusion::BACKEND {
+            vec!["DLSSG-Transfusion.log", "DLSSG-Transfusion_perf.csv"]
+        } else {
+            VK_LOGS.to_vec()
+        };
+        for name in logs.into_iter().chain([config]) {
+            let q = core::no_links(&dir.join(name))?;
+            if q.exists() {
+                if q.is_file() {
+                    targets.insert(q.clone(), core::digest(&q)?);
+                } else {
+                    kept.insert(q);
+                }
+            }
+        }
+        if record.backend == crate::encore::BACKEND {
+            let notice = core::no_links(&dir.join(crate::encore::NOTICES))?;
+            if notice.exists() {
+                if notice.is_file()
+                    && record
+                        .hashes
+                        .get(crate::encore::NOTICES)
+                        .is_some_and(|expected| {
+                            core::digest(&notice).is_ok_and(|actual| &actual == expected)
+                        })
+                {
+                    targets.insert(notice.clone(), core::digest(&notice)?);
+                } else {
+                    kept.insert(notice);
+                }
+            }
+            scan_encore_logs(dir, &mut kept, &mut targets, &mut dirs)?;
+        }
+        if record.backend == crate::rtxmfg::BACKEND {
+            if let Some(expected) = record.hashes.get(crate::rtxmfg::NOTICES) {
+                let notice = core::no_links(&dir.join(crate::rtxmfg::NOTICES))?;
+                if notice.is_file() && core::digest(&notice)? == *expected {
+                    targets.insert(notice, expected.clone());
+                } else if notice.exists() {
+                    kept.insert(notice);
+                }
+            }
+            for path in crate::rtxmfg::log_paths(&p) {
+                let path = core::no_links(&path)?;
+                if path.is_file() {
+                    targets.insert(path.clone(), core::digest(&path)?);
+                }
+            }
+            // The 1.6+ menu settings always live beside the game EXE, including
+            // plugin/custom-directory installs. These fixed sidecars belong to it.
+            if let Some(exe_dir) = p.parent().filter(|d| core::key(d) != core::key(dir)) {
+                for name in [crate::rtxmfg::UI_CONFIG, "RTX40MFG-UI-layout.ini"] {
+                    let path = core::no_links(&exe_dir.join(name))?;
+                    if path.is_file() && path.metadata()?.len() <= 1024 * 1024 {
+                        targets.insert(path.clone(), core::digest(&path)?);
+                    }
+                }
             }
         }
     }
@@ -621,8 +902,11 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         .into_iter()
         .collect();
     let mut stage_pending = Vec::new();
-    for name in core::deployment_names(&record.backend, &record.selected())? {
-        let n = format!("{name}.stage");
+    if record.backend == crate::rtxmfg::BACKEND && record.selected() == [crate::mfg_plugin::ENTRY] {
+        allowed.insert(crate::mfg_plugin::JOURNAL.into());
+    }
+    for name in record.hashes.keys() {
+        let n = core::stage_name(name);
         allowed.insert(n.clone());
         let candidate = root.join(&n);
         let checked = (|| -> Result<Option<(PathBuf, String)>> {
@@ -632,13 +916,13 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
             }
             ensure!(stage.is_file(), "临时文件不是普通文件");
             let h = core::digest(&stage)?;
-            if record.hashes.get(&name) != Some(&h) {
+            if record.hashes.get(name) != Some(&h) {
                 // Cloud-only packages have no embedded source. An unverifiable
                 // fragment must not block removal of independently owned DLLs.
                 let package = core::package(&record.backend, &record.selected())?;
-                let bytes = package.get(&name).context("缺少匹配的临时文件安装源")?;
+                let bytes = package.get(name).context("缺少匹配的临时文件安装源")?;
                 ensure!(
-                    record.hashes.get(&name) == Some(&core::hash(bytes))
+                    record.hashes.get(name) == Some(&core::hash(bytes))
                         && stage.metadata()?.len() <= bytes.len() as u64
                         && bytes.starts_with(&fs::read(&stage)?),
                     "临时文件不完整且安装源已变化，请恢复原安装源后重试"
@@ -733,14 +1017,7 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         core::atomic_json(&root.join(MARKER), &record)?;
     }
     let mut ordered = targets.keys().cloned().collect::<Vec<_>>();
-    ordered.sort_by_key(|q| {
-        (
-            !(q.parent() == Some(dir)
-                && q.file_name()
-                    .is_some_and(|n| PROXIES.iter().any(|p| n == *p))),
-            q.clone(),
-        )
-    });
+    ordered.sort_by_key(|q| (!PROXIES.iter().any(|p| *q == dir.join(p)), q.clone()));
     for q in ordered {
         core::no_links(&q)?;
         ensure!(
@@ -774,8 +1051,20 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
     };
     let pending_stage = !stage_pending.is_empty();
     pending.extend(stage_pending);
+    pending.extend(component_pending);
     if !pending.is_empty() {
         record.cache_pending = true;
+        record.cleanup_pending_reasons = pending
+            .iter()
+            .take(4)
+            .map(|s| s.chars().take(512).collect())
+            .collect();
+        // Preserve the existing bounded record format even for long OS errors.
+        while !record.cleanup_pending_reasons.is_empty()
+            && serde_json::to_vec(&record)?.len() > 19500
+        {
+            record.cleanup_pending_reasons.pop();
+        }
         core::atomic_json(&root.join(MARKER), &record)?;
         let message = if pending_stage {
             format!(
@@ -791,6 +1080,9 @@ pub fn clean_outcome_at(target: &core::DeploymentTarget) -> Result<CleanOutcome>
         });
     }
     let marker = core::no_links(&root.join(MARKER))?;
+    if record.backend == crate::rtxmfg::BACKEND && record.selected() == [crate::mfg_plugin::ENTRY] {
+        crate::mfg_plugin::restore_locked(&target)?;
+    }
     let bytes = fs::read(&marker)?;
     fs::remove_file(&marker)?;
     if fs::read_dir(&root)?.next().is_none()

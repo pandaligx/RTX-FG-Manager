@@ -36,6 +36,17 @@ pub struct State {
     pub configured: Option<u32>,
     pub build: u32,
 }
+impl State {
+    pub fn selected(&self) -> Option<bool> {
+        None
+    }
+    pub fn needs_restart(&self) -> bool {
+        false
+    }
+}
+pub fn configure(_enabled: bool, _cancel: &AtomicBool) -> Result<State> {
+    anyhow::bail!("硬件加速 GPU 调度是 Windows 功能，Linux 不支持此设置")
+}
 /// Shared, platform-neutral classification. Kept identical to the Windows
 /// implementation so both builds describe the same conditions the same way.
 pub fn classify(adapters: Vec<Adapter>, configured: Option<u32>, build: u32) -> State {

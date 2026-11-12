@@ -84,10 +84,48 @@ impl Context {
 }
 
 pub type Values = BTreeMap<String, String>;
+/// The catalog describes the available download; an installed game may still
+/// use the previous INI contract. Never apply the new defaults to that game.
+pub fn policy_for_version(
+    policy: &crate::cloud::Policy,
+    version: Option<&str>,
+) -> crate::cloud::Policy {
+    let mut policy = policy.clone();
+    if policy.parameter_profile == crate::encore::PROFILE && version.is_some() {
+        policy.defaults.insert(
+            "flipMeteringBypass".into(),
+            if crate::encore::supports_200(version) {
+                "auto"
+            } else {
+                "0"
+            }
+            .into(),
+        );
+    }
+    if crate::upstream040::is_profile(&policy.parameter_profile) && version.is_some() {
+        let profile = crate::upstream040::profile_for_version(version);
+        if policy.parameter_profile != profile {
+            policy.parameter_profile = profile.into();
+            policy.defaults.clear();
+        }
+    }
+    policy
+}
 pub const MFG_VULKAN: &str = "mfg_vulkan_sm86_7";
 /// Normalize dependent settings without discarding an inactive target FPS.
 /// The INI cap counts generated frames; ForceMultiplier includes the real frame.
 pub fn normalize(profile: &str, values: &mut Values) -> bool {
+    if profile == crate::upstream040::PROFILE_041 {
+        if values.get("fg_engine").is_some_and(|v| v == "XeSS")
+            && values
+                .get("max_generated_frames")
+                .is_some_and(|v| matches!(v.as_str(), "4" | "5"))
+        {
+            values.insert("max_generated_frames".into(), "3".into());
+            return true;
+        }
+        return false;
+    }
     if profile != MFG_VULKAN {
         return false;
     }
@@ -108,6 +146,14 @@ pub fn normalize(profile: &str, values: &mut Values) -> bool {
     false
 }
 pub fn parameter_enabled(profile: &str, key: &str, values: &Values) -> bool {
+    if profile == crate::upstream040::PROFILE_041 {
+        let xess = values.get("fg_engine").is_some_and(|v| v == "XeSS");
+        return match key {
+            "optimized" | "preset" => !xess,
+            "xess_flow" | "xess_hudless" => xess,
+            _ => true,
+        };
+    }
     if profile == crate::encore::PROFILE {
         return crate::encore::field_enabled(key, values, None);
     }
@@ -118,6 +164,16 @@ pub fn parameter_enabled(profile: &str, key: &str, values: &Values) -> bool {
     if profile == crate::rtxmfg::PROFILE {
         let dynamic = values.get("rtx_mode").map(String::as_str) == Some("dynamic");
         return match key {
+            "rtx_nr_scale" => {
+                values.get("rtx_nr").is_some_and(|v| v == "1")
+                    && !values.get("rtx_nr_scale_auto").is_some_and(|v| v == "1")
+            }
+            "rtx_xemfg_target" | "rtx_xemfg_rounding" | "rtx_xemfg_allow1x" | "rtx_xemfg_cap" => {
+                values.get("rtx_xemfg").is_some_and(|v| v == "1")
+                    && values.get("rtx_xemfg_dynamic").is_some_and(|v| v == "1")
+            }
+            k if k.starts_with("rtx_nr_") => values.get("rtx_nr").is_some_and(|v| v == "1"),
+            k if k.starts_with("rtx_xemfg_") => values.get("rtx_xemfg").is_some_and(|v| v == "1"),
             "rtx_target" => dynamic,
             "rtx_reflex_limit" => !dynamic,
             _ => true,
@@ -136,6 +192,12 @@ pub struct Parameter {
     pub choices: Vec<(&'static str, &'static str)>,
 }
 pub fn parameters(profile: &str) -> Vec<Parameter> {
+    if profile == crate::upstream040::PROFILE_041 {
+        return crate::upstream040::parameters_041();
+    }
+    if profile == crate::upstream040::PROFILE {
+        return crate::upstream040::parameters();
+    }
     if profile == crate::encore::PROFILE {
         return crate::encore::fields()
             .iter()
@@ -259,6 +321,8 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
         matches!(
             profile,
             "upstream035"
+                | crate::upstream040::PROFILE
+                | crate::upstream040::PROFILE_041
                 | "upstream031"
                 | "native026"
                 | "initial"
@@ -278,6 +342,9 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
                     && crate::transfusion::valid_value(key, value)),
             "Invalid preset parameter: {key}"
         );
+    }
+    if profile == crate::upstream040::PROFILE_041 {
+        crate::upstream040::validate_041(values)?;
     }
     if profile == MFG_VULKAN {
         let cap = values
@@ -331,6 +398,12 @@ pub fn defaults(profile: &str, overrides: &Values) -> Values {
     values
 }
 pub fn configure(bytes: &[u8], profile: &str, values: &Values) -> Result<Vec<u8>> {
+    if profile == crate::upstream040::PROFILE_041 {
+        return crate::upstream040::configure_041(bytes, values);
+    }
+    if profile == crate::upstream040::PROFILE {
+        return crate::upstream040::configure(bytes, values);
+    }
     if profile == crate::encore::PROFILE {
         return crate::encore::configure(bytes, values);
     }
@@ -525,6 +598,9 @@ fn mfg_parameters() -> Vec<Parameter> {
 }
 
 pub fn read_values(bytes: &[u8], profile: &str) -> Result<Values> {
+    if profile == crate::upstream040::PROFILE_041 {
+        return crate::upstream040::read_041(bytes);
+    }
     if profile == crate::encore::PROFILE {
         return crate::encore::read(bytes);
     }
@@ -601,6 +677,14 @@ pub fn inspect_at(
     let Some(policy) = catalog.scheme_policies.get(&scheme) else {
         return Ok(None);
     };
+    let policy = policy_for_version(
+        policy,
+        record.as_ref().and_then(|r| {
+            r.upstream_version
+                .as_deref()
+                .or(r.payload_version.as_deref())
+        }),
+    );
     let ini = crate::core::no_links(
         &dir.join(
             if record
@@ -630,10 +714,20 @@ pub fn inspect_at(
             .is_some_and(|r| r.backend == crate::transfusion::BACKEND)
     {
         crate::encore::read(&crate::encore::migrate(&bytes, &Values::new())?)?
+    } else if policy.parameter_profile == crate::encore::PROFILE {
+        let version = record.as_ref().and_then(|r| {
+            r.upstream_version
+                .as_deref()
+                .or(r.payload_version.as_deref())
+        });
+        crate::encore::read_for_version(&bytes, version)?
     } else {
         read_values(&bytes, &policy.parameter_profile)?
     };
-    if Context::new(&scheme, policy, exe).delta {
+    if policy.parameter_profile == crate::rtxmfg::PROFILE {
+        values.extend(crate::rtxmfg_settings::read_ui_at(&target)?);
+    }
+    if Context::new(&scheme, &policy, exe).delta {
         let (text, _) = crate::diagnostics::decode_ini(&bytes)?;
         if let Some(n) =
             crate::diagnostics::ini_value(&text, "Compatibility", "DeltaForceGeneratedFrames")?

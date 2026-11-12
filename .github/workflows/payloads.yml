@@ -1,12 +1,9 @@
 name: Publish verified DLL resources
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - cloud/schemes.json
-      - tools/cloud_release.py
-      - .github/workflows/payloads.yml
+  # Legacy per-DLL distribution is retained for old clients. New releases use
+  # reviewed complete bundles; source commits must not rescan historical ZIPs.
+  # Invoke explicitly only when maintaining the legacy catalog itself.
   workflow_dispatch:
     inputs:
       seed_release:

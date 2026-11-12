@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><title>社区审核 · RTX FG Manager</title>
+<main><p class="eyebrow">RTX FG MANAGER · MODERATION</p><h1>配置审核</h1><p>独立签名登录，无需付款方式。私钥和密码不会上传，审核操作留有记录。</p>
+<section class="card" aria-labelledby="login-title"><h2 id="login-title">管理员身份</h2>
+<label>备份密码（至少 12 个字符）<input id="password" type="password" autocomplete="off" minlength="12" maxlength="1024"></label>
+<label>首次创建时再次输入密码<input id="password-confirm" type="password" autocomplete="off" maxlength="1024"></label>
+<button id="create">创建身份</button><button id="unlock">解锁本机身份</button><button id="logout">锁定</button>
+<label>恢复加密备份<input id="backup-file" type="file" accept=".json,application/json"></label><button id="download" disabled>下载加密备份</button>
+<p id="identity-status" role="status">首次使用请创建身份；然后由账户维护者登记下方公钥。</p><label>公开身份（可交给部署维护者，不含私钥）<textarea id="public-identity" readonly rows="4"></textarea></label></section>
+<button id="refresh">刷新待处理项</button><p id="status" role="status"></p><section id="profiles"></section><div class="card"><h2>按编号处理</h2><label>配置或身份编号<input id="target" autocomplete="off"></label><label>操作<select id="action"><option value="hide">隐藏配置</option><option value="restore">恢复配置</option><option value="official">授予官方标记</option><option value="unofficial">移除官方标记</option><option value="block">限制身份</option><option value="unblock">解除身份限制</option></select></label><label>审核原因<textarea id="reason" maxlength="240"></textarea></label><button id="apply">确认执行</button></div><div class="card"><h2>登记游戏</h2><p>只登记真实游戏名称。不同发行版本确有配置差异时使用独立 ID；不生成示例玩家配置。</p><label>游戏 ID<input id="game-id" placeholder="steam:1091500 或 game:your-game" maxlength="85"></label><label>公开游戏名称<input id="game-name" maxlength="120"></label><label>登记原因<input id="game-reason" maxlength="240"></label><button id="game-save">确认登记 / 更新名称</button></div></main><script src="/admin.js" type="module"></script></html>

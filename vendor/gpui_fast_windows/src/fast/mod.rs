@@ -8,11 +8,20 @@
 //! forwarding a call to it. The logic itself is written here, one file per
 //! topic.
 
+pub(crate) mod class_names;
 pub(crate) mod composition;
+pub(crate) mod composition_scene;
+pub(crate) mod device_recovery;
+pub(crate) mod device_wake;
 pub(crate) mod draw_state;
+pub(crate) mod font_fallback;
 pub(crate) mod frame;
+pub(crate) mod frame_schedule;
 pub(crate) mod globals;
 pub(crate) mod layers;
+#[cfg(test)]
+pub(crate) mod native_tests;
+pub(crate) mod rounded_clip;
 
 pub(crate) mod compat;
 pub(crate) mod color_glyphs;

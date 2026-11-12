@@ -4,8 +4,8 @@ use rtx_fg_manager::{core, transfer};
 use std::{fs, sync::atomic::AtomicBool, time::Instant};
 
 #[test]
-#[ignore = "requires network; uses a disposable directory and real aria2"]
-fn live_domestic_metadata_uses_aria2_and_does_not_touch_fallback() -> Result<()> {
+#[ignore = "requires network; uses a disposable directory and native HTTP"]
+fn live_domestic_metadata_does_not_touch_fallback() -> Result<()> {
     let mut seen = Vec::new();
     let bytes = transfer::fetch_metadata(
         vec![

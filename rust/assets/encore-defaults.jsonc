@@ -1,28 +1,88 @@
 {
+  "renderingEngines": {
+    "reconstructionEngine": "game",
+    "frameGenerationEngine": "game",
+    "xessTensorCores": false,
+    "xefgTensorCores": false
+  },
+  "xefg": {
+    "xefgMfg4VariablePacing": true,
+    "xefgSourcePacing": true,
+    "xefgUiHandling": "interpolate",
+    "xefgUiAlpha": "unknown"
+  },
+  "superResolutionInputs": {
+    "srHdr": "game",
+    "srAutoExposure": "game"
+  },
+
   "configVersion": 4,                        // Settings apply live unless the comment says to restart the game. Editable in the RTX Encore native menu (Insert).
   "frameGeneration": {
+    "frameGenerationWithoutGameFg": false, // Experimental, games without native FG only.
+    "flipMeteringLearned": "", // Local per-game measurement; never shared.
     "mode": "game",                          // fixed (the multiplier below), dynamic (DLSS-G picks the multiplier to reach the target FPS) or game (the game or NVIDIA Profile Inspector decides).
     "multiplier": 4,                         // Fixed mode multiplier: 2 to 6. 5 and 6 are experimental.
     "dynamicTargetFrameRate": 0,             // Dynamic mode target FPS. 0 follows the refresh rate of the monitor showing the game.
     "dynamicExperimental56": false           // Let Dynamic mode go up to 5x and 6x (needs plenty of VRAM). Off: Dynamic stays at 4x or less.
   },
   "smoothMotion": {
-    "smoothMotionEnabled": false,            // Driver Smooth Motion for RTX 30, with the NVIDIA 617.42, 617.14, 616.92 or 616.64 driver. Restart the game to apply.
-    "smoothMotionApi": "d3d12"               // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
+    "smoothMotionEnabled": false,            // RTX 30 with supported drivers; experimental RTX 20 in Encore 1.3. Restart.
+    "smoothMotionApi": "d3d12"              // d3d12, d3d11 or vulkan: select the game's active graphics API. Restart the game to apply.
   },
   "dlssSuperResolution": {
+    "dlssWithoutGameDlss": false,
+    "dlssWithoutGameDlssEngine": "dlss",
+    "dlssWithoutGameDlssOutput": "game",
+    "presentOpticalFlow": "encore",
+    "fastSuperResolution": false, // RTX 30, DX12, SR 310.9.x preset M/L; restart. Not RR/DLAA.
     "dlssRenderScale": "game",               // Force the DLSS render resolution: game, dlaa, quality, balanced, performance, ultra-performance or custom. The game must use DLSS already.
     "dlssCustomScale": 67                    // Render scale in percent (50 to 100) when dlssRenderScale is custom.
   },
+  "superResolutionSharpening": {
+    "srSharpening": "off", // Encore 1.2.2: off, game or custom; applies live after reconstruction/NR.
+    "srSharpness": 30 // Custom strength 0-100%; zero adds no sharpening pass.
+  },
+  "dlssPresets": {
+    "dlssNrPreset": "b", // NR 310.9.16: b smaller network, a larger network, auto DLL default; live.
+    "dlssSrPreset": "game",                  // SR preset: game, default, a-f, j, k, l or m. Supported models depend on the DLSS DLL. Encore 1.2 can change this live in its Insert menu.
+    "dlssRrPreset": "game",                  // RR preset: game, default, a-c, d, e or f. F (RR2) requires Encore 1.5.3 and RR DLL 310.9.1+. Does not enable RR. Encore 1.2 can change this live in its Insert menu; driver/model selection may override hints.
+    "dlssFgPreset": "game",                  // FG preset: game (no override), a, b or c. A/B use Normal; C enables Lite and needs compatible 310.9.16.0. Fast FG is independent. Encore 1.2.1 no longer requires NVIDIA runtimes to appear in a fixed list; game and runtime feature requirements still apply. B needs compatible HUD-less/UI inputs. Lite keeps NVIDIA's native image policy: protection tuning and UI recomposition are unavailable. Restart to apply.
+    "dlssFgLite": "game"                     // Diagnostic-only JSON override; not shown as a menu setting. Leave game to follow the preset (A/B Normal, C Lite) or the game/driver. Only for diagnostics with qualified 310.9.16.0: off forces Normal, on forces Lite, taking priority over the preset. Restart to apply.
+  },
   "nativeMenuFeatures": {
-    "reflexFrameLimit": 0,                   // 0 follows the game's Reflex frame limit; 1-1000 requests a render-frame cap. Requires a supported Reflex plugin. Applied at its owning options/sleep boundary.
-    "vsyncOff": false,                       // Request interval zero on the application's own DXGI Present. Driver overrides keep priority; TEST/nested presents are preserved.
+    "reflexMode": "game", // Encore 1.4.6: game, on, on-boost. Never lowers the game request.
+    "reflexFrameLimit": 0,                   // 0 restores the game's Reflex settings; 1-1000 requests a Reflex FPS limit. FG may count toward it depending on the game/driver. Applied on options updates or the next available Reflex sleep boundary.
+    "vsync": "game",                         // Encore 1.5.2+: game, off, on. DirectX only; not Vulkan or XeSS-FG. Driver override takes priority. Live.
     "hairEnabled": true                      // Prepare the compatible HairWorks ray-traced conversion when the game, shaders, driver and DXR device match a verified profile. The game's hair setting remains authoritative; restart to change.
   },
   "neuralRendering": {
+    "nrWithoutGameDlss": false,
+    "passModels": {"nrPass1Preset":"inherit","nrPass2Preset":"inherit","nrPass3Preset":"inherit","nrPass4Preset":"inherit"},
+    "passTuning": {
+      "nrPass1Intensity": "inherit",
+      "nrPass1LocalStructure": "inherit",
+      "nrPass1LocalTone": "inherit",
+      "nrPass1SkinStructure": "inherit",
+      "nrPass1AutoMask": "inherit",
+      "nrPass2Intensity": "inherit",
+      "nrPass2LocalStructure": "inherit",
+      "nrPass2LocalTone": "inherit",
+      "nrPass2SkinStructure": "inherit",
+      "nrPass2AutoMask": "inherit",
+      "nrPass3Intensity": "inherit",
+      "nrPass3LocalStructure": "inherit",
+      "nrPass3LocalTone": "inherit",
+      "nrPass3SkinStructure": "inherit",
+      "nrPass3AutoMask": "inherit",
+      "nrPass4Intensity": "inherit",
+      "nrPass4LocalStructure": "inherit",
+      "nrPass4LocalTone": "inherit",
+      "nrPass4SkinStructure": "inherit",
+      "nrPass4AutoMask": "inherit"
+    },
     "core": {                                // Activation, engine and NR scaler: the main quality/performance controls.
-      "nrEnabled": false,                    // DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0. The first launch prepares it in the background.
-      "nrEngine": "nvidia",                  // nvidia (default) or opendlss (experimental). Open runs dedicated in a Direct3D game (on its own device beside the game) and in-game in a Vulkan game (on the game's device). Restart to apply; no engine fallback.
+      "nrPlacement": "after-sr", // Encore 1.4: before-sr is experimental; default remains Post-SR.
+      "nrEnabled": false,                    // DLSS Neural Rendering on the game's DLSS SR/DLAA output (D3D11, D3D12 or Vulkan with a compatible device). Needs NVIDIA's nvngx_dlssnr.dll 310.8.0 or 310.9.16. The first launch prepares it in the background.
       "nrPasses": 1,                         // Independent temporal NR passes, 1 to 4. Cost and VRAM grow. Only a complete chain is published; unsupported chain routes preserve SR.
       "nrLaterPassLocalTone": 0,             // Tone applied after pass one, 0 to 2. Default zero avoids repeated tone accumulation.
       "nrResolution": "render",              // Size NR runs at: render (follows the DLSS render size), output (full size), quality (67 percent of the output), balanced (58), performance (50), ultra-performance (33) or custom. Smaller is faster; DLSS keeps the fine detail.
@@ -48,24 +108,17 @@
       "nrFastProcessing": true               // Faster NR processing with the same output bit for bit. Restart the game to apply.
     },
     "experimental": {                        // Optional size and scheduling experiments; disabled by default.
+      "nrFoveation": false,                 // Experimental: full NR in the centre, softer edges. Off by default.
+      "nrFoveaPreset": "balanced",           // light, balanced, strong or custom; live.
+      "nrFoveaWidth": 55,                    // Custom: centre width, 1-100%.
+      "nrFoveaHeight": 55,                   // Custom: centre height, 1-100%.
+      "nrFoveaFalloff": 8,                   // Custom: transition per side, 0-100%.
+      "nrFoveaEdge": 50,                     // Custom: edge density, 25-100%.
       "nrPaddingAware": false,               // Optionally reduce NR's requested dimensions by up to 2 percent per axis to avoid model padding. May change the NR image; applied live. Does not change DLSS-SR render size.
       "nrMaxInFlight": 0                     // Experimental D3D12 NR run-ahead limit: 0 baseline, 1 or 2 outstanding NR evaluations. Waits before Reflex sleep; active FG uses at least 2 to retain producer overlap. Same NR image and model; applied live.
     },
-    "openExperimental": {                    // Open only: explicit backend, speed options and deterministic noise.
-      "nrOpenBackend": "disabled",           // disabled (choose explicitly), rtx40 (RTX 40/50), rtx30 (RTX 30, experimental) or compat (very slow, for qualification). Independent of NVIDIA precision. Restart to apply.
-      "nrOpenExecution": "dedicated",        // Direct3D games only, where Open runs: dedicated (default; on its own device beside the game), shared (experimental, Direct3D 12 only, one NR pass: on the game's device, on a queue of its own) or in_game (experimental: in the game's own command list). Restart to apply; no fallback between them. A Vulkan game always runs it in-game.
-      "nrOpenVramForSpeed": false,           // Open on RTX 30 only: shorter NR time, same image, for more VRAM: about 160 MB at 1440p DLSS Balanced. Leave off when VRAM is nearly full. Restart to apply.
-      "nrOpenFastProjection": true,          // Open on RTX 30 only: shorter NR time, with a slightly different image. Restart to apply.
-      "nrOpenSharedLoads": true,             // Open on RTX 40/50 only: shorter NR time on large sizes, same output. Restart to apply.
-      "nrOpenFast": false,                   // Open on RTX 30 only: fast precision. Shorter NR time, no extra VRAM, a slightly different image. Restart to apply.
-      "nrOpenUltraFast": false,              // Open, one NR pass: ultra-fast mode. About half the NR time, the same on every frame. The image changes: the NR layer follows the image one frame late and can lag or smear in motion; a surface just uncovered or just come on screen is given what NR had made of look-alike surfaces nearby (the two tolerances below). A few MB of VRAM. Restart to apply.
-      "nrOpenUltraFastGhostTolerance": 0.03, // nrOpenUltraFast only: how far the previous frame may differ, where a pixel was, before what NR had made there is dropped (0 to 0.3 of the code range). Lower: fewer ghosts behind what moves, more surface left to fill. Whatever this value, what moved unlike the pixel there (a character the camera turns round) is dropped. Applied live.
-      "nrOpenUltraFastFillTolerance": 0.03,  // nrOpenUltraFast only: a surface just uncovered or just come on screen takes what NR had made of surfaces of the previous frame that look like it; this is how alike they must be (0 to 0.3). 0: no filling, such a surface shows without NR until the network reaches it. Applied live.
-      "nrOpenSeed": 0                        // Open deterministic noise seed. Applied live with history reset.
-    },
     "advanced": {                            // Model compatibility.
-      "nrUiCorrection": false,               // Model UI correction.
-      "nrPreset": 0                          // NVIDIA model profile: 0 Automatic (recommended), 1-3 numbered profiles. No documented quality/speed ranking; separate from image style.
+      "nrUiCorrection": false               // Model UI correction.
     }
   },
   "overlay": {
@@ -88,8 +141,8 @@
   },
   "imageQuality": {
     "highMultiplierQuality": true,           // Keeps generated frames clean from 3x to 6x. Leave on. Restart the game to apply.
-    "frameProtection": true,                 // Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). Restart the game to apply.
-    "fastFrameGeneration": true,             // Lowers the GPU cost of each generated frame, same image. Restart the game to apply.
+    "frameProtection": true,                 // Anti-tearing and anti-ghosting protection of generated frames (thin geometry, moving shadows). No effect with Lite composition. Restart the game to apply.
+    "fastFrameGeneration": true,             // Lowers the GPU cost of each generated frame, same image. Independent of the FG preset: applies to A/B Normal and C Lite using the optimizations available for each path. Restart the game to apply.
     "protectionTuning": "refined"            // Protection tuning: refined (default) or classic. Restart the game to apply.
   },
   "hudUi": {
@@ -101,20 +154,26 @@
     "gpuSeries": "auto"                      // auto, rtx40, rtx30 or rtx20. Leave on auto unless detection fails. Restart the game to apply.
   },
   "compatibility": {
+    "disableInGameMenu": false, // Encore 1.0.0: for menu conflicts (e.g. Star Wars Outlaws). FG remains active. Insert cannot open the menu; turn this off here and restart to restore it.
     "disableMenuDetection": false,           // Keep frame generation running in menus and loading screens. Leave false: idling at 1x there avoids device-hang crashes.
-    "forceOTA": false,                       // Load the Frame Generation models downloaded by the NVIDIA App. Restart the game to apply.
-    "flipMeteringBypass": false,             // OptiScaler flip metering bypass, only for setups that need it. Restart the game to apply.
+    "forceOTA": false,                       // Use locally downloaded NVIDIA App models (SR/RR/FG/NR in Encore 2.0+). No OTA files are changed. Restart to apply.
+    "flipMeteringBypass": "auto",             // Encore 2.0+: auto measures pacing for this game; true forces bypass, false forces metering. Restart to apply.
     "disableMvDilation": false               // Legacy experiment: declare the motion vectors as already dilated. Leave false.
   },
   "diagnostics": {
-    "logPerformance": false,                 // Write FPS and frame times to rtx-encore_perf.csv, in rtx-encore-logs.
+    "logDxgiWrappers": false, // Encore 1.0.0: logs game calls to the menu swapchain to diagnose crashes after menu attachment. Off by default; restart required. Disable after collecting logs.
+    "crashDetails": false, // Encore 1.0.0: adds register/stack details and a .dmp on crashes (often tens of MB). Diagnostics only; disable afterwards and restart. Dumps may contain process memory; review before sharing.
+    "logGraphics": false,                    // Trace graphics creation, COM interface upgrades, swapchain lifetime, initial presentation and resize. Applied live; enable before launch for startup crashes.
+    "logStreamline": false,                  // Extra verbose Streamline and NGX messages. Basic messages and failure reasons are logged automatically. Restart required; disable and restart after collecting the log. May reduce performance.
+    "logPerformance": false,                 // Write FPS and frame times to rtx-encore_perf.csv, plus one GPU/power diagnostic sample per second in the session log (rtx-encore-logs).
     "logNr": false,                          // DLSS Neural Rendering: log what DLSS gives each frame and what NR does (10 frames after enabling, then every 300). Applied live.
-    "profileNrGpu": false,                   // Record NR GPU timestamps and source-frame waits to rtx-encore_nr.csv (NVIDIA engine), or log a [NR-Open timing] line every five seconds (Open engine on Direct3D 12, with logNr; on the shared and in-game routes, also one row per step in rtx-encore_nr_open_steps.csv). The files are in rtx-encore-logs. Optional diagnostics; applied live.
+    "profileNrGpu": false,                   // Record NR GPU timestamps and source-frame waits in rtx-encore-logs/rtx-encore_nr.csv. Optional diagnostics; applied live.
     "logHudUi": false,                       // Trace the first three game HUD-less copies and D3D12 barrier steps. Applied live.
     "logMotionTracing": false,               // Very verbose motion-vector diagnostics, for debugging only.
-    "logFilesKept": 3                        // Session logs kept in rtx-encore-logs, the current one included: 1 to 100. Older ones are deleted when the game starts.
+    "logFilesKept": 3                        // Logs kept in rtx-encore-logs: 1 to 100 sessions plus the same number of exception logs. Active files are preserved. Older closed files are deleted at startup.
   },
   "keyboardShortcuts": {
+    "hotkeyToggleNr": "Ctrl+Alt+N", // Toggle Neural Rendering while the game has focus.
     "hotkeyFixed2": "Ctrl+Alt+2, Ctrl+Alt+Num2", // Combinations such as Ctrl+Alt+4 or Ctrl+Shift+F5; several separated by commas; empty disables the action.
     "hotkeyFixed3": "Ctrl+Alt+3, Ctrl+Alt+Num3",
     "hotkeyFixed4": "Ctrl+Alt+4, Ctrl+Alt+Num4",

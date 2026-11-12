@@ -33,7 +33,7 @@ import zipfile
 REPO = "pandaligx/RTX-FG-Manager"
 GITEE_RESOURCE_REPO = "pandaligx/RTX-FG-Manager-payloads"
 RESOURCE_TAG = "payloads"
-MAX_ZIP = 128 * 1024 * 1024
+MAX_ZIP = 512 * 1024 * 1024
 MAX_JSON = 1024 * 1024
 PROXIES = {"version.dll", "winmm.dll", "dinput8.dll", "dbghelp.dll", "dxgi.dll", "d3d12.dll", "winhttp.dll"}
 ENCORE_PROFILE = "rtx_encore_json_v4"
@@ -160,6 +160,12 @@ def encore_value_valid(field, value):
     if not isinstance(value, str):
         return False
     kind = field["kind"]
+    if kind == "inheritbool":
+        return value in {"inherit", "0", "1"}
+    if kind == "inheritdecimal":
+        if value == "inherit":
+            return True
+        kind = "decimal"
     if kind == "bool":
         return value in {"0", "1"}
     if kind == "choice":
@@ -212,10 +218,14 @@ def validate_encore_config(config):
     for field in encore_fields():
         value = config
         missing = False
-        for part in field["path"]:
+        field_path = field["path"]
+        if field["key"] == "flipMeteringBypass" and "flipMeteringBypass" in config.get("frameGeneration", {}):
+            field_path = ["frameGeneration", "flipMeteringBypass"]
+        for part in field_path:
             require(isinstance(value, dict), "Invalid Encore section: " + ".".join(field["path"]))
             if part not in value:
-                require(field.get("optional", False), "Missing Encore field: " + field["key"])
+                modern_vsync = field["key"] == "vsyncOff" and "vsync" in config.get("nativeMenuFeatures", {})
+                require(field.get("optional", False) or modern_vsync, "Missing Encore field: " + field["key"])
                 missing = True
                 break
             value = value[part]
@@ -225,13 +235,18 @@ def validate_encore_config(config):
         if field["key"] == "tf_mode":
             require(isinstance(value, str) and value in {"game", "fixed", "dynamic"}, "Invalid Encore mode")
             continue
-        if kind == "bool":
+        if field["key"] == "flipMeteringBypass":
+            valid_type = type(value) is bool or value == "auto"
+            encoded = ("1" if value else "0") if type(value) is bool else value
+        elif kind in {"inheritbool", "inheritdecimal"} and value == "inherit":
+            valid_type, encoded = True, "inherit"
+        elif kind in {"bool", "inheritbool"}:
             valid_type = type(value) is bool
             encoded = "1" if value is True else "0"
         elif kind == "integer":
             valid_type = type(value) is int
             encoded = str(value)
-        elif kind == "decimal":
+        elif kind in {"decimal", "inheritdecimal"}:
             valid_type = type(value) in {int, float}
             encoded = str(value)
         elif kind == "choice" and all(re.fullmatch(r"[0-9]+", choice["value"]) for choice in field["choices"]):
@@ -247,6 +262,13 @@ def validate_encore_config(config):
     require(config["general"]["gpuSeries"] == "auto", "Cloud Encore must auto-detect GPU")
     require(config["smoothMotion"]["smoothMotionEnabled"] is False, "Cloud Encore must not enable driver Smooth Motion")
     require(config["neuralRendering"]["core"]["nrEnabled"] is False, "Cloud Encore must not enable Neural Rendering")
+    require(config["neuralRendering"].get("experimental", {}).get("nrFoveation", False) is False,
+            "Cloud Encore must not enable experimental foveated NR")
+    for section, key in ((fg, "frameGenerationWithoutGameFg"),
+                         (config["dlssSuperResolution"], "dlssWithoutGameDlss"),
+                         (config["neuralRendering"], "nrWithoutGameDlss")):
+        require(section.get(key, False) is False,
+                "Cloud Encore must not enable experimental added features: " + key)
 
 
 def package_from_zip(scheme, item, data):

@@ -11,6 +11,30 @@ const JOURNAL: &str = "rtxmfg-upgrade.json";
 const WORK: &str = "rtxmfg-upgrade";
 const MAX_FILE: u64 = 128 * 1024 * 1024;
 
+/// Hotfix is an upstream patch revision, not a manager release or a SemVer prerelease.
+/// Keep the three-part package protocol and compare the recorded upstream label.
+fn revision(record: &core::Record) -> Result<([u16; 3], u16)> {
+    let base = record
+        .payload_version
+        .as_deref()
+        .context("补丁缺少版本记录")?;
+    let version = crate::updater::version(base)?;
+    let upstream = record.upstream_version.as_deref().unwrap_or(base);
+    if upstream == base {
+        return Ok((version, 0));
+    }
+    let (release, hotfix) = upstream
+        .split_once("-hotfix.")
+        .context("无法识别补丁修订版本，请先卸载再安装")?;
+    ensure!(
+        release == base && !hotfix.is_empty() && hotfix.bytes().all(|c| c.is_ascii_digit()),
+        "补丁修订版本无效"
+    );
+    let hotfix: u16 = hotfix.parse()?;
+    ensure!(hotfix > 0, "补丁修订版本无效");
+    Ok((version, hotfix))
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Journal {
@@ -67,22 +91,15 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
         j.old.selected() == j.new.selected(),
         "RTX40 MFG 更新须保留原 DLL 入口；换入口前请先卸载"
     );
-    let old_version = j
-        .old
-        .payload_version
-        .as_deref()
-        .context("旧版缺少版本记录，请先核对原安装；不能自动升级")?;
-    let new_version = j
-        .new
-        .payload_version
-        .as_deref()
-        .context("新版缺少版本记录")?;
     ensure!(
-        crate::updater::version(new_version)? > crate::updater::version(old_version)?,
+        revision(&j.new)? > revision(&j.old)?,
         "RTX40 MFG 只允许升级到更高版本；已有文件未覆盖"
     );
     ensure!(
-        j.old.hashes.get(&j.old.proxy) != j.new.hashes.get(&j.new.proxy),
+        j.new
+            .selected()
+            .iter()
+            .any(|n| j.old.hashes.get(n) != j.new.hashes.get(n)),
         "RTX40 MFG DLL 内容未变化"
     );
     ensure!(
@@ -116,13 +133,13 @@ fn transaction_files(j: &Journal) -> BTreeMap<String, String> {
     files.extend(
         j.before
             .iter()
-            .map(|(n, h)| (format!("old.{n}"), h.clone())),
+            .map(|(n, h)| (format!("old.{}", n.replace('/', "__")), h.clone())),
     );
     files.extend(
         j.new
             .hashes
             .iter()
-            .map(|(n, h)| (format!("next.{n}"), h.clone())),
+            .map(|(n, h)| (format!("next.{}", n.replace('/', "__")), h.clone())),
     );
     files
 }
@@ -218,7 +235,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
                 "原文件位置已被其他文件占用：{name}"
             );
             ensure!(
-                matches(&work.join(format!("old.{name}")), hash)?,
+                matches(&work.join(format!("old.{}", name.replace('/', "__"))), hash)?,
                 "原件备份缺失或已改变：{name}"
             );
         }
@@ -238,7 +255,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
     for (name, hash) in &j.before {
         let path = core::no_links(&target.directory.join(name))?;
         if !path.exists() {
-            let backup = core::no_links(&work.join(format!("old.{name}")))?;
+            let backup = core::no_links(&work.join(format!("old.{}", name.replace('/', "__"))))?;
             ensure!(matches(&backup, hash)?, "原件备份在恢复期间改变：{name}");
             win::rename_no_replace(&backup, &path)?;
         }
@@ -363,11 +380,17 @@ pub fn upgrade_locked(
         core::write_new(&work.join("old.install.json"), &marker_bytes)?;
         checkpoint("marker-backup")?;
         for (name, bytes) in &originals {
-            core::write_new(&work.join(format!("old.{name}")), bytes)?;
+            core::write_new(
+                &work.join(format!("old.{}", name.replace('/', "__"))),
+                bytes,
+            )?;
             checkpoint(&format!("backup:{name}"))?;
         }
         for (name, bytes) in &files {
-            core::write_new(&work.join(format!("next.{name}")), bytes)?;
+            core::write_new(
+                &work.join(format!("next.{}", name.replace('/', "__"))),
+                bytes,
+            )?;
             checkpoint(&format!("stage:{name}"))?;
         }
         core::assert_target_stopped(target)?;
@@ -381,7 +404,7 @@ pub fn upgrade_locked(
                 "升级前原文件已变化：{name}"
             );
             ensure!(
-                matches(&work.join(format!("old.{name}")), hash)?,
+                matches(&work.join(format!("old.{}", name.replace('/', "__"))), hash)?,
                 "原件备份核验失败：{name}"
             );
         }
@@ -398,12 +421,12 @@ pub fn upgrade_locked(
         // The DLL is exposed last so an accidental launch cannot observe the
         // new runtime with an absent configuration.
         let mut names = files.keys().collect::<Vec<_>>();
-        names.sort_by_key(|n| n.ends_with(".dll"));
+        names.sort_by_key(|n| j.new.selected().contains(n));
         for name in names {
             if j.before.get(name) == j.new.hashes.get(name) {
                 continue;
             }
-            let stage = core::no_links(&work.join(format!("next.{name}")))?;
+            let stage = core::no_links(&work.join(format!("next.{}", name.replace('/', "__"))))?;
             ensure!(matches(&stage, &j.new.hashes[name])?, "升级暂存文件已变化");
             win::rename_no_replace(&stage, &core::no_links(&dir.join(name))?)?;
             checkpoint(&format!("publish:{name}"))?;
@@ -541,6 +564,43 @@ mod tests {
         let mut out = BTreeMap::new();
         visit(root, root, &mut out)?;
         Ok(out)
+    }
+
+    #[test]
+    fn hotfix_upgrade_preserves_config_and_rejects_downgrade() -> Result<()> {
+        let (_temp, target) = fixture()?;
+        let mut old = core::record(&target.directory)?.context("record")?;
+        old.payload_version = Some("1.5.0".into());
+        old.upstream_version = Some("1.5.0".into());
+        core::atomic_json(&target.directory.join(core::OWN).join("install.json"), &old)?;
+        let apply = |label: &str, identity| {
+            core::deploy_prepared_context_at_with_overrides(
+                &target,
+                rtxmfg::BACKEND,
+                &["version.dll".into()],
+                None,
+                BTreeMap::from([
+                    ("version.dll".into(), pe(true, identity)),
+                    (rtxmfg::CONFIG.into(), b"{}".to_vec()),
+                    (rtxmfg::NOTICES.into(), b"fixture notices".to_vec()),
+                ]),
+                Some("1.5.0"),
+                Some(&context()),
+                Some(&presets::Values::new()),
+                Some(label),
+            )
+        };
+        apply("1.5.0-hotfix.1", 2)?;
+        assert_eq!(fs::read(target.directory.join(rtxmfg::CONFIG))?, ORIGINAL);
+        let before = snapshot(&target.directory)?;
+        assert!(apply("1.5.0", 3).is_err());
+        assert!(apply("1.5.0-hotfix.1", 3).is_err());
+        assert_eq!(snapshot(&target.directory)?, before);
+        apply("1.5.0-hotfix.2", 4)?;
+        assert_eq!(fs::read(target.directory.join(rtxmfg::CONFIG))?, ORIGINAL);
+        assert!(crate::mfg_plugin::supported(Some("1.5.0-hotfix.1")));
+        assert!(!crate::mfg_plugin::supported(Some("1.5.0-rc.1")));
+        Ok(())
     }
     fn fault(point: &str, crash: bool) {
         FAULT.with(|f| *f.borrow_mut() = Some((point.into(), crash)));

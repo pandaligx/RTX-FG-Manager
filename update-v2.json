@@ -1,0 +1,14 @@
+{
+  "schema": 2,
+  "version": "4.3.30",
+  "file": "RTXManager.exe",
+  "bytes": 47414216,
+  "sha256": "a567efe2bee40ad3cc175bb9a6d28695e18498b0f656912198b54a21a83a939d",
+  "notes": {
+    "zh-CN": "## 4.3.30 更新日志\n\n- 升级 GPUI Kit 0.9.1 与 GPUI Fast 0.1.14，合入输入、文本选取与字形、滑块、无障碍及界面绘制改进。\n- 改善设置语言切换，搜索提示即时更新并保留当前页面；为字体大小滑块补充本地化无障碍名称。\n- 保留游戏加加监测兼容修复、Direct3D 11 GPU 加速及现有补丁和下载功能。\n- 在软件“关于”和中英文文档中致谢小黑盒博主“落日无序的米莉安”，感谢分享软件并制作教程。\n",
+    "en": "## 4.3.30 Release notes\n\n- Update GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, incorporating improvements to input, text selection and glyphs, sliders, accessibility and rendering.\n- Refine settings language switching: refresh the search prompt in place while preserving the current page, and add a localized accessibility label to the font-size slider.\n- Retain the GamePP monitoring compatibility fix, Direct3D 11 GPU acceleration, and existing patch and download features.\n- Credit HeyBox creator “落日无序的米莉安” in About and both READMEs for sharing the manager and creating tutorials.\n",
+    "ru": "English fallback\n\n## 4.3.30 Release notes\n\n- Update GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, incorporating improvements to input, text selection and glyphs, sliders, accessibility and rendering.\n- Refine settings language switching: refresh the search prompt in place while preserving the current page, and add a localized accessibility label to the font-size slider.\n- Retain the GamePP monitoring compatibility fix, Direct3D 11 GPU acceleration, and existing patch and download features.\n- Credit HeyBox creator “落日无序的米莉安” in About and both READMEs for sharing the manager and creating tutorials.\n",
+    "ja": "English fallback\n\n## 4.3.30 Release notes\n\n- Update GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, incorporating improvements to input, text selection and glyphs, sliders, accessibility and rendering.\n- Refine settings language switching: refresh the search prompt in place while preserving the current page, and add a localized accessibility label to the font-size slider.\n- Retain the GamePP monitoring compatibility fix, Direct3D 11 GPU acceleration, and existing patch and download features.\n- Credit HeyBox creator “落日无序的米莉安” in About and both READMEs for sharing the manager and creating tutorials.\n",
+    "ko": "English fallback\n\n## 4.3.30 Release notes\n\n- Update GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, incorporating improvements to input, text selection and glyphs, sliders, accessibility and rendering.\n- Refine settings language switching: refresh the search prompt in place while preserving the current page, and add a localized accessibility label to the font-size slider.\n- Retain the GamePP monitoring compatibility fix, Direct3D 11 GPU acceleration, and existing patch and download features.\n- Credit HeyBox creator “落日无序的米莉安” in About and both READMEs for sharing the manager and creating tutorials.\n"
+  }
+}

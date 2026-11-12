@@ -1,5 +1,6 @@
-//! RTX Encore beta.2 JSONC v4. Field metadata comes from an isolated upstream
-//! configuration extraction; deployment never requires a fixed DLL hash.
+//! RTX Encore JSONC v4, including 1.3 foveated NR and Turing Smooth Motion.
+//! Legacy paths remain writable for games whose patch has not been upgraded.
+//! Deployment never requires a fixed DLL hash.
 use crate::{jsonc::Document, presets::Values};
 use anyhow::{Context, Result, bail, ensure};
 use serde::Deserialize;
@@ -12,6 +13,12 @@ pub const CONFIG: &str = "rtx-encore.jsonc";
 pub const NOTICES: &str = "rtx-encore-THIRD-PARTY-NOTICES.md";
 pub const SCHEME: &str = "dlssg-transfusion-1.4.5.3";
 pub const SOURCE: &str = "https://github.com/SilyNoMeta/rtx-encore";
+pub const INTEL_FILES: [&str; 4] = [
+    "rtx-encore-runtimes/intel/libxess.dll",
+    "rtx-encore-runtimes/intel/libxess_fg.dll",
+    "rtx-encore-runtimes/intel/libxell.dll",
+    "rtx-encore-runtimes/intel/LICENSE.txt",
+];
 pub const PROXIES: [&str; 19] = [
     "version.dll",
     "dinput8.dll",
@@ -33,6 +40,15 @@ pub const PROXIES: [&str; 19] = [
     "xinput9_1_0.dll",
     "xinputuap.dll",
 ];
+pub const ENTRIES: [&str; 20] = {
+    let mut entries = ["rtx-encore.asi"; 20];
+    let mut i = 0;
+    while i < PROXIES.len() {
+        entries[i] = PROXIES[i];
+        i += 1;
+    }
+    entries
+};
 pub const DEFAULT_CONFIG: &[u8] = include_bytes!("../assets/encore-defaults.jsonc");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -43,11 +59,15 @@ pub enum FieldKind {
     Integer,
     Decimal,
     Hotkey,
+    InheritDecimal,
+    InheritBool,
 }
 #[derive(Debug, Clone, Deserialize)]
 pub struct Choice {
     pub value: String,
     pub label: String,
+    #[serde(default)]
+    pub since: Option<String>,
 }
 #[derive(Debug, Clone, Deserialize)]
 pub struct Field {
@@ -64,6 +84,10 @@ pub struct Field {
     pub dependencies: Vec<String>,
     pub help: String,
     pub optional: bool,
+    #[serde(default)]
+    pub since: Option<String>,
+    #[serde(default)]
+    pub until: Option<String>,
 }
 pub fn fields() -> &'static [Field] {
     static FIELDS: OnceLock<Vec<Field>> = OnceLock::new();
@@ -78,11 +102,107 @@ pub fn defaults() -> Values {
         .map(|f| (f.key.clone(), f.default.clone()))
         .collect()
 }
+pub fn defaults_for_version(version: Option<&str>) -> Values {
+    let mut values = defaults();
+    if supports_200(version) {
+        values.insert("flipMeteringBypass".into(), "auto".into());
+    }
+    values
+}
 pub fn default_config() -> &'static [u8] {
     DEFAULT_CONFIG
 }
 pub fn field(key: &str) -> Option<&'static Field> {
     fields().iter().find(|f| f.key == key)
+}
+pub fn supports_120(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::parse("1.2.0-beta.1").expect("constant"))
+}
+pub fn supports_130(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(1, 3, 0))
+}
+pub fn supports_200(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(2, 0, 0))
+}
+pub fn supports_220(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(2, 2, 0))
+}
+/// Apply the manager's resolved locale only to a fresh default, before explicit
+/// per-game values are merged. Other locales retain the upstream default.
+pub fn localize_defaults(values: &mut Values, language: &str) {
+    if language == "zh-CN" {
+        values.insert("menuLanguage".into(), "zh-CN".into());
+    }
+}
+const GPU_METRICS: [&str; 5] = [
+    "overlayShowGpuLoad",
+    "overlayShowGpuTemperature",
+    "overlayShowGpuPower",
+    "overlayShowGpuClock",
+    "overlayShowGpuMemoryClock",
+];
+fn removed_open_field(key: &str) -> bool {
+    key == "nrEngine" || key.starts_with("nrOpen")
+}
+pub fn field_available(field: &Field, version: Option<&str>) -> bool {
+    if field.until.as_deref().is_some_and(|until| {
+        version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .zip(semver::Version::parse(until).ok())
+            .is_some_and(|(v, end)| v >= end)
+    }) {
+        return false;
+    }
+    if supports_130(version) && removed_open_field(&field.key) {
+        return false;
+    }
+    if field.key == "smoothMotionForce" && supports_120(version) {
+        return false;
+    }
+    if field.key == "providerPatchPolicy"
+        && version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .is_some_and(|v| v >= semver::Version::new(1, 2, 1))
+    {
+        return false;
+    }
+    field.since.as_deref().is_none_or(|since| {
+        version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .zip(semver::Version::parse(since).ok())
+            .is_some_and(|(v, min)| v >= min)
+    })
+}
+pub fn choice_available(choice: &Choice, version: Option<&str>) -> bool {
+    choice.since.as_deref().is_none_or(|since| {
+        version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .zip(semver::Version::parse(since).ok())
+            .is_some_and(|(v, minimum)| v >= minimum)
+    })
+}
+pub fn value_available(key: &str, value: &str, version: Option<&str>) -> bool {
+    field(key).is_some_and(|f| {
+        field_available(f, version)
+            && (f.kind != FieldKind::Choice
+                || f.choices
+                    .iter()
+                    .any(|c| c.value == value && choice_available(c, version)))
+    })
+}
+pub fn requires_restart(field: &Field, version: Option<&str>) -> bool {
+    field.restart
+        && !(supports_120(version)
+            && !supports_200(version)
+            && matches!(field.key.as_str(), "dlssSrPreset" | "dlssRrPreset"))
 }
 
 pub fn valid_hotkey(value: &str) -> bool {
@@ -154,6 +274,9 @@ pub fn valid_hotkey(value: &str) -> bool {
     })
 }
 pub fn valid_value(key: &str, value: &str) -> bool {
+    if key == "nrPreset" {
+        return ["0", "1", "2", "3"].contains(&value);
+    }
     let Some(f) = field(key) else {
         return false;
     };
@@ -161,7 +284,9 @@ pub fn valid_value(key: &str, value: &str) -> bool {
         FieldKind::Bool => matches!(value, "0" | "1"),
         FieldKind::Choice => f.choices.iter().any(|c| c.value == value),
         FieldKind::Hotkey => valid_hotkey(value),
-        FieldKind::Integer | FieldKind::Decimal => {
+        FieldKind::InheritBool => matches!(value, "inherit" | "0" | "1"),
+        FieldKind::InheritDecimal if value == "inherit" => true,
+        FieldKind::Integer | FieldKind::Decimal | FieldKind::InheritDecimal => {
             if value.is_empty() || value.trim() != value {
                 return false;
             }
@@ -185,7 +310,7 @@ pub fn validate_values(values: &Values) -> Result<()> {
     }
     Ok(())
 }
-pub fn field_enabled(key: &str, values: &Values, gpu: Option<i32>) -> bool {
+pub fn field_enabled(key: &str, values: &Values, _gpu: Option<i32>) -> bool {
     let Some(f) = field(key) else {
         return false;
     };
@@ -195,7 +320,7 @@ pub fn field_enabled(key: &str, values: &Values, gpu: Option<i32>) -> bool {
             .map(String::as_str)
             .or_else(|| field(k).map(|f| f.default.as_str()))
     };
-    let dependencies = f.dependencies.iter().all(|dep| {
+    f.dependencies.iter().all(|dep| {
         if let Some((k, v)) = dep.split_once(">=") {
             get(k)
                 .and_then(|n| n.parse::<u32>().ok())
@@ -203,17 +328,25 @@ pub fn field_enabled(key: &str, values: &Values, gpu: Option<i32>) -> bool {
                 .is_some_and(|(a, b)| a >= b)
         } else if let Some((k, v)) = dep.split_once('=') {
             get(k) == Some(v)
+                || k == "nrEnabled" && v == "1" && get("nrWithoutGameDlss") == Some("1")
+                || key == "xessTensorCores"
+                    && k == "reconstructionEngine"
+                    && v == "xess"
+                    && get("dlssWithoutGameDlss") == Some("1")
+                    && get("dlssWithoutGameDlssEngine") == Some("xess")
         } else {
             false
         }
-    });
-    dependencies
-        && match (key, gpu) {
-            (key, Some(0)) if key.starts_with("nrOpen") => false,
-            ("smoothMotionEnabled" | "smoothMotionApi", Some(series)) => series == 1,
-            ("nrPrecision", Some(series)) => series == 0 || series == 1,
-            _ => true,
-        }
+    })
+}
+
+/// Keep the four custom values out of the normal preset view. The values are
+/// retained when another preset is selected, and reset still covers them.
+pub fn field_visible(field: &Field, values: &Values) -> bool {
+    !matches!(
+        field.key.as_str(),
+        "nrFoveaWidth" | "nrFoveaHeight" | "nrFoveaFalloff" | "nrFoveaEdge"
+    ) || values.get("nrFoveaPreset").is_some_and(|v| v == "custom")
 }
 
 fn document(bytes: &[u8]) -> Result<Document> {
@@ -240,8 +373,19 @@ const RENAMES: &[(&str, &str)] = &[
     ("nrOpenNativeQkvPairs", "nrOpenSharedLoads"),
     ("gpuArchitecture", "gpuSeries"),
     ("patchFlipMetering", "flipMeteringBypass"),
+    ("nrPreset", "dlssNrPreset"),
 ];
 fn normalized(key: &str, value: &Value) -> Value {
+    if key == "dlssNrPreset"
+        && let Some(n) = value.as_u64()
+    {
+        return json!(match n {
+            0 | 3 => "auto",
+            1 => "a",
+            2 => "b",
+            _ => return value.clone(),
+        });
+    }
     let mapped = match (key, value.as_str()) {
         ("protectionTuning", Some("explained-warp")) => Some("refined"),
         ("protectionTuning", Some("transfusion")) => Some("classic"),
@@ -264,6 +408,7 @@ fn supported_container(path: &[String]) -> bool {
         "frameGeneration",
         "smoothMotion",
         "dlssSuperResolution",
+        "dlssPresets",
         "nativeMenuFeatures",
         "neuralRendering",
         "overlay",
@@ -274,6 +419,10 @@ fn supported_container(path: &[String]) -> bool {
         "diagnostics",
         "keyboardShortcuts",
         "menuState",
+        "renderingEngines",
+        "xefg",
+        "superResolutionInputs",
+        "superResolutionSharpening",
     ];
     if path.len() == 1 {
         return roots.contains(&path[0].as_str());
@@ -284,6 +433,8 @@ fn supported_container(path: &[String]) -> bool {
                 "core",
                 "appearance",
                 "passStyles",
+                "passTuning",
+                "passModels",
                 "optimizations",
                 "experimental",
                 "openExperimental",
@@ -320,8 +471,13 @@ fn locations(
 fn resolve(doc: &Document, path: &[String]) -> Result<(Option<Value>, Vec<Vec<String>>)> {
     // Checking canonical parents also rejects a malformed known section even
     // when an equivalent flat legacy key is available.
-    let canonical = doc.get(path)?.cloned();
+    let mut canonical = doc.get(path)?.cloned();
     let key = path.last().context("Empty field path")?;
+    if key == "flipMeteringBypass"
+        && let Some(value) = doc.get(&self::path(&["frameGeneration", "flipMeteringBypass"]))?
+    {
+        canonical = Some(value.clone());
+    }
     let mut candidates = Vec::new();
     locations(&doc.value, key, &mut Vec::new(), &mut candidates);
     let aliases = candidates.iter().map(|(p, _)| p.clone()).collect();
@@ -348,6 +504,19 @@ fn multiplier(doc: &Document) -> Result<u64> {
 }
 fn decode(f: &Field, value: &Value) -> Result<String> {
     let result = match f.kind {
+        FieldKind::InheritDecimal | FieldKind::InheritBool if value.as_str() == Some("inherit") => {
+            "inherit".into()
+        }
+        FieldKind::InheritDecimal => value
+            .as_f64()
+            .context("Invalid inherited decimal")?
+            .to_string(),
+        FieldKind::InheritBool => if value.as_bool().context("Invalid inherited boolean")? {
+            "1"
+        } else {
+            "0"
+        }
+        .into(),
         FieldKind::Bool => if value.as_bool().context("Invalid Encore boolean type")? {
             "1"
         } else {
@@ -362,6 +531,11 @@ fn decode(f: &Field, value: &Value) -> Result<String> {
             .as_f64()
             .context("Invalid Encore decimal type")?
             .to_string(),
+        FieldKind::Choice if f.key == "flipMeteringBypass" => match value {
+            Value::Bool(v) => if *v { "1" } else { "0" }.into(),
+            Value::String(v) if v == "auto" => v.clone(),
+            _ => bail!("Invalid Encore flip metering value"),
+        },
         FieldKind::Choice if matches!(f.key.as_str(), "nrStyle" | "nrPreset") => value
             .as_u64()
             .context("Invalid Encore numeric choice")?
@@ -380,9 +554,21 @@ fn decode(f: &Field, value: &Value) -> Result<String> {
 }
 fn encode(f: &Field, value: &str) -> Result<Value> {
     Ok(match f.kind {
+        FieldKind::InheritDecimal | FieldKind::InheritBool if value == "inherit" => {
+            json!("inherit")
+        }
+        FieldKind::InheritDecimal => json!(value.parse::<f64>()?),
+        FieldKind::InheritBool => json!(value == "1"),
         FieldKind::Bool => json!(value == "1"),
         FieldKind::Integer => json!(value.parse::<u64>()?),
         FieldKind::Decimal => json!(value.parse::<f64>()?),
+        FieldKind::Choice if f.key == "flipMeteringBypass" => {
+            if value == "auto" {
+                json!("auto")
+            } else {
+                json!(value == "1")
+            }
+        }
         FieldKind::Choice if matches!(f.key.as_str(), "nrStyle" | "nrPreset") => {
             json!(value.parse::<u64>()?)
         }
@@ -392,8 +578,39 @@ fn encode(f: &Field, value: &str) -> Result<Value> {
 pub fn read(bytes: &[u8]) -> Result<Values> {
     let doc = document(bytes)?;
     let mut values = defaults();
+    // 2.2 inherits each absent sensor from the legacy aggregate switch.
+    if let Some(legacy) = field("overlayShowGpu")
+        && let Some(value) = resolve(&doc, &legacy.path)?.0.and_then(|v| v.as_bool())
+    {
+        for key in GPU_METRICS {
+            values.insert(key.into(), u8::from(value).to_string());
+        }
+    }
     let mult = multiplier(&doc)?;
     for f in fields() {
+        if f.key == "vsync" {
+            if let Some(value) = vsync_value(&doc)? {
+                values.insert(f.key.clone(), value);
+            }
+            continue;
+        }
+        if f.key == "vsyncOff"
+            && resolve(&doc, &path(&["nativeMenuFeatures", "vsync"]))?
+                .0
+                .is_some()
+        {
+            // The new key has priority, including over malformed legacy values.
+            values.insert(
+                f.key.clone(),
+                if vsync_value(&doc)?.as_deref() == Some("off") {
+                    "1"
+                } else {
+                    "0"
+                }
+                .into(),
+            );
+            continue;
+        }
         if let Some(v) = resolve(&doc, &f.path)?.0 {
             let result = if f.key == "tf_mode" {
                 match v.as_str().context("Invalid Encore mode type")? {
@@ -416,7 +633,40 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
     read(bytes)?;
     let mut out = bytes.to_vec();
     for (key, value) in values {
+        if key == "vsyncOff" {
+            if values.contains_key("vsync") {
+                continue;
+            }
+            let modern = path(&["nativeMenuFeatures", "vsync"]);
+            if resolve(&document(&out)?, &modern)?.0.is_some() {
+                out = document(&out)?
+                    .set(&modern, json!(if value == "1" { "off" } else { "game" }))?;
+                continue;
+            }
+        }
+        if key == "nrPreset" {
+            if !values.contains_key("dlssNrPreset") {
+                let mapped = normalized("dlssNrPreset", &json!(value.parse::<u64>()?));
+                out = document(&out)?.set(&path(&["dlssPresets", "dlssNrPreset"]), mapped)?;
+            }
+            continue;
+        }
         let f = field(key).context("Unknown Encore field")?;
+        if key == "flipMeteringBypass" {
+            let doc = document(&out)?;
+            let modern = path(&["frameGeneration", key]);
+            if doc.get(&modern)?.is_some() {
+                let (_, locations) = resolve(&doc, &f.path)?;
+                for old in locations.into_iter().filter(|p| p != &modern) {
+                    out = document(&out)?.remove(&old)?;
+                }
+                out = document(&out)?.set(&modern, encode(f, value)?)?;
+            } else {
+                // An old game still needs the legacy section until its mod is upgraded.
+                out = doc.set(&f.path, encode(f, value)?)?;
+            }
+            continue;
+        }
         if key == "tf_mode" {
             out = document(&out)?.set(
                 &f.path,
@@ -435,6 +685,199 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
     }
     read(&out)?;
     Ok(out)
+}
+
+pub fn used_open_nr(bytes: &[u8]) -> Result<bool> {
+    let f = field("nrEngine").expect("legacy engine metadata");
+    Ok(resolve(&document(bytes)?, &f.path)?
+        .0
+        .is_some_and(|v| v == "opendlss"))
+}
+
+/// 1.3 removed OpenNR. Retire only known keys inside documented containers;
+/// unrelated objects, comments, shortcuts and menu state are not rewritten.
+/// The upgrade journal retains the original bytes for rollback.
+pub fn migrate_130(bytes: &[u8]) -> Result<Vec<u8>> {
+    let open = used_open_nr(bytes)?;
+    let doc = document(bytes)?;
+    let mut retired = Vec::new();
+    for f in fields().iter().filter(|f| removed_open_field(&f.key)) {
+        retired.extend(resolve(&doc, &f.path)?.1);
+    }
+    let mut out = bytes.to_vec();
+    for p in retired {
+        out = document(&out)?.remove(&p)?;
+    }
+    if open {
+        // Remove flat/legacy aliases as well so the DLL cannot read a stale true.
+        let f = field("nrEnabled").expect("NR activation metadata");
+        let (_, aliases) = resolve(&document(&out)?, &f.path)?;
+        for p in aliases.into_iter().filter(|p| p != &f.path) {
+            out = document(&out)?.remove(&p)?;
+        }
+        out = document(&out)?.set(&f.path, json!(false))?;
+    }
+    read(&out)?;
+    Ok(out)
+}
+
+fn at_least(version: Option<&str>, minor: u64, patch: u64) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(1, minor, patch))
+}
+
+fn vsync_value(doc: &Document) -> Result<Option<String>> {
+    if let Some(value) = resolve(doc, &path(&["nativeMenuFeatures", "vsync"]))?.0 {
+        return decode(field("vsync").expect("V-Sync metadata"), &value).map(Some);
+    }
+    resolve(doc, &path(&["nativeMenuFeatures", "vsyncOff"]))?
+        .0
+        .map(|value| {
+            let disabled = value
+                .as_bool()
+                .context("Invalid Encore legacy V-Sync boolean")?;
+            Ok(if disabled { "off" } else { "game" }.to_owned())
+        })
+        .transpose()
+}
+
+/// Retire only documented aliases. Preserve unknown objects and original bytes
+/// in the caller's upgrade journal; repeated migration is byte-for-byte stable.
+fn migrate_version_fields(bytes: &[u8], version: Option<&str>) -> Result<Vec<u8>> {
+    let mut out = bytes.to_vec();
+    if supports_220(version) {
+        let doc = document(&out)?;
+        if let Some(legacy) = field("overlayShowGpu")
+            && let Some(value) = resolve(&doc, &legacy.path)?.0.and_then(|v| v.as_bool())
+        {
+            for key in GPU_METRICS {
+                let f = field(key).expect("sensor metadata");
+                if resolve(&document(&out)?, &f.path)?.0.is_none() {
+                    out = document(&out)?.set(&f.path, json!(value))?;
+                }
+            }
+        }
+    }
+    let pacing = path(&["frameGeneration", "flipMeteringBypass"]);
+    let value = resolve(&document(&out)?, &pacing)?.0;
+    if supports_200(version) && value.is_none() {
+        // Existing explicit booleans retain their meaning; only absent settings
+        // acquire the new upstream default. Learned state stays local and intact.
+        out = document(&out)?.set(&pacing, json!("auto"))?;
+    } else if version.is_some() && !supports_200(version) && value == Some(json!("auto")) {
+        // The common template also serves old installed versions, whose parser
+        // accepts booleans only. Explicit unsupported overrides are rejected below.
+        out = document(&out)?.set(&pacing, json!(false))?;
+    }
+    if at_least(version, 5, 1) {
+        let mut candidates = Vec::new();
+        locations(
+            &document(&out)?.value,
+            "smoothMotionTuringVariant",
+            &mut Vec::new(),
+            &mut candidates,
+        );
+        for (p, _) in candidates {
+            out = document(&out)?.remove(&p)?;
+        }
+    }
+    let doc = document(&out)?;
+    let modern = path(&["nativeMenuFeatures", "vsync"]);
+    let legacy = path(&["nativeMenuFeatures", "vsyncOff"]);
+    if at_least(version, 5, 2) {
+        if let Some(value) = vsync_value(&doc)? {
+            let mut retired = Vec::new();
+            locations(&doc.value, "vsyncOff", &mut Vec::new(), &mut retired);
+            for (p, _) in retired {
+                out = document(&out)?.remove(&p)?;
+            }
+            out = document(&out)?.set(&modern, json!(value))?;
+        }
+    } else if version.is_some() && resolve(&doc, &modern)?.0.is_some() {
+        // Bundled defaults also serve older installed patches. Never silently
+        // downgrade forced-on V-Sync, which old Encore cannot represent.
+        let value = vsync_value(&doc)?.context("Missing V-Sync setting")?;
+        ensure!(value != "on", "此 Encore 版本不支持强制开启垂直同步");
+        for p in resolve(&doc, &modern)?.1 {
+            out = document(&out)?.remove(&p)?;
+        }
+        out = document(&out)?.set(&legacy, json!(value == "off"))?;
+    }
+    Ok(out)
+}
+
+pub fn read_for_version(bytes: &[u8], version: Option<&str>) -> Result<Values> {
+    let bytes = migrate_version_fields(bytes, version)?;
+    if supports_130(version) {
+        read(&migrate_130(&bytes)?)
+    } else {
+        read(&bytes)
+    }
+}
+
+pub fn configure_for_version(
+    bytes: &[u8],
+    values: &Values,
+    version: Option<&str>,
+) -> Result<Vec<u8>> {
+    for (key, value) in values {
+        let f = field(if key == "nrPreset" {
+            "dlssNrPreset"
+        } else {
+            key
+        })
+        .context("Unknown Encore field")?;
+        ensure!(
+            value_available(&f.key, value, version),
+            "Encore setting unavailable in installed version: {key}"
+        );
+    }
+    let bytes = migrate_version_fields(bytes, version)?;
+    if !supports_130(version) {
+        return configure(&bytes, values);
+    }
+    let open = used_open_nr(&bytes)?;
+    let migrated = migrate_130(&bytes)?;
+    let mut values = values.clone();
+    if open {
+        // Even a stale draft from the previous engine must not silently turn
+        // NVIDIA NR on. Once migrated, an explicit later enable works normally.
+        values.insert("nrEnabled".into(), "0".into());
+    }
+    configure(&migrated, &values)
+}
+/// 1.1.0 moves only the legacy NR model setting. Keep all unrelated bytes as-is.
+pub fn migrate_nr(bytes: &[u8]) -> Result<Vec<u8>> {
+    let doc = document(bytes)?;
+    let canonical = path(&["dlssPresets", "dlssNrPreset"]);
+    let (value, locations) = resolve(&doc, &canonical)?;
+    let old: Vec<_> = locations.into_iter().filter(|p| p != &canonical).collect();
+    if old.is_empty() {
+        return Ok(bytes.to_vec());
+    }
+    read(bytes)?;
+    let mut out = bytes.to_vec();
+    for p in old {
+        out = document(&out)?.remove(&p)?;
+    }
+    if let Some(value) = value {
+        out = document(&out)?.set(&canonical, value)?;
+    }
+    Ok(out)
+}
+/// Called only when deploying Encore 1.1.2 or newer; preserves comments and
+/// unknown fields, and prevents a stale legacy key from overriding the new one.
+pub fn migrate_frame_pacing(bytes: &[u8]) -> Result<Vec<u8>> {
+    read(bytes)?;
+    let doc = document(bytes)?;
+    let canonical = path(&["frameGeneration", "flipMeteringBypass"]);
+    let (value, locations) = resolve(&doc, &canonical)?;
+    let mut out = bytes.to_vec();
+    for old in locations.into_iter().filter(|p| p != &canonical) {
+        out = document(&out)?.remove(&old)?;
+    }
+    document(&out)?.set(&canonical, value.unwrap_or(json!(false)))
 }
 pub fn migrate(bytes: &[u8], explicit_overrides: &Values) -> Result<Vec<u8>> {
     validate_values(explicit_overrides)?;
@@ -469,7 +912,14 @@ pub fn validate_template(bytes: &[u8]) -> Result<()> {
     );
     for f in fields().iter().filter(|f| !f.optional) {
         ensure!(
-            doc.get(&f.path)?.is_some(),
+            if f.key == "vsyncOff" {
+                doc.get(&f.path)?.is_some()
+                    || doc.get(&path(&["nativeMenuFeatures", "vsync"]))?.is_some()
+            } else if f.key == "flipMeteringBypass" {
+                resolve(&doc, &f.path)?.0.is_some()
+            } else {
+                doc.get(&f.path)?.is_some()
+            },
             "Encore package missing {}",
             f.path.join(".")
         );
@@ -490,6 +940,10 @@ pub fn validate_cloud_config(bytes: &[u8]) -> Result<()> {
         ("gpuSeries", "auto"),
         ("smoothMotionEnabled", "0"),
         ("nrEnabled", "0"),
+        ("nrFoveation", "0"),
+        ("dlssWithoutGameDlss", "0"),
+        ("nrWithoutGameDlss", "0"),
+        ("frameGenerationWithoutGameFg", "0"),
     ] {
         ensure!(
             values.get(key).is_some_and(|v| v == value),

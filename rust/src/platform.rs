@@ -137,7 +137,8 @@ mod tests {
         std::fs::write(&path, b"0123456789").expect("write");
         let meta = std::fs::metadata(&path).expect("metadata");
         assert_eq!(meta.file_size(), 10);
-        assert!(meta.file_attributes() == 0);
+        #[cfg(not(windows))]
+        assert_eq!(meta.file_attributes(), 0);
     }
 
     #[test]

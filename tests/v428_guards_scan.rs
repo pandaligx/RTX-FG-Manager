@@ -1,9 +1,5 @@
 //! Grouped process guards and scanner role regressions. Only the test binary's
 //! sleeper branch is executed; synthetic PE fixtures never run as games.
-// These regressions exercise Win32 handles, share modes and CREATE_NO_WINDOW
-// directly, so the whole test binary is Windows-only. It compiles to nothing elsewhere.
-#![cfg(windows)]
-
 use anyhow::Result;
 use rtx_fg_manager::{cleanup, core, presets, scanner, win};
 use std::{

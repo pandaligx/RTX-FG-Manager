@@ -1,6 +1,6 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use rtx_fg_manager::{
-    cleanup, cloud, core, gpu_alias, i18n, preferences,
+    cleanup, cloud, core, game_names, gpu_alias, hags, i18n, preferences,
     scanner::{self, Game},
     updater, win,
 };
@@ -15,10 +15,28 @@ use std::{
     },
     time::{Duration, Instant},
 };
+#[cfg(test)]
+mod preset_regressions;
+#[derive(Clone, Debug, Default)]
+pub struct ScanProgress {
+    pub directories: u64,
+    pub skipped: u64,
+    pub path: String,
+}
+
 pub enum Event {
+    EncorePrepared(Result<EncoreInstallPlan>),
+    GameNamesCached(game_names::Catalog),
+    GameIdentities(u64, Vec<(String, String, Value)>),
+    GameNames(Result<game_names::Catalog>, bool),
     Catalog(cloud::Catalog),
-    Deployments(u64, String, rtx_fg_manager::deployment::Snapshot),
+    RuntimeCatalogCached(u64, rtx_fg_manager::runtime_catalog::Catalog),
+    RuntimeCatalog(u64, Result<rtx_fg_manager::runtime_catalog::Catalog>),
+    Deployments(u64, String, Box<rtx_fg_manager::deployment::Snapshot>),
+    Uninstalled(u64, String),
+    CleanupPreview(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>),
     Scan(scanner::Report),
+    ScanProgress(ScanProgress),
     Progress(String),
     PayloadProgress(cloud::CloudProgress),
     PatchResult(bool),
@@ -28,31 +46,42 @@ pub enum Event {
     RefreshDone,
     Status(String, String),
     Evidence(String, scanner::Evidence),
-    PresetRead(
-        String,
-        Option<(String, rtx_fg_manager::presets::Values)>,
-        bool,
-        u64,
-    ),
+    PresetRead {
+        exe: String,
+        values: Option<(String, rtx_fg_manager::presets::Values)>,
+        profile: Option<String>,
+        running: bool,
+        epoch: u64,
+        consistent: bool,
+    },
     PresetApplied(String, String, rtx_fg_manager::presets::Values),
     PresetReadFailed(String, String, bool, u64),
     Devices(Vec<gpu_alias::Device>),
     Gpu(Vec<(String, i32)>),
+    Hags(Result<hags::State>),
     Icons(Vec<(String, Option<image::RgbaImage>)>),
     Log(String),
     Warning(String),
+    TaskWarning(bool, String),
+    TaskCancelled(bool),
     Notice(String),
     Done,
+    Blocked(BlockedOperation),
+    RetryReady(RetryRequest),
     Checked(Result<Option<updater::Manifest>>, bool, Arc<AtomicBool>),
     Download(PathBuf),
     DownloadProgress(updater::DownloadProgress),
     UpdateDone,
     Installed,
+    RenamePrepared(Result<()>),
+    ResetPrepared(Result<()>),
+    ResetStartup(Result<()>, Option<PathBuf>),
     Saved(Result<()>),
     SmokeWritten,
 }
 pub struct Channel {
     tx: mpsc::Sender<Event>,
+    task_scope: Option<bool>,
 }
 struct Completion(Channel);
 struct RefreshCompletion(Channel);
@@ -70,11 +99,23 @@ impl Clone for Channel {
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),
+            task_scope: self.task_scope,
         }
     }
 }
 impl Channel {
+    fn report_error(&self, error: anyhow::Error) {
+        if rtx_fg_manager::transfer::is_cancelled(&error) {
+            self.send(Event::TaskCancelled(self.task_scope.unwrap_or(false)));
+        } else {
+            self.send(Event::Warning(format!("{error:#}")));
+        }
+    }
     pub fn send(&self, e: Event) {
+        let e = match (self.task_scope, e) {
+            (Some(update), Event::Warning(message)) => Event::TaskWarning(update, message),
+            (_, event) => event,
+        };
         let _ = self.tx.send(e);
     }
     pub fn job(&self, f: impl FnOnce(&Channel) -> Result<()> + Send + 'static) {
@@ -86,14 +127,91 @@ impl Channel {
         });
     }
     pub fn operation(&self, f: impl FnOnce(&Channel) -> Result<()> + Send + 'static) {
-        self.job(move |c| {
+        let mut c = self.clone();
+        c.task_scope = Some(false);
+        std::thread::spawn(move || {
             let _completion = Completion(c.clone());
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(c))) {
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&c))) {
                 Ok(result) => result,
-                Err(_) => anyhow::bail!("后台操作异常终止，请检查操作日志后重试"),
+                Err(_) => Err(anyhow::anyhow!("后台操作异常终止，请检查操作日志后重试")),
+            };
+            // The failure must reach the owning task before Completion emits Done.
+            if let Err(error) = result {
+                c.report_error(error);
             }
         });
     }
+}
+#[derive(Clone)]
+pub enum RetryAction {
+    Recommendation(
+        Box<rtx_fg_manager::recommendations::Recipe>,
+        rtx_fg_manager::recommendation_presets::Action,
+    ),
+    Patch(bool, BTreeSet<String>),
+    InstallNr(&'static str),
+    RemoveNr,
+    Runtime(&'static str, bool, String),
+    Apply,
+    DeleteCleanup(Vec<rtx_fg_manager::cleanup_pending::Plan>),
+    CleanupResiduals(Vec<core::DeploymentTarget>),
+}
+#[derive(Clone)]
+pub struct RetryRequest {
+    action: RetryAction,
+    epoch: u64,
+    fingerprint: String,
+}
+#[derive(Clone)]
+pub struct BlockedOperation {
+    request: RetryRequest,
+    pub processes: Vec<win::BlockingProcess>,
+}
+impl BlockedOperation {
+    pub fn can_terminate(&self) -> bool {
+        !self.processes.is_empty()
+            && self
+                .processes
+                .iter()
+                .all(win::BlockingProcess::can_terminate)
+    }
+}
+fn defer_if_running(
+    c: &Channel,
+    targets: &[core::DeploymentTarget],
+    request: RetryRequest,
+) -> Result<bool> {
+    let mut processes = BTreeMap::new();
+    for target in targets {
+        let detected = if matches!(
+            &request.action,
+            RetryAction::Patch(true, _)
+                | RetryAction::CleanupResiduals(_)
+                | RetryAction::DeleteCleanup(_)
+                | RetryAction::RemoveNr
+                | RetryAction::Runtime(_, true, _)
+        ) {
+            cleanup::blocking_processes(target)?
+        } else {
+            core::blocking_processes(target)?
+        };
+        for process in detected {
+            processes.insert(process.pid, process);
+        }
+    }
+    if processes.is_empty() {
+        return Ok(false);
+    }
+    c.send(Event::Blocked(BlockedOperation {
+        request,
+        processes: processes.into_values().collect(),
+    }));
+    Ok(true)
+}
+pub struct EncoreInstallPlan {
+    pub fingerprint: String,
+    pub paths: BTreeSet<String>,
+    pub choices: Vec<rtx_fg_manager::encore_install::Choice>,
 }
 struct PatchRequest {
     clean: bool,
@@ -141,10 +259,63 @@ fn parameter_target(game: &Game) -> core::DeploymentTarget {
     game.deployment_target(std::path::Path::new(paths.first().unwrap_or(&game.exe)))
 }
 
+struct ParameterSnapshot {
+    values: Option<(String, rtx_fg_manager::presets::Values)>,
+    consistent: bool,
+}
+fn inspect_game_parameters(
+    game: &Game,
+    catalog: &cloud::Catalog,
+    mut inspect: impl FnMut(
+        &core::DeploymentTarget,
+        &cloud::Catalog,
+    ) -> Result<Option<(String, rtx_fg_manager::presets::Values)>>,
+) -> Result<ParameterSnapshot> {
+    let targets = game.deployment_targets();
+    let first = parameter_target(game);
+    let values = inspect(&first, catalog)?;
+    let normalize = |target: &core::DeploymentTarget,
+                     value: Option<(String, rtx_fg_manager::presets::Values)>| {
+        value.and_then(|(scheme, values)| {
+            let policy = catalog.scheme_policies.get(&scheme)?;
+            let record = core::record(&target.directory).ok().flatten();
+            let policy = record
+                .as_ref()
+                .map(|r| {
+                    rtx_fg_manager::presets::policy_for_version(
+                        policy,
+                        r.upstream_version
+                            .as_deref()
+                            .or(r.payload_version.as_deref()),
+                    )
+                })
+                .unwrap_or_else(|| policy.clone());
+            let mut normalized =
+                rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            normalized.extend(values);
+            rtx_fg_manager::presets::Context::new(&scheme, &policy, &target.game_exe)
+                .normalize(&mut normalized);
+            Some((scheme, policy.parameter_profile, normalized))
+        })
+    };
+    let baseline = normalize(&first, values.clone());
+    // A primary-folder success is not proof that a multi-folder apply completed.
+    // Unreadable, missing or differently configured siblings keep the draft retryable.
+    let consistent = baseline.is_some()
+        && targets.iter().all(|target| {
+            core::key(&target.directory) == core::key(&first.directory)
+                || inspect(target, catalog).is_ok_and(|v| normalize(target, v) == baseline)
+        });
+    Ok(ParameterSnapshot { values, consistent })
+}
+
 fn uses_explicit_edits(profile: &str) -> bool {
     matches!(
         profile,
-        rtx_fg_manager::encore::PROFILE | rtx_fg_manager::rtxmfg::PROFILE
+        rtx_fg_manager::encore::PROFILE
+            | rtx_fg_manager::rtxmfg::PROFILE
+            | rtx_fg_manager::upstream040::PROFILE
+            | rtx_fg_manager::upstream040::PROFILE_041
     )
 }
 
@@ -155,15 +326,35 @@ fn read_json_preset_values(
     let config = match profile {
         rtx_fg_manager::encore::PROFILE => rtx_fg_manager::encore::CONFIG,
         rtx_fg_manager::rtxmfg::PROFILE => rtx_fg_manager::rtxmfg::CONFIG,
+        rtx_fg_manager::upstream040::PROFILE | rtx_fg_manager::upstream040::PROFILE_041 => {
+            core::INI
+        }
         _ => anyhow::bail!("不支持的配置协议"),
     };
     let path = core::no_links(&target.directory.join(config))?;
     anyhow::ensure!(path.metadata()?.len() <= 1024 * 1024, "配置文件过大");
     let bytes = std::fs::read(path)?;
     if profile == rtx_fg_manager::encore::PROFILE {
-        rtx_fg_manager::encore::read(&bytes)
+        let record = core::record(&target.directory)?;
+        let version = record.as_ref().and_then(|r| {
+            r.upstream_version
+                .as_deref()
+                .or(r.payload_version.as_deref())
+        });
+        rtx_fg_manager::encore::read_for_version(&bytes, version)
+    } else if rtx_fg_manager::upstream040::is_profile(profile) {
+        let record = core::record(&target.directory)?;
+        let actual =
+            rtx_fg_manager::upstream040::profile_for_version(record.as_ref().and_then(|r| {
+                r.upstream_version
+                    .as_deref()
+                    .or(r.payload_version.as_deref())
+            }));
+        rtx_fg_manager::presets::read_values(&bytes, actual)
     } else {
-        rtx_fg_manager::rtxmfg::read(&bytes)
+        let mut values = rtx_fg_manager::rtxmfg::read(&bytes)?;
+        values.extend(rtx_fg_manager::rtxmfg_settings::read_ui_at(target)?);
+        Ok(values)
     }
 }
 
@@ -175,6 +366,12 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
     paths.extend(core::PROXIES.iter().map(|n| dir.join(n)));
     paths.extend(
         [
+            "nvngx_dlssnr.dll",
+            ".rtx-fg-nr/ownership.json",
+            ".rtx-fg-runtimes/sr/ownership.json",
+            ".rtx-fg-runtimes/rr/ownership.json",
+            ".rtx-fg-runtimes/fg/ownership.json",
+            ".rtx-fg-runtimes/xemfg/ownership.json",
             core::INI,
             rtx_fg_manager::rtxmfg::CONFIG,
             rtx_fg_manager::transfusion::CONFIG,
@@ -202,10 +399,72 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
         })
         .collect()
 }
+#[derive(Default)]
+pub struct RuntimeCatalogLoad {
+    loading: bool,
+    usable: bool,
+    online: bool,
+    pending: bool,
+    error: Option<String>,
+}
+impl RuntimeCatalogLoad {
+    pub fn loading(&self) -> bool {
+        self.loading
+    }
+    pub fn failed(&self) -> bool {
+        self.error.is_some()
+    }
+    pub fn message(&self) -> &'static str {
+        if self.loading {
+            if self.usable {
+                "正在刷新版本清单，现有版本仍可使用…"
+            } else {
+                "正在加载版本清单…"
+            }
+        } else if self.failed() {
+            if self.usable {
+                "版本清单加载失败，继续使用缓存版本。点击“刷新”重试。"
+            } else {
+                "版本清单加载失败，当前使用内置版本。点击“刷新”重试。"
+            }
+        } else if self.pending {
+            "清单已获取，当前操作完成后更新。"
+        } else if self.online {
+            "版本清单已更新"
+        } else if self.usable {
+            "正在使用缓存版本，可点击“刷新”获取最新清单。"
+        } else {
+            "历史版本尚未加载，点击“刷新”获取。"
+        }
+    }
+    pub fn single_version_hint(&self, kind: &str) -> &'static str {
+        if kind == "xemfg" {
+            "此组件当前仅提供一个版本"
+        } else if self.loading {
+            "正在获取其他版本…"
+        } else if self.failed() || !self.online {
+            "历史版本暂不可用，可点击顶部“刷新”重试"
+        } else {
+            "此组件当前仅提供一个版本"
+        }
+    }
+}
+
 pub struct Controller {
+    pub game_names: Arc<game_names::Catalog>,
+    pub names_busy: bool,
+    pub names_status: String,
+    names_generation: u64,
+    names_cancel: Arc<AtomicBool>,
     pub catalog: cloud::Catalog,
     pending_catalog: Option<cloud::Catalog>,
+    pending_runtime_catalog: Option<(rtx_fg_manager::runtime_catalog::Catalog, bool)>,
+    pub runtime_catalog_load: RuntimeCatalogLoad,
+    runtime_catalog_generation: u64,
+    runtime_catalog_cancel: Arc<AtomicBool>,
     pub data: PathBuf,
+    pub reset_available: bool,
+    pub reset_backup: Option<PathBuf>,
     pub state: Value,
     pub store: Option<preferences::Store>,
     pub read_only: bool,
@@ -221,11 +480,14 @@ pub struct Controller {
     pub deployments: BTreeMap<String, rtx_fg_manager::deployment::Snapshot>,
     pub evidence: BTreeMap<String, Option<scanner::Evidence>>,
     pub disk_presets: BTreeMap<(String, String), rtx_fg_manager::presets::Values>,
+    disk_profiles: BTreeMap<(String, String), (u64, String)>,
+    preset_baselines: BTreeMap<(String, String), rtx_fg_manager::presets::Values>,
     pub running_games: BTreeSet<String>,
     pub preset_reads: BTreeSet<String>,
     pub logs: VecDeque<String>,
     pub page: u8,
     pub busy: bool,
+    pub tasks: rtx_fg_manager::task_progress::Tasks,
     pub critical: bool,
     pub status_epoch: u64,
     pub refresh_busy: bool,
@@ -233,7 +495,9 @@ pub struct Controller {
     pub icons: BTreeMap<String, Option<Arc<gpui::RenderImage>>>,
     pub cancel: Arc<AtomicBool>,
     pub progress: String,
+    pub scan_progress: Option<ScanProgress>,
     pub payload_progress: Option<cloud::CloudProgress>,
+    pub neural_versions: BTreeMap<String, &'static str>,
     display_cache: DisplayCache,
     patch_summary: Option<PatchSummary>,
     save_revision: u64,
@@ -254,10 +518,23 @@ pub struct Controller {
     pub device_index: usize,
     pub alias_index: usize,
     pub gpu: String,
+    pub hags: Option<hags::State>,
+    pub hags_busy: bool,
+    pub hags_writing: bool,
+    pub hags_error: Option<String>,
+    hags_checked: Instant,
+    hags_cancel: Arc<AtomicBool>,
     pub warning: Option<String>,
+    pub blocked: Option<BlockedOperation>,
     pub notice: Option<String>,
+    pub information: Option<String>,
     pub confirm: Option<String>,
+    pending_cleanup: Option<(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>)>,
     pending_patch: Option<PatchRequest>,
+    pub encore_install: Option<EncoreInstallPlan>,
+    encore_install_values: BTreeMap<String, rtx_fg_manager::presets::Values>,
+    encore_components: BTreeMap<String, rtx_fg_manager::encore_components::Components>,
+    resume_install: Option<BTreeSet<String>>,
     pub search: String,
     pub smoke: Option<PathBuf>,
     pub closing: bool,
@@ -282,8 +559,11 @@ impl Controller {
         }
         let tr = i18n::Translator::new(state["language"].as_str().unwrap_or("system"));
         let (tx, rx) = mpsc::channel();
-        let channel = Channel { tx };
-        let games = state["games"]
+        let channel = Channel {
+            tx,
+            task_scope: None,
+        };
+        let mut games: Vec<Game> = state["games"]
             .as_array()
             .map(|v| {
                 v.iter()
@@ -291,11 +571,25 @@ impl Controller {
                     .collect()
             })
             .unwrap_or_default();
+        for game in &mut games {
+            game.repair_renderer();
+        }
         let read_only = error.is_some();
         let mut app = Self {
+            game_names: Arc::new(game_names::bundled()),
+            names_busy: false,
+            names_status: String::new(),
+            names_generation: 0,
+            names_cancel: Arc::new(AtomicBool::new(false)),
             catalog: cloud::bundled(),
             pending_catalog: None,
+            pending_runtime_catalog: None,
+            runtime_catalog_load: RuntimeCatalogLoad::default(),
+            runtime_catalog_generation: 0,
+            runtime_catalog_cancel: Arc::new(AtomicBool::new(false)),
             data: data.clone(),
+            reset_available: rtx_fg_manager::reset::available(&data),
+            reset_backup: rtx_fg_manager::reset::backup(&data),
             state,
             store: (!read_only).then(|| preferences::Store::new(data)),
             read_only,
@@ -310,11 +604,14 @@ impl Controller {
             deployments: BTreeMap::new(),
             evidence: BTreeMap::new(),
             disk_presets: BTreeMap::new(),
+            disk_profiles: BTreeMap::new(),
+            preset_baselines: BTreeMap::new(),
             running_games: BTreeSet::new(),
             preset_reads: BTreeSet::new(),
             logs: VecDeque::new(),
             page: 0,
             busy: false,
+            tasks: Default::default(),
             critical: false,
             status_epoch: 0,
             refresh_busy: false,
@@ -322,7 +619,9 @@ impl Controller {
             icons: BTreeMap::new(),
             cancel: Arc::new(AtomicBool::new(false)),
             progress: String::new(),
+            scan_progress: None,
             payload_progress: None,
+            neural_versions: BTreeMap::new(),
             display_cache: Arc::new(Mutex::new(BTreeMap::new())),
             patch_summary: None,
             save_revision: 0,
@@ -343,10 +642,23 @@ impl Controller {
             device_index: 0,
             alias_index: 0,
             gpu: String::new(),
+            hags: None,
+            hags_busy: false,
+            hags_writing: false,
+            hags_error: None,
+            hags_checked: Instant::now(),
+            hags_cancel: Arc::new(AtomicBool::new(false)),
             warning: error,
+            blocked: None,
             notice: None,
+            information: None,
             confirm: None,
+            pending_cleanup: None,
             pending_patch: None,
+            encore_install: None,
+            encore_install_values: BTreeMap::new(),
+            encore_components: BTreeMap::new(),
+            resume_install: None,
             search: String::new(),
             smoke,
             closing: false,
@@ -366,6 +678,9 @@ impl Controller {
             }
         }
         app.migrate_presets();
+        // Older builds persisted uncommitted drafts indefinitely. They were
+        // never applied to the game; discard them on migration, then read disk.
+        app.discard_presets(None);
         app.log("游戏库已载入。扫描仅查找游戏，安装前请退出游戏。");
         if let Some(message) = app
             .state
@@ -380,8 +695,32 @@ impl Controller {
             app.focus = app.games.first().map(|g| g.exe.clone());
         }
         app.refresh();
+        #[cfg(not(test))]
+        {
+            app.identify_game_names();
+            if app.smoke.is_none() && !app.read_only {
+                app.names_busy = true;
+                let data = app.data.clone();
+                let github = app.choice("download_source", "domestic") == "github";
+                let cancel = app.names_cancel.clone();
+                app.channel.job(move |c| {
+                    let cached = game_names::cached(&data);
+                    c.send(Event::GameNamesCached(cached.clone()));
+                    let result = if game_names::refresh_due(&data) {
+                        game_names::refresh(&data, &cached, github, &cancel)
+                    } else {
+                        Ok(cached)
+                    };
+                    c.send(Event::GameNames(result, false));
+                    Ok(())
+                });
+            }
+        }
+        #[cfg(not(test))]
+        app.refresh_hags();
         if app.smoke.is_none() {
             let prefer_github = app.choice("download_source", "domestic") == "github";
+            app.refresh_runtime_catalog();
             let cancel = app.cancel.clone();
             app.channel.job(move |c| {
                 c.send(Event::Catalog(cloud::cached()));
@@ -434,16 +773,75 @@ impl Controller {
                 app.download_progress = p;
             }
         }
+        // Explicit UI smoke fixtures only; no network or game mutations. Use the
+        // normal channel, task owner and cancellation path for overlay checks.
+        if app.smoke.is_some()
+            && let Ok(events) = serde_json::from_value::<Vec<(updater::DownloadProgress, u64)>>(
+                app.state["smoke_downloads"].clone(),
+            )
+            && !events.is_empty()
+            && events.len() <= 64
+        {
+            app.begin_work("下载组件");
+            let cancel = app.cancel.clone();
+            app.channel.operation(move |c| {
+                for (transfer, delay) in events {
+                    if cancel.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    c.send(Event::PayloadProgress(cloud::CloudProgress {
+                        transfer,
+                        proxy: String::new(),
+                        package_index: 0,
+                        package_count: 0,
+                    }));
+                    let start = std::time::Instant::now();
+                    while start.elapsed() < std::time::Duration::from_millis(delay.min(30000))
+                        && !cancel.load(Ordering::Relaxed)
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(25));
+                    }
+                }
+                Ok(())
+            });
+        }
         app
     }
     pub fn text(&self, s: &str) -> String {
         self.tr.t(s)
     }
     pub fn cloud_label(&self, p: &cloud::Package) -> String {
-        p.labels
-            .get(&self.tr.language)
-            .cloned()
-            .unwrap_or_else(|| self.text(&p.label))
+        let name = match p.scheme_id.as_str() {
+            "upstream-0.3.5-310-9" => {
+                return format!(
+                    "Dlssg_for_sm86 · {}",
+                    p.upstream_version.as_deref().unwrap_or(&p.version)
+                );
+            }
+            "rtxfg-0.3.5-dx12-vulkan" => {
+                Some("Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan")
+            }
+            "pipotoufik-mfg-vulkan-sm86-7" => Some("Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan"),
+            "rtx40mfg-1.3.3-hf2" => {
+                return format!(
+                    "MFG-Unlocker · {}",
+                    p.upstream_version.as_deref().unwrap_or(&p.version)
+                );
+            }
+            "dlssg-transfusion-1.4.5.3" => {
+                return format!(
+                    "RTX-Encore · {}",
+                    p.upstream_version.as_deref().unwrap_or(&p.version)
+                );
+            }
+            _ => None,
+        };
+        name.map(|n| self.text(n)).unwrap_or_else(|| {
+            p.labels
+                .get(&self.tr.language)
+                .cloned()
+                .unwrap_or_else(|| self.text(&p.label))
+        })
     }
     pub fn cloud_scheme(&self) -> String {
         self.scheme_for(self.focus.as_deref())
@@ -532,6 +930,7 @@ impl Controller {
             })
             .unwrap_or_else(|| self.catalog.default_scheme.clone())
     }
+    #[cfg(test)]
     pub fn select_series(&mut self, series: usize) {
         if self.busy || series > 2 {
             return;
@@ -565,23 +964,59 @@ impl Controller {
         self.state[key].as_bool().unwrap_or(default)
     }
     pub fn parameter_profile(&self) -> String {
-        self.catalog.scheme_policies[&self.cloud_scheme()]
+        self.parameter_policy(self.focus.as_deref().unwrap_or(""), &self.cloud_scheme())
             .parameter_profile
-            .clone()
+    }
+    fn parameter_policy(&self, exe: &str, scheme: &str) -> cloud::Policy {
+        let mut policy = self.catalog.scheme_policies[scheme].clone();
+        if let Some((epoch, profile)) = self.disk_profiles.get(&(exe.into(), scheme.into()))
+            && *epoch == self.status_epoch
+        {
+            if policy.parameter_profile != *profile {
+                policy.parameter_profile = profile.clone();
+                policy.defaults.clear();
+            }
+            return policy;
+        }
+        if let Some(profiles) = self
+            .deployments
+            .get(exe)
+            .and_then(|d| d.parameter_profiles.get(scheme))
+            && profiles.len() == 1
+            && let Some(profile) = profiles.first()
+            && policy.parameter_profile != *profile
+        {
+            policy.parameter_profile = profile.clone();
+            policy.defaults.clear();
+        }
+        policy
     }
     pub fn preset_values(&self, exe: &str) -> rtx_fg_manager::presets::Values {
         self.preset_values_for(exe, &self.scheme_for(Some(exe)))
     }
+    fn preset_defaults(
+        &self,
+        profile: &str,
+        defaults: &rtx_fg_manager::presets::Values,
+    ) -> rtx_fg_manager::presets::Values {
+        let mut values = rtx_fg_manager::presets::defaults(profile, defaults);
+        if profile == rtx_fg_manager::encore::PROFILE {
+            rtx_fg_manager::encore::localize_defaults(&mut values, &self.tr.language);
+        }
+        values
+    }
     fn preset_values_for(&self, exe: &str, scheme: &str) -> rtx_fg_manager::presets::Values {
-        let policy = &self.catalog.scheme_policies[scheme];
+        let policy = &self.parameter_policy(exe, scheme);
         let profile = &policy.parameter_profile;
-        let mut values = rtx_fg_manager::presets::defaults(profile, &policy.defaults);
+        let mut values = self.preset_defaults(profile, &policy.defaults);
         if let Some(game) = self.games.iter().find(|g| g.exe == exe) {
-            if let Some(saved) = game
-                .extra
-                .get("preset_options")
-                .and_then(|v| v.get(profile))
-            {
+            if let Some(saved) = game.extra.get("preset_options").and_then(|v| {
+                v.get(profile).or_else(|| {
+                    (profile == rtx_fg_manager::upstream040::PROFILE)
+                        .then(|| v.get("upstream035"))
+                        .flatten()
+                })
+            }) {
                 if let Ok(saved) =
                     serde_json::from_value::<rtx_fg_manager::presets::Values>(saved.clone())
                 {
@@ -673,6 +1108,9 @@ impl Controller {
             .and_then(|v| v.get(scheme))
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        if !legacy_dirty {
+            return Default::default();
+        }
         let names: Vec<&str> = if let Some(keys) = keys.and_then(Value::as_array) {
             keys.iter().filter_map(Value::as_str).collect()
         } else if legacy_dirty
@@ -686,6 +1124,15 @@ impl Controller {
                 "rtx_vsync",
                 "rtx_reflex_limit",
             ]
+        } else if legacy_dirty
+            && (rtx_fg_manager::upstream040::is_profile(
+                &self.parameter_policy(exe, scheme).parameter_profile,
+            ) || !uses_explicit_edits(&self.parameter_policy(exe, scheme).parameter_profile))
+        {
+            saved
+                .and_then(Value::as_object)
+                .map(|v| v.keys().map(String::as_str).collect())
+                .unwrap_or_default()
         } else if legacy_dirty {
             vec!["tf_mode", "tf_target", "tf_dynamic56", "tf_overlay"]
         } else {
@@ -697,7 +1144,7 @@ impl Controller {
                 let value = saved?.get(key)?.as_str()?;
                 let item = BTreeMap::from([(key.to_owned(), value.to_owned())]);
                 rtx_fg_manager::presets::validate(
-                    &self.catalog.scheme_policies[scheme].parameter_profile,
+                    &self.parameter_policy(exe, scheme).parameter_profile,
                     &item,
                 )
                 .ok()
@@ -709,7 +1156,9 @@ impl Controller {
         let mut updates = Vec::new();
         let mut clamped = Vec::new();
         for game in &self.games {
-            for (scheme, policy) in &self.catalog.scheme_policies {
+            for scheme in self.catalog.scheme_policies.keys() {
+                let policy = self.parameter_policy(&game.exe, scheme);
+                let policy = &policy;
                 let context = rtx_fg_manager::presets::Context::new(
                     scheme,
                     policy,
@@ -774,15 +1223,86 @@ impl Controller {
         }
         self.save();
     }
+    /// A cached installation snapshot is not a choice for a fresh installation.
+    /// Only call after every deployment directory is confirmed uninstalled.
+    fn reset_uninstalled_presets(&mut self, exe: &str) {
+        let schemes: Vec<_> = self
+            .catalog
+            .scheme_policies
+            .iter()
+            .map(|(id, p)| (id.clone(), p.clone()))
+            .collect();
+        let mut changed = false;
+        for (scheme, policy) in schemes {
+            let identity = (exe.to_owned(), scheme.clone());
+            self.disk_profiles.remove(&identity);
+            self.disk_presets.remove(&identity);
+            let explicit = self.explicit_preset_values(exe, &scheme);
+            let defaults = self.preset_defaults(&policy.parameter_profile, &policy.defaults);
+            let mut values = defaults.clone();
+            values.extend(explicit);
+            rtx_fg_manager::presets::Context::new(&scheme, &policy, std::path::Path::new(exe))
+                .normalize(&mut values);
+            let keys: Vec<_> = values
+                .iter()
+                .filter(|(key, value)| defaults.get(*key) != Some(*value))
+                .map(|(key, _)| key.clone())
+                .collect();
+            if let Some(baseline) = self.preset_baselines.get_mut(&identity) {
+                *baseline = defaults;
+            }
+            if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
+                for (field, value) in [
+                    ("preset_options_v2", json!(values)),
+                    ("preset_dirty", json!(!keys.is_empty())),
+                    ("preset_dirty_keys", json!(keys)),
+                ] {
+                    let entry = game.extra.entry(field).or_insert_with(|| json!({}));
+                    if !entry.is_object() {
+                        *entry = json!({});
+                    }
+                    if entry.get(&scheme) != Some(&value) {
+                        entry[&scheme] = value;
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if changed {
+            self.save();
+        }
+    }
+    /// A completed explicit uninstall also ends drafts from that installation.
+    /// Ordinary status refreshes keep edits made for the next installation.
+    fn forget_uninstalled_presets(&mut self, exe: &str) {
+        self.preset_baselines.retain(|(path, _), _| path != exe);
+        if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
+            for field in [
+                "preset_options_v2",
+                "preset_options",
+                "upstream_options",
+                "preset_dirty",
+                "preset_dirty_keys",
+            ] {
+                game.extra.remove(field);
+            }
+        }
+        self.reset_uninstalled_presets(exe);
+    }
     pub fn preset_context(&self, exe: &str) -> rtx_fg_manager::presets::Context {
         let scheme = self.scheme_for(Some(exe));
         rtx_fg_manager::presets::Context::new(
             &scheme,
-            &self.catalog.scheme_policies[&scheme],
+            &self.parameter_policy(exe, &scheme),
             std::path::Path::new(exe),
         )
     }
     pub fn set_game_option(&mut self, exe: &str, key: &str, value: &str) {
+        self.set_game_options(exe, &BTreeMap::from([(key.into(), value.into())]));
+    }
+    /// Apply one logical choice as a single validated draft change. Composite
+    /// controls must not save or normalize an intermediate engine/enable state.
+    pub fn set_game_options(&mut self, exe: &str, edits: &BTreeMap<String, String>) {
         if self.busy || self.read_only {
             return;
         }
@@ -791,36 +1311,54 @@ impl Controller {
             return;
         }
         let scheme = self.scheme_for(Some(exe));
-        let profile = self.catalog.scheme_policies[&scheme]
-            .parameter_profile
-            .clone();
+        let policy = self.parameter_policy(exe, &scheme);
+        let profile = policy.parameter_profile.clone();
         let mut values = self.preset_values(exe);
-        if key == "reset" {
-            values = rtx_fg_manager::presets::defaults(
-                &profile,
-                &self.catalog.scheme_policies[&scheme].defaults,
-            );
+        let identity = (exe.to_owned(), scheme.clone());
+        self.preset_baselines
+            .entry(identity.clone())
+            .or_insert_with(|| values.clone());
+        if edits.contains_key("reset") {
+            values = self.preset_defaults(&profile, &policy.defaults);
         } else {
-            values.insert(key.into(), value.into());
+            values.extend(edits.clone());
         }
         self.preset_context(exe).normalize(&mut values);
         if rtx_fg_manager::presets::validate(&profile, &values).is_err() {
             return;
         }
-        let changed = self.disk_presets.get(&(exe.to_owned(), scheme.clone())) != Some(&values);
+        let mut baseline = self.preset_defaults(&profile, &policy.defaults);
+        baseline.extend(
+            self.disk_presets
+                .get(&identity)
+                .or_else(|| self.preset_baselines.get(&identity))
+                .cloned()
+                .unwrap_or_default(),
+        );
+        self.preset_context(exe).normalize(&mut baseline);
+        let changed = baseline != values;
         let mut dirty_keys: BTreeSet<String> = self
             .explicit_preset_values(exe, &scheme)
             .into_keys()
             .collect();
         if uses_explicit_edits(&profile) {
-            if key == "reset" {
+            if edits.contains_key("reset") {
                 dirty_keys.extend(values.keys().cloned());
             } else {
-                dirty_keys.insert(key.into());
+                dirty_keys.extend(edits.keys().cloned());
+                if profile == rtx_fg_manager::upstream040::PROFILE_041
+                    && edits.contains_key("fg_engine")
+                {
+                    dirty_keys.insert("max_generated_frames".into());
+                }
             }
-            if let Some(disk) = self.disk_presets.get(&(exe.to_owned(), scheme.clone())) {
-                dirty_keys.retain(|key| disk.get(key) != values.get(key));
-            }
+            dirty_keys.retain(|key| baseline.get(key) != values.get(key));
+        } else {
+            dirty_keys = values
+                .iter()
+                .filter(|(key, value)| baseline.get(*key) != Some(*value))
+                .map(|(key, _)| key.clone())
+                .collect();
         }
         if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
             let entry = game
@@ -841,15 +1379,15 @@ impl Controller {
             dirty[&scheme] = json!(changed);
             if uses_explicit_edits(&profile) {
                 dirty[&scheme] = json!(!dirty_keys.is_empty());
-                let keys = game
-                    .extra
-                    .entry("preset_dirty_keys")
-                    .or_insert_with(|| json!({}));
-                if !keys.is_object() {
-                    *keys = json!({});
-                }
-                keys[&scheme] = json!(dirty_keys);
             }
+            let keys = game
+                .extra
+                .entry("preset_dirty_keys")
+                .or_insert_with(|| json!({}));
+            if !keys.is_object() {
+                *keys = json!({});
+            }
+            keys[&scheme] = json!(dirty_keys);
             self.save();
         }
     }
@@ -858,13 +1396,150 @@ impl Controller {
             return;
         }
         self.state["schema"] = json!(3);
-        self.state["games"] = serde_json::to_value(&self.games).unwrap_or(json!([]));
+        // Drafts are session-only. Saving unrelated settings must not turn a
+        // pending edit into a draft that nags again after restarting the app.
+        let mut saved_games = self.games.clone();
+        for game in &mut saved_games {
+            self.restore_unapplied(game, None);
+        }
+        self.state["games"] = serde_json::to_value(saved_games).unwrap_or(json!([]));
         if let Some(s) = &self.store {
             match s.save_tracked(self.state.clone()) {
                 Ok(revision) => self.save_revision = revision,
                 Err(e) => self.save_error = Some(e.to_string()),
             }
         }
+    }
+    pub fn game_name(&self, game: &Game) -> String {
+        game_names::display(
+            game,
+            &self.game_names,
+            self.tr.language == "zh-CN" && self.boolean("chinese_game_names", true),
+        )
+    }
+    pub fn set_game_name(&mut self, exe: &str, name: Option<&str>) -> Result<()> {
+        anyhow::ensure!(!self.read_only && !self.closing, "游戏库当前无法保存");
+        if let Some(name) = name {
+            anyhow::ensure!(
+                game_names::valid_title(name),
+                "名称需要 1–160 个字符，不能包含控制字符"
+            );
+        }
+        let game = self
+            .games
+            .iter_mut()
+            .find(|g| g.exe == exe)
+            .ok_or_else(|| anyhow::anyhow!("游戏已从库中移除"))?;
+        match name {
+            Some(name) => {
+                game.extra
+                    .insert("title_override".into(), json!(name.trim()));
+            }
+            None => {
+                game.extra.remove("title_override");
+            }
+        }
+        self.library_revision += 1;
+        self.save();
+        Ok(())
+    }
+    pub fn identify_game_names(&mut self) {
+        if self.closing {
+            return;
+        }
+        self.names_generation += 1;
+        let generation = self.names_generation;
+        let catalog = self.game_names.clone();
+        let games = self.games.clone();
+        let cancel = self.names_cancel.clone();
+        self.channel.job(move |c| {
+            c.send(Event::GameIdentities(
+                generation,
+                rtx_fg_manager::game_identity::identify(&games, &catalog, &cancel),
+            ));
+            Ok(())
+        });
+    }
+    pub fn update_game_names(&mut self) {
+        if self.names_busy || self.closing || self.read_only {
+            return;
+        }
+        self.names_busy = true;
+        self.names_status = "正在更新名称库…".into();
+        let data = self.data.clone();
+        let current = self.game_names.clone();
+        let github = self.choice("download_source", "domestic") == "github";
+        let cancel = self.names_cancel.clone();
+        self.channel.job(move |c| {
+            c.send(Event::GameNames(
+                game_names::refresh(&data, &current, github, &cancel),
+                true,
+            ));
+            Ok(())
+        });
+    }
+    fn restore_unapplied(&self, game: &mut Game, only_scheme: Option<&str>) {
+        let schemes: Vec<String> = game
+            .extra
+            .get("preset_dirty")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter(|(s, v)| {
+                v.as_bool() == Some(true) && only_scheme.is_none_or(|only| only == s.as_str())
+            })
+            .map(|(s, _)| s.clone())
+            .collect();
+        for scheme in schemes {
+            let identity = (game.exe.clone(), scheme.clone());
+            if let Some(saved) = game
+                .extra
+                .get_mut("preset_options_v2")
+                .and_then(Value::as_object_mut)
+            {
+                if let Some(base) = self
+                    .disk_presets
+                    .get(&identity)
+                    .or_else(|| self.preset_baselines.get(&identity))
+                {
+                    saved.insert(scheme.clone(), json!(base));
+                } else {
+                    saved.remove(&scheme);
+                }
+            }
+            game.extra["preset_dirty"][&scheme] = json!(false);
+            if let Some(keys) = game
+                .extra
+                .get_mut("preset_dirty_keys")
+                .and_then(Value::as_object_mut)
+            {
+                keys.remove(&scheme);
+            }
+        }
+    }
+    pub fn discard_presets(&mut self, target: Option<(&str, &str)>) {
+        let mut games = self.games.clone();
+        for game in &mut games {
+            if target.is_none_or(|(exe, _)| exe == game.exe) {
+                self.restore_unapplied(game, target.map(|(_, scheme)| scheme));
+            }
+        }
+        self.games = games;
+        self.preset_baselines
+            .retain(|(exe, scheme), _| target.is_some_and(|(e, s)| e != exe || s != scheme));
+        self.save();
+    }
+    pub fn first_pending_preset(&self) -> Option<(String, String)> {
+        self.games.iter().find_map(|game| {
+            game.extra
+                .get("preset_dirty")
+                .and_then(Value::as_object)?
+                .iter()
+                .find(|(scheme, v)| {
+                    v.as_bool() == Some(true) && self.catalog.scheme_policies.contains_key(*scheme)
+                })
+                .map(|(scheme, _)| (game.exe.clone(), scheme.clone()))
+        })
     }
     pub fn preset_dirty(&self, exe: &str) -> bool {
         self.games
@@ -937,18 +1612,26 @@ impl Controller {
         };
         let paths = game.deployment_executables();
         let scheme = self.cloud_scheme();
-        let policy = self.catalog.scheme_policies[&scheme].clone();
+        let policy = self.parameter_policy(&exe, &scheme);
         let values = if uses_explicit_edits(&policy.parameter_profile) {
             self.explicit_preset_values(&exe, &scheme)
         } else {
             self.preset_values(&exe)
         };
         let data = self.data.clone();
-        self.busy = true;
+        self.begin_work("应用参数");
         self.critical = true;
         self.status_epoch += 1;
         self.progress = "正在应用参数…".into();
+        let retry = self.retry_request(RetryAction::Apply);
         self.channel.operation(move |c| {
+            let guards = paths
+                .iter()
+                .map(|p| game.deployment_target(std::path::Path::new(p)))
+                .collect::<Vec<_>>();
+            if defer_if_running(c, &guards, retry)? {
+                return Ok(());
+            }
             let mut unavailable = Vec::new();
             for path in &paths {
                 let target = std::path::Path::new(path);
@@ -1037,7 +1720,7 @@ impl Controller {
         if self.busy || self.update_busy || self.read_only || self.closing {
             return;
         }
-        self.busy = true;
+        self.begin_work("清理缓存");
         self.critical = true;
         self.download = None;
         self.download_progress = Default::default();
@@ -1059,6 +1742,23 @@ impl Controller {
                     delta.pending.join("；")
                 )));
             }
+            Ok(())
+        });
+    }
+    pub fn reset_manager(&mut self) {
+        if self.busy || self.update_busy || self.critical || self.hags_busy || self.closing {
+            return;
+        }
+        self.begin_work("恢复初始状态");
+        self.critical = true;
+        let data = self.data.clone();
+        let games = self.games.clone();
+        self.channel.job(move |c| {
+            c.send(Event::ResetPrepared(rtx_fg_manager::reset::prepare(
+                &data,
+                &games,
+                |s| c.send(Event::Progress(s)),
+            )));
             Ok(())
         });
     }
@@ -1145,11 +1845,32 @@ impl Controller {
                     }
                 }
                 let status = snapshot.status.clone();
-                c.send(Event::Deployments(epoch, g.exe.clone(), snapshot));
+                c.send(Event::Deployments(epoch, g.exe.clone(), Box::new(snapshot)));
                 c.send(Event::Statuses(epoch, vec![(g.exe, status)]));
             }
             Ok(())
         })
+    }
+    /// Move one card relative to another without changing selection or game identity.
+    pub fn reorder_game(&mut self, source: &str, target: &str, after: bool) {
+        if self.busy || self.read_only || self.closing || source == target {
+            return;
+        }
+        let Some(from) = self.games.iter().position(|g| g.exe == source) else {
+            return;
+        };
+        let Some(to) = self.games.iter().position(|g| g.exe == target) else {
+            return;
+        };
+        let insertion = to + usize::from(after);
+        let insertion = insertion - usize::from(from < insertion);
+        if from == insertion {
+            return;
+        }
+        let game = self.games.remove(from);
+        self.games.insert(insertion, game);
+        self.library_revision += 1;
+        self.save();
     }
     pub fn merge(&mut self, rows: Vec<Game>) {
         let before = self.games.len();
@@ -1185,13 +1906,14 @@ impl Controller {
         }
         if self.games.len() != before {
             self.library_revision += 1;
+            self.identify_game_names();
         }
         self.save();
         self.refresh();
     }
     /// Refresh scanned installations without discarding a previously deployed path.
     pub fn merge_scan(&mut self, rows: Vec<Game>) {
-        // A same-count rescan can reorder entries and replace their title/root.
+        // A same-count rescan can replace entries and their title/root.
         self.library_revision += 1;
         // In-flight reads and status checks refer to the old library identities.
         self.status_epoch += 1;
@@ -1352,6 +2074,12 @@ impl Controller {
                 .iter()
                 .map(|g| core::key(std::path::Path::new(&g.exe)))
                 .collect::<BTreeSet<_>>();
+            // A scan refresh replaces a card in its original user-ordered slot.
+            let insertion = self
+                .games
+                .iter()
+                .position(|g| old_paths.contains(&core::key(std::path::Path::new(&g.exe))))
+                .unwrap_or(self.games.len());
             self.games
                 .retain(|g| !old_paths.contains(&core::key(std::path::Path::new(&g.exe))));
             for old in &matched {
@@ -1370,18 +2098,41 @@ impl Controller {
                     self.disk_presets.retain(|(exe, _), _| exe != &old.exe);
                 }
             }
-            self.games.push(fresh);
+            self.games.insert(insertion.min(self.games.len()), fresh);
         }
+        self.identify_game_names();
         self.save();
         self.refresh();
     }
+    /// Only fresh preferences opt in; upgrades and recovered libraries do not.
+    pub fn initial_scan_ready(&self) -> bool {
+        self.boolean("initial_scan_pending", false)
+            && self.games.is_empty()
+            && !self.read_only
+            && !self.closing
+            && !self.busy
+            && !self.checking
+            && !self.update_offer
+            && !self.update_busy
+            && !self.update_installing
+            && !self.install_pending
+            && self.confirm.is_none()
+    }
+
+    pub fn dismiss_initial_scan(&mut self) {
+        self.state["initial_scan_pending"] = json!(false);
+        self.save();
+    }
+
     pub fn scan(&mut self, roots: Vec<PathBuf>) {
         if self.busy {
             return;
         }
         self.state["roots"] = json!(roots);
+        self.state["initial_scan_pending"] = json!(false);
         self.save();
-        self.busy = true;
+        self.begin_work("扫描游戏");
+        self.scan_progress = Some(ScanProgress::default());
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
         self.log(&format!(
@@ -1393,8 +2144,12 @@ impl Controller {
                 .join("；")
         ));
         self.channel.operation(move |c| {
-            let result = scanner::scan(&roots, &cancel, |n, _, p| {
-                c.send(Event::Progress(format!("{n}  ·  {}", p.display())))
+            let result = scanner::scan(&roots, &cancel, |directories, skipped, p| {
+                c.send(Event::ScanProgress(ScanProgress {
+                    directories,
+                    skipped,
+                    path: p.display().to_string(),
+                }))
             });
             match result {
                 Ok(r) => c.send(Event::Scan(r)),
@@ -1407,28 +2162,51 @@ impl Controller {
         if self.busy {
             return;
         }
-        self.busy = true;
+        self.begin_work("添加游戏");
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
+        let title = self.text("添加游戏");
         self.channel.operation(move |c| {
             (|| {
                 if folder {
                     if let Some(p) = rfd::FileDialog::new().pick_folder() {
-                        let r = scanner::scan(&[p], &cancel, |n, _, p| {
-                            c.send(Event::Progress(format!("{n}  ·  {}", p.display())))
+                        c.send(Event::ScanProgress(ScanProgress {
+                            path: p.display().to_string(),
+                            ..Default::default()
+                        }));
+                        let r = scanner::scan(&[p], &cancel, |directories, skipped, p| {
+                            c.send(Event::ScanProgress(ScanProgress {
+                                directories,
+                                skipped,
+                                path: p.display().to_string(),
+                            }))
                         })?;
                         c.send(Event::Scan(r));
                     }
-                } else if let Some(files) = rfd::FileDialog::new()
-                    .add_filter("Windows EXE", &["exe"])
-                    .pick_files()
-                {
+                } else if let Some(files) = rtx_fg_manager::game_picker::pick(&title, true)? {
                     let mut rows = Vec::new();
                     for p in files {
-                        let p = core::library_location(&p)?;
+                        let p = core::library_location(&p).map_err(|e| {
+                            if e.chain().any(|cause| {
+                                cause.downcast_ref::<std::io::Error>().is_some_and(|io| {
+                                    io.kind() == std::io::ErrorKind::PermissionDenied
+                                })
+                            }) {
+                                anyhow::anyhow!("{}", rtx_fg_manager::xbox::access_hint(&p))
+                            } else {
+                                e
+                            }
+                        })?;
+                        let xbox = rtx_fg_manager::xbox::identified(&p);
                         rows.push(Game {
                             exe: p.display().to_string(),
-                            root: scanner::game_root(&p).display().to_string(),
+                            root: xbox
+                                .as_ref()
+                                .map(|g| g.root.clone())
+                                .unwrap_or_else(|| scanner::game_root(&p))
+                                .display()
+                                .to_string(),
+                            title: xbox.map(|g| g.title).unwrap_or_default(),
                             ..Default::default()
                         });
                     }
@@ -1460,7 +2238,7 @@ impl Controller {
             ));
         }
         let exe_title = self.text("选择关联的游戏本体 EXE");
-        self.busy = true;
+        self.begin_work("选择部署目录");
         self.channel.operation(move |c| {
             let Some(folder) = rfd::FileDialog::new().set_title(title).pick_folder() else {
                 return Ok(());
@@ -1469,10 +2247,8 @@ impl Controller {
             let game = if let Some(g) = existing {
                 g
             } else {
-                let Some(exe) = rfd::FileDialog::new()
-                    .set_title(exe_title)
-                    .add_filter("Windows EXE", &["exe"])
-                    .pick_file()
+                let Some(exe) = rtx_fg_manager::game_picker::pick(&exe_title, false)?
+                    .and_then(|files| files.into_iter().next())
                 else {
                     return Ok(());
                 };
@@ -1531,17 +2307,231 @@ impl Controller {
             Ok(())
         });
     }
+    fn begin_work(&mut self, label: &str) {
+        self.busy = true;
+        self.scan_progress = None;
+        self.progress = label.into();
+        self.payload_progress = None;
+        let title = self
+            .focus
+            .as_ref()
+            .and_then(|exe| self.games.iter().find(|g| &g.exe == exe))
+            .map(|g| format!("{}  —  {}", self.game_name(g), self.text(label)))
+            .unwrap_or_else(|| self.text(label));
+        self.tasks.start(false, title);
+    }
+    fn prepare_encore_install(&mut self, paths: BTreeSet<String>) {
+        let jobs = self
+            .games
+            .iter()
+            .filter(|g| {
+                g.deployment_executables()
+                    .iter()
+                    .any(|exe| paths.contains(exe))
+            })
+            .filter(|g| self.scheme_for(Some(&g.exe)) == rtx_fg_manager::encore::SCHEME)
+            .map(|g| (self.game_name(g), g.clone()))
+            .collect::<Vec<_>>();
+        let fingerprint = self.retry_fingerprint();
+        let nis_available = self.catalog.packages.iter().any(|p| {
+            p.scheme_id == rtx_fg_manager::encore::SCHEME
+                && rtx_fg_manager::encore::supports_220(
+                    p.upstream_version.as_deref().or(Some(&p.version)),
+                )
+        });
+        self.begin_work("检查安装内容");
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancel = self.cancel.clone();
+        self.channel.operation(move |c| {
+            let result = (|| -> Result<EncoreInstallPlan> {
+                let mut choices = Vec::new();
+                for (name, game) in jobs {
+                    for target in game.deployment_targets() {
+                        let exe = target.game_exe.display().to_string();
+                        if !paths.contains(&exe) {
+                            continue;
+                        }
+                        anyhow::ensure!(!cancel.load(Ordering::Relaxed), "已取消");
+                        let e = scanner::inspect_for_installation(&target.game_exe);
+                        anyhow::ensure!(
+                            !e.limited,
+                            "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
+                        );
+                        let available =
+                            rtx_fg_manager::runtime_files::can_add_encore_fg(&target, &e);
+                        let previous = core::record(&target.directory)?;
+                        let installed = previous.as_ref().is_some_and(|r| {
+                            r.backend == rtx_fg_manager::encore::BACKEND
+                                && !r.cache_pending
+                                && rtx_fg_manager::encore::supports_200(
+                                    r.upstream_version
+                                        .as_deref()
+                                        .or(r.payload_version.as_deref()),
+                                )
+                        });
+                        let mut choice = rtx_fg_manager::encore_install::Choice::new(
+                            exe.clone(),
+                            name.clone(),
+                            &e,
+                            available,
+                        );
+                        choice.installed = installed;
+                        choice.nis_available = nis_available;
+                        if rtx_fg_manager::runtime_files::inspect(&target, "encorefg").managed {
+                            choice.native_streamline = false;
+                            choice.native_fg = false;
+                        }
+                        if previous.is_some() {
+                            choice.needs_frames = false;
+                            choice.needs_reconstruction = false;
+                        }
+                        if let Some(saved) = game
+                            .extra
+                            .get("encore_components")
+                            .and_then(|v| v.get(&exe))
+                            .cloned()
+                            .and_then(|v| serde_json::from_value(v).ok())
+                        {
+                            choice.components = saved;
+                        }
+                        if !installed {
+                            choice.components.patch = true;
+                        }
+                        if !available {
+                            choice.components.added_fg = false;
+                        }
+                        if !choice.native_streamline {
+                            choice.components.streamline = false;
+                        }
+                        if !choice.native_fg {
+                            choice.components.fg = false;
+                        }
+                        choices.push(choice);
+                    }
+                }
+                Ok(EncoreInstallPlan {
+                    fingerprint,
+                    paths,
+                    choices,
+                })
+            })();
+            c.send(Event::EncorePrepared(result));
+            Ok(())
+        });
+    }
+    pub fn confirm_encore_install(
+        &mut self,
+        choices: Vec<rtx_fg_manager::encore_install::Choice>,
+    ) -> Result<()> {
+        let plan = self
+            .encore_install
+            .take()
+            .context("安装计划已失效，请重试")?;
+        anyhow::ensure!(
+            plan.fingerprint == self.retry_fingerprint(),
+            "游戏或配置已变化，请重新发起操作。"
+        );
+        anyhow::ensure!(choices.len() == plan.choices.len(), "安装选择不完整");
+        let mut values = BTreeMap::new();
+        let mut components = BTreeMap::new();
+        for (selected, original) in choices.into_iter().zip(plan.choices) {
+            anyhow::ensure!(
+                selected.exe == original.exe
+                    && selected.needs_frames == original.needs_frames
+                    && selected.needs_reconstruction == original.needs_reconstruction
+                    && selected.nis_available == original.nis_available
+                    && selected.dlss_fg_available == original.dlss_fg_available
+                    && selected.installed == original.installed
+                    && selected.native_streamline == original.native_streamline
+                    && selected.native_fg == original.native_fg
+                    && (!selected.components.added_fg || selected.dlss_fg_available)
+                    && (!selected.components.streamline || selected.native_streamline),
+                "安装计划已变化"
+            );
+            components.insert(selected.exe.clone(), selected.components);
+            values.insert(
+                selected.exe.clone(),
+                selected
+                    .values()
+                    .context("请选择帧生成与超分辨率引擎，也可选择不启用")?,
+            );
+        }
+        for game in &mut self.games {
+            for exe in game.deployment_executables() {
+                if let Some(selected) = components.get(&exe) {
+                    let saved = game
+                        .extra
+                        .entry("encore_components")
+                        .or_insert_with(|| json!({}));
+                    if !saved.is_object() {
+                        *saved = json!({});
+                    }
+                    saved[&exe] = serde_json::to_value(selected)?;
+                }
+            }
+        }
+        self.save();
+        self.encore_components = components;
+        self.encore_install_values = values;
+        self.perform(false, plan.paths);
+        Ok(())
+    }
     pub fn request_patch(&mut self, clean: bool) {
-        if self.closing || self.busy || self.pending_patch.is_some() || (self.read_only && !clean) {
+        self.request_patch_for(clean, false);
+    }
+    /// Only the library's explicit batch action consumes checked rows.
+    pub fn request_checked_patch(&mut self, clean: bool) {
+        self.request_patch_for(clean, true);
+    }
+    fn request_patch_for(&mut self, clean: bool, checked: bool) {
+        if self.closing
+            || self.busy
+            || self.pending_patch.is_some()
+            || self.encore_install.is_some()
+            || (self.read_only && !clean)
+        {
             return;
         }
-        let targets = self.patch_targets(clean);
-        if self.target_games().len() > 1 {
+        let games = if checked {
+            self.games
+                .iter()
+                .filter(|g| self.selected.contains(&g.exe))
+                .collect()
+        } else {
+            self.target_games()
+        };
+        let targets = self.patch_targets_for(games, clean);
+        if targets.is_empty() {
+            return;
+        }
+        if checked {
             self.pending_patch = Some(PatchRequest { clean, targets });
             self.confirm = Some(if clean { "clean_batch" } else { "deploy_batch" }.into());
         } else {
-            self.perform(clean, targets);
+            self.dispatch_patch(clean, targets);
         }
+    }
+    fn dispatch_patch(&mut self, clean: bool, targets: BTreeSet<String>) {
+        self.encore_install_values.clear();
+        self.encore_components.clear();
+        if !clean
+            && self.games.iter().any(|g| {
+                self.scheme_for(Some(&g.exe)) == rtx_fg_manager::encore::SCHEME
+                    && g.deployment_executables()
+                        .iter()
+                        .any(|p| targets.contains(p))
+            })
+            && self.catalog.packages.iter().any(|p| {
+                p.scheme_id == rtx_fg_manager::encore::SCHEME
+                    && rtx_fg_manager::encore::supports_200(
+                        p.upstream_version.as_deref().or(Some(&p.version)),
+                    )
+            })
+        {
+            self.prepare_encore_install(targets);
+            return;
+        }
+        self.perform(clean, targets);
     }
     pub fn pending_patch_list(&self) -> String {
         self.pending_patch
@@ -1556,16 +2546,530 @@ impl Controller {
             })
             .unwrap_or_default()
     }
+    fn retry_fingerprint(&self) -> String {
+        core::hash(serde_json::to_string(&json!({"games": self.games, "focus": self.focus,
+            "scheme": self.cloud_scheme(), "catalog":self.catalog.revision,"series": self.cloud_series(), "proxies": self.proxies()})).unwrap_or_default().as_bytes())
+    }
+    fn retry_request(&self, action: RetryAction) -> RetryRequest {
+        RetryRequest {
+            action,
+            epoch: self.status_epoch,
+            fingerprint: self.retry_fingerprint(),
+        }
+    }
+    fn retry_operation(&mut self, request: RetryRequest) {
+        if self.busy || self.closing {
+            return;
+        }
+        if request.epoch != self.status_epoch || request.fingerprint != self.retry_fingerprint() {
+            self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
+            return;
+        }
+        self.blocked = None;
+        match request.action {
+            RetryAction::Recommendation(recipe, action) => {
+                if let Err(e) = self.use_recommendation(*recipe, action) {
+                    self.warning = Some(e.to_string());
+                }
+            }
+            RetryAction::Patch(clean, paths) => self.perform(clean, paths),
+            RetryAction::InstallNr(version) => self.install_neural_runtime(version),
+            RetryAction::RemoveNr => self.remove_neural_runtime(),
+            RetryAction::Runtime(kind, remove, version) => {
+                self.runtime_operation(kind, remove, version)
+            }
+            RetryAction::Apply => self.apply_focused_parameters(),
+            RetryAction::DeleteCleanup(plans) => self.delete_cleanup_plans(plans),
+            RetryAction::CleanupResiduals(targets) => self.cleanup_residual_targets(targets),
+        }
+    }
+    pub fn recheck_blocked(&mut self) {
+        if let Some(blocked) = self.blocked.take() {
+            self.retry_operation(blocked.request);
+        }
+    }
+    pub fn end_blocked_and_retry(&mut self) {
+        if self.busy || self.closing {
+            return;
+        }
+        let Some(blocked) = self.blocked.clone() else {
+            return;
+        };
+        if !blocked.can_terminate() {
+            self.warning = Some("无法核实进程身份，请在任务管理器中处理".into());
+            return;
+        }
+        if blocked.request.epoch != self.status_epoch
+            || blocked.request.fingerprint != self.retry_fingerprint()
+        {
+            self.blocked = None;
+            self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
+            return;
+        }
+        self.begin_work("重试操作");
+        self.critical = true;
+        self.channel.job(move |c| {
+            let result = (|| -> Result<()> {
+                for process in &blocked.processes {
+                    win::terminate_confirmed(process)?;
+                }
+                Ok(())
+            })();
+            c.send(Event::Done);
+            match result {
+                Ok(()) => c.send(Event::RetryReady(blocked.request)),
+                Err(error) => c.send(Event::Warning(format!(
+                    "结束进程未完成；请重新检测或在任务管理器中处理：{error:#}"
+                ))),
+            }
+            Ok(())
+        });
+    }
+    pub fn runtime_operation(&mut self, kind: &'static str, remove: bool, version: String) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned()
+        else {
+            return;
+        };
+        if kind == "encore-complete" && !remove {
+            if self.scheme_for(Some(&game.exe)) != rtx_fg_manager::encore::SCHEME {
+                self.warning = Some(self.text("请先在右侧选择 RTX Encore 方案，再选择安装组件。"));
+                return;
+            }
+            self.encore_components.clear();
+            self.encore_install_values.clear();
+            self.prepare_encore_install(game.deployment_executables().into_iter().collect());
+            return;
+        }
+        let targets = game.deployment_targets();
+        self.status_epoch += 1;
+        let data = self.data.clone();
+        self.begin_work("运行库");
+        self.critical = true;
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancel = self.cancel.clone();
+        let retry = self.retry_request(RetryAction::Runtime(kind, remove, version.clone()));
+        let github = self.choice("download_source", "domestic") == "github";
+        self.channel.operation(move |c| {
+            if defer_if_running(c, &targets, retry)? { return Ok(()); }
+            for t in &targets { ensure_directory_outside_data(&t.directory, &data)?; }
+            if kind == "encore-complete" {
+                rtx_fg_manager::runtime_files::complete_encore_runtimes(&targets, github, &cancel, &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress { transfer, proxy: "Encore".into(), package_index:1, package_count:1 })))?;
+            }
+            else if remove { rtx_fg_manager::runtime_files::remove_many(&targets, kind)?; }
+            else { rtx_fg_manager::runtime_files::install_version(&targets, kind, &version, github, &cancel, &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress { transfer, proxy: kind.into(), package_index:1, package_count:1 })))?; }
+            c.send(Event::Notice(if remove { "运行库已恢复原件；管理器添加的文件已移除。" } else if kind == "encore-complete" { "Encore 配套运行库已补齐，设置未改变。请重新启动游戏。" } else if kind == "encorefg" { "新增帧生成组件已安装，功能默认关闭。请在 Encore 参数中启用新增帧生成并选择引擎，关闭 Smooth Motion 后重启游戏。" } else if kind == "xemfg" { "XeSS 运行库已安装。请在参数设置中启用独立 XeSS 多帧生成，再启动游戏；也可按 Backspace 设置。" } else { "DLSS 运行库已更新并保留原件备份。若游戏出现兼容问题，可在运行库窗口恢复。" }.into()));
+            Ok(())
+        });
+    }
+    pub fn use_recommendation(
+        &mut self,
+        recipe: rtx_fg_manager::recommendations::Recipe,
+        action: rtx_fg_manager::recommendation_presets::Action,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            !self.busy && !self.closing && !self.read_only,
+            "当前正在处理游戏，请稍后再试"
+        );
+        let game = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("请选择游戏"))?;
+        anyhow::ensure!(
+            rtx_fg_manager::recommendations::identify(&game, &self.game_names)
+                .is_some_and(|id| id.id == recipe.game.id),
+            "推荐不属于当前游戏"
+        );
+        let version = recipe.available_version(&self.catalog)?;
+        if action.parameters() {
+            recipe
+                .presets
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("此分享未附带参数，请选择仅安装方案"))?
+                .for_version(&recipe.scheme, &recipe.patch_version, &version)?;
+        }
+        anyhow::ensure!(
+            self.first_pending_preset().is_none(),
+            "请先应用或放弃本机未应用的参数"
+        );
+        self.set_selection(
+            recipe.scheme.clone(),
+            self.cloud_series(),
+            recipe.entries.clone(),
+        );
+        self.selected.clear();
+        self.selected.insert(game.exe.clone());
+        if let Some(g) = self.games.iter_mut().find(|g| g.exe == game.exe) {
+            if let Some(name) = recipe.required_gpu_name() {
+                g.extra.insert(
+                    "recommendation_gpu".into(),
+                    json!({"scheme":recipe.scheme,"name":name}),
+                );
+            } else {
+                g.extra.remove("recommendation_gpu");
+            }
+        }
+        self.save();
+        self.status_epoch += 1;
+        self.begin_work("安装玩家方案");
+        self.critical = true;
+        self.progress = action.label().into();
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancel = self.cancel.clone();
+        let data = self.data.clone();
+        let mut catalog = self.catalog.clone();
+        catalog.prefer_github = self.choice("download_source", "domestic") == "github";
+        let series = self.cloud_series();
+        let language = self.tr.language.clone();
+        let retry = self.retry_request(RetryAction::Recommendation(
+            Box::new(recipe.clone()),
+            action,
+        ));
+        self.channel.operation(move |c| {
+            let targets = game.deployment_targets();
+            if defer_if_running(c, &targets, retry)? {
+                return Ok(());
+            }
+            for t in &targets {
+                ensure_directory_outside_data(&t.directory, &data)?;
+            }
+            rtx_fg_manager::recommendation_presets::execute_with_options(
+                &game,
+                &catalog,
+                &recipe,
+                action,
+                rtx_fg_manager::recommendation_presets::InstallOptions {
+                    series,
+                    language: &language,
+                },
+                &cancel,
+                |p| c.send(Event::PayloadProgress(p)),
+            )?;
+            if action.parameters()
+                && let Some(snapshot) =
+                    inspect_game_parameters(&game, &catalog, rtx_fg_manager::presets::inspect_at)?
+                        .values
+            {
+                c.send(Event::PresetApplied(
+                    game.exe.clone(),
+                    snapshot.0,
+                    snapshot.1,
+                ));
+            }
+            c.send(Event::Notice(
+                match action {
+                    rtx_fg_manager::recommendation_presets::Action::InstallAndApply => {
+                        "方案与运行库已安装，玩家参数已应用；下次启动游戏生效。"
+                    }
+                    rtx_fg_manager::recommendation_presets::Action::InstallOnly => {
+                        "方案已安装；玩家参数未应用。"
+                    }
+                    rtx_fg_manager::recommendation_presets::Action::ParametersOnly => {
+                        "玩家参数已应用；下次启动游戏生效。"
+                    }
+                    rtx_fg_manager::recommendation_presets::Action::Selected { .. } => {
+                        "所选内容已完成；下次启动游戏生效。"
+                    }
+                }
+                .into(),
+            ));
+            Ok(())
+        });
+        Ok(())
+    }
+    pub fn install_neural_runtime(&mut self, version: &'static str) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned()
+        else {
+            return;
+        };
+        let targets = game.deployment_targets();
+        self.status_epoch += 1;
+        let data = self.data.clone();
+        self.begin_work("安装 DLSSNR");
+        self.critical = true;
+        self.cancel = Arc::new(AtomicBool::new(false));
+        let cancel = self.cancel.clone();
+        let retry = self.retry_request(RetryAction::InstallNr(version));
+        let prefer_github = self.choice("download_source", "domestic") == "github";
+        self.channel.operation(move |c| {
+            if defer_if_running(c, &targets, retry)? {
+                return Ok(());
+            }
+            for target in &targets {
+                ensure_directory_outside_data(&target.directory, &data)?;
+            }
+            rtx_fg_manager::neural_runtime::install_many(
+                &targets,
+                version,
+                prefer_github,
+                &cancel,
+                &mut |transfer| {
+                    c.send(Event::PayloadProgress(cloud::CloudProgress {
+                        transfer,
+                        proxy: "nvngx_dlssnr.dll".into(),
+                        package_index: 1,
+                        package_count: 1,
+                    }));
+                },
+            )?;
+            c.send(Event::Notice(
+                "NR 运行库已安装。请在游戏中开启 DLSS/DLAA；Encore 按 Insert，MFG 按 Backspace 开启神经渲染。".into(),
+            ));
+            Ok(())
+        });
+    }
+    pub fn remove_neural_runtime(&mut self) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+        else {
+            return;
+        };
+        let targets = game.deployment_targets();
+        let data = self.data.clone();
+        self.status_epoch += 1;
+        self.begin_work("卸载 DLSSNR");
+        self.critical = true;
+        let retry = self.retry_request(RetryAction::RemoveNr);
+        self.channel.operation(move |c| {
+            if defer_if_running(c, &targets, retry)? {
+                return Ok(());
+            }
+            for target in &targets {
+                ensure_directory_outside_data(&target.directory, &data)?;
+            }
+            rtx_fg_manager::neural_runtime::remove_many(&targets)?;
+            c.send(Event::Notice(
+                "NR 安装已撤销；若原先已有运行库，已恢复原件。其他补丁保持不变。".into(),
+            ));
+            Ok(())
+        });
+    }
+    pub fn preview_cleanup_deletion(&mut self) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        let Some(game) = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.games.iter().find(|g| &g.exe == e))
+            .cloned()
+        else {
+            return;
+        };
+        let epoch = self.status_epoch;
+        let fingerprint = self.retry_fingerprint();
+        self.pending_cleanup = None;
+        self.begin_work("检查清理内容");
+        self.channel.operation(move |c| {
+            let mut plans = Vec::new();
+            let mut directories = BTreeSet::new();
+            for exe in game
+                .deployment_executables()
+                .into_iter()
+                .chain(game.cleanup_only.clone())
+            {
+                let target = game.deployment_target(std::path::Path::new(&exe));
+                if !directories.insert(core::key(&target.directory)) {
+                    continue;
+                }
+                if core::record(&target.directory)?.is_some_and(|r| r.cache_pending) {
+                    let plan = rtx_fg_manager::cleanup_pending::prepare(&target)?;
+                    if plan.paths().next().is_some() {
+                        plans.push(plan);
+                    }
+                }
+            }
+            anyhow::ensure!(
+                !plans.is_empty(),
+                "没有可直接删除的当前游戏文件。请点击重新清理；共享缓存和其他游戏的目录会保留。"
+            );
+            c.send(Event::CleanupPreview(epoch, fingerprint, plans));
+            Ok(())
+        });
+    }
+    pub fn cleanup_deletion_list(&self) -> String {
+        self.pending_cleanup
+            .as_ref()
+            .map(|(_, _, plans)| {
+                plans
+                    .iter()
+                    .flat_map(|p| p.paths())
+                    .map(|p| p.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .unwrap_or_default()
+    }
+    pub fn confirm_cleanup_deletion(&mut self) {
+        let Some((epoch, fingerprint, plans)) = self.pending_cleanup.take() else {
+            return;
+        };
+        if epoch != self.status_epoch || fingerprint != self.retry_fingerprint() {
+            self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
+            return;
+        }
+        self.delete_cleanup_plans(plans);
+    }
+    fn delete_cleanup_plans(&mut self, plans: Vec<rtx_fg_manager::cleanup_pending::Plan>) {
+        if self.busy || self.closing || self.read_only {
+            return;
+        }
+        self.status_epoch += 1;
+        let retry = self.retry_request(RetryAction::DeleteCleanup(plans.clone()));
+        self.begin_work("清理文件");
+        self.critical = true;
+        self.channel.operation(move |c| {
+            let targets = plans.iter().map(|p| p.target().clone()).collect::<Vec<_>>();
+            if defer_if_running(c, &targets, retry)? {
+                return Ok(());
+            }
+            let mut pending = Vec::new();
+            for plan in &plans {
+                rtx_fg_manager::cleanup_pending::delete_confirmed(plan)?;
+                let outcome = cleanup::retry_pending_at(plan.target())?;
+                c.send(Event::Log(outcome.message.clone()));
+                if !outcome.complete {
+                    pending.push(outcome.message);
+                }
+            }
+            if pending.is_empty() {
+                c.send(Event::Notice("已删除所列文件并完成清理。".into()));
+            } else {
+                c.send(Event::Warning(pending.join("\n\n")));
+            }
+            Ok(())
+        });
+    }
+    pub fn retry_focused_cleanup(&mut self) {
+        if self.busy || self.closing {
+            return;
+        }
+        let targets = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.deployments.get(e))
+            .map(|s| {
+                s.issues()
+                    .iter()
+                    .filter(|i| i.kind() == rtx_fg_manager::deployment::IssueKind::Residuals)
+                    .map(|i| i.target().clone())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        self.cleanup_residual_targets(targets);
+    }
+    fn cleanup_residual_targets(&mut self, targets: Vec<core::DeploymentTarget>) {
+        if self.busy || self.closing {
+            return;
+        }
+        if targets.is_empty() {
+            self.refresh();
+            return;
+        }
+        self.status_epoch += 1;
+        self.begin_work("清理残留");
+        self.critical = true;
+        let retry = self.retry_request(RetryAction::CleanupResiduals(targets.clone()));
+        let data = self.data.clone();
+        self.channel.operation(move |c| {
+            if defer_if_running(c, &targets, retry)? {
+                return Ok(());
+            }
+            let mut pending = Vec::new();
+            for target in &targets {
+                ensure_directory_outside_data(&target.directory, &data)?;
+                match cleanup::retry_pending_at(target) {
+                    Ok(outcome) if outcome.complete => c.send(Event::Log(outcome.message)),
+                    Ok(outcome) => pending.push(format!(
+                        "{}\n{}",
+                        target.directory.display(),
+                        outcome.message
+                    )),
+                    Err(error) => {
+                        pending.push(format!("{}\n{error:#}", target.directory.display()))
+                    }
+                }
+            }
+            if pending.is_empty() {
+                c.send(Event::Notice(
+                    "当前游戏的残留清理已完成，状态已刷新。".into(),
+                ));
+            } else {
+                c.send(Event::Warning(format!(
+                    "仍有文件未清理；已保留恢复记录，可查看详情后重试。\n\n{}",
+                    pending.join("\n\n")
+                )));
+            }
+            Ok(())
+        });
+    }
+    pub fn request_focused_recovery(&mut self) {
+        if self.busy || self.closing {
+            return;
+        }
+        let targets = self
+            .focus
+            .as_ref()
+            .and_then(|e| self.deployments.get(e))
+            .map(|s| {
+                s.issues()
+                    .iter()
+                    .filter(|i| {
+                        matches!(
+                            i.kind(),
+                            rtx_fg_manager::deployment::IssueKind::Interrupted
+                                | rtx_fg_manager::deployment::IssueKind::Modified
+                        )
+                    })
+                    .map(|i| i.target().game_exe.display().to_string())
+                    .collect::<BTreeSet<_>>()
+            })
+            .unwrap_or_default();
+        if targets.is_empty() {
+            self.refresh();
+            return;
+        }
+        self.pending_patch = Some(PatchRequest {
+            clean: true,
+            targets,
+        });
+        self.confirm = Some("recover_patch".into());
+    }
     pub fn confirm_patch(&mut self) {
         if let Some(p) = self.pending_patch.take() {
-            self.perform(p.clean, p.targets);
+            self.dispatch_patch(p.clean, p.targets);
         }
     }
     pub fn cancel_patch(&mut self) {
+        self.encore_install = None;
+        self.encore_install_values.clear();
+        self.encore_components.clear();
+        self.resume_install = None;
         self.pending_patch = None;
+        self.pending_cleanup = None;
         if matches!(
             self.confirm.as_deref(),
-            Some("deploy_batch" | "clean_batch")
+            Some("deploy_batch" | "clean_batch" | "recover_patch")
         ) {
             self.confirm = None;
         }
@@ -1576,7 +3080,8 @@ impl Controller {
         }
         self.status_epoch += 1;
         self.critical = true;
-        self.busy = true;
+        self.begin_work("安装 / 卸载补丁");
+        let epoch = self.status_epoch;
         self.patch_summary = Some(PatchSummary {
             total: paths.len(),
             ..Default::default()
@@ -1622,7 +3127,41 @@ impl Controller {
         let mut catalog = self.catalog.clone();
         let data = self.data.clone();
         catalog.prefer_github = self.choice("download_source", "domestic") == "github";
+        let retry = self.retry_request(RetryAction::Patch(clean, paths.clone()));
+        let first_install_values = self.encore_install_values.clone();
+        let components = self.encore_components.clone();
+        let language = self.tr.language.clone();
         self.channel.operation(move |c| {
+            let guards = jobs
+                .iter()
+                .flat_map(|(_, targets, game, _, _, _, _, _)| {
+                    targets
+                        .iter()
+                        .map(|p| game.deployment_target(std::path::Path::new(p)))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            if defer_if_running(c, &guards, retry)? {
+                return Ok(());
+            }
+            if !clean {
+                let mut queue = Vec::new();
+                for (_, targets, game, scheme, series, proxies, _, _) in &jobs {
+                    // Keep invalid destinations out of both downloads and their UI plan.
+                    if targets.iter().any(|exe| ensure_directory_outside_data(&game.deployment_target(std::path::Path::new(exe)).directory,&data).is_err()) { continue; }
+                    if let Ok(files) = cloud::download_files(&catalog, scheme, *series, proxies) {
+                        queue.extend(files);
+                    }
+                    if scheme == rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p| &p.scheme_id == scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version))))
+                    {
+                        for target in game.deployment_targets() {
+                            let choice = components.get(&target.game_exe.display().to_string()).copied().unwrap_or_default();
+                            if let Ok(files) = rtx_fg_manager::runtime_files::encore_selected_download_files(std::slice::from_ref(&target), choice) { queue.extend(files); }
+                        }
+                    }
+                }
+                if !queue.is_empty() { c.send(Event::PayloadProgress(cloud::CloudProgress { transfer:rtx_fg_manager::transfer::Progress::plan(queue),proxy:String::new(),package_index:0,package_count:0 })); }
+            }
             let mut errors = Vec::new();
             for (primary, targets, game, scheme, series, proxies, options, overrides) in jobs {
                 if cancel.load(Ordering::Relaxed) {
@@ -1642,6 +3181,12 @@ impl Controller {
                                 &proxies,
                             )?;
                         }
+                        if scheme==rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p|p.scheme_id==scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version)))) {
+                            for target in game.deployment_targets() {
+                                let choice = components.get(&target.game_exe.display().to_string()).copied().unwrap_or_default();
+                                rtx_fg_manager::runtime_files::prepare_encore_selected_sources(std::slice::from_ref(&target),choice,catalog.prefer_github,&cancel,&mut|transfer|c.send(Event::PayloadProgress(cloud::CloudProgress{transfer,proxy:"Encore runtimes".into(),package_index:1,package_count:1})))?;
+                            }
+                        }
                         cloud::prepare_with_progress(
                             &catalog,
                             &scheme,
@@ -1656,6 +3201,10 @@ impl Controller {
                 let prepared = match prepared {
                     Ok(p) => p,
                     Err(e) => {
+                        if rtx_fg_manager::transfer::is_cancelled(&e) {
+                            c.send(Event::TaskCancelled(false));
+                            break;
+                        }
                         errors.push(format!("{primary}：{e}"));
                         for exe in targets {
                             c.send(Event::PatchResult(false));
@@ -1669,6 +3218,9 @@ impl Controller {
                         continue;
                     }
                 };
+                let fresh_targets=targets.iter().filter_map(|exe| {
+                    first_install_values.get(exe).filter(|_|core::record(&game.deployment_target(std::path::Path::new(exe)).directory).is_ok_and(|r|r.is_none())).map(|v|(exe.clone(),v.clone()))
+                }).collect::<Vec<_>>();
                 let mut all_ok = true;
                 let read_target = targets
                     .first()
@@ -1685,6 +3237,7 @@ impl Controller {
                                 &game.deployment_target(&p).directory,
                                 &data,
                             )?;
+                            c.send(Event::Progress("正在备份并安装补丁…".into()));
                             let mut files = payload.files.clone();
                             let context = rtx_fg_manager::presets::Context::new(
                                 &payload.scheme_id,
@@ -1692,8 +3245,66 @@ impl Controller {
                                 &p,
                             );
                             let name = core::config_name(&payload.backend);
-                            files.insert(name.into(), context.configure(&files[name], &options)?);
-                            core::deploy_prepared_context_at_with_overrides(
+                            // Applied snapshots belong to the removed installation.
+                            // Check disk here too: refresh may still be in flight after
+                            // uninstall, or an older manager may have left stale state.
+                            let fresh_options;
+                            let options = if core::record(&game.deployment_target(&p).directory)?
+                                .is_none()
+                            {
+                                let mut values = rtx_fg_manager::presets::defaults(
+                                    &payload.policy.parameter_profile,
+                                    &payload.policy.defaults,
+                                );
+                                if payload.backend == rtx_fg_manager::encore::BACKEND {
+                                    rtx_fg_manager::encore::localize_defaults(&mut values, &language);
+                                }
+                                values.extend(overrides.clone());
+                                context.normalize(&mut values);
+                                fresh_options = values;
+                                &fresh_options
+                            } else {
+                                &options
+                            };
+                            let configured = if payload.backend == rtx_fg_manager::encore::BACKEND {
+                                let version = payload
+                                    .upstream_version
+                                    .as_deref()
+                                    .or(Some(&payload.version));
+                                let mut available: rtx_fg_manager::presets::Values = options
+                                    .iter()
+                                    .filter(|(key, _)| {
+                                        rtx_fg_manager::encore::field(key).is_some_and(|f| {
+                                            rtx_fg_manager::encore::field_available(f, version)
+                                        })
+                                    })
+                                    .map(|(k, v)| (k.clone(), v.clone()))
+                                    .collect();
+                                if fresh_targets.iter().any(|(path,_)|path==&exe) {
+                                    for key in ["dlssWithoutGameDlss","frameGenerationWithoutGameFg","smoothMotionEnabled"] {available.insert(key.into(),"0".into());}
+                                    available.insert("frameGenerationEngine".into(),"game".into());
+                                }
+                                rtx_fg_manager::encore::configure_for_version(
+                                    &files[name],
+                                    &available,
+                                    version,
+                                )?
+                            } else if payload.backend == rtx_fg_manager::upstream040::BACKEND {
+                                if core::record(&game.deployment_target(&p).directory)?.is_some() {
+                                    // Existing installations preserve their disk values.
+                                    files[name].clone()
+                                } else {
+                                    // Do not replay a 0.4.0 snapshot into a fresh 0.4.1 INI,
+                                    // even if the background status refresh has not arrived.
+                                    context.configure(&files[name], &overrides)?
+                                }
+                            } else {
+                                context.configure(&files[name], options)?
+                            };
+                            files.insert(name.into(), configured);
+                            let deployed = if payload.backend == rtx_fg_manager::encore::BACKEND && rtx_fg_manager::encore::supports_200(payload.upstream_version.as_deref().or(Some(&payload.version))) {
+                                rtx_fg_manager::encore_components::deploy(&game.deployment_target(&p), payload, &proxies, files, &context, &overrides, components.get(&exe).copied().unwrap_or_default())
+                            } else { core::deploy_prepared_context_at_with_overrides(
                                 &game.deployment_target(&p),
                                 &payload.backend,
                                 &proxies,
@@ -1703,13 +3314,13 @@ impl Controller {
                                 Some(&context),
                                 Some(&overrides),
                                 payload.upstream_version.as_deref(),
-                            )
-                            .map(|message| cleanup::CleanOutcome {
-                                message,
-                                complete: true,
+                            ) };
+                            deployed.map(|message| cleanup::CleanOutcome {
+                                message, complete: true,
                             })
                         })()
                     } else {
+                        c.send(Event::Progress("正在恢复原件并清理补丁…".into()));
                         cleanup::clean_outcome_at(&game.deployment_target(&p))
                     };
                     match result {
@@ -1729,6 +3340,10 @@ impl Controller {
                         }
                         Err(e) => {
                             all_ok = false;
+                            if rtx_fg_manager::transfer::is_cancelled(&e) {
+                                c.send(Event::TaskCancelled(false));
+                                break;
+                            }
                             c.send(Event::PatchResult(false));
                             errors.push(format!("{exe}：{e}"));
                         }
@@ -1738,16 +3353,56 @@ impl Controller {
                         core::status_at(&game.deployment_target(&p)),
                     ));
                 }
+                if all_ok && clean {
+                    let snapshot = rtx_fg_manager::deployment::inspect(&game, &catalog);
+                    if snapshot.status == "未部署" && snapshot.installed == 0 {
+                        c.send(Event::Uninstalled(epoch, primary.clone()));
+                    }
+                }
                 if all_ok && !clean {
-                    let profile = &catalog.scheme_policies[&scheme].parameter_profile;
-                    let actual = if uses_explicit_edits(profile) {
-                        read_target
-                            .as_ref()
-                            .ok_or_else(|| anyhow::anyhow!("没有实际部署目录"))
-                            .and_then(|target| read_json_preset_values(target, profile))
-                    } else {
-                        Ok(options)
-                    };
+                    if prepared.as_ref().is_some_and(|payload| payload.backend == rtx_fg_manager::encore::BACKEND
+                        && rtx_fg_manager::encore::supports_200(payload.upstream_version.as_deref().or(Some(&payload.version)))) {
+                        let previous_errors=errors.len();
+                        for target in game.deployment_targets() {
+                        let choice = components.get(&target.game_exe.display().to_string()).copied().unwrap_or_default();
+                        if let Err(error) = rtx_fg_manager::runtime_files::complete_encore_selected(
+                            std::slice::from_ref(&target), choice, catalog.prefer_github, &cancel,
+                            &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
+                                transfer, proxy: "Encore".into(), package_index: 1, package_count: 1,
+                            })),
+                        ) {
+                            if rtx_fg_manager::transfer::is_cancelled(&error) {
+                                c.send(Event::TaskCancelled(false));
+                                all_ok = false;
+                                break;
+                            }
+                            errors.push(format!("补丁已安装，配套运行库未完成；请在运行库窗口点击补齐后重试：{error:#}"));
+                        }
+                        }
+                        if all_ok && errors.len()==previous_errors {
+                            c.send(Event::Progress("正在应用所选引擎…".into()));
+                            for (exe,values) in &fresh_targets {
+                                let target=game.deployment_target(std::path::Path::new(exe));
+                                let policy=&catalog.scheme_policies[&scheme];
+                                let context=rtx_fg_manager::presets::Context::new(&scheme,policy,&target.game_exe);
+                                if let Err(e)=core::apply_parameters_at(&target,&context,values) {errors.push(format!("{exe}：{e:#}"));}
+                            }
+                        }
+                        for target in game.deployment_targets() {
+                            c.send(Event::Status(target.game_exe.display().to_string(), core::status_at(&target)));
+                        }
+                    }
+                    // Cache what was actually written, including a fresh install's
+                    // defaults, rather than the previous installation's input snapshot.
+                    let actual = read_target
+                        .as_ref()
+                        .context("没有实际部署目录")
+                        .and_then(|target| {
+                            rtx_fg_manager::presets::inspect_at(target, &catalog)?
+                                .filter(|(installed, _)| installed == &scheme)
+                                .map(|(_, values)| values)
+                                .context("无法读取已安装方案的参数")
+                        });
                     match actual {
                         Ok(actual) => c.send(Event::PresetApplied(primary, scheme, actual)),
                         Err(error) => {
@@ -1765,19 +3420,16 @@ impl Controller {
     fn target_games(&self) -> Vec<&Game> {
         self.games
             .iter()
-            .filter(|g| {
-                if self.selected.is_empty() {
-                    self.focus.as_ref() == Some(&g.exe)
-                } else {
-                    self.selected.contains(&g.exe)
-                }
-            })
+            .filter(|g| self.focus.as_ref() == Some(&g.exe))
             .collect()
     }
     /// Installation operates once per verified rendering directory, never on a launcher.
     pub fn patch_targets(&self, clean: bool) -> BTreeSet<String> {
+        self.patch_targets_for(self.target_games(), clean)
+    }
+    fn patch_targets_for(&self, games: Vec<&Game>, clean: bool) -> BTreeSet<String> {
         let mut directories = BTreeMap::new();
-        for game in self.target_games() {
+        for game in games {
             let targets = game.deployment_executables();
             for target in targets
                 .iter()
@@ -1803,9 +3455,6 @@ impl Controller {
     }
     pub fn targets(&self) -> BTreeSet<String> {
         self.patch_targets(false)
-    }
-    pub fn target_game_count(&self) -> usize {
-        self.target_games().len()
     }
     pub fn can_forget_focused_without_confirmation(&self) -> bool {
         !self.busy
@@ -1850,12 +3499,49 @@ impl Controller {
                 .map(parameter_target)
                 .unwrap_or_else(|| core::DeploymentTarget::for_game(std::path::Path::new(&exe)));
             let catalog = self.catalog.clone();
+            let game = self.games.iter().find(|g| g.exe == exe).cloned();
             let epoch = self.status_epoch;
             self.channel.job(move |c| {
                 let running = core::assert_target_stopped(&location).is_err();
-                let values = rtx_fg_manager::presets::inspect_at(&location, &catalog);
+                let values = match game {
+                    Some(game) => inspect_game_parameters(
+                        &game,
+                        &catalog,
+                        rtx_fg_manager::presets::inspect_at,
+                    ),
+                    None => {
+                        rtx_fg_manager::presets::inspect_at(&location, &catalog).map(|values| {
+                            ParameterSnapshot {
+                                values,
+                                consistent: true,
+                            }
+                        })
+                    }
+                };
                 match values {
-                    Ok(values) => c.send(Event::PresetRead(target, values, running, epoch)),
+                    Ok(snapshot) => c.send(Event::PresetRead {
+                        profile: core::record(&location.directory)
+                            .ok()
+                            .flatten()
+                            .and_then(|r| {
+                                let policy =
+                                    catalog.scheme_policies.get(r.scheme_id.as_deref()?)?;
+                                Some(
+                                    rtx_fg_manager::presets::policy_for_version(
+                                        policy,
+                                        r.upstream_version
+                                            .as_deref()
+                                            .or(r.payload_version.as_deref()),
+                                    )
+                                    .parameter_profile,
+                                )
+                            }),
+                        exe: target,
+                        values: snapshot.values,
+                        running,
+                        epoch,
+                        consistent: snapshot.consistent,
+                    }),
                     Err(error) => c.send(Event::PresetReadFailed(
                         target,
                         format!(
@@ -1873,8 +3559,14 @@ impl Controller {
             return;
         }
         self.evidence.insert(exe.clone(), None);
+        let target = self
+            .games
+            .iter()
+            .find(|g| g.exe == exe)
+            .map(parameter_target)
+            .unwrap_or_else(|| core::DeploymentTarget::for_game(std::path::Path::new(&exe)));
         self.channel.job(move |c| {
-            let evidence = scanner::inspect(std::path::Path::new(&exe));
+            let evidence = scanner::inspect(&target.game_exe);
             c.send(Event::Evidence(exe, evidence));
             Ok(())
         });
@@ -1885,7 +3577,7 @@ impl Controller {
     pub fn proxies_for(&self, exe: Option<&str>) -> Vec<String> {
         let scheme = self.scheme_for(exe);
         let allowed = self.catalog.proxies(&scheme);
-        let limit = self.catalog.scheme_policies[&scheme].max_selected_proxies;
+        let limit = self.catalog.selection_limit(&scheme);
         let saved = exe
             .and_then(|e| self.games.iter().find(|g| g.exe == e))
             .and_then(|g| g.extra.get("proxy_choices"))
@@ -1950,7 +3642,7 @@ impl Controller {
         let source = if self.choice("download_source", "domestic") == "github" {
             "github"
         } else {
-            "gitee"
+            "gitcode"
         }
         .to_owned();
         self.channel.job(move |c| {
@@ -1993,6 +3685,7 @@ impl Controller {
         }
         let Some(m) = self.update.clone() else { return };
         let preference = self.choice("download_source", "domestic");
+        self.tasks.start(true, self.text("更新管理器"));
         self.install_requested = install_requested;
         self.update_status = "正在连接下载服务器…".into();
         self.download_progress = updater::DownloadProgress {
@@ -2000,7 +3693,7 @@ impl Controller {
             source: if preference == "github" {
                 "github"
             } else {
-                "gitee"
+                "gitcode"
             }
             .into(),
             ..Default::default()
@@ -2018,7 +3711,7 @@ impl Controller {
                 Err(_) if cancel.load(Ordering::Relaxed) => {
                     c.send(Event::Log("更新下载已取消".into()))
                 }
-                Err(e) => c.send(Event::Warning(e.to_string())),
+                Err(e) => c.send(Event::TaskWarning(true, e.to_string())),
             }
             c.send(Event::UpdateDone);
             Ok(())
@@ -2035,28 +3728,99 @@ impl Controller {
         self.install_requested = false;
         self.update_busy = true;
         self.update_installing = true;
+        self.tasks.start(true, self.text("更新管理器"));
+        if let Some(t) = &mut self.tasks.update {
+            t.stage("正在安装更新，完成后将自动重启…");
+        }
         self.update_status = "正在安装更新，完成后将自动重启…".into();
         let data = self.data.clone();
         self.channel.job(move |c| {
             match updater::install(&path, &m, &data) {
                 Ok(()) => c.send(Event::Installed),
                 Err(e) => {
-                    c.send(Event::Warning(e.to_string()));
+                    c.send(Event::TaskWarning(true, e.to_string()));
                     c.send(Event::UpdateDone);
                 }
             }
             Ok(())
         });
     }
+    pub fn rename_manager(&mut self) {
+        if self.busy || self.critical || self.update_busy || self.closing || self.read_only {
+            return;
+        }
+        if self.first_pending_preset().is_some() {
+            self.warning = Some(self.text("请先应用或放弃待修改参数，再统一文件名。"));
+            return;
+        }
+        self.begin_work("统一文件名");
+        self.critical = true;
+        self.update_busy = true;
+        self.update_installing = true;
+        self.progress = "正在准备改名，完成后自动重启…".into();
+        let data = self.data.clone();
+        self.channel.job(move |c| {
+            c.send(Event::RenamePrepared(
+                rtx_fg_manager::executable_name::prepare(&data),
+            ));
+            Ok(())
+        });
+    }
+    fn begin_runtime_catalog_refresh(&mut self) -> Option<u64> {
+        if self.closing || self.busy || self.runtime_catalog_load.loading {
+            return None;
+        }
+        self.runtime_catalog_generation += 1;
+        self.runtime_catalog_load.loading = true;
+        self.runtime_catalog_load.error = None;
+        self.runtime_catalog_cancel = Arc::new(AtomicBool::new(false));
+        Some(self.runtime_catalog_generation)
+    }
+    pub fn refresh_runtime_catalog(&mut self) {
+        let Some(generation) = self.begin_runtime_catalog_refresh() else {
+            return;
+        };
+        let github = self.choice("download_source", "domestic") == "github";
+        let cancel = self.runtime_catalog_cancel.clone();
+        self.channel.job(move |c| {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if let Some(catalog) = rtx_fg_manager::runtime_catalog::cached() {
+                    c.send(Event::RuntimeCatalogCached(generation, catalog));
+                }
+                rtx_fg_manager::runtime_catalog::refresh(github, &cancel)
+            }))
+            .unwrap_or_else(|_| Err(anyhow::anyhow!("版本清单任务异常，请重试")));
+            c.send(Event::RuntimeCatalog(generation, result));
+            Ok(())
+        });
+    }
     fn apply_pending_catalog(&mut self) {
         if self.closing {
             self.pending_catalog = None;
+            self.pending_runtime_catalog = None;
             return;
         }
         if self.busy {
             return;
         }
-        if let Some(catalog) = self.pending_catalog.take() {
+        if let Some((catalog, online)) = self.pending_runtime_catalog.take() {
+            match rtx_fg_manager::runtime_catalog::activate(catalog) {
+                Ok(()) => {
+                    self.runtime_catalog_load.usable = true;
+                    if online {
+                        self.runtime_catalog_load.online = true;
+                        self.runtime_catalog_load.error = None;
+                    }
+                }
+                Err(e) => {
+                    self.log(&format!("运行库清单未应用：{e}"));
+                    self.runtime_catalog_load.error = Some(format!("{e:#}"));
+                }
+            }
+            self.runtime_catalog_load.pending = false;
+        }
+        if let Some(mut catalog) = self.pending_catalog.take() {
+            catalog.retain_bundled_versions();
             for (scheme, reason) in &catalog.skipped_schemes {
                 self.log(&format!("{scheme}：{reason}"));
             }
@@ -2090,7 +3854,68 @@ impl Controller {
             let Ok(e) = self.rx.try_recv() else { break };
             changed = true;
             match e {
+                Event::GameNamesCached(catalog) => {
+                    if !self.closing && catalog.revision() > self.game_names.revision() {
+                        self.game_names = Arc::new(catalog);
+                        self.library_revision += 1;
+                        self.identify_game_names();
+                    }
+                }
+                Event::GameIdentities(generation, rows) => {
+                    if self.closing || generation != self.names_generation {
+                        continue;
+                    }
+                    let mut changed = false;
+                    for (exe, root, identity) in rows {
+                        if let Some(g) = self
+                            .games
+                            .iter_mut()
+                            .find(|g| g.exe == exe && g.root == root)
+                            && g.extra.get("name_identity") != Some(&identity)
+                        {
+                            // Never copy a worker's old manual name or presets.
+                            g.extra.insert("name_identity".into(), identity);
+                            changed = true;
+                        }
+                    }
+                    if changed {
+                        self.library_revision += 1;
+                        self.save();
+                    }
+                }
+                Event::GameNames(result, requested) => {
+                    self.names_busy = false;
+                    if self.closing {
+                        continue;
+                    }
+                    match result {
+                        Ok(catalog) => {
+                            if catalog.revision() > self.game_names.revision() {
+                                self.game_names = Arc::new(catalog);
+                                self.library_revision += 1;
+                                self.identify_game_names();
+                            }
+                            if requested {
+                                self.names_status = "名称库已是最新版本".into();
+                            }
+                        }
+                        Err(e) => {
+                            self.names_status = "名称库更新暂不可用，继续使用离线名称库。".into();
+                            self.log(&format!("Game names retained: {e}"));
+                        }
+                    }
+                }
                 Event::Scan(r) => {
+                    self.notice = Some(format!(
+                        "{}：{} {}",
+                        self.text(if r.cancelled {
+                            "扫描已停止"
+                        } else {
+                            "扫描完成"
+                        }),
+                        r.rows.len(),
+                        self.text("个游戏")
+                    ));
                     self.log(&format!(
                         "扫描结束：{} 个目录，{} 个候选。",
                         r.directories, r.candidates
@@ -2115,8 +3940,44 @@ impl Controller {
                         self.merge_scan(r.rows)
                     }
                 }
-                Event::Progress(p) => self.progress = p,
+                Event::EncorePrepared(_) if self.closing || self.cancel.load(Ordering::Relaxed) => {
+                }
+                Event::EncorePrepared(result) => match result {
+                    Ok(plan) if plan.fingerprint == self.retry_fingerprint() => {
+                        if plan.choices.is_empty() {
+                            self.resume_install = Some(plan.paths);
+                        } else {
+                            self.encore_install = Some(plan);
+                            self.confirm = Some("encore_engines".into());
+                        }
+                    }
+                    Ok(_) => self.warning = Some("游戏或配置已变化，请重新发起操作。".into()),
+                    Err(e) => {
+                        let message = format!("{e:#}");
+                        if let Some(task) = &mut self.tasks.work {
+                            task.fail(message.clone());
+                        }
+                        self.warning = Some(message);
+                    }
+                },
+                Event::ScanProgress(p) => {
+                    if self.busy && !self.closing {
+                        self.scan_progress = Some(p);
+                    }
+                }
+                Event::Progress(p) => {
+                    if let Some(task) = &mut self.tasks.work {
+                        task.stage(p.clone());
+                    }
+                    self.progress = p;
+                }
                 Event::PayloadProgress(p) => {
+                    if let Some(task) = &mut self.tasks.work {
+                        task.download(
+                            format!("{}  {}/{}", p.proxy, p.package_index, p.package_count),
+                            p.transfer.clone(),
+                        );
+                    }
                     if !p.transfer.detail.is_empty()
                         && self
                             .payload_progress
@@ -2193,7 +4054,14 @@ impl Controller {
                         self.evidence.insert(exe, Some(evidence));
                     }
                 }
-                Event::PresetRead(exe, values, running, epoch) => {
+                Event::PresetRead {
+                    exe,
+                    values,
+                    profile,
+                    running,
+                    epoch,
+                    consistent,
+                } => {
                     self.preset_reads.remove(&exe);
                     if epoch != self.status_epoch || !self.games.iter().any(|g| g.exe == exe) {
                         continue;
@@ -2204,8 +4072,15 @@ impl Controller {
                         self.running_games.remove(&exe);
                     }
                     self.disk_presets.retain(|(game, _), _| game != &exe);
+                    self.disk_profiles.retain(|(game, _), _| game != &exe);
                     if let Some((scheme, mut values)) = values {
-                        if let Some(policy) = self.catalog.scheme_policies.get(&scheme) {
+                        if let Some(profile) = profile {
+                            self.disk_profiles
+                                .insert((exe.clone(), scheme.clone()), (epoch, profile));
+                        }
+                        if self.catalog.scheme_policies.contains_key(&scheme) {
+                            let policy = self.parameter_policy(&exe, &scheme);
+                            let policy = &policy;
                             let context = rtx_fg_manager::presets::Context::new(
                                 &scheme,
                                 policy,
@@ -2221,7 +4096,28 @@ impl Controller {
                                 }
                             }
                         }
-                        self.disk_presets.insert((exe, scheme), values);
+                        self.disk_presets
+                            .insert((exe.clone(), scheme.clone()), values.clone());
+                        if self.catalog.scheme_policies.contains_key(&scheme) {
+                            let policy = self.parameter_policy(&exe, &scheme);
+                            let policy = &policy;
+                            let mut baseline = rtx_fg_manager::presets::defaults(
+                                &policy.parameter_profile,
+                                &policy.defaults,
+                            );
+                            baseline.extend(values);
+                            rtx_fg_manager::presets::Context::new(
+                                &scheme,
+                                policy,
+                                std::path::Path::new(&exe),
+                            )
+                            .normalize(&mut baseline);
+                            // A game menu or an earlier successful apply may
+                            // already match the draft. No difference, no prompt.
+                            if consistent && self.preset_values_for(&exe, &scheme) == baseline {
+                                self.discard_presets(Some((&exe, &scheme)));
+                            }
+                        }
                     }
                 }
                 Event::PresetReadFailed(exe, error, running, epoch) => {
@@ -2237,6 +4133,7 @@ impl Controller {
                     }
                 }
                 Event::PresetApplied(exe, scheme, values) => {
+                    self.preset_baselines.remove(&(exe.clone(), scheme.clone()));
                     self.disk_presets
                         .insert((exe.clone(), scheme.clone()), values.clone());
                     if let Some(game) = self.games.iter_mut().find(|g| g.exe == exe) {
@@ -2306,6 +4203,20 @@ impl Controller {
                         self.save();
                     }
                 }
+                Event::Hags(result) => {
+                    self.hags_busy = false;
+                    self.hags_writing = false;
+                    self.hags_checked = Instant::now();
+                    match result {
+                        Ok(state) => {
+                            self.hags = Some(state);
+                            self.hags_error = None;
+                        }
+                        Err(error) => {
+                            self.hags_error = Some(format!("{error:#}"));
+                        }
+                    }
+                }
                 Event::Devices(d) => {
                     self.devices = d;
                     self.device_index = self.device_index.min(self.devices.len().saturating_sub(1));
@@ -2319,18 +4230,109 @@ impl Controller {
                     self.log(&s);
                     self.warning = Some(s)
                 }
+                Event::TaskWarning(update, s) => {
+                    let task = if update {
+                        &mut self.tasks.update
+                    } else {
+                        &mut self.tasks.work
+                    };
+                    if let Some(t) = task {
+                        t.fail(s.clone());
+                    }
+                    self.log(&s);
+                    self.warning = Some(s)
+                }
+                Event::TaskCancelled(update) => {
+                    let token = if update {
+                        &self.update_cancel
+                    } else {
+                        &self.cancel
+                    };
+                    token.store(true, Ordering::Relaxed);
+                }
                 Event::Catalog(catalog) => {
                     // Keep the newest successful refresh while the active operation
                     // continues with its own catalog/payload snapshot.
                     self.pending_catalog = Some(catalog);
                     self.apply_pending_catalog();
                 }
-                Event::Deployments(epoch, exe, snapshot) => {
-                    if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
-                        self.deployments.insert(exe, snapshot);
+                Event::RuntimeCatalogCached(generation, catalog) => {
+                    if self.closing || generation != self.runtime_catalog_generation {
+                        continue;
+                    }
+                    self.pending_runtime_catalog = Some((catalog, false));
+                    self.apply_pending_catalog();
+                }
+                Event::RuntimeCatalog(generation, result) => {
+                    if self.closing || generation != self.runtime_catalog_generation {
+                        continue;
+                    }
+                    self.runtime_catalog_load.loading = false;
+                    match result {
+                        Ok(catalog) => {
+                            self.runtime_catalog_load.pending = true;
+                            self.pending_runtime_catalog = Some((catalog, true));
+                            self.apply_pending_catalog();
+                        }
+                        Err(e) => {
+                            self.log(&format!("运行库清单更新失败，继续使用已验证版本：{e:#}"));
+                            self.runtime_catalog_load.error = Some(format!("{e:#}"));
+                        }
                     }
                 }
+                Event::Deployments(epoch, exe, snapshot) => {
+                    if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
+                        let uninstalled = snapshot.status == "未部署" && snapshot.installed == 0;
+                        self.deployments.insert(exe.clone(), *snapshot);
+                        if uninstalled {
+                            self.reset_uninstalled_presets(&exe);
+                        }
+                    }
+                }
+                Event::Uninstalled(epoch, exe) => {
+                    if epoch == self.status_epoch && self.games.iter().any(|g| g.exe == exe) {
+                        self.forget_uninstalled_presets(&exe);
+                    }
+                }
+                Event::CleanupPreview(epoch, fingerprint, plans) => {
+                    if epoch == self.status_epoch && fingerprint == self.retry_fingerprint() {
+                        self.pending_cleanup = Some((epoch, fingerprint, plans));
+                        self.confirm = Some("delete_cleanup".into());
+                    } else {
+                        self.warning = Some("游戏或配置已变化，请重新发起操作。".into());
+                    }
+                }
+                Event::Blocked(blocked) => {
+                    if blocked.request.epoch == self.status_epoch {
+                        self.blocked = Some(blocked);
+                        self.patch_summary = None;
+                        self.confirm = Some("end_processes".into());
+                    }
+                }
+                Event::RetryReady(request) => self.retry_operation(request),
                 Event::Done => {
+                    self.scan_progress = None;
+                    if let Some(task) = &mut self.tasks.work {
+                        let was_active = task.active;
+                        if self.blocked.is_some() {
+                            task.fail("文件被占用，请处理列出的进程后重试。".into());
+                        }
+                        task.finish(self.cancel.load(Ordering::Relaxed));
+                        if was_active
+                            && self.notice.is_none()
+                            && self.warning.is_none()
+                            && task.error.is_none()
+                            && self.resume_install.is_none()
+                            && self.blocked.is_none()
+                        {
+                            if self.cancel.load(Ordering::Relaxed) {
+                                self.information = Some("操作已取消".into());
+                            } else {
+                                self.notice =
+                                    Some(format!("{}：{}", task.title, self.tr.t(&task.stage)));
+                            }
+                        }
+                    }
                     self.busy = false;
                     self.critical = false;
                     self.progress.clear();
@@ -2344,7 +4346,13 @@ impl Controller {
                         ));
                     }
                     self.apply_pending_catalog();
-                    self.refresh()
+                    self.refresh();
+                    if let Some(paths) = self.resume_install.take()
+                        && !self.closing
+                        && !self.cancel.load(Ordering::Relaxed)
+                    {
+                        self.perform(false, paths);
+                    }
                 }
                 Event::Checked(result, automatic, token) => {
                     if !Arc::ptr_eq(&token, &self.update_cancel)
@@ -2390,7 +4398,7 @@ impl Controller {
                             }
                         }
                         Err(e) => {
-                            self.update_status = format!("{}：{e}", self.text("检查更新失败"));
+                            self.update_status = e.to_string();
                             self.log(&self.update_status.clone());
                             if !automatic {
                                 self.warning = Some(self.update_status.clone());
@@ -2408,12 +4416,25 @@ impl Controller {
                     self.install_pending = self.install_requested && self.smoke.is_none();
                 }
                 Event::DownloadProgress(p) => {
+                    if let Some(t) = &mut self.tasks.update {
+                        t.download("RTXManager.exe".into(), p.clone());
+                    }
                     if !self.update_cancel.load(Ordering::Relaxed) {
                         self.update_status = p.label().into();
                         self.download_progress = p;
                     }
                 }
                 Event::UpdateDone => {
+                    if let Some(t) = &mut self.tasks.update {
+                        t.finish(self.update_cancel.load(Ordering::Relaxed));
+                        if t.error.is_none() && !self.update_installing && !self.install_pending {
+                            if self.update_cancel.load(Ordering::Relaxed) {
+                                self.information = Some("更新下载已取消".into());
+                            } else {
+                                self.notice = Some(self.update_status.clone());
+                            }
+                        }
+                    }
                     let failed_install = self.update_installing;
                     self.update_busy = false;
                     self.update_installing = false;
@@ -2424,10 +4445,39 @@ impl Controller {
                     }
                 }
                 Event::Installed => {
+                    if let Some(t) = &mut self.tasks.update {
+                        t.finish(false);
+                    }
                     self.update_busy = false;
                     self.update_installing = false;
                     self.closing = true;
                     self.pending_catalog = None;
+                }
+                Event::ResetStartup(result, backup) => {
+                    self.reset_backup = backup;
+                    if let Err(error) = result {
+                        self.warning = Some(format!("{error:#}"));
+                    }
+                }
+                Event::RenamePrepared(result) | Event::ResetPrepared(result) => {
+                    if let Some(t) = &mut self.tasks.work {
+                        if let Err(error) = &result {
+                            t.fail(error.to_string());
+                        }
+                        t.finish(false);
+                    }
+                    self.busy = false;
+                    self.critical = false;
+                    self.update_busy = false;
+                    self.update_installing = false;
+                    self.progress.clear();
+                    match result {
+                        Ok(()) => self.close(),
+                        Err(error) => {
+                            self.warning = Some(format!("{error:#}"));
+                            self.refresh();
+                        }
+                    }
                 }
                 Event::SmokeWritten => self.close(),
                 Event::Saved(result) => match result {
@@ -2443,9 +4493,47 @@ impl Controller {
         changed
     }
 
+    pub fn can_set_hags(&self) -> bool {
+        !self.hags_busy
+            && !self.read_only
+            && !self.closing
+            && self.hags_error.is_none()
+            && self.hags.as_ref().and_then(hags::State::selected).is_some()
+    }
+    pub fn refresh_hags(&mut self) {
+        if self.hags_busy || self.closing {
+            return;
+        }
+        self.hags_busy = true;
+        let cancel = self.hags_cancel.clone();
+        self.channel.job(move |c| {
+            c.send(Event::Hags(hags::detect(&cancel)));
+            Ok(())
+        });
+    }
+    pub fn poll_hags(&mut self) {
+        if self.smoke.is_none() && self.hags_checked.elapsed() >= Duration::from_secs(30) {
+            self.refresh_hags();
+        }
+    }
+    pub fn set_hags(&mut self, enabled: bool) {
+        if !self.can_set_hags()
+            || self.hags.as_ref().and_then(hags::State::selected) == Some(enabled)
+        {
+            return;
+        }
+        self.hags_busy = true;
+        self.hags_writing = true;
+        let cancel = self.hags_cancel.clone();
+        self.channel.job(move |c| {
+            c.send(Event::Hags(hags::configure(enabled, &cancel)));
+            Ok(())
+        });
+    }
     pub fn language(&mut self, code: &str) {
         self.state["language"] = json!(code);
         self.tr = i18n::Translator::new(code);
+        self.library_revision += 1;
         self.save();
     }
     pub fn close(&mut self) {
@@ -2454,12 +4542,41 @@ impl Controller {
         self.install_pending = false;
         self.cancel.store(true, Ordering::Relaxed);
         self.update_cancel.store(true, Ordering::Relaxed);
+        self.hags_cancel.store(true, Ordering::Relaxed);
+        self.names_cancel.store(true, Ordering::Relaxed);
+        self.runtime_catalog_cancel.store(true, Ordering::Relaxed);
+        self.runtime_catalog_generation += 1;
+        self.runtime_catalog_load.loading = false;
+        self.runtime_catalog_load.pending = false;
+        self.pending_runtime_catalog = None;
+    }
+    pub fn close_status(&self) -> &'static str {
+        if self.critical {
+            "正在结束文件操作，请稍候…"
+        } else if self.hags_writing {
+            "正在保存 GPU 调度设置…"
+        } else if self.update_installing {
+            "正在完成管理器更新…"
+        } else {
+            "正在保存设置…"
+        }
     }
     pub fn tick_close(&mut self) {
-        if self.closing && !self.saved && !self.critical && (!self.update_busy || self.checking) {
+        if self.closing
+            && !self.saved
+            && !self.critical
+            && !self.hags_writing
+            // A cancelled update download touches its private cache only and
+            // its HTTP requests stop with this process. Never wait for a network callback
+            // (or signature service) to allow the application to close.
+            && !self.update_installing
+        {
             if let Some(store) = self.store.take() {
                 self.channel.job(move |c| {
-                    c.send(Event::Saved(store.finish()));
+                    let result =
+                        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| store.finish()))
+                            .unwrap_or_else(|_| Err(anyhow::anyhow!("设置保存线程异常")));
+                    c.send(Event::Saved(result));
                     Ok(())
                 });
             } else if self.read_only {
@@ -2472,6 +4589,191 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn upstream_scheme_label_tracks_the_catalog_version() {
+        let (_dir, c) = controller();
+        let mut package = c
+            .catalog
+            .selected(rtx_fg_manager::upstream040::SCHEME)
+            .clone();
+        package.version = "0.4.2".into();
+        package.upstream_version = Some("0.4.2-rc.1".into());
+        assert_eq!(c.cloud_label(&package), "Dlssg_for_sm86 · 0.4.2-rc.1");
+        package.upstream_version = None;
+        assert_eq!(c.cloud_label(&package), "Dlssg_for_sm86 · 0.4.2");
+    }
+    fn runtime_catalog_fixture() -> rtx_fg_manager::runtime_catalog::Catalog {
+        serde_json::from_str(include_str!("../../cloud/runtime-catalog.json")).unwrap()
+    }
+    #[test]
+    fn runtime_catalog_failure_is_visible_and_refresh_can_retry_without_duplicates() {
+        let (_dir, mut c) = controller();
+        let first = c.begin_runtime_catalog_refresh().unwrap();
+        assert!(c.runtime_catalog_load.loading());
+        assert_eq!(c.begin_runtime_catalog_refresh(), None);
+        assert_eq!(c.runtime_catalog_load.message(), "正在加载版本清单…");
+        c.channel.send(Event::RuntimeCatalog(
+            first,
+            Err(anyhow::anyhow!("offline")),
+        ));
+        c.events();
+        assert!(!c.runtime_catalog_load.loading());
+        assert!(c.runtime_catalog_load.failed());
+        assert!(c.runtime_catalog_load.message().contains("内置版本"));
+        assert!(
+            c.runtime_catalog_load
+                .single_version_hint("sr")
+                .contains("重试")
+        );
+        assert_eq!(
+            c.runtime_catalog_load.single_version_hint("xemfg"),
+            "此组件当前仅提供一个版本"
+        );
+        let retry = c.begin_runtime_catalog_refresh().unwrap();
+        assert!(retry > first);
+        assert!(!c.runtime_catalog_load.failed());
+        c.channel.send(Event::RuntimeCatalog(
+            first,
+            Err(anyhow::anyhow!("stale failure")),
+        ));
+        c.events();
+        assert!(c.runtime_catalog_load.loading());
+        assert!(!c.runtime_catalog_load.failed());
+        c.channel
+            .send(Event::RuntimeCatalog(retry, Ok(runtime_catalog_fixture())));
+        c.events();
+        assert!(!c.runtime_catalog_load.loading());
+        assert!(!c.runtime_catalog_load.failed());
+        assert_eq!(c.runtime_catalog_load.message(), "版本清单已更新");
+        assert!(rtx_fg_manager::runtime_files::versions("sr").contains(&"310.9.1".into()));
+    }
+    #[test]
+    fn runtime_catalog_refresh_keeps_cached_versions_and_defers_during_installation() {
+        let (_dir, mut c) = controller();
+        let generation = c.begin_runtime_catalog_refresh().unwrap();
+        c.channel.send(Event::RuntimeCatalogCached(
+            generation,
+            runtime_catalog_fixture(),
+        ));
+        c.events();
+        assert!(c.runtime_catalog_load.usable);
+        assert!(c.runtime_catalog_load.loading());
+        assert!(
+            c.runtime_catalog_load
+                .message()
+                .contains("现有版本仍可使用")
+        );
+        let versions = rtx_fg_manager::runtime_files::versions("sr");
+        c.channel.send(Event::RuntimeCatalog(
+            generation,
+            Err(anyhow::anyhow!("offline")),
+        ));
+        c.events();
+        assert!(c.runtime_catalog_load.message().contains("缓存版本"));
+        assert_eq!(versions, rtx_fg_manager::runtime_files::versions("sr"));
+        let retry = c.begin_runtime_catalog_refresh().unwrap();
+        c.busy = true;
+        c.channel
+            .send(Event::RuntimeCatalog(retry, Ok(runtime_catalog_fixture())));
+        c.events();
+        assert!(c.pending_runtime_catalog.is_some());
+        assert!(c.runtime_catalog_load.message().contains("当前操作完成后"));
+        assert!(c.begin_runtime_catalog_refresh().is_none());
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(c.pending_runtime_catalog.is_none());
+        assert_eq!(c.runtime_catalog_load.message(), "版本清单已更新");
+    }
+    #[test]
+    fn runtime_catalog_closing_cancels_metadata_only_and_ignores_late_results() {
+        let (_dir, mut c) = controller();
+        let generation = c.begin_runtime_catalog_refresh().unwrap();
+        c.cancel.store(true, Ordering::Relaxed);
+        assert!(!c.runtime_catalog_cancel.load(Ordering::Relaxed));
+        c.close();
+        assert!(c.runtime_catalog_cancel.load(Ordering::Relaxed));
+        assert!(!c.runtime_catalog_load.loading());
+        c.channel.send(Event::RuntimeCatalogCached(
+            generation,
+            runtime_catalog_fixture(),
+        ));
+        c.channel.send(Event::RuntimeCatalog(
+            generation,
+            Ok(runtime_catalog_fixture()),
+        ));
+        c.events();
+        assert!(c.pending_runtime_catalog.is_none());
+        assert!(!c.runtime_catalog_load.online);
+        assert!(c.begin_runtime_catalog_refresh().is_none());
+        // If saving preferences prevents closing, a new request must not revive
+        // the cancelled request or leave the refresh button stuck.
+        let cancelled = c.runtime_catalog_cancel.clone();
+        c.closing = false;
+        assert!(c.begin_runtime_catalog_refresh().is_some());
+        assert!(cancelled.load(Ordering::Relaxed));
+        assert!(!c.runtime_catalog_cancel.load(Ordering::Relaxed));
+    }
+    #[test]
+    fn hags_results_are_independent_of_game_preferences_and_failures_are_visible() {
+        let (_dir, mut c) = controller();
+        let state = c.state.clone();
+        let running = hags::Adapter {
+            supported: Some(true),
+            enabled: Some(false),
+            ..Default::default()
+        };
+        c.channel.send(Event::Hags(Ok(hags::classify(
+            vec![running.clone()],
+            Some(2),
+            26100,
+        ))));
+        c.events();
+        assert!(c.can_set_hags());
+        assert_eq!(c.hags.as_ref().unwrap().selected(), Some(true));
+        assert!(c.hags.as_ref().unwrap().needs_restart());
+        c.hags_busy = true;
+        c.hags_writing = true;
+        c.set_hags(false); // Duplicate requests while busy must not spawn a real writer.
+        c.channel
+            .send(Event::Hags(Err(anyhow::anyhow!("access denied"))));
+        c.events();
+        assert!(!c.hags_busy && !c.hags_writing);
+        assert!(!c.can_set_hags());
+        assert!(c.hags_error.is_some());
+        assert_eq!(c.hags.as_ref().unwrap().selected(), Some(true));
+        c.channel.send(Event::Hags(Ok(hags::classify(
+            vec![running],
+            Some(1),
+            26100,
+        ))));
+        c.events();
+        assert!(!c.hags.as_ref().unwrap().needs_restart());
+        assert!(c.hags_error.is_none());
+        assert_eq!(c.state, state);
+        c.read_only = true;
+        assert!(!c.can_set_hags());
+        c.close();
+        assert!(c.hags_cancel.load(Ordering::Relaxed));
+        assert!(!c.can_set_hags());
+    }
+    #[test]
+    fn nr_changes_invalidate_display_cache_without_hashing_runtime() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let exe = dir.path().join("game.exe");
+        std::fs::write(&exe, b"fixture")?;
+        let target = core::DeploymentTarget::for_game(&exe);
+        let before = display_stamp(&target)?;
+        std::fs::write(dir.path().join("nvngx_dlssnr.dll"), b"runtime fixture")?;
+        let installed = display_stamp(&target)?;
+        assert_ne!(before, installed);
+        std::fs::create_dir(dir.path().join(".rtx-fg-nr"))?;
+        std::fs::write(dir.path().join(".rtx-fg-nr/ownership.json"), b"{}")?;
+        assert_ne!(installed, display_stamp(&target)?);
+        std::fs::remove_file(dir.path().join("nvngx_dlssnr.dll"))?;
+        assert_ne!(installed, display_stamp(&target)?);
+        Ok(())
+    }
+
     #[test]
     fn grouped_encore_settings_read_rendering_directory_and_failed_read_preserves_last_values() {
         use rtx_fg_manager::encore;
@@ -2487,7 +4789,7 @@ mod tests {
         assert_eq!(parameter_target(&game).directory, render_dir);
         assert_eq!(
             read_json_preset_values(&parameter_target(&game), encore::PROFILE).unwrap(),
-            encore::defaults()
+            encore::read(encore::DEFAULT_CONFIG).unwrap()
         );
         let exe = game.exe.clone();
         c.games = vec![game];
@@ -2519,6 +4821,96 @@ mod tests {
         assert!(c.warning.is_none());
         c.close();
         c.tick_close();
+    }
+    #[test]
+    fn partial_multi_folder_parameter_apply_keeps_pending_edits_for_retry() {
+        use rtx_fg_manager::encore;
+        let (_dir, mut c) = controller();
+        let exe = "Multi.exe";
+        let scheme = encore::SCHEME;
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: exe.into(),
+            targets: vec!["A/Game.exe".into(), "B/Game.exe".into()],
+            ..Default::default()
+        }];
+        let disk = encore::defaults();
+        c.disk_presets
+            .insert((exe.into(), scheme.into()), disk.clone());
+        c.set_game_option(exe, "tf_mode", "4");
+        assert!(c.preset_dirty(exe));
+        let mut first_directory = disk;
+        first_directory.insert("tf_mode".into(), "4".into());
+        // The first directory succeeded, but the second could not be written.
+        c.channel.send(Event::PresetRead {
+            profile: None,
+            exe: exe.into(),
+            values: Some((scheme.into(), first_directory)),
+            running: false,
+            epoch: c.status_epoch,
+            consistent: false,
+        });
+        c.events();
+        assert!(
+            c.preset_dirty(exe),
+            "a primary-directory read must not erase a partial failure"
+        );
+        assert_eq!(
+            c.explicit_preset_values(exe, scheme)
+                .get("tf_mode")
+                .map(String::as_str),
+            Some("4")
+        );
+        c.channel.send(Event::PresetApplied(
+            exe.into(),
+            scheme.into(),
+            c.preset_values(exe),
+        ));
+        c.events();
+        assert!(!c.preset_dirty(exe));
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn parameter_snapshot_requires_every_folder_to_match_before_discarding_edits() {
+        use rtx_fg_manager::{encore, presets::Values};
+        let catalog = cloud::bundled();
+        let game = Game {
+            exe: "Launcher.exe".into(),
+            targets: vec!["A/Game.exe".into(), "B/Game.exe".into()],
+            ..Default::default()
+        };
+        let full = Some((
+            encore::SCHEME.into(),
+            rtx_fg_manager::presets::defaults(
+                encore::PROFILE,
+                &catalog.scheme_policies[encore::SCHEME].defaults,
+            ),
+        ));
+        for other in [
+            Ok(None),
+            Err(anyhow::anyhow!("second directory is locked")),
+            Ok(Some((
+                encore::SCHEME.into(),
+                Values::from([("tf_mode".into(), "4".into())]),
+            ))),
+        ] {
+            let mut reads = vec![Ok(full.clone()), other].into_iter();
+            let snapshot =
+                inspect_game_parameters(&game, &catalog, |_, _| reads.next().unwrap()).unwrap();
+            assert_eq!(snapshot.values, full);
+            assert!(!snapshot.consistent);
+        }
+        // Omitted default fields and explicit defaults are semantically equal.
+        let mut reads = vec![
+            Ok(full.clone()),
+            Ok(Some((encore::SCHEME.into(), Values::new()))),
+        ]
+        .into_iter();
+        let snapshot =
+            inspect_game_parameters(&game, &catalog, |_, _| reads.next().unwrap()).unwrap();
+        assert!(snapshot.consistent);
+        assert!(reads.next().is_none());
     }
     #[test]
     fn encore_dirty_fields_merge_over_latest_menu_values_and_clear_after_apply() {
@@ -2553,12 +4945,14 @@ mod tests {
         );
         disk.insert("reflexFrameLimit".into(), "141".into());
         disk.insert("tf_mode".into(), "2".into());
-        c.channel.send(Event::PresetRead(
-            "Encore-A.exe".into(),
-            Some((scheme.into(), disk)),
-            false,
-            c.status_epoch,
-        ));
+        c.channel.send(Event::PresetRead {
+            profile: None,
+            exe: "Encore-A.exe".into(),
+            values: Some((scheme.into(), disk)),
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.preset_values("Encore-A.exe")["reflexFrameLimit"], "141");
         assert_eq!(c.preset_values("Encore-A.exe")["tf_mode"], "4");
@@ -2735,7 +5129,7 @@ mod tests {
                     c.rx.recv_timeout(deadline.saturating_duration_since(Instant::now()))
                         .expect("operation completed");
                 match event {
-                    Event::Warning(message) => {
+                    Event::Warning(message) | Event::TaskWarning(_, message) => {
                         blocked |= message.contains("不能部署到管理器缓存或设置目录");
                     }
                     Event::Log(message) => cleaned |= message.contains("未发现可确认归属的补丁"),
@@ -2758,7 +5152,7 @@ mod tests {
         c.tick_close();
     }
     #[test]
-    fn series_switch_selects_compatible_scheme_without_affecting_other_games() {
+    fn series_switch_preserves_free_scheme_choice_without_affecting_other_games() {
         let (_dir, mut c) = controller();
         c.games = vec![
             Game {
@@ -2784,9 +5178,10 @@ mod tests {
         assert_eq!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
         assert_eq!(c.proxies(), ["dxgi.dll"]);
         c.set_selection("rtx40mfg-1.3.3-hf2".into(), 0, vec!["version.dll".into()]);
-        assert_eq!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
+        assert_eq!(c.cloud_scheme(), "rtx40mfg-1.3.3-hf2");
+        assert_eq!(c.proxies(), ["version.dll"]);
         c.focus = Some("B.exe".into());
-        assert_ne!(c.cloud_scheme(), "dlssg-transfusion-1.4.5.3");
+        assert_ne!(c.cloud_scheme(), "rtx40mfg-1.3.3-hf2");
     }
     #[test]
     fn custom_folder_event_keeps_grouped_paths_for_restoration_and_rescan() {
@@ -2829,15 +5224,13 @@ mod tests {
             ("A.exe", "upstream-0.3.5-310-9", "d3d12.dll"),
             ("B.exe", "rtxfg-0.3.5-dx12-vulkan", "version.dll"),
         ] {
-            c.deployments.insert(
-                exe.into(),
-                rtx_fg_manager::deployment::Snapshot {
-                    total: 1,
-                    installed: 1,
-                    common: Some((scheme.into(), vec![proxy.into()], None)),
-                    ..Default::default()
-                },
-            );
+            c.deployments.insert(exe.into(), {
+                let mut snapshot = rtx_fg_manager::deployment::Snapshot::default();
+                snapshot.total = 1;
+                snapshot.installed = 1;
+                snapshot.common = Some((scheme.into(), vec![proxy.into()], None));
+                snapshot
+            });
         }
         c.focus = Some("A.exe".into());
         assert_eq!(c.cloud_scheme(), "upstream-0.3.5-310-9");
@@ -2848,15 +5241,17 @@ mod tests {
         assert_eq!(c.cloud_scheme(), "rtxfg-0.3.5-dx12-vulkan");
         assert_eq!(c.proxies(), vec!["version.dll"]);
         assert_eq!(c.preset_values("B.exe")["logging_level"], "1");
-        c.channel.send(Event::PresetRead(
-            "A.exe".into(),
-            Some((
+        c.channel.send(Event::PresetRead {
+            profile: None,
+            exe: "A.exe".into(),
+            values: Some((
                 "upstream-0.3.5-310-9".into(),
                 BTreeMap::from([("logging_level".into(), "0".into())]),
             )),
-            false,
-            c.status_epoch,
-        ));
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.cloud_scheme(), "rtxfg-0.3.5-dx12-vulkan");
         c.focus = Some("A.exe".into());
@@ -2871,6 +5266,117 @@ mod tests {
         c.close();
         c.tick_close();
     }
+    #[test]
+    fn preset_roundtrip_without_install_is_clean_and_discard_never_persists_a_draft() {
+        let (_dir, mut c) = controller();
+        let exe = "Draft.exe";
+        let scheme = rtx_fg_manager::encore::SCHEME;
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        let original = c.preset_values(exe);
+        let old = original["nrEnabled"].clone();
+        let changed = if old == "1" { "0" } else { "1" };
+        c.set_game_option(exe, "nrEnabled", changed);
+        assert!(c.preset_dirty(exe));
+        assert_eq!(c.state["games"][0]["preset_dirty"][scheme], false);
+        assert_eq!(
+            c.state["games"][0]["preset_options_v2"][scheme]["nrEnabled"],
+            old
+        );
+        c.set_game_option(exe, "nrEnabled", &old);
+        assert!(!c.preset_dirty(exe));
+        c.set_game_option(exe, "nrEnabled", changed);
+        c.discard_presets(Some((exe, scheme)));
+        assert_eq!(c.preset_values(exe), original);
+        assert!(!c.preset_dirty(exe));
+        assert!(c.first_pending_preset().is_none());
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn composite_encore_choice_is_atomic_and_draft_only() {
+        let (_dir, mut c) = controller();
+        let exe = "Added.exe";
+        let scheme = rtx_fg_manager::encore::SCHEME;
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        let original = c.preset_values(exe);
+        c.set_game_options(
+            exe,
+            &BTreeMap::from([
+                ("dlssWithoutGameDlss".into(), "1".into()),
+                ("dlssWithoutGameDlssEngine".into(), "invalid".into()),
+            ]),
+        );
+        assert_eq!(c.preset_values(exe), original);
+        assert!(!c.preset_dirty(exe));
+        c.set_game_options(
+            exe,
+            &BTreeMap::from([
+                ("dlssWithoutGameDlss".into(), "1".into()),
+                ("dlssWithoutGameDlssEngine".into(), "xess".into()),
+            ]),
+        );
+        assert_eq!(c.preset_values(exe)["dlssWithoutGameDlss"], "1");
+        assert_eq!(c.preset_values(exe)["dlssWithoutGameDlssEngine"], "xess");
+        assert!(c.preset_dirty(exe));
+        assert_eq!(
+            c.state["games"][0]["preset_options_v2"][scheme]["dlssWithoutGameDlss"],
+            original["dlssWithoutGameDlss"]
+        );
+        c.discard_presets(Some((exe, scheme)));
+        assert_eq!(c.preset_values(exe), original);
+        assert!(!c.preset_dirty(exe));
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn preset_roundtrip_partial_disk_and_stale_other_scheme_drafts() {
+        let (_dir, mut c) = controller();
+        let exe = "Draft.exe";
+        let scheme = rtx_fg_manager::encore::SCHEME;
+        c.state["cloud_scheme"] = json!(scheme);
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        c.disk_presets.insert(
+            (exe.into(), scheme.into()),
+            BTreeMap::from([("tf_mode".into(), "3".into())]),
+        );
+        let old = c.preset_values(exe)["nrEnabled"].clone();
+        c.set_game_option(exe, "nrEnabled", if old == "1" { "0" } else { "1" });
+        c.set_game_option(exe, "nrEnabled", &old);
+        assert!(!c.preset_dirty(exe));
+        c.games[0].extra.insert(
+            "preset_dirty".into(),
+            json!({scheme:true,"obsolete-scheme":true}),
+        );
+        c.games[0].extra.insert(
+            "preset_options_v2".into(),
+            json!({scheme:{"tf_mode":"5"},"obsolete-scheme":{}}),
+        );
+        c.discard_presets(None);
+        assert_eq!(c.preset_values(exe)["tf_mode"], "3");
+        assert!(c.first_pending_preset().is_none());
+        assert_eq!(
+            c.state["games"][0]["preset_dirty"]["obsolete-scheme"],
+            false
+        );
+        c.close();
+        c.tick_close();
+    }
+
     fn controller() -> (tempfile::TempDir, Controller) {
         let dir = tempfile::tempdir().unwrap();
         let c = Controller::new(
@@ -2880,6 +5386,245 @@ mod tests {
             Some(dir.path().join("test.json")),
         );
         (dir, c)
+    }
+
+    #[test]
+    fn first_scan_waits_for_update_then_prompts_once() {
+        let (dir, mut c) = controller();
+        c.state["welcome_pending"] = json!(true);
+        assert!(
+            !c.initial_scan_ready(),
+            "upgrades must not become first runs"
+        );
+        c.state["initial_scan_pending"] = json!(true);
+        c.checking = true;
+        assert!(
+            !c.initial_scan_ready(),
+            "wait for the startup update result"
+        );
+        c.checking = false;
+        c.update_offer = true;
+        assert!(!c.initial_scan_ready(), "offer the update before scanning");
+        c.update_offer = false;
+        assert!(c.initial_scan_ready());
+        c.update_busy = true;
+        assert!(!c.initial_scan_ready());
+        c.update_busy = false;
+        c.install_pending = true;
+        assert!(!c.initial_scan_ready());
+        c.install_pending = false;
+        c.update_installing = true;
+        assert!(!c.initial_scan_ready());
+        c.update_installing = false;
+        c.busy = true;
+        assert!(!c.initial_scan_ready());
+        c.busy = false;
+        c.read_only = true;
+        assert!(!c.initial_scan_ready());
+        c.read_only = false;
+        c.games.push(Game {
+            exe: "test.exe".into(),
+            ..Default::default()
+        });
+        assert!(!c.initial_scan_ready());
+        c.games.clear();
+        c.dismiss_initial_scan();
+        assert!(!c.initial_scan_ready());
+        assert!(!c.update_offer);
+        c.store.take().unwrap().finish().unwrap();
+        assert_eq!(
+            preferences::load(dir.path()).unwrap()["initial_scan_pending"],
+            false
+        );
+    }
+
+    #[test]
+    fn first_scan_is_not_lost_when_startup_check_is_current_or_offline() {
+        for result in [Ok(None), Err(anyhow::anyhow!("offline"))] {
+            let (_dir, mut c) = controller();
+            c.state["initial_scan_pending"] = json!(true);
+            c.checking = true;
+            c.update_busy = true;
+            assert!(!c.initial_scan_ready());
+            c.channel
+                .send(Event::Checked(result, true, c.update_cancel.clone()));
+            c.events();
+            assert!(c.initial_scan_ready());
+            assert_eq!(c.state["initial_scan_pending"], true);
+        }
+    }
+
+    #[test]
+    fn scan_details_clear_on_cancel_and_do_not_leak_into_other_operations() {
+        let (_dir, mut c) = controller();
+        c.begin_work("扫描游戏");
+        c.channel.send(Event::ScanProgress(ScanProgress {
+            directories: 12,
+            skipped: 2,
+            path: "C:\\Games".into(),
+        }));
+        c.events();
+        assert_eq!(c.scan_progress.as_ref().unwrap().directories, 12);
+        assert_eq!(c.scan_progress.as_ref().unwrap().path, "C:\\Games");
+        c.cancel.store(true, Ordering::Relaxed);
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(!c.busy);
+        assert!(c.scan_progress.is_none());
+        c.channel.send(Event::ScanProgress(ScanProgress::default()));
+        c.events();
+        assert!(
+            c.scan_progress.is_none(),
+            "late scan feedback is ignored while idle"
+        );
+        c.begin_work("运行库");
+        assert!(c.scan_progress.is_none());
+    }
+    #[test]
+    fn game_names_preserve_manual_overrides_across_scan_cache_and_restart() {
+        let (dir, mut c) = controller();
+        let root = dir.path().join("Game");
+        std::fs::create_dir_all(&root).unwrap();
+        let exe = root.join("game.exe").display().to_string();
+        let game = Game {
+            exe: exe.clone(),
+            root: root.display().to_string(),
+            title: "The Witcher 3".into(),
+            ..Default::default()
+        };
+        c.games = vec![game.clone()];
+        c.set_game_name(&exe, Some("我的猎魔人")).unwrap();
+        c.channel
+            .send(Event::GameNamesCached(game_names::bundled()));
+        c.events();
+        c.merge_scan(vec![game]);
+        assert_eq!(c.game_name(&c.games[0]), "我的猎魔人");
+        let generation = c.names_generation;
+        c.channel.send(Event::GameIdentities(
+            generation,
+            vec![(
+                exe.clone(),
+                root.display().to_string(),
+                json!({"keys":["steam:292030"],"title":"The Witcher 3"}),
+            )],
+        ));
+        c.events();
+        assert_eq!(c.game_name(&c.games[0]), "我的猎魔人");
+        let state = c.state.clone();
+        let mut reopened = Controller::new(
+            dir.path().join("reopened"),
+            state,
+            None,
+            Some(dir.path().join("smoke.json")),
+        );
+        assert_eq!(reopened.game_name(&reopened.games[0]), "我的猎魔人");
+        reopened.set_game_name(&exe, None).unwrap();
+        assert_eq!(reopened.game_name(&reopened.games[0]), "巫师3：狂猎");
+        reopened.language("en");
+        assert_eq!(reopened.game_name(&reopened.games[0]), "The Witcher 3");
+        c.close();
+        c.tick_close();
+        reopened.close();
+        reopened.tick_close();
+    }
+    #[test]
+    fn stale_name_reads_and_removed_games_cannot_be_renamed() {
+        let (_dir, mut c) = controller();
+        c.games = vec![Game {
+            exe: "A.exe".into(),
+            root: "A".into(),
+            ..Default::default()
+        }];
+        c.names_generation = 2;
+        c.channel.send(Event::GameIdentities(
+            1,
+            vec![("A.exe".into(), "A".into(), json!({"keys":["steam:292030"]}))],
+        ));
+        c.channel.send(Event::GameIdentities(
+            2,
+            vec![(
+                "A.exe".into(),
+                "different root".into(),
+                json!({"keys":["steam:292030"]}),
+            )],
+        ));
+        c.events();
+        assert!(game_names::keys(&c.games[0]).is_empty());
+        assert!(c.set_game_name("removed.exe", Some("Name")).is_err());
+        assert!(c.set_game_name("A.exe", Some("bad\nname")).is_err());
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn reorder_preserves_selection_and_saved_game_data() {
+        let (_dir, mut c) = controller();
+        c.games = ["A", "B", "C"]
+            .map(|name| Game {
+                exe: format!("{name}.exe"),
+                title: name.into(),
+                extra: serde_json::from_value(json!({"custom": name})).unwrap(),
+                ..Default::default()
+            })
+            .to_vec();
+        c.focus = Some("B.exe".into());
+        c.selected.insert("A.exe".into());
+        c.reorder_game("A.exe", "C.exe", true);
+        assert_eq!(
+            c.games.iter().map(|g| g.title.as_str()).collect::<Vec<_>>(),
+            ["B", "C", "A"]
+        );
+        c.reorder_game("A.exe", "B.exe", false);
+        assert_eq!(
+            c.games.iter().map(|g| g.title.as_str()).collect::<Vec<_>>(),
+            ["A", "B", "C"]
+        );
+        assert_eq!(c.focus.as_deref(), Some("B.exe"));
+        assert_eq!(c.selected, BTreeSet::from(["A.exe".into()]));
+        assert_eq!(c.games[0].extra["custom"], "A");
+        assert_eq!(c.state["games"], serde_json::to_value(&c.games).unwrap());
+        let revision = c.library_revision;
+        c.reorder_game("A.exe", "B.exe", false);
+        c.reorder_game("missing.exe", "B.exe", true);
+        c.busy = true;
+        c.reorder_game("A.exe", "C.exe", true);
+        c.busy = false;
+        assert_eq!(c.library_revision, revision);
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn rescan_preserves_manual_order_and_appends_new_games() {
+        let (dir, mut c) = controller();
+        let rows = ["A", "B", "C"].map(|name| {
+            let root = dir.path().join("Steam/steamapps/common").join(name);
+            std::fs::create_dir_all(&root).unwrap();
+            let exe = root.join(format!("{name}.exe")).display().to_string();
+            Game {
+                exe: exe.clone(),
+                title: name.into(),
+                root: root.display().to_string(),
+                targets: vec![exe],
+                ..Default::default()
+            }
+        });
+        c.games = vec![rows[1].clone(), rows[0].clone()];
+        c.merge_scan(rows.to_vec());
+        assert_eq!(
+            c.games.iter().map(|g| g.title.as_str()).collect::<Vec<_>>(),
+            ["B", "A", "C"]
+        );
+        assert_eq!(c.state["games"], serde_json::to_value(&c.games).unwrap());
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn process_retry_rejects_changed_game_or_options() {
+        let (_dir, mut c) = controller();
+        let request = c.retry_request(RetryAction::RemoveNr);
+        c.focus = Some("different-game.exe".into());
+        c.retry_operation(request);
+        assert!(!c.busy);
+        assert!(c.warning.as_deref().unwrap().contains("已变化"));
     }
     #[test]
     fn busy_catalog_refresh_keeps_latest_success_until_operation_finishes() {
@@ -3000,11 +5745,52 @@ mod tests {
                         .any(|s| s.contains("成功 0，失败 1，未处理 0"))
                 );
                 assert_eq!(std::fs::read(&stage).unwrap(), pe[..100]);
-                assert!(core::record(game.path()).unwrap().unwrap().cache_pending);
-                // Only the synthetic test fragment is removed; recovery is retried normally.
-                std::fs::remove_file(&stage).unwrap();
+                let record = core::record(game.path()).unwrap().unwrap();
+                assert!(record.cache_pending && !record.cleanup_pending_reasons.is_empty());
+                c.focus = Some(exe.clone());
+                // Preview and cancel are read-only. A changed selection must
+                // invalidate confirmation, even while the old dialog exists.
+                for action in ["cancel", "changed-focus", "confirm"] {
+                    c.preview_cleanup_deletion();
+                    let deadline = Instant::now() + Duration::from_secs(5);
+                    while c.busy {
+                        c.events();
+                        assert!(Instant::now() < deadline);
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    assert_eq!(
+                        c.confirm.take().as_deref(),
+                        Some("delete_cleanup"),
+                        "action={action}, warning={:?}, logs={:?}",
+                        c.warning,
+                        c.logs
+                    );
+                    assert!(c.cleanup_deletion_list().contains("version.dll.stage"));
+                    if action == "cancel" {
+                        c.cancel_patch();
+                        assert!(stage.exists());
+                    } else if action == "changed-focus" {
+                        c.focus = None;
+                        c.confirm_cleanup_deletion();
+                        assert!(c.warning.as_deref().unwrap().contains("已变化"));
+                        assert!(stage.exists());
+                        c.focus = Some(exe.clone());
+                    } else {
+                        c.warning = None;
+                        c.confirm_cleanup_deletion();
+                        let deadline = Instant::now() + Duration::from_secs(5);
+                        while c.busy {
+                            c.events();
+                            assert!(Instant::now() < deadline);
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                        assert!(c.warning.is_none(), "{:?}", c.warning);
+                        assert!(!stage.exists());
+                        assert!(core::record(game.path()).unwrap().is_none());
+                    }
+                }
             } else {
-                assert!(c.warning.is_none());
+                assert!(c.warning.is_none(), "{:?}", c.warning);
                 assert!(
                     c.logs
                         .iter()
@@ -3031,6 +5817,57 @@ mod tests {
         assert!(c.store.is_none());
         assert!(c.cancel.load(Ordering::Relaxed));
         assert!(c.update_cancel.load(Ordering::Relaxed));
+    }
+    #[test]
+    fn close_does_not_require_cancelled_update_download_callback() {
+        let (_dir, mut c) = controller();
+        c.update_busy = true;
+        c.checking = false;
+        c.update_installing = false;
+        c.close();
+        c.tick_close();
+        assert!(c.store.is_none());
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while !c.saved && Instant::now() < deadline {
+            c.events();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(c.saved, "a stalled download must not trap safe exit");
+    }
+    #[test]
+    fn close_still_waits_for_installer_and_hags_write() {
+        let (_dir, mut c) = controller();
+        c.update_installing = true;
+        c.close();
+        c.tick_close();
+        assert!(c.store.is_some());
+        c.update_installing = false;
+        c.hags_writing = true;
+        c.tick_close();
+        assert!(c.store.is_some());
+        c.hags_writing = false;
+        c.tick_close();
+        assert!(c.store.is_none());
+    }
+    #[test]
+    fn rename_failure_releases_operation_guards_and_success_saves_before_exit() {
+        let (_dir, mut c) = controller();
+        c.busy = true;
+        c.critical = true;
+        c.update_busy = true;
+        c.update_installing = true;
+        c.channel
+            .send(Event::RenamePrepared(Err(anyhow::anyhow!("name conflict"))));
+        c.events();
+        assert!(!c.busy && !c.critical && !c.update_busy && !c.update_installing);
+        assert!(!c.closing);
+        assert_eq!(c.warning.as_deref(), Some("name conflict"));
+        c.channel.send(Event::RenamePrepared(Ok(())));
+        c.events();
+        assert!(c.closing);
+        assert!(c.runtime_catalog_cancel.load(Ordering::Relaxed));
+        c.tick_close();
+        assert!(c.store.is_none());
     }
     #[test]
     fn cancelled_update_cannot_publish_stale_result_or_restart_download() {
@@ -3141,14 +5978,132 @@ mod tests {
     #[test]
     fn failed_operation_always_completes() {
         let (tx, rx) = mpsc::channel();
-        let c = Channel { tx };
+        let c = Channel {
+            tx,
+            task_scope: None,
+        };
         c.operation(|_| anyhow::bail!("fixture error"));
         let events = [
             rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
             rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap(),
         ];
-        assert!(events.iter().any(|e| matches!(e, Event::Done)));
-        assert!(events.iter().any(|e| matches!(e, Event::Warning(_))));
+        assert!(
+            matches!(&events[0], Event::TaskWarning(false, message) if message == "fixture error")
+        );
+        assert!(matches!(&events[1], Event::Done));
+    }
+
+    #[test]
+    fn cancelled_operation_reports_info_once_and_keeps_genuine_failures() {
+        let (_dir, mut c) = controller();
+        c.begin_work("Download fixture");
+        c.channel.send(Event::TaskCancelled(false));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.information.take().as_deref(), Some("操作已取消"));
+        assert!(c.warning.is_none());
+        assert!(c.tasks.work.as_ref().unwrap().error.is_none());
+        assert!(!c.busy);
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(c.information.is_none());
+        c.begin_work("Failing fixture");
+        c.channel
+            .send(Event::TaskWarning(false, "Checksum mismatch".into()));
+        c.channel.send(Event::TaskCancelled(false));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.warning.as_deref(), Some("Checksum mismatch"));
+        assert!(c.information.is_none());
+        assert_eq!(c.tasks.work.as_ref().unwrap().stage, "操作未完成");
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn encore_default_language_tracks_resolved_manager_locale_but_keeps_game_choice() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::encore::SCHEME;
+        let exe = "LocaleFixture.exe";
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        for (setting, expected) in [("zh-CN", "zh-CN"), ("en", "en"), ("ja", "en")] {
+            c.tr = i18n::Translator::new(setting);
+            assert_eq!(c.preset_values_for(exe, scheme)["menuLanguage"], expected);
+        }
+        c.tr = i18n::Translator::new("system");
+        let expected = if c.tr.language == "zh-CN" {
+            "zh-CN"
+        } else {
+            "en"
+        };
+        assert_eq!(c.preset_values_for(exe, scheme)["menuLanguage"], expected);
+        c.tr = i18n::Translator::new("zh-CN");
+        c.disk_presets.insert(
+            (exe.into(), scheme.into()),
+            BTreeMap::from([("menuLanguage".into(), "fr".into())]),
+        );
+        assert_eq!(c.preset_values_for(exe, scheme)["menuLanguage"], "fr");
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn panicked_operation_reports_failure_before_completion() {
+        let (tx, rx) = mpsc::channel();
+        Channel {
+            tx,
+            task_scope: None,
+        }
+        .operation(|_| panic!("fixture panic"));
+        assert!(matches!(
+            rx.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Event::TaskWarning(false, _)
+        ));
+        assert!(matches!(
+            rx.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Event::Done
+        ));
+    }
+    #[test]
+    fn concurrent_tasks_receive_only_their_own_failures() {
+        let (_dir, mut c) = controller();
+        c.begin_work("fixture work");
+        c.tasks.start(true, "fixture update".into());
+        c.update_busy = true;
+        c.channel
+            .send(Event::Warning("background catalog unavailable".into()));
+        c.events();
+        assert!(c.tasks.work.as_ref().unwrap().error.is_none());
+        assert!(c.tasks.update.as_ref().unwrap().error.is_none());
+        c.channel
+            .send(Event::TaskWarning(true, "update failed".into()));
+        c.channel.send(Event::UpdateDone);
+        c.events();
+        assert!(c.tasks.work.as_ref().unwrap().active);
+        assert!(c.tasks.work.as_ref().unwrap().error.is_none());
+        assert_eq!(c.tasks.update.as_ref().unwrap().stage, "操作未完成");
+        c.channel
+            .send(Event::TaskWarning(false, "work failed".into()));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.tasks.work.as_ref().unwrap().stage, "操作未完成");
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn completion_feedback_is_not_replayed_by_unrelated_operations() {
+        let (_dir, mut c) = controller();
+        c.begin_work("fixture work");
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(c.notice.take().is_some());
+        c.channel.send(Event::Done);
+        c.events();
+        assert!(c.notice.is_none());
+        c.close();
+        c.tick_close();
     }
     #[test]
     fn only_known_undeployed_single_game_skips_remove_confirmation() {
@@ -3194,11 +6149,60 @@ mod tests {
         assert!(c.selected.is_empty());
         assert_eq!(c.targets(), BTreeSet::from(["a".into()]));
         c.selected = BTreeSet::from(["b".into(), "c".into(), "stale".into()]);
-        assert_eq!(c.targets(), BTreeSet::from(["b".into(), "c".into()]));
+        assert_eq!(c.targets(), BTreeSet::from(["a".into()]));
         c.focus = Some("b".into());
-        assert_eq!(c.targets(), BTreeSet::from(["b".into(), "c".into()]));
+        assert_eq!(c.targets(), BTreeSet::from(["b".into()]));
+        assert_eq!(
+            c.selected,
+            BTreeSet::from(["b".into(), "c".into(), "stale".into()])
+        );
         c.close();
         c.tick_close();
+    }
+    #[test]
+    fn inspector_patch_ignores_checked_rows_and_keeps_each_games_profile() {
+        let (dir, mut c) = controller();
+        let a = dir.path().join("A/A.exe").display().to_string();
+        let b = dir.path().join("B/B.exe").display().to_string();
+        c.games = [&a, &b]
+            .into_iter()
+            .map(|exe| Game {
+                exe: exe.clone(),
+                ..Default::default()
+            })
+            .collect();
+        c.focus = Some(a.clone());
+        c.set_selection(
+            rtx_fg_manager::encore::SCHEME.into(),
+            1,
+            vec!["version.dll".into()],
+        );
+        c.selected.insert(a.clone());
+        c.focus = Some(b.clone());
+        c.set_selection("rtx40mfg-1.3.3-hf2".into(), 1, vec!["winmm.dll".into()]);
+        assert_eq!(c.scheme_for(Some(&a)), rtx_fg_manager::encore::SCHEME);
+        assert_eq!(c.scheme_for(Some(&b)), "rtx40mfg-1.3.3-hf2");
+        assert_eq!(c.proxies_for(Some(&b)), vec!["winmm.dll"]);
+        assert_eq!(c.patch_targets(false), BTreeSet::from([b.clone()]));
+        assert_eq!(c.patch_targets(true), BTreeSet::from([b.clone()]));
+        c.request_patch(false);
+        assert!(c.busy && c.critical);
+        assert_eq!(c.patch_summary.as_ref().unwrap().total, 1);
+        assert_eq!(c.statuses.get(&b).map(String::as_str), Some("正在安装…"));
+        assert!(!c.statuses.contains_key(&a));
+        assert!(
+            c.encore_install.is_none(),
+            "A's Encore selection must not start an Encore plan for B"
+        );
+        c.close();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while c.critical && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+            c.events();
+        }
+        assert!(!c.critical);
+        c.tick_close();
+        assert!(!dir.path().join("A").exists() && !dir.path().join("B").exists());
     }
     #[test]
     fn rescan_folds_legacy_entries_and_keeps_parameters_and_old_cleanup_path() {
@@ -3252,7 +6256,7 @@ mod tests {
         assert_eq!(c.games.len(), 1);
         assert_eq!(c.focus.as_deref(), Some(renderer.as_str()));
         assert_eq!(c.selected, BTreeSet::from([renderer.clone()]));
-        assert_eq!(c.target_game_count(), 1);
+        assert_eq!(c.target_games().len(), 1);
         assert_eq!(c.patch_targets(false), BTreeSet::from([renderer.clone()]));
         assert_eq!(
             c.patch_targets(true),
@@ -3283,7 +6287,7 @@ mod tests {
             ..Default::default()
         }];
         c.focus = Some(c.games[0].exe.clone());
-        assert_eq!(c.target_game_count(), 1);
+        assert_eq!(c.target_games().len(), 1);
         assert_eq!(c.patch_targets(false).len(), 2);
         assert_eq!(c.patch_targets(true).len(), 3);
         c.close();
@@ -3335,8 +6339,14 @@ mod tests {
             },
         ];
         c.selected = BTreeSet::from([first.clone(), second]);
-        assert_eq!(c.patch_targets(false), BTreeSet::from([first.clone()]));
-        assert_eq!(c.patch_targets(true), BTreeSet::from([first]));
+        for clean in [false, true] {
+            c.request_checked_patch(clean);
+            assert_eq!(
+                c.pending_patch.as_ref().unwrap().targets,
+                BTreeSet::from([first.clone()])
+            );
+            c.cancel_patch();
+        }
         c.close();
         c.tick_close();
     }
@@ -3363,15 +6373,13 @@ mod tests {
             .insert(first.clone(), "已部署 1/2 个目录，请检查未完成项".into());
         assert!(!c.can_apply_parameters());
         let scheme = c.cloud_scheme();
-        c.deployments.insert(
-            first.clone(),
-            rtx_fg_manager::deployment::Snapshot {
-                total: 2,
-                installed: 1,
-                common: Some((scheme.clone(), vec!["version.dll".into()], None)),
-                ..Default::default()
-            },
-        );
+        c.deployments.insert(first.clone(), {
+            let mut snapshot = rtx_fg_manager::deployment::Snapshot::default();
+            snapshot.total = 2;
+            snapshot.installed = 1;
+            snapshot.common = Some((scheme.clone(), vec!["version.dll".into()], None));
+            snapshot
+        });
         assert!(!c.can_apply_parameters());
         c.statuses.insert(first.clone(), "已部署 2/2 个目录".into());
         c.deployments.get_mut(&first).unwrap().installed = 2;
@@ -3505,7 +6513,7 @@ mod tests {
             .collect();
         c.selected = BTreeSet::from(["A.exe".into(), "B.exe".into()]);
         for clean in [false, true] {
-            c.request_patch(clean);
+            c.request_checked_patch(clean);
             assert!(!c.busy && !c.critical);
             assert_eq!(
                 c.confirm.as_deref(),
@@ -3541,10 +6549,369 @@ mod tests {
         assert_eq!(a["optimized"], "0");
         assert_eq!(
             c.preset_values("B.exe"),
-            rtx_fg_manager::presets::defaults("upstream035", &BTreeMap::new())
+            rtx_fg_manager::presets::defaults(
+                &c.parameter_profile(),
+                &c.catalog.scheme_policies[&c.cloud_scheme()].defaults
+            )
         );
         c.set_game_option("A.exe", "max_generated_frames", "99");
         assert_eq!(c.preset_values("A.exe"), a);
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    #[ignore = "requires an isolated staged 0.4.1 bundle cache; never runs a game"]
+    fn cached_041_fresh_install_and_uninstall_do_not_replay_040_snapshot() -> Result<()> {
+        let cache = std::env::var("LOCALAPPDATA")?;
+        anyhow::ensure!(
+            cache.contains("isolated-appdata"),
+            "Use an isolated bundle cache"
+        );
+        let (data, mut c) = controller();
+        let game_dir = tempfile::tempdir()?;
+        let path = game_dir.path().join("FixtureGame.exe");
+        std::fs::copy(std::env::current_exe()?, &path)?;
+        let exe = path.to_string_lossy().into_owned();
+        let scheme = rtx_fg_manager::upstream040::SCHEME;
+        let old = rtx_fg_manager::presets::defaults("upstream040", &BTreeMap::new());
+        c.games = vec![Game {
+            exe: exe.clone(),
+            extra: [("preset_options_v2".into(), json!({scheme:old}))]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.clone());
+        c.set_selection(scheme.into(), 1, vec!["version.dll".into()]);
+        let finish = |c: &mut Controller| -> Result<()> {
+            let deadline = Instant::now() + Duration::from_secs(90);
+            while c.busy || c.refresh_busy || !c.preset_reads.is_empty() {
+                c.events();
+                anyhow::ensure!(Instant::now() < deadline, "operation timed out");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            anyhow::ensure!(c.warning.is_none(), "{:?}", c.warning);
+            Ok(())
+        };
+        // No refresh is delivered before this click: exercise the worker guard.
+        assert_eq!(c.preset_values(&exe)["optimized"], "2");
+        c.perform(false, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        let config = game_dir.path().join(core::INI);
+        assert_eq!(
+            rtx_fg_manager::upstream040::read_041(&std::fs::read(&config)?)?["optimized"],
+            "1"
+        );
+        // Preserve a real user's existing installation choice.
+        let context = c.preset_context(&exe);
+        core::apply_parameters_at(
+            &core::DeploymentTarget::for_game(&path),
+            &context,
+            &BTreeMap::from([("optimized".into(), "2".into())]),
+        )?;
+        c.perform(false, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        assert_eq!(
+            rtx_fg_manager::upstream040::read_041(&std::fs::read(&config)?)?["optimized"],
+            "2"
+        );
+        c.perform(true, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        assert!(!config.exists());
+        assert_eq!(c.preset_values(&exe)["optimized"], "1");
+        c.perform(false, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        assert_eq!(
+            rtx_fg_manager::upstream040::read_041(&std::fs::read(&config)?)?["optimized"],
+            "1"
+        );
+        c.perform(true, BTreeSet::from([exe.clone()]));
+        finish(&mut c)?;
+        assert!(!config.exists());
+        assert!(data.path().exists());
+        c.close();
+        c.tick_close();
+        Ok(())
+    }
+    #[test]
+    fn uninstalled_all_schemes_forget_applied_snapshots_and_keep_other_games() {
+        let (_dir, mut c) = controller();
+        let exe = "Uninstalled.exe";
+        let other = "StillInstalled.exe";
+        c.games = vec![
+            Game {
+                exe: exe.into(),
+                ..Default::default()
+            },
+            Game {
+                exe: other.into(),
+                ..Default::default()
+            },
+        ];
+        let policies = c.catalog.scheme_policies.clone();
+        for (scheme, policy) in &policies {
+            let mut values =
+                rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            let changed = rtx_fg_manager::presets::parameters(&policy.parameter_profile)
+                .into_iter()
+                .find_map(|p| {
+                    p.choices
+                        .iter()
+                        .find(|(v, _)| values.get(p.key).is_some_and(|old| old != v))
+                        .map(|(v, _)| (p.key.to_owned(), (*v).to_owned()))
+                })
+                .expect("each supported protocol has an editable parameter");
+            values.insert(changed.0, changed.1);
+            for game in [exe, other] {
+                c.channel.send(Event::PresetApplied(
+                    game.into(),
+                    scheme.clone(),
+                    values.clone(),
+                ));
+            }
+        }
+        c.events();
+        let untouched = c.games[1].extra.clone();
+        c.channel.send(Event::Deployments(
+            c.status_epoch,
+            exe.into(),
+            Box::new({
+                let mut snapshot = rtx_fg_manager::deployment::Snapshot::default();
+                snapshot.status = "未部署".into();
+                snapshot.total = 1;
+                snapshot
+            }),
+        ));
+        c.events();
+        for (scheme, policy) in &policies {
+            let mut expected =
+                rtx_fg_manager::presets::defaults(&policy.parameter_profile, &policy.defaults);
+            if policy.parameter_profile == rtx_fg_manager::encore::PROFILE {
+                expected.insert("menuLanguage".into(), "zh-CN".into());
+            }
+            rtx_fg_manager::presets::Context::new(scheme, policy, std::path::Path::new(exe))
+                .normalize(&mut expected);
+            assert_eq!(
+                c.preset_values_for(exe, scheme),
+                expected,
+                "stale applied snapshot for {scheme}"
+            );
+        }
+        assert_eq!(
+            c.games[1].extra, untouched,
+            "another game's preferences changed"
+        );
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn uninstalled_041_uses_new_defaults_without_deleting_preferences() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::upstream040::SCHEME;
+        let exe = "A.exe";
+        let old = rtx_fg_manager::presets::defaults("upstream040", &BTreeMap::new());
+        c.games = vec![Game {
+            exe: exe.into(),
+            title: "My game".into(),
+            extra: [
+                (
+                    "preset_options_v2".into(),
+                    json!({scheme:old, "rtxfg-0.3.5-dx12-vulkan":{"optimized":"2"}}),
+                ),
+                ("preset_options".into(), json!({"upstream040":old})),
+                ("preset_dirty".into(), json!({scheme:false})),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        c.disk_presets
+            .insert((exe.into(), scheme.into()), old.clone());
+        c.disk_profiles.insert(
+            (exe.into(), scheme.into()),
+            (c.status_epoch, "upstream040".into()),
+        );
+        c.channel.send(Event::Deployments(
+            c.status_epoch,
+            exe.into(),
+            Box::new({
+                let mut s = rtx_fg_manager::deployment::Snapshot::default();
+                s.status = "未部署".into();
+                s.total = 1;
+                s
+            }),
+        ));
+        c.events();
+        assert_eq!(c.parameter_profile(), "upstream041");
+        assert_eq!(c.preset_values(exe)["optimized"], "1");
+        assert_eq!(c.preset_values(exe)["preset"], "A");
+        assert_eq!(c.preset_values(exe)["xess_hudless"], "Auto");
+        assert_eq!(c.games[0].title, "My game");
+        assert_eq!(
+            c.games[0].extra["preset_options_v2"]["rtxfg-0.3.5-dx12-vulkan"]["optimized"],
+            "1"
+        );
+        c.save();
+        let persisted = c.state.clone();
+        c.close();
+        c.tick_close();
+        let restart_dir = tempfile::tempdir().unwrap();
+        let mut restarted = Controller::new(
+            restart_dir.path().into(),
+            persisted,
+            None,
+            Some(restart_dir.path().join("smoke.json")),
+        );
+        restarted.focus = Some(exe.into());
+        assert_eq!(restarted.preset_values(exe)["optimized"], "1");
+        restarted.close();
+        restarted.tick_close();
+    }
+    #[test]
+    fn uninstalled_041_preserves_current_explicit_choices_and_discard_baseline() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::upstream040::SCHEME;
+        let exe = "A.exe";
+        c.games = vec![Game {
+            exe: exe.into(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        c.set_game_option(exe, "optimized", "2");
+        for _ in 0..2 {
+            c.channel.send(Event::Deployments(
+                c.status_epoch,
+                exe.into(),
+                Box::new({
+                    let mut s = rtx_fg_manager::deployment::Snapshot::default();
+                    s.status = "未部署".into();
+                    s.total = 1;
+                    s
+                }),
+            ));
+            c.events();
+            assert_eq!(c.preset_values(exe)["optimized"], "2");
+            assert!(c.preset_dirty(exe));
+        }
+        c.discard_presets(Some((exe, scheme)));
+        assert_eq!(c.preset_values(exe)["optimized"], "1");
+        assert!(!c.preset_dirty(exe));
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn installed_041_lossy_choice_is_not_reset_by_catalog_or_partial_cleanup() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::upstream040::SCHEME;
+        let exe = "A.exe";
+        c.games = vec![Game {
+            exe: exe.into(),
+            extra: [(
+                "preset_options_v2".into(),
+                json!({scheme:{"optimized":"2"}}),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.into());
+        for status in ["已部署", "部分已部署", "需检查", "补丁已移除，缓存待清理"]
+        {
+            c.channel.send(Event::Deployments(
+                c.status_epoch,
+                exe.into(),
+                Box::new({
+                    let mut s = rtx_fg_manager::deployment::Snapshot::default();
+                    s.status = status.into();
+                    s.total = 2;
+                    s.installed = 1;
+                    s.parameter_profiles =
+                        BTreeMap::from([(scheme.into(), BTreeSet::from(["upstream041".into()]))]);
+                    s
+                }),
+            ));
+            c.events();
+            assert_eq!(c.preset_values(exe)["optimized"], "2", "{status}");
+        }
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn installed_040_profile_survives_new_041_catalog_and_draft_discard() {
+        let (_dir, mut c) = controller();
+        let scheme = rtx_fg_manager::upstream040::SCHEME.to_owned();
+        let exe = "A.exe".to_owned();
+        c.catalog
+            .scheme_policies
+            .get_mut(&scheme)
+            .unwrap()
+            .parameter_profile = "upstream041".into();
+        c.games = vec![Game {
+            exe: exe.clone(),
+            ..Default::default()
+        }];
+        c.focus = Some(exe.clone());
+        let values = rtx_fg_manager::presets::defaults("upstream040", &BTreeMap::new());
+        c.channel.send(Event::PresetRead {
+            exe: exe.clone(),
+            profile: Some("upstream040".into()),
+            values: Some((scheme.clone(), values.clone())),
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
+        c.events();
+        assert_eq!(c.parameter_profile(), "upstream040");
+        assert_eq!(c.preset_values(&exe)["xess_hudless"], "1");
+        c.set_game_option(&exe, "sr_mode", "On");
+        assert_eq!(c.preset_values(&exe)["sr_mode"], "On");
+        c.discard_presets(Some((&exe, &scheme)));
+        assert_eq!(c.preset_values(&exe), values);
+        c.close();
+        c.tick_close();
+    }
+    #[test]
+    fn legacy_035_settings_migrate_to_040_without_overwriting_scheme_values() {
+        let (_dir, mut c) = controller();
+        c.catalog
+            .scheme_policies
+            .get_mut(rtx_fg_manager::upstream040::SCHEME)
+            .unwrap()
+            .parameter_profile = "upstream040".into();
+        let scheme = c.catalog.default_scheme.clone();
+        c.games = vec![Game {
+            exe: "A.exe".into(),
+            extra: [(
+                "preset_options".into(),
+                json!({"upstream035":{
+                    "max_generated_frames":"5", "optimized":"3", "preset":"B",
+                    "logging_level":"2", "unknown_old_field":"keep only in old storage"
+                }}),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }];
+        c.migrate_presets();
+        let values = c.preset_values("A.exe");
+        assert_eq!(values["max_generated_frames"], "5");
+        assert_eq!(values["optimized"], "3");
+        assert_eq!(values["preset"], "B");
+        assert_eq!(values["logging_level"], "2");
+        assert_eq!(values["sr_mode"], "Off");
+        assert!(!values.contains_key("unknown_old_field"));
+        c.set_game_option("A.exe", "max_generated_frames", "2");
+        c.migrate_presets();
+        assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "2");
+        assert_eq!(
+            c.games[0].extra["preset_options"]["upstream035"]["max_generated_frames"],
+            "5"
+        );
+        assert_eq!(
+            c.games[0].extra["preset_options_v2"][&scheme]["max_generated_frames"],
+            "2"
+        );
         c.close();
         c.tick_close();
     }
@@ -3558,12 +6925,13 @@ mod tests {
         c.set_game_option("A.exe", "optimized", "3");
         c.set_game_option("A.exe", "max_generated_frames", "5");
         c.state["cloud_scheme"] = json!("native-0.2.6-experimental");
-        assert_eq!(c.cloud_scheme(), "native-0.2.6-stable");
+        assert_eq!(c.cloud_scheme(), c.catalog.default_scheme);
+        c.state["cloud_scheme"] = json!("rtx40mfg-1.3.3-hf2");
         assert!(!c.preset_values("A.exe").contains_key("optimized"));
-        c.set_game_option("A.exe", "max_generated_frames", "2");
         c.state["cloud_scheme"] = json!("initial-rtx20");
-        assert_eq!(c.cloud_scheme(), "initial");
-        assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "3");
+        assert_eq!(c.cloud_scheme(), c.catalog.default_scheme);
+        assert_eq!(c.preset_values("A.exe")["max_generated_frames"], "5");
+        assert_eq!(c.state["cloud_scheme"], "initial-rtx20");
         c.state["proxies"] = json!(["winhttp.dll", "version.dll"]);
         assert_eq!(c.proxies(), vec!["version.dll"]);
         c.state["cloud_scheme"] = json!("upstream-0.3.1-310-9");
@@ -3580,6 +6948,12 @@ mod tests {
         let (_dir, mut c) = controller();
         let original = c.catalog.default_scheme.clone();
         let extended = "rtxfg-0.3.5-dx12-vulkan";
+        // Exercise the historical shared-0.3.5 settings migration explicitly;
+        // the current default now has a different protocol (0.4.0).
+        let original_policy = c.catalog.scheme_policies.get_mut(&original).unwrap();
+        original_policy.parameter_profile = "upstream035".into();
+        original_policy.defaults =
+            rtx_fg_manager::presets::defaults("upstream035", &BTreeMap::new());
         let mut policy = c.catalog.scheme_policies[&original].clone();
         policy
             .capabilities
@@ -3609,15 +6983,17 @@ mod tests {
         c.state["cloud_scheme"] = json!(extended);
         assert_eq!(c.preset_values(exe)["max_generated_frames"], "3");
         c.set_game_option(exe, "max_generated_frames", "2");
-        c.channel.send(Event::PresetRead(
-            exe.into(),
-            Some((
+        c.channel.send(Event::PresetRead {
+            profile: None,
+            exe: exe.into(),
+            values: Some((
                 extended.into(),
                 BTreeMap::from([("max_generated_frames".into(), "1".into())]),
             )),
-            false,
-            c.status_epoch,
-        ));
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.preset_values(exe)["max_generated_frames"], "2");
         c.state["cloud_scheme"] = json!(original);
@@ -3629,15 +7005,17 @@ mod tests {
             c.preset_values(exe),
         ));
         c.events();
-        c.channel.send(Event::PresetRead(
-            exe.into(),
-            Some((
+        c.channel.send(Event::PresetRead {
+            profile: None,
+            exe: exe.into(),
+            values: Some((
                 extended.into(),
                 BTreeMap::from([("max_generated_frames".into(), "1".into())]),
             )),
-            false,
-            c.status_epoch,
-        ));
+            running: false,
+            epoch: c.status_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.preset_values(exe)["max_generated_frames"], "1");
         c.running_games.insert(exe.into());
@@ -3671,15 +7049,17 @@ mod tests {
             scheme.clone(),
             applied.clone(),
         ));
-        c.channel.send(Event::PresetRead(
-            exe.clone(),
-            Some((
+        c.channel.send(Event::PresetRead {
+            profile: None,
+            exe: exe.clone(),
+            values: Some((
                 scheme.clone(),
                 BTreeMap::from([("max_generated_frames".into(), "1".into())]),
             )),
-            false,
-            old_epoch,
-        ));
+            running: false,
+            epoch: old_epoch,
+            consistent: true,
+        });
         c.events();
         assert_eq!(c.disk_presets[&(exe.clone(), scheme)], applied);
         assert!(!c.preset_reads.contains(&exe));
@@ -3688,6 +7068,42 @@ mod tests {
         c.busy = false;
         c.inspect(exe.clone());
         assert!(c.preset_reads.contains(&exe));
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn cancelled_encore_probe_never_opens_choices_or_starts_installation() {
+        let (_dir, mut c) = controller();
+        c.begin_work("检查安装内容");
+        let epoch = c.status_epoch;
+        let plan = EncoreInstallPlan {
+            fingerprint: c.retry_fingerprint(),
+            paths: BTreeSet::from(["cancelled.exe".into()]),
+            choices: vec![],
+        };
+        c.cancel.store(true, Ordering::Relaxed);
+        c.channel.send(Event::EncorePrepared(Ok(plan)));
+        c.channel.send(Event::Done);
+        c.events();
+        assert_eq!(c.status_epoch, epoch);
+        assert!(!c.busy && c.encore_install.is_none() && c.resume_install.is_none());
+        assert_eq!(c.tasks.work.as_ref().unwrap().stage, "已取消");
+        c.close();
+        c.tick_close();
+    }
+
+    #[test]
+    fn changed_catalog_invalidates_a_first_install_plan_before_any_write() {
+        let (_dir, mut c) = controller();
+        c.encore_install = Some(EncoreInstallPlan {
+            fingerprint: c.retry_fingerprint(),
+            paths: BTreeSet::from(["unchanged.exe".into()]),
+            choices: vec![],
+        });
+        c.catalog.revision.push_str("-new");
+        assert!(c.confirm_encore_install(vec![]).is_err());
+        assert!(!c.busy && c.encore_install_values.is_empty());
         c.close();
         c.tick_close();
     }

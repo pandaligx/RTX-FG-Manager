@@ -3,4 +3,11 @@
 /tests/fixtures/catalog*/index.json -text
 /cloud/indexes/*.json -text
 /cloud/catalog.json -text
+/cloud/v3/indexes/*.json -text
+/cloud/v3/catalog.json -text
+/cloud/help.json -text
 /update.json -text
+/cloud/names/*.json -text
+/rust/assets/game-names.json -text
+/packaging/*.sh text eol=lf
+/packaging/AppRun text eol=lf

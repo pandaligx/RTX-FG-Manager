@@ -32,7 +32,6 @@ use gpui::{
 use gpui_util::ResultExt;
 use windows::{
     Win32::{
-        Foundation::HWND,
         Graphics::{
             Direct3D11::{ID3D11RenderTargetView, ID3D11Texture2D},
             DirectComposition::{
@@ -41,7 +40,6 @@ use windows::{
             },
             Dxgi::{DXGI_PRESENT, DXGI_SWAP_CHAIN_FLAG, IDXGISwapChain1},
         },
-        UI::WindowsAndMessaging::GetClassNameW,
     },
     core::{IUnknown, Interface},
 };
@@ -51,6 +49,8 @@ use crate::directx_renderer::{
     create_render_target_and_its_view, create_swap_chain_for_composition,
 };
 use crate::{DirectXRenderer, WindowsWindow};
+
+use super::composition_scene::whole_scene_layer;
 
 /// The renderer's window composition state.
 #[derive(Default)]
@@ -134,18 +134,6 @@ pub(crate) fn set_composition_order(
     surfaces: &[PlatformCompositionSurface],
 ) -> Result<()> {
     set_order(&mut window.state.renderer.borrow_mut(), surfaces)
-}
-
-/// Forwarded to by `translate_accelerator`: whether `hwnd` is one of GPUI's
-/// windows, whose key downs GPUI handles before they are translated. Key
-/// downs of other windows, such as a WebView2 controller's child windows,
-/// are left to their own window procedures.
-pub(crate) fn is_gpui_window(hwnd: HWND) -> Option<()> {
-    let class_name = unsafe { crate::window::WINDOW_CLASS_NAME.as_wide() };
-    let mut buffer = [0u16; 64];
-    let length = unsafe { GetClassNameW(hwnd, &mut buffer) };
-    let length = usize::try_from(length).ok()?;
-    (buffer.get(..length)? == class_name).then_some(())
 }
 
 /// Forwarded to by `DirectXRenderer::handle_device_lost_impl` before it
@@ -255,21 +243,29 @@ fn draw(
     let Some(base_surface) = renderer.fast_composition.base else {
         return renderer.draw(scene.scene(), background_appearance);
     };
-    if renderer.skip_draws {
+    if renderer.skip_draws || !crate::fast::device_recovery::can_draw(renderer) {
         return Ok(());
     }
 
-    for layer in scene.layers() {
-        let surface_scene = scene.layer_scene(layer)?;
+    let whole_scene = whole_scene_layer(scene.scene(), scene.layers());
+    for (layer_index, layer) in scene.layers().iter().enumerate() {
+        let replayed_scene;
+        let surface_scene = match whole_scene {
+            Some((target_index, whole_scene)) if target_index == layer_index => whole_scene,
+            _ => {
+                replayed_scene = scene.layer_scene(layer)?;
+                &replayed_scene
+            }
+        };
         if layer.surface == base_surface {
-            renderer.render(&surface_scene, background_appearance)?;
+            renderer.render(surface_scene, background_appearance)?;
             continue;
         }
         // `render` draws into the window's render target view, which paths
         // also bind again after their intermediate pass; lend it the
         // surface's view for the draw.
         swap_render_target(renderer, layer.surface)?;
-        let drawn = renderer.render(&surface_scene, WindowBackgroundAppearance::Transparent);
+        let drawn = renderer.render(surface_scene, WindowBackgroundAppearance::Transparent);
         swap_render_target(renderer, layer.surface)?;
         drawn?;
     }

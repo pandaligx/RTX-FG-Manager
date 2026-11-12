@@ -1,190 +1,201 @@
-# RTX Frame Generation Manager · by 小南瓜
+<div align="center">
 
-**Install, tune and remove frame-generation patches from one place.**
-A portable Windows app for RTX 20 / 30 / 40, with a native Rust / GPUI interface.
+# RTX-FG-Manager
+
+<img src="docs/brand-banner.png" alt="RTX-FG-Manager — Your games. Your settings." width="100%">
 
 **English** · [简体中文](README.zh-CN.md)
 
-<p align="center">
-  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.9"><img alt="release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager"></a>
-  <a href="https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.9"><img alt="downloads" src="https://img.shields.io/github/downloads/pandaligx/RTX-FG-Manager/total"></a>
-  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white">
-  <a href="LICENSE"><img alt="manager license MIT" src="https://img.shields.io/badge/manager_license-MIT-blue"></a>
-</p>
+**Your games. Your settings. One place to manage frame generation.**
 
-- **One game library:** scan or add games, install individually or in batches, and see what is actually deployed.
-- **Settings that follow each game:** remember the scheme, DLL entry and presets; download matching files when needed.
-- **Flexible destinations:** deploy beside the game EXE or to an associated plugin folder, then remove files by ownership.
-- **Make it yours:** preview 38 offline color schemes; use Chinese, English, Russian, Japanese or Korean.
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/pandaligx/RTX-FG-Manager?style=flat-square&color=78b93c"></a>
+<img alt="Windows 10 / 11 x64" src="https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078D6?style=flat-square">
+<a href="LICENSE"><img alt="Manager license MIT" src="https://img.shields.io/badge/Manager-MIT-blue?style=flat-square"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/pandaligx/RTX-FG-Manager?style=flat-square"></a>
+
+<a href="docs/download-stats.json"><img alt="Total downloads" src="docs/downloads-total.svg"></a>
+
+[Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
+
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.30"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+
+</div>
+
+---
+
+> **4.3.30 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+
+![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
+
+<p align="center"><sub>4.3.6 user-provided screenshot · interface illustration, not a game compatibility or performance result</sub></p>
+
+## One library. Five patch choices.
+
+**RTX-FG-Manager** is a portable Windows utility by **小南瓜** for installing, configuring, upgrading and removing supported frame-generation patches. A native Rust / GPUI interface keeps the game library in the center and the selected game's hardware, patch and actions together on the right.
+
+| Manage | Customize | Recover |
+| :--- | :--- | :--- |
+| Scan or add games; individual and batch operations | A single configuration per game; supported DLL entry selection | Owned-file removal and transactional upgrade recovery |
+| One complete download per scheme, reused from cache | Collapsible navigation, resizable inspector, 12–18 font sizes | Preserve unknown files, original Bink components and unrelated plugins |
+| GitCode first, GitHub fallback | Light/dark themes, 38 color schemes, five interface languages | No automatic replacement of game patches when the manager updates |
 
 ## Download
 
-**Current version: 4.2.9** · [Gitee download](https://gitee.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.9) · [GitHub download](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.2.9) · [Changelog](CHANGELOG.md)
+**Version 4.3.30** · Windows 10 / 11 x64
 
-Download **`RTXManager-v4.2.9-x64.exe`** for Windows 10 / 11 x64. The release page includes the signed EXE and checksums. No separate Python, Rust, CUDA Toolkit or aria2 installation is needed; game DLLs are downloaded on demand.
+| Source | Download | Purpose |
+| :--- | :--- | :--- |
+| **GitCode** | [Open 4.3.30 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.30) | Default domestic source |
+| **GitHub** | [Open 4.3.30 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.30) | Primary project and fallback |
+| **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
-### What changed in 4.2.9: RTX Encore and RTX MFG 1.4.2
+Download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
-Version 4.2.9 adds **[RTX40 MFG · 1.4.2](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.2)** and updates the existing **DLSSG-Transfusion 1.4.5.3** scheme to **[RTX Encore 1.0.0-beta.2](https://github.com/SilyNoMeta/rtx-encore)**, retaining each game's scheme selection.
+## 4.3.30 highlights
 
-- **RTX MFG 1.4.2 improves The Witcher 3's experimental path-traced hair detection** after a game update made the option unavailable. Use `winmm.dll` beside `witcher3.exe` for this game. The manager keeps this scheme RTX40-only; Vulkan remains experimental without Dynamic MFG, and the menu key is **Backspace**.
-- **Upgrade RTX MFG while keeping settings:** exit the game and choose **Install and apply**. A valid manager record, the same scheme and DLL entry, and a newer target version are required. The existing installation must pass ownership checks; unknown modifications are protected. Updating the manager alone does not replace game DLLs.
+- Updates GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, improving input, text, sliders and rendering.
+- Refines settings language switching and accessibility, retains GamePP monitoring compatibility, and adds credits for a HeyBox tutorial creator.
 
-- **Press Insert for Encore's menu.** It opens once on first launch and can be rebound. Its native DX11/DX12/Vulkan menu needs no ReShade; RTX40 MFG retains Backspace.
-- Full JSONC v4 advanced settings preserve comments, unknown keys and menu state. Only explicit edits are written; other values come from the latest disk document. For an old manager-owned Transfusion install, exit the game and choose **Install and apply** to migrate in place; do not uninstall first and lose settings. The DLL, configuration and ownership record are backed up before changes. Failures restore originals; unknown modifications and unfinished recovery material remain.
-- Copying and renaming the same signed `rtx-encore.dll` preserves its bytes and signature, so aliases need no separate signing. This does not cover separately built `alternative-proxies` or ASI binaries; this version deploys only the 19 DLL entries, without ASI. A filename selects the loading route and does not add graphics API support.
-- **NR is off by default.** Supply NVIDIA's `nvngx_dlssnr.dll` **310.8.0** beside the patch and enable DLSS SR/DLAA in the game. The manager does not distribute that NVIDIA file. NVIDIA/Open engines, passes, precision and experimental settings may increase GPU time or VRAM and change image quality; follow restart guidance. RTX20 remains experimental, with no promised performance gain.
-- **Smooth Motion is off by default.** This unlock route is RTX30-only and accepts exactly **617.42, 617.14, 616.92 or 616.64**. Upstream reports actual game validation only for **617.14**, not the other three. Select the game's actual API and restart. “Driver prepared” and estimated FPS do not establish that interpolated frames were presented.
+[Full changelog →](CHANGELOG.md)
 
-Five-language offline help is now a concise eight-section guide covering setup, scheme selection, upgrades and troubleshooting, with contents, scrolling and copy support.
+> **Dlssg_for_sm86 0.4.1** requires manager **4.3.14**; use **4.3.28 or later** for **Encore 2.2.0** settings and preset sharing. Upgrade games explicitly; manager updates do not automatically replace installed patches.
 
-Upstream details: [installation](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/INSTALLATION.md) · [menu](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/MENU-AND-OVERLAY.md) · [settings](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/SETTINGS.md) · [NR](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/NEURAL-RENDERING.md) · [Smooth Motion](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/SMOOTH-MOTION.md). Loader checks and offline regressions are not target-game or GPU acceptance tests.
+## Choose a patch
 
-### What changed in 4.2.8
+| Scheme | What to know | Settings / menu |
+| :--- | :--- | :--- |
+| **Dlssg_for_sm86 · 0.4.1** | Complete bundle with XeSS 2X–4X; fresh installs default to `Optimized=1`, preset A and SR off. | Manager / INI |
+| **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | Retained custom route with additional Delta Force support. Choose according to the actual game's requirements. | Manager / INI |
+| **Dlssg_for_sm86-MFG-version · Vulkan** | Retained dedicated Vulkan route; not interchangeable with the DX12 routes. | Manager / INI |
+| **MFG-Unlocker · 1.7.0** | Standalone DLL or an existing OptiScaler 10 plugin installation; these modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
+| **RTX Encore · 2.2.0** | SR/RR/FG presets, fixed/dynamic FG, NR, Smooth Motion, XeSS/XeFG Tensor and Reflex controls. | **Insert**, unless the menu is disabled or its key was changed |
 
-Compared with **4.2.7**, this release fixes six manager issues:
+> MFG-Unlocker 1.6.1 is available as a compatibility option. Uninstall the current patch before switching versions. Preset sharing for this option is supported from manager 4.3.15.
 
-- Custom plugin folders check every associated game EXE process during installation, parameter changes and removal.
-- DLL preparation and manager downloads wait cancellably for the shared cache; a timeout asks you to retry.
-- New cloud metadata received during scanning, file selection or deployment is retained and applied after the operation without changing settings already in use.
-- Search results refresh when a same-count rescan changes game order or names.
-- Removal with temporary files awaiting verification or pending cache cleanup is reported as incomplete with a warning; recovery records remain for retry.
-- Unreal server builds with suffixes such as `Win64-Shipping` are excluded from game detection.
+GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility. The initial scheme and 0.2.6 are retired from new installation choices; existing installations remain eligible for owned cleanup/recovery.
 
-**RTX40 (SM89)** selection is now available for **0.3.5 · Delta Force** only, reusing existing signed DLLs without rebuilding them or changing device IDs. Original Github upstream remains the default, and other schemes retain their GPU ranges. Five-language offline help is organized into seven Markdown sections with a contents list, steps, tips, copy support and a narrow-window layout.
+### RTX 20 / 30 / 40 reference
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/docs/screenshot-home.png" alt="RTX Frame Generation Manager 4.2.8 in the light theme with demo games" width="980">
-</p>
-<p align="center">Actual version 4.2.8 window in the light theme, using a demo game library.</p>
+| Scheme | RTX 20 · Turing | RTX 30 · Ampere | RTX 40 · Ada |
+| :--- | :--- | :--- | :--- |
+| Dlssg_for_sm86 · 0.4.1 | Upstream-supported; new FG kernels still lack real Turing validation | Primary supported and tested family | PTX path provided; not tested on real hardware upstream |
+| 0.3.5 · Extra Delta Force support · DX12/Vulkan | Retained custom adaptation | Retained custom adaptation | Custom SM89 support provided; not a guarantee for every game |
+| Dlssg_for_sm86-MFG-version · Vulkan | Upstream targets RTX 20/30; check the selected Vulkan package | Primary target family | No explicit upstream guarantee |
+| MFG-Unlocker · 1.7.0 | Experimental DLSS MFG with supported 310.9 runtimes | Upstream DLSS MFG support | Upstream DLSS MFG support |
+| RTX Encore · 2.2.0 | Experimental FG / NR; Smooth Motion V2 requires 621.01 and DX12 | FG / NR; Smooth Motion depends on driver and API | FG / NR; NVIDIA provides Smooth Motion |
 
-## Choose a scheme
+Sources: [Dlssg_for_sm86 requirements and limitations](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). The retained Delta Force package is this project's custom adaptation, not an upstream compatibility promise. This selection guide does not claim manager-side testing of every GPU or game.
 
-**The default is 0.3.5 · Github-sdli1995, the original upstream build.** Choose your GPU series first: the manager keeps a compatible scheme or selects an available one and disables unsupported choices. The table lists the schemes available in **4.2.9**, including Encore and RTX MFG 1.4.2. GPU selections are not compatibility guarantees for every game.
+MFG's DLSS route needs an existing Streamline DLSS FG integration; Preset C needs runtime 310.9.16. RTX 20 DLSS MFG is experimental and limited to 310.9.0 / 310.9.1 / 310.9.16; XeMFG is a separate route: standalone MFG 1.7 can use its private Intel 3.0.2 runtime; plugin mode uses an existing OptiScaler installation. Official 0.4.1 targets DX12; changing a DLL filename does not add Vulkan support.
 
-| Scheme | GPU series in the app | Game/API requirements and purpose | DLL entry | Configuration |
-| --- | --- | --- | --- | --- |
-| **0.3.5 · Github-sdli1995 — default** | RTX20 / 30 | Compatible D3D12 DLSS FG game; original upstream 310.9 model | Six choices | INI |
-| **0.3.5 · Delta Force** | RTX20 / 30 / 40 | D3D12/Vulkan extension; additional multiplier controls for the identified Delta Force game | Six choices | INI |
-| **Dlssg-MFG-Vulkan** | RTX20 / 30 | Compatible DLSS FG path; upstream DX12/Vulkan MFG. RTX20 remains unverified; Dynamic requires compatible DX12 | `version.dll` | Separate INI protocol |
-| **0.2.6 · DX12/Vulkan** | RTX20 / 30 | Retained compatibility option for supported DLSS FG games, using the 310.1 model | Five choices | INI |
-| **Initial · GitHub first release** | RTX20 / 30 | Earlier basic integration for compatible games; a fallback with fewer controls | `version.dll` | INI |
-| **RTX40 MFG · 1.4.2** | RTX40 only | Requires existing Streamline DLSS FG. Vulkan is experimental; Dynamic is DX12 only | One of 19 names; universal DLL renamed by the manager | `RTXMFG-Universal.json` |
-| **RTX Encore · 1.0.0-beta.2** | RTX20 / 30 / 40 | FG, DLSS SR, NR and Smooth Motion have separate requirements; menu support does not imply support for every feature | One of 19 names for the same signed universal DLL | `rtx-encore.jsonc` (v4) |
+### Encore feature support
 
-- **Six-entry schemes:** `version.dll`, `winmm.dll`, `dinput8.dll`, `dbghelp.dll`, `dxgi.dll`, `d3d12.dll`. Start with one, usually `version.dll`; `dxgi.dll` and `d3d12.dll` cannot be selected together. The five 0.2.6 entries are version / winmm / dinput8 / winhttp / dxgi.
-- **Encore's 19 names:** `version.dll`, `dinput8.dll`, `winmm.dll`, `dxgi.dll`, `d3d9.dll`, `d3d10.dll`, `d3d11.dll`, `d3d12.dll`, `dsound.dll`, `wininet.dll`, `winhttp.dll`, `binkw64.dll`, `bink2w64.dll`, `xinput1_1.dll`, `xinput1_2.dll`, `xinput1_3.dll`, `xinput1_4.dll`, `xinput9_1_0.dll`, `xinputuap.dll`. Select one. Keep original Bink files alongside as `binkw64Hooked.dll` / `bink2w64Hooked.dll`; these are names for the originals, not extra entries. The manager does not rename, overwrite or delete them. Fixed 5X/6X remain experimental.
-- **Keep schemes separate:** INI, RTX40 JSON, legacy Transfusion JSONC and Encore JSONC v4 are different protocols. Follow the upgrade procedure above for old Transfusion; exit the game and uninstall the old patch before other scheme or entry changes. Do not stack frame-generation patches.
+| Feature | DX11 | DX12 | Vulkan |
+| :--- | :--- | :--- | :--- |
+| X2–X6 frame generation | — | Yes | Yes; experimental on RTX 20/30 |
+| UI assist / RTX 30 Fast SR | — | Yes | — |
+| RTX 30 Smooth Motion | Yes | Yes | Yes |
+| Neural Rendering | Experimental | Experimental | Experimental |
+| Menu / overlay | Yes | Yes | Yes |
 
-The scheme name indicates its origin, not the download route. **Project source** in the scheme menu opens the relevant upstream project. Choosing a scheme does not install it, and the manager cannot add frame generation to an arbitrary game.
+Summary of [upstream compatibility notes](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md), not universal game validation. RTX 20 FG/NR remain experimental; GTX, other GPU vendors, DX9 and OpenGL are unsupported. Smooth Motion needs qualified drivers; NR needs 310.8.0 or 310.9.16. See upstream for version requirements and game exceptions.
 
-## Get started in four steps
+### Start in three steps
 
-1. **Run the EXE** and accept the Windows administrator prompt. Cancelling stops startup.
-2. **Enable hardware-accelerated GPU scheduling** through the home page's **Graphics settings** shortcut, then restart Windows if requested.
-3. **Exit the game and add its actual EXE** by scanning or manual selection. Choose the GPU series, scheme and DLL entry, open **Presets** on the game row, then **Install and apply**. A row click selects the current game; checkboxes select batch targets.
-4. **Start the game and enable DLSS Frame Generation.** Exit before changing settings. With the same scheme already installed, **Apply to current game** updates its parameters without downloading the DLL again.
+1. **Exit the game.** Scan your library or add the actual rendering EXE. Unreal games often use `Binaries/Win64`, rather than the launcher.
+2. **Select the game and patch.** Choose the intended DLL entry, review **Preset parameters**, then use **Install and apply**. Start with a single suitable entry unless your setup specifically needs more.
+3. **Launch and check.** Enable the game's supported frame-generation path. Use the menu key above when available; restart the game for settings marked as requiring restart.
 
-**For Delta Force:** add `DeltaForceClient-Win64-Shipping.exe` inside `Binaries/Win64`, choose **0.3.5 · Delta Force**, then select Follow game / 2X / 3X / 4X in Presets; 4X is the default. Its 3X/4X components use a separate cache and do not overwrite the game's original `sl.*.dll` files. This special path applies only to the identified game.
+Close the game before configuration changes or removal. Upgrade a managed supported installation with **Install and apply**; changing patch families generally requires removing the old patch first. Unknown collisions stop deployment instead of silently replacing files.
 
-## Themes, folders and maintenance
+<details>
+<summary><b>DLL names, ASI and OptiScaler</b></summary>
 
-**Themes.** Open the palette in the left sidebar to search and scroll through all 38 offline color schemes. Hover or use arrow keys to preview; click/Enter to save. Esc or a click outside restores the previous theme. System mode remembers light and dark choices separately.
+- The manager permits multiple supported DLL entries. Loading multiple copies can conflict; this is a choice, not a compatibility guarantee. ASI/plugin mode remains exclusive with standalone DLL mode.
+- Encore's `version.dll`, `winmm.dll`, `dxgi.dll`, `dinput8.dll` and `rtx-encore.asi` use their corresponding upstream files. Other supported names use the main DLL. Renaming identical bytes preserves that file's signature; it does not sign separately built proxies or add graphics API support.
+- For Bink loading, preserve the original as `binkw64Hooked.dll` or `bink2w64Hooked.dll` beside the patch. The manager does not automatically rename or delete the game's originals.
+- MFG plugin mode requires an already installed OptiScaler 10 and its supported `OptiScaler/plugins` directory. The manager does not install OptiScaler or automatically discover custom plugin paths.
 
-**Game folders.** Select a game and use **Add folder** for a plugin destination that need not contain an EXE. It remains associated with the real game for process checks, settings and removal; third-party loaders still need their own setup. Grouped games may list several deployment directories, so review the displayed paths before installing. Manager data lives in `%LOCALAPPDATA%\RTXFGManager`.
+</details>
 
-**Downloads and updates.** Update checks read a public static manifest without the rate-limited Gitee Release API. Gitee is the default first route, with GitHub fallback; an explicit GitHub preference is remembered. Downloads show progress and speed, and verified DLL caches can be reused offline. App updates verify size, SHA-256 and publisher signature and require confirmation before replacement. Updating the manager preserves the library and preferences but does not replace game DLLs automatically. Settings also includes current and historical release notes for offline reading.
+<details>
+<summary><b>Encore 1.0.0: new switches and existing settings</b></summary>
 
-**Safe removal.** Exit the game and use **Uninstall patch**. The manager removes recognized files belonging to that deployment while preserving original game files, unknown files and other mods. Locked files leave a retry notice; close the relevant processes and retry. Removing a game from the library is not uninstalling its patch, and **Clear cache** does not delete the library or preferences.
+All three new controls are in **Compatibility and hotkeys**, default to off, and require a game restart:
 
-## Linux: Wine prefix support
+| Key | Use |
+| :--- | :--- |
+| `compatibility.disableInGameMenu` | Avoid menu attachment conflicts, including the upstream Star Wars Outlaws case. FG remains active. Disable this option in the manager and restart to restore the menu; Insert cannot bypass it. |
+| `diagnostics.logDxgiWrappers` | Trace game calls to the menu swapchain when investigating crashes after menu attachment. |
+| `diagnostics.crashDetails` | Add register/stack details and `.dmp` crash snapshots, often tens of MB. Turn off after collection. Dumps can contain process memory; review before sharing. |
 
-Linux builds ship as an AppImage and work on a Wine prefix instead of a live
-Windows install. Install a game in the prefix as usual, then point the manager
-at it. It takes the prefix from the UI, or from `RTXFG_PREFIX`, or `WINEPREFIX`,
-or `~/.wine`.
+Upgrading rc.3 preserves the existing JSONC, including comments, unknown fields and menu state. New settings are written only when edited; upgrading does not reset your configuration. SR/RR/FG presets, NR and Smooth Motion retain their existing controls. Consult [upstream settings](https://github.com/SilyNoMeta/rtx-encore/blob/v1.0.0/docs/SETTINGS.md) for feature-specific requirements.
 
-What works: scanning `<prefix>/drive_c`, installing, replacing and removing
-patched DLLs, per-game settings, presets, the five UI languages and 38 themes.
-Registry-backed features edit the prefix's `system.reg` and `user.reg` directly,
-including the GPU display-name feature.
+</details>
 
-What does not work, and says so instead of failing quietly: publisher signature
-verification (update files are still checked by size and SHA-256, but a Windows
-publisher identity cannot be proven outside Windows), administrator elevation,
-HAGS, the Windows error event log, and `ms-settings:` links. A working Vulkan
-driver is required, either `mesa-vulkan-drivers` or `lavapipe` as a software
-fallback. The AppImage bundles no GPU driver.
+## Update, remove and recover
 
-## Build from source
+| Action | Effect |
+| :--- | :--- |
+| **Update manager** | Updates the app. Does not automatically replace game patches. |
+| **Install and apply** | Installs or upgrades the selected supported patch; preserves managed configuration where supported. |
+| **Uninstall patch** | Removes owned patch components, managed state and recognized game-specific logs; restores eligible originals/settings. |
+| **Remove game** | Removes the library entry only. Does not uninstall the patch. |
+| **Clear cache** | Removes downloaded cache data only. Does not uninstall the patch. |
 
-Both builds need Rustup. Full details, including the Windows prerequisites and
-the optional test features, are in [BUILDING.md](BUILDING.md).
+Cleanup includes dlssg frame-time/NGX logs, MFG game-specific temporary logs, and Encore session, exception, performance logs and recognized generated crash dumps. Unknown files, manual captures and other games/plugins are retained. Locked files or incomplete recovery remain visible for retry. OptiScaler fields are restored only if the manager changed them and they have not since been edited.
 
-### Windows
+Resources use one complete ZIP per scheme in [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads). The 0.4.1 package includes all required distributed components; only selected loaders are deployed. Encore's complete ZIP exceeds Gitee's per-file limit, so its download uses GitCode/GitHub.
 
-```powershell
-./tools/prepare-build.ps1
-cargo check --locked
-cargo build --locked --release
-```
+## Frequently asked questions
 
-Output: `target/x86_64-pc-windows-msvc/release/RTXManager.exe`. `prepare-build.ps1`
-fetches the pinned aria2 binary, so the network is needed once.
+<details>
+<summary><b>Which scheme or DLL is right for my game?</b></summary>
 
-### Linux
+Use the relevant upstream game's compatibility notes and the game's actual API. The filename controls how the game loads the patch; it does not turn a DX12 feature into Vulkan support. Keep one patch family at a time. If a file already belongs to another mod, choose an appropriate supported alternative or resolve the conflict first.
 
-`.cargo/config.toml` pins the Windows target to keep that build reproducible,
-so every Linux command must pass `--target` explicitly:
+</details>
 
-```bash
-rustup target add x86_64-unknown-linux-gnu
-cargo test   --locked --target x86_64-unknown-linux-gnu
-cargo clippy --locked --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
-cargo build  --locked --release --target x86_64-unknown-linux-gnu
-```
+<details>
+<summary><b>Why is 0.4.0's kernel mode 2?</b></summary>
 
-Output: `target/x86_64-unknown-linux-gnu/release/RTXManager`.
+0.4.0 defaults to `Optimized=2`; fresh 0.4.1 installs default to `Optimized=1`. Manager 4.3.15 fixes stale cached defaults: reinstall the patch if affected, without deleting manager data. Explicit settings in existing installations are preserved.
 
-Distribution packages needed to compile and package:
+</details>
 
-```bash
-# Debian / Ubuntu
-sudo apt-get install -y --no-install-recommends \
-  build-essential pkg-config ca-certificates curl wget file \
-  libfreetype-dev libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev \
-  libxcb1-dev libxcb-xkb-dev libwayland-dev squashfs-tools desktop-file-utils zsync
+<details>
+<summary><b>Downloads or update checks fail — what next?</b></summary>
 
-# Arch / CachyOS
-sudo pacman -S --needed base-devel pkgconf curl wget file \
-  freetype2 fontconfig libxkbcommon libxcb wayland squashfs-tools desktop-file-utils zsync
-```
+Retry with GitHub as the source if GitCode is unavailable, or use the release links above. A valid cached catalog/package remains usable when the network fails. Do not substitute an incomplete archive. When reporting an issue, include the app version, source and error text; avoid posting personal paths or crash dumps publicly.
 
-To produce the AppImage, get `appimagetool` and run the packaging script:
+</details>
 
-```bash
-curl -fL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-chmod +x appimagetool
-APPIMAGETOOL=$PWD/appimagetool packaging/build-appimage.sh
-```
+<details>
+<summary><b>Does signing or a passing manager test prove game compatibility?</b></summary>
 
-That writes `dist/RTXManager-<version>-x86_64.AppImage`. Running it needs FUSE,
-most often `libfuse2` (`libfuse2t64` on Ubuntu 24.04 and newer).
+No. Signing identifies a publisher; file, configuration and UI tests do not establish GPU performance, game compatibility or anti-cheat acceptance. Follow the game's modding rules. The previously reported RTX 3060 6GB VRAM issue is not claimed fixed by this release.
 
-## FAQ and limits
+</details>
 
-- **A scanned game is not a compatibility verdict.** Results depend on its frame-generation integration, graphics API, driver and GPU. A requested multiplier does not guarantee the same FPS increase or unchanged latency; no performance gain is promised.
-- **The reported RTX3060 6GB VRAM issue remains unresolved in 4.2.9.** RTX40 selection does not establish compatibility or performance across all hardware.
-- **RTX40 MFG's Backspace menu remains English.** Use the manager's localized presets for multiplier, Dynamic target, UI preset, VSync and fixed-mode Reflex FPS limit. Bink entries require the original Hooked file described by the upstream project.
-- **Digital signatures do not grant anti-cheat approval.** Follow the game's rules and check whether third-party patches are allowed. Administrator access provides file permissions; it does not change those rules.
-- **Different configuration needs different help.** The **?** beside presets explains the selected scheme. Keep its defaults when unsure, and read [version history](CHANGELOG.md) for release-specific changes.
+## Build and contribute
 
-## Open source and credits
+The manager is **MIT licensed**. See [Building](BUILDING.md), [Cloud maintenance](docs/cloud-publishing.md) and [GitCode distribution](docs/gitcode-publishing.md). Game DLLs retain their own licenses; NVIDIA SDK headers and private patch research are not part of the public source.
 
-The Rust manager is available under [MIT](LICENSE), with [build instructions](BUILDING.md) and a [cloud maintenance guide](docs/cloud-publishing.md). Game DLLs retain their own licenses; private DLL patch sources and NVIDIA SDK headers are not included. See [third-party notices](THIRD_PARTY_NOTICES.txt).
+Bug reports: [GitHub Issues](https://github.com/pandaligx/RTX-FG-Manager/issues). Include the manager version, patch/version, selected entry, GPU/driver and reproducible steps. Avoid attaching game copies, credentials or personal logs.
 
-Thanks to [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [dashdogy / RTX40MFG-Unlock](https://github.com/dashdogy/RTX40MFG-Unlock), [SilyNoMeta / RTX Encore (formerly DLSSG-Transfusion)](https://github.com/SilyNoMeta/rtx-encore), [GPUI](https://gpui.rs/), [GPUI Kit](https://github.com/longbridge/gpui-kit), [GPUI Fast](https://github.com/longbridge/gpui-fast) and [aria2](https://github.com/aria2/aria2).
+## Credits
 
-Thanks also to [大大大怪将军阁下](https://space.bilibili.com/608531525), [云外逸声](https://space.bilibili.com/256887068) and everyone sharing compatibility feedback. This project is not affiliated with NVIDIA, game publishers or the upstream projects.
+Thanks to [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore), [GPUI](https://gpui.rs/), [GPUI Kit](https://github.com/longbridge/gpui-kit), [GPUI Fast](https://github.com/longbridge/gpui-fast) and [aria2](https://github.com/aria2/aria2). See [Third-party notices](THIRD_PARTY_NOTICES.txt).
 
-[Website](https://lgxng.cn/) · [Bilibili](https://b23.tv/5mHCHFn) · [GitHub](https://github.com/pandaligx/RTX-FG-Manager) · [Gitee](https://gitee.com/pandaligx/RTX-FG-Manager)
+Special thanks to [大大大怪将军阁下](https://space.bilibili.com/608531525), [云外逸声](https://space.bilibili.com/256887068), [坏坏的帅帅啊](https://space.bilibili.com/296225145) and everyone contributing compatibility feedback. This project is not affiliated with NVIDIA, game publishers or the upstream projects.
+
+Thanks to [落日无序的米莉安](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp) on HeyBox for sharing the manager and creating tutorials.
+
+---
+
+<div align="center">
+
+**RTX-FG-Manager · by 小南瓜**  
+[Website](https://lgxng.cn/) · [Bilibili](https://b23.tv/5mHCHFn) · [GitHub](https://github.com/pandaligx/RTX-FG-Manager) · [GitCode](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager) · [Gitee](https://gitee.com/pandaligx/RTX-FG-Manager)
+
+</div>

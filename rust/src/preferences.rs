@@ -28,40 +28,32 @@ fn read_bounded(path: &Path) -> Result<Vec<u8>> {
     );
     Ok(bytes)
 }
-/// Where the game library, settings and update staging live.
-///
-/// Windows uses `%LOCALAPPDATA%\RTXFGManager`. Linux uses an XDG data
-/// directory (`$XDG_DATA_HOME/rtx-fg-manager`, normally `~/.local/share/...`),
-/// so user state is discoverable and backup-friendly rather than hidden in a
-/// Windows-only variable.
+#[cfg(windows)]
 pub fn directory() -> PathBuf {
-    #[cfg(windows)]
-    {
-        std::env::var_os("LOCALAPPDATA")
-            .map(PathBuf::from)
-            .unwrap_or_else(std::env::temp_dir)
-            .join("RTXFGManager")
-    }
-    #[cfg(not(windows))]
-    {
-        std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .filter(|p| p.is_absolute())
-            .or_else(|| {
-                std::env::var_os("HOME")
-                    .map(PathBuf::from)
-                    .map(|home| home.join(".local").join("share"))
-            })
-            .unwrap_or_else(std::env::temp_dir)
-            .join("rtx-fg-manager")
-    }
+    std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("RTXFGManager")
+}
+#[cfg(target_os = "linux")]
+pub fn directory() -> PathBuf {
+    std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .unwrap_or_else(|| {
+            std::env::var_os("HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(std::env::temp_dir)
+                .join(".local/share")
+        })
+        .join("RTXFGManager")
 }
 pub fn load(dir: &Path) -> Result<Value> {
     let path = dir.join("games.json");
     crate::core::no_links(&path)?;
     if !path.exists() {
         return Ok(
-            json!({"schema":3,"games":[],"roots":[],"language":"system","theme":"跟随系统","backend":"native30","proxies":["version.dll"],"welcome_pending":true}),
+            json!({"schema":3,"games":[],"roots":[],"language":"system","theme":"跟随系统","backend":"native30","proxies":["version.dll"],"initial_scan_pending":true}),
         );
     }
     let v = crate::core::read_json(&path, MAX_SETTINGS_BYTES)?;

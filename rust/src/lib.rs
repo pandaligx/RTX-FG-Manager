@@ -1,82 +1,69 @@
-//! Cross-platform Rust manager core.
-//!
-//! The Windows build talks to the live Win32 API. The Linux build never runs as
-//! a Windows process: it manages a Wine prefix on disk, so `drive_c` is an
-//! ordinary directory tree and the registry is text (`system.reg` / `user.reg`).
-//!
-//! To avoid threading `#[cfg]` through ~22k lines, the platform-specific
-//! modules are selected by `#[path]` while keeping their PUBLIC NAMES identical.
-//! Every existing call site (`crate::win::game_lock`, `crate::gpu_alias::enumerate`,
-//! ...) therefore compiles unchanged on both targets, and the Windows files are
-//! still compiled verbatim on Windows.
-
 pub mod assets;
 pub mod cache;
 pub mod cleanup;
+#[cfg_attr(target_os = "linux", path = "linux/cleanup_pending.rs")]
+pub mod cleanup_pending;
 pub mod cloud;
+pub mod config_store;
 pub mod core;
 pub mod delta;
 pub mod deployment;
 pub mod diagnostics;
+#[cfg_attr(target_os = "linux", path = "elevation_linux.rs")]
+pub mod elevation;
 pub mod encore;
+pub mod encore_components;
+pub mod encore_install;
 pub mod encore_upgrade;
+#[cfg_attr(target_os = "linux", path = "linux/executable_name.rs")]
+pub mod executable_name;
+mod game_engines;
+pub mod game_identity;
+mod game_installations;
+mod game_name_rules;
+#[cfg_attr(target_os = "linux", path = "linux/game_names.rs")]
+mod game_name_windows;
+pub mod game_names;
+#[cfg_attr(target_os = "linux", path = "linux/game_picker.rs")]
+pub mod game_picker;
+#[cfg_attr(target_os = "linux", path = "gpu_alias_linux.rs")]
+pub mod gpu_alias;
+#[cfg_attr(target_os = "linux", path = "hags_linux.rs")]
+pub mod hags;
 pub mod i18n;
 pub mod jsonc;
+#[cfg(windows)]
+mod manager_shortcuts;
+pub mod mfg_plugin;
+pub mod operation_history;
+#[cfg(target_os = "linux")]
 pub mod pe_version;
 pub mod platform;
 pub mod preferences;
 pub mod presets;
+pub mod recommendation_presets;
+pub mod recommendation_runtimes;
+pub mod recommendations;
 pub mod release_notes;
+pub mod reset;
 pub mod rtxmfg;
+pub mod rtxmfg_settings;
 pub mod rtxmfg_upgrade;
 pub mod scanner;
+#[cfg_attr(target_os = "linux", path = "selftest_linux.rs")]
+pub mod selftest;
+pub mod task_progress;
 pub mod transfer;
 pub mod transfusion;
 pub mod updater;
+pub mod upstream040;
+pub mod upstream040_upgrade;
+#[cfg_attr(target_os = "linux", path = "win_linux.rs")]
+pub mod win;
+#[cfg(target_os = "linux")]
 pub mod wine_reg;
-
-// Platform-selected modules. The Windows sources are untouched; the `_linux`
-// siblings expose the same public API so callers stay identical.
-#[cfg(windows)]
-#[path = "win.rs"]
-pub mod win;
-#[cfg(not(windows))]
-#[path = "win_linux.rs"]
-pub mod win;
-
-#[cfg(windows)]
-#[path = "elevation.rs"]
-pub mod elevation;
-#[cfg(not(windows))]
-#[path = "elevation_linux.rs"]
-pub mod elevation;
-
-#[cfg(windows)]
-#[path = "game_icons.rs"]
-pub mod game_icons;
-#[cfg(not(windows))]
-#[path = "game_icons_linux.rs"]
-pub mod game_icons;
-
-#[cfg(windows)]
-#[path = "gpu_alias.rs"]
-pub mod gpu_alias;
-#[cfg(not(windows))]
-#[path = "gpu_alias_linux.rs"]
-pub mod gpu_alias;
-
-#[cfg(windows)]
-#[path = "hags.rs"]
-pub mod hags;
-#[cfg(not(windows))]
-#[path = "hags_linux.rs"]
-pub mod hags;
-
-#[cfg(windows)]
-#[path = "selftest.rs"]
-pub mod selftest;
-#[cfg(not(windows))]
-#[path = "selftest_linux.rs"]
-pub mod selftest;
-
+pub mod xbox;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub mod neural_runtime;
+pub mod runtime_catalog;
+pub mod runtime_files;

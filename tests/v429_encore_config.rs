@@ -6,12 +6,122 @@ fn values(pairs: &[(&str, &str)]) -> Values {
         .map(|(k, v)| ((*k).into(), (*v).into()))
         .collect()
 }
+
+#[test]
+fn encore122_sharpening_is_opt_in_versioned_and_preserves_user_content() {
+    let mode = encore::field("srSharpening").unwrap();
+    let strength = encore::field("srSharpness").unwrap();
+    for version in [None, Some("1.2.1"), Some("1.2.2-beta.1")] {
+        assert!(!encore::field_available(mode, version));
+        assert!(!encore::field_available(strength, version));
+    }
+    assert!(encore::field_available(mode, Some("1.2.2")));
+    assert!(!encore::requires_restart(mode, Some("1.2.2")));
+    let defaults = encore::defaults();
+    assert_eq!(defaults["srSharpening"], "off");
+    assert_eq!(defaults["srSharpness"], "30");
+    assert!(!encore::field_enabled("srSharpness", &defaults, None));
+    let original = b"{\r\n// keep comment\r\n\"configVersion\":4,\"menuState\":{\"menuKey\":36},\"vendor\":{\"srSharpness\":999}}\r\n";
+    assert_eq!(
+        encore::configure(original, &Values::new()).unwrap(),
+        original
+    );
+    let output = encore::configure(
+        original,
+        &values(&[("srSharpening", "custom"), ("srSharpness", "45")]),
+    )
+    .unwrap();
+    let parsed = rtx_fg_manager::jsonc::Document::parse(&output).unwrap();
+    assert_eq!(parsed.value["superResolutionSharpening"]["srSharpness"], 45);
+    assert_eq!(parsed.value["vendor"]["srSharpness"], 999);
+    assert_eq!(parsed.value["menuState"]["menuKey"], 36);
+    assert!(String::from_utf8_lossy(&output).contains("// keep comment\r\n"));
+    assert!(encore::field_enabled(
+        "srSharpness",
+        &encore::read(&output).unwrap(),
+        None
+    ));
+    for value in ["-1", "101", "30.5", "NaN"] {
+        assert!(!encore::valid_value("srSharpness", value));
+    }
+    for value in ["0", "30", "100"] {
+        assert!(encore::valid_value("srSharpness", value));
+    }
+    for value in ["off", "game", "custom"] {
+        assert!(encore::valid_value("srSharpening", value));
+    }
+    assert!(!encore::valid_value("srSharpening", "on"));
+}
+
+#[test]
+fn encore121_hides_retired_policy_without_erasing_legacy_configuration() {
+    let policy = encore::field("providerPatchPolicy").unwrap();
+    assert!(encore::field_available(policy, Some("1.2.0")));
+    assert!(!encore::field_available(policy, Some("1.2.1")));
+    assert!(!encore::field_available(policy, Some("1.3.0")));
+    assert!(!encore::field_available(policy, Some("1.1.4")));
+    let original = b"{\"configVersion\":4, /* preserved */ \"providerPatchPolicy\":\"exact\"}";
+    let out = encore::configure(original, &values(&[("nrIntensity", "0.5")])).unwrap();
+    assert!(String::from_utf8_lossy(&out).contains("/* preserved */"));
+    assert_eq!(encore::read(&out).unwrap()["providerPatchPolicy"], "exact");
+}
+
+#[test]
+fn encore120_inheritance_types_and_version_gates_are_explicit() {
+    let base = b"{\"configVersion\":4,\"vendor\":true}";
+    let out = encore::configure(
+        base,
+        &values(&[("nrPass1Intensity", "0.25"), ("nrPass1AutoMask", "1")]),
+    )
+    .unwrap();
+    let doc = rtx_fg_manager::jsonc::Document::parse(&out).unwrap();
+    assert_eq!(
+        doc.value["neuralRendering"]["passTuning"]["nrPass1Intensity"],
+        0.25
+    );
+    assert_eq!(
+        doc.value["neuralRendering"]["passTuning"]["nrPass1AutoMask"],
+        true
+    );
+    let out = encore::configure(
+        &out,
+        &values(&[
+            ("nrPass1Intensity", "inherit"),
+            ("nrPass1AutoMask", "inherit"),
+        ]),
+    )
+    .unwrap();
+    assert_eq!(encore::read(&out).unwrap()["nrPass1AutoMask"], "inherit");
+    for value in ["-1", "2.1", "NaN", "true"] {
+        assert!(!encore::valid_value("nrPass1Intensity", value));
+    }
+    let engine = encore::field("reconstructionEngine").unwrap();
+    assert!(!encore::field_available(engine, None));
+    assert!(!encore::field_available(engine, Some("1.1.4")));
+    assert!(encore::field_available(engine, Some("1.2.0")));
+    assert!(!encore::field_available(
+        encore::field("smoothMotionForce").unwrap(),
+        Some("1.2.0")
+    ));
+    assert!(encore::requires_restart(
+        encore::field("dlssSrPreset").unwrap(),
+        Some("1.1.4")
+    ));
+    assert!(!encore::requires_restart(
+        encore::field("dlssSrPreset").unwrap(),
+        Some("1.2.0")
+    ));
+    assert!(encore::requires_restart(
+        encore::field("dlssFgPreset").unwrap(),
+        Some("1.2.0")
+    ));
+}
 #[test]
 fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults() {
     encore::validate_cloud_config(encore::DEFAULT_CONFIG).unwrap();
     let read = encore::read(encore::DEFAULT_CONFIG).unwrap();
-    assert_eq!(read, encore::defaults());
-    assert_eq!(encore::fields().len(), 88);
+    assert_eq!(read, encore::defaults_for_version(Some("2.2.0")));
+    assert_eq!(encore::fields().len(), 174);
     assert_eq!(read["menuKey"], "45");
     assert_eq!(read["nrOpenFastProjection"], "1");
     assert_eq!(read["nrFastProcessing"], "1");
@@ -24,14 +134,44 @@ fn upstream_template_covers_every_editable_field_and_conservative_cloud_defaults
 }
 
 #[test]
-fn open_engine_controls_keep_values_but_disable_unsupported_rtx20() {
+fn gpu_detection_does_not_gate_explicit_parameter_selection() {
     let mut settings = encore::defaults();
     settings.insert("nrEnabled".into(), "1".into());
     settings.insert("nrEngine".into(), "opendlss".into());
-    assert!(!encore::field_enabled("nrOpenBackend", &settings, Some(0)));
+    assert!(encore::field_enabled("nrOpenBackend", &settings, Some(0)));
     assert!(encore::field_enabled("nrOpenBackend", &settings, Some(1)));
     assert!(encore::field_enabled("nrOpenBackend", &settings, Some(2)));
     assert_eq!(settings["nrEngine"], "opendlss");
+}
+
+#[test]
+fn stable_switches_are_opt_in_and_old_configs_are_preserved_until_edited() {
+    let mut legacy = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG)
+        .unwrap()
+        .value;
+    legacy["compatibility"]
+        .as_object_mut()
+        .unwrap()
+        .remove("disableInGameMenu");
+    for key in ["logDxgiWrappers", "crashDetails"] {
+        legacy["diagnostics"].as_object_mut().unwrap().remove(key);
+    }
+    encore::validate_cloud_config(&serde_json::to_vec(&legacy).unwrap()).unwrap();
+    let old = b"{\r\n// keep user settings\r\n\"configVersion\":4,\"menuState\":{\"menuKey\":36},\"unknown\":7}\r\n";
+    assert_eq!(encore::configure(old, &Values::new()).unwrap(), old);
+    for key in ["disableInGameMenu", "logDxgiWrappers", "crashDetails"] {
+        let field = encore::fields().iter().find(|f| f.key == key).unwrap();
+        assert!(field.restart);
+        assert_eq!(encore::read(old).unwrap()[key], "0");
+        let out = encore::configure(old, &values(&[(key, "1")])).unwrap();
+        let text = std::str::from_utf8(&out).unwrap();
+        assert!(text.contains("// keep user settings\r\n"));
+        assert!(text.contains("\"menuState\":{\"menuKey\":36}"));
+        assert!(text.contains("\"unknown\":7"));
+        assert_eq!(encore::read(&out).unwrap()[key], "1");
+        assert_eq!(encore::read(&out).unwrap()["menuKey"], "36");
+        assert!(!encore::valid_value(key, "true"));
+    }
 }
 
 #[test]
@@ -51,12 +191,12 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
             out.insert(path.clone());
         }
     }
-    // This is the verbatim JSONC emitted by the signed beta.2 DLL in an isolated
-    // no-window host, not a configuration synthesized from our field metadata.
+    // The template follows documented defaults through 2.1.0. Retired controls
+    // remain in the editor metadata for older installs, not in new configs.
     let captured = rtx_fg_manager::jsonc::Document::parse(encore::DEFAULT_CONFIG).unwrap();
     let mut actual = std::collections::BTreeSet::new();
     leaves(&captured.value, &mut Vec::new(), &mut actual);
-    assert_eq!(actual.len(), 89);
+    assert_eq!(actual.len(), 140);
     let represented: std::collections::BTreeSet<_> =
         encore::fields().iter().map(|f| f.path.clone()).collect();
     let absent: Vec<_> = actual.difference(&represented).cloned().collect();
@@ -64,9 +204,14 @@ fn captured_upstream_template_has_no_unrepresented_functional_leaf() {
         absent,
         vec![
             vec!["configVersion".to_string()],
+            vec![
+                "frameGeneration".to_string(),
+                "flipMeteringLearned".to_string()
+            ],
             vec!["frameGeneration".to_string(), "multiplier".to_string()]
         ]
     );
+    // The learned result is local runtime state, not a preset or shared field.
     // The version is protocol metadata. The physical multiplier is deliberately
     // represented by the existing requested-mode control, including every 2–6X.
     for n in 2..=6 {
@@ -250,7 +395,7 @@ fn hotkey_grammar_and_dependencies_are_shared_with_the_ui() {
     assert!(!encore::field_enabled("nrPrecision", &v, None));
     assert!(!encore::field_enabled("nrPass3Style", &v, None));
     assert!(encore::field_enabled("smoothMotionEnabled", &v, Some(1)));
-    assert!(!encore::field_enabled("smoothMotionEnabled", &v, Some(0)));
+    assert!(encore::field_enabled("smoothMotionEnabled", &v, Some(0)));
 }
 
 #[test]
@@ -270,6 +415,8 @@ fn every_editor_field_can_be_written_and_has_four_translations() {
             encore::FieldKind::Integer => f.min.unwrap_or(0.0).to_string(),
             encore::FieldKind::Decimal => f.min.unwrap_or(0.125).to_string(),
             encore::FieldKind::Hotkey => "Ctrl+Alt+F12".into(),
+            encore::FieldKind::InheritDecimal => "0.25".into(),
+            encore::FieldKind::InheritBool => "1".into(),
         };
         let out = encore::configure(
             encore::DEFAULT_CONFIG,

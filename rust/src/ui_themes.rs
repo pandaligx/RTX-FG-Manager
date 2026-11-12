@@ -3,11 +3,46 @@ use anyhow::{Context as _, Result};
 use gpui::{
     App,
     component::{Theme, ThemeConfig, ThemeMode, ThemeRegistry},
-    px,
 };
 use std::rc::Rc;
 
 const FONT_FAMILY: &str = "Microsoft YaHei UI";
+
+/// NVIDIA's brand color is an identity token, not an operation/status color.
+pub(crate) fn nvidia_brand() -> gpui::Hsla {
+    gpui::rgb(0x76b900).into()
+}
+
+/// Product accent tokens for the optional community light border. Separate from
+/// status/chart colors: the stock chart palette is monochrome blue. Luminance
+/// follows the surface mode so the thin decorative edge works in both themes.
+pub(crate) fn recommendation_accents(theme: &Theme) -> [gpui::Hsla; 5] {
+    let lightness = if theme.mode.is_dark() { 0.65 } else { 0.43 };
+    [0.52, 0.70, 0.90, 0.10, 0.40].map(|hue| gpui::hsla(hue, 0.64, lightness, 1.))
+}
+
+pub(crate) fn flowing_accent(palette: &[gpui::Hsla; 5], phase: f32) -> gpui::Hsla {
+    use gpui::component::Colorize;
+    let position = phase.rem_euclid(1.) * palette.len() as f32;
+    let index = position.floor() as usize % palette.len();
+    let t = position.fract();
+    // Periodic cubic B-spline: position, velocity and acceleration match at every
+    // color join. Unlike per-segment easing, the ribbon never pauses on a color.
+    let weights = [
+        (1. - t).powi(3) / 6.,
+        (3. * t.powi(3) - 6. * t * t + 4.) / 6.,
+        (-3. * t.powi(3) + 3. * t * t + 3. * t + 1.) / 6.,
+        t.powi(3) / 6.,
+    ];
+    let mut color = palette[(index + palette.len() - 1) % palette.len()];
+    let mut total = weights[0];
+    for (offset, weight) in weights.into_iter().enumerate().skip(1) {
+        let next = total + weight;
+        color = color.mix_oklab(palette[(index + offset - 1) % palette.len()], total / next);
+        total = next;
+    }
+    color
+}
 
 /// A preview is an ephemeral choice; only an explicit confirmation persists it.
 #[derive(Clone, Debug, PartialEq)]
@@ -205,7 +240,6 @@ pub fn apply(mode: ThemeMode, light_name: &str, dark_name: &str, cx: &mut App) -
         && Rc::ptr_eq(&current.light_theme, &light)
         && Rc::ptr_eq(&current.dark_theme, &dark)
         && current.font_family.as_ref() == FONT_FAMILY
-        && current.font_size == px(14.)
     {
         return false;
     }
@@ -232,6 +266,7 @@ fn apply_config_with_defaults(
     // a theme that omits shadows, radii, fonts or highlighting cannot inherit
     // them from the previously selected theme. Keep interaction settings such
     // as scrollbar behavior, focus rings and motion policy on the live theme.
+    let font_size = theme.font_size;
     let mut defaults = Theme::default();
     defaults.apply_config(fallback);
     theme.font_family = defaults.font_family;
@@ -244,12 +279,37 @@ fn apply_config_with_defaults(
     theme.highlight_theme = defaults.highlight_theme;
     theme.apply_config(selected);
     theme.font_family = FONT_FAMILY.into();
-    theme.font_size = px(14.);
+    theme.font_size = font_size;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::px;
+    #[test]
+    fn flowing_border_has_no_color_jump_at_any_seam() {
+        let palette = recommendation_accents(&Theme::default());
+        for step in 0..=5 {
+            let phase = step as f32 / 5.;
+            let left = flowing_accent(&palette, phase - 0.00001).to_rgb();
+            let right = flowing_accent(&palette, phase + 0.00001).to_rgb();
+            assert!((left.r - right.r).abs() < 0.001);
+            assert!((left.g - right.g).abs() < 0.001);
+            assert!((left.b - right.b).abs() < 0.001);
+        }
+    }
+    #[test]
+    fn theme_changes_keep_the_users_text_scale() {
+        for size in [12., 14., 18.] {
+            let mut theme = Theme::default();
+            theme.font_size = px(size * 8. / 7.);
+            for mode in [ThemeMode::Light, ThemeMode::Dark] {
+                let fallback = default_theme(mode);
+                apply_config_with_defaults(&mut theme, &fallback, &fallback);
+                assert_eq!(theme.font_size, px(size * 8. / 7.));
+            }
+        }
+    }
     use gpui::component::ThemeSet;
     use std::collections::HashSet;
 
@@ -293,16 +353,15 @@ mod tests {
     }
 
     fn default_theme(mode: ThemeMode) -> Rc<ThemeConfig> {
-        Rc::new(ThemeConfig {
-            name: if mode.is_dark() {
-                "Default Dark".into()
-            } else {
-                "Default Light".into()
-            },
-            mode,
-            is_default: true,
-            ..Default::default()
-        })
+        let mut config = ThemeConfig::default();
+        config.name = if mode.is_dark() {
+            "Default Dark".into()
+        } else {
+            "Default Light".into()
+        };
+        config.mode = mode;
+        config.is_default = true;
+        Rc::new(config)
     }
 
     #[test]
@@ -397,33 +456,29 @@ mod tests {
         apply_config_with_defaults(&mut theme, &fallback, &fallback);
         assert_eq!(theme.shadow, Theme::default().shadow);
         assert_eq!(theme.font_family, FONT_FAMILY);
-        assert_eq!(theme.font_size, px(14.));
+        assert_eq!(theme.font_size, px(16.));
     }
 
     #[test]
     fn omitted_config_fields_restore_mode_defaults_without_resetting_interactions() {
         for mode in [ThemeMode::Light, ThemeMode::Dark] {
-            let fallback = Rc::new(ThemeConfig {
-                highlight: Some(Default::default()),
-                ..default_theme(mode).as_ref().clone()
-            });
-            let custom = Rc::new(ThemeConfig {
-                name: "Custom optional fields".into(),
-                mode,
-                font_family: Some("Temporary UI font".into()),
-                font_size: Some(22.),
-                mono_font_family: Some("Temporary mono font".into()),
-                mono_font_size: Some(19.),
-                radius: Some(1),
-                radius_lg: Some(2),
-                shadow: Some(false),
-                highlight: Some(Default::default()),
-                ..Default::default()
-            });
-            let mut theme = Theme {
-                focus_ring: false,
-                ..Default::default()
-            };
+            let mut fallback = default_theme(mode).as_ref().clone();
+            fallback.highlight = Some(Default::default());
+            let fallback = Rc::new(fallback);
+            let mut custom = ThemeConfig::default();
+            custom.name = "Custom optional fields".into();
+            custom.mode = mode;
+            custom.font_family = Some("Temporary UI font".into());
+            custom.font_size = Some(22.);
+            custom.mono_font_family = Some("Temporary mono font".into());
+            custom.mono_font_size = Some(19.);
+            custom.radius = Some(1);
+            custom.radius_lg = Some(2);
+            custom.shadow = Some(false);
+            custom.highlight = Some(Default::default());
+            let custom = Rc::new(custom);
+            let mut theme = Theme::default();
+            theme.focus_ring = false;
             apply_config_with_defaults(&mut theme, &custom, &fallback);
             assert_eq!(theme.mono_font_family, "Temporary mono font");
             assert_eq!(theme.radius, px(1.));
@@ -441,7 +496,7 @@ mod tests {
             assert_eq!(theme.highlight_theme.name, fallback.name.as_ref());
             assert_eq!(theme.highlight_theme.appearance, mode);
             assert_eq!(theme.font_family, FONT_FAMILY);
-            assert_eq!(theme.font_size, px(14.));
+            assert_eq!(theme.font_size, px(16.));
             assert!(!theme.focus_ring);
         }
     }

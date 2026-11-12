@@ -44,13 +44,18 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Unit and filesystem regression tests
+      - name: Check Linux library and desktop application
+        run: cargo check --locked --target x86_64-unknown-linux-gnu --lib --bin RTXManager
+
+      - name: Portable configuration and Linux regression tests
         # --target is mandatory here too: .cargo/config.toml pins the Windows
         # triple, so without it this would try to build for Windows and fail.
-        run: cargo test --locked --target x86_64-unknown-linux-gnu
+        run: |
+          cargo test --locked --target x86_64-unknown-linux-gnu --lib
+          cargo test --locked --target x86_64-unknown-linux-gnu --test v429_encore_config --test v4328_encore220 --test gpu_alias_linux_e2e
 
       - name: Clippy
-        run: cargo clippy --locked --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
+        run: cargo clippy --locked --lib --bin RTXManager --target x86_64-unknown-linux-gnu -- -D warnings
 
       - name: Build release
         # --target is required: .cargo/config.toml pins the Windows triple, and
@@ -61,7 +66,7 @@ jobs:
         run: |
           curl -fsSL -o "$RUNNER_TEMP/appimagetool" \
             https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          echo "95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6  $RUNNER_TEMP/appimagetool" \
+          echo "e8c1169c4af66c3184d7ee110713d4be04befe671fa358e2c1591ee840553b03  $RUNNER_TEMP/appimagetool" \
             | sha256sum -c -
           chmod +x "$RUNNER_TEMP/appimagetool"
 

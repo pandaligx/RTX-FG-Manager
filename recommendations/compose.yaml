@@ -1,0 +1,23 @@
+services:
+  recommendations:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:17836:8080"
+    env_file: .env
+    environment:
+      TRUST_PROXY: "1"
+    volumes:
+      - recommendation-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    pids_limit: 96
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "3"}
+volumes:
+  recommendation-data:

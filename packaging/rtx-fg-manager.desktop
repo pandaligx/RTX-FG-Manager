@@ -14,4 +14,3 @@ Keywords=nvidia;dlss;frame;generation;gpu;
 StartupNotify=true
 StartupWMClass=RTXManager
 X-AppImage-Name=RTXFrameGenerationManager
-X-AppImage-Version=4.2.9

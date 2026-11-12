@@ -50,7 +50,9 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
         serde_json::from_slice(&fs::read(folder.join("catalog.json"))?)?;
     let c = compact.expand(&fs::read(folder.join("index.json"))?)?;
     assert_eq!(c.packages.len(), 20);
-    assert_eq!(c.schemes().len(), 5);
+    assert_eq!(c.schemes().len(), 3);
+    assert_eq!(c.scheme_policies.len(), 5); // Retired initial scheme stays readable for recovery.
+    assert!(c.schemes().iter().all(|p| p.scheme_id != "initial"));
     assert_eq!(c.default_scheme, "upstream-0.3.5-310-9");
     assert_eq!(c.proxies(SCHEME), ["version.dll"]);
     assert_eq!(c.proxies("rtxfg-0.3.5-dx12-vulkan").len(), 6);
@@ -75,10 +77,19 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
     // those ZIPs intentionally have new immutable names and identities. Keep
     // the stable scheme IDs and assert the *unchanged* 4.2.2 resources exactly.
     for (id, old) in &c.scheme_policies {
+        if id == "initial" {
+            assert!(!current.schemes().iter().any(|p| p.scheme_id == *id));
+            continue;
+        }
         let new = &current.scheme_policies[id];
         assert_eq!(new.gpu_paths, old.gpu_paths, "{id}");
-        assert_eq!(new.parameter_profile, old.parameter_profile, "{id}");
-        assert_eq!(new.max_selected_proxies, old.max_selected_proxies, "{id}");
+        if id == &current.default_scheme {
+            assert_eq!(new.parameter_profile, "upstream041");
+            assert_eq!(new.max_selected_proxies, 1);
+        } else {
+            assert_eq!(new.parameter_profile, old.parameter_profile, "{id}");
+            assert_eq!(new.max_selected_proxies, old.max_selected_proxies, "{id}");
+        }
     }
     let unchanged = c
         .packages
@@ -88,9 +99,25 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
     assert_eq!(unchanged.len(), 6);
     for old in unchanged {
         let new = current.packages.iter().find(|p| p.id == old.id).unwrap();
+        if new.scheme_id == SCHEME {
+            assert_eq!(new.label, "Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan");
+        }
         let sorted = |p: &cloud::Package| -> Result<serde_json::Value> {
             let mut p = p.clone();
             p.files.sort_by(|a, b| a.name.cmp(&b.name));
+            // Schema 3 makes the legacy download URLs explicit; bytes and
+            // deployment identities remain unchanged.
+            p.urls.clear();
+            // 4.3.1 changes only packaging for these legacy schemes.
+            p.archive.clear();
+            p.archive_prefix.clear();
+            p.bytes = 0;
+            p.sha256.clear();
+            // 4.3.10 corrects the public upstream label, not the legacy binary.
+            if p.scheme_id == SCHEME {
+                p.label.clear();
+                p.labels.clear();
+            }
             Ok(serde_json::to_value(p)?)
         };
         assert_eq!(sorted(new)?, sorted(old)?);

@@ -48,6 +48,8 @@ function Add-Tree([string]$Relative, [string[]]$Extensions) {
     while ($pending.Count) {
         $directory = $pending.Pop()
         foreach ($item in Get-ChildItem -LiteralPath $directory -Force) {
+            # Generated static deployment output; the reviewed source is help/.
+            if ($Relative -eq 'community/public' -and $item.PSIsContainer -and $item.Name -eq 'help') { continue }
             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Linked source entry is not permitted: $($item.FullName)" }
             if ($item.PSIsContainer) { $pending.Push($item.FullName); continue }
             if ($Extensions -contains $item.Extension.ToLowerInvariant()) {
@@ -64,30 +66,66 @@ foreach ($name in @(
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json', 'rust/ui-translations.json',
     'app/assets/cleanup-catalog.json', 'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',
     'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/GPUI-FAST-LICENSE', 'rust/assets/licenses/LUCIDE-LICENSE',
-    'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json', 'app/tools/aria2.conf',
-    'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1',
+    'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json',
+    'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1', 'tools/build_scheme_bundles.py',
     'tools/prepare-fixtures.ps1', 'tools/export-source.ps1', 'tests/fixture-manifest.json', 'tests/source_export.ps1', 'tests/test_publication.py', 'tests/test_encore_cloud.py', '.github/workflows/build.yml',
     'vendor/gpui_fast_windows/Cargo.toml', 'vendor/gpui_fast_windows/Cargo.toml.orig',
     'vendor/gpui_fast_windows/build.rs', 'vendor/gpui_fast_windows/LICENSE',
     'vendor/gpui_fast_windows/README.md', 'vendor/gpui_fast_windows/LOCAL_CHANGES.md',
     'rust/assets/themes/LICENSE-APACHE'
 )) { Add-File $name }
-foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md')) { Add-File $name $false }
+foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md', 'docs/encore-1.1.0.md', 'docs/encore-1.1.0.zh-CN.md')) { Add-File $name $false }
+Add-File 'tools/build_game_names.py'
+Add-File 'tools/game-name-overrides.json'
+Add-File 'tests/test_game_names.py'
+Add-File '.github/workflows/update-game-names.yml'
+Add-File 'docs/game-names.md'
+Add-File 'tools/update_download_stats.py'
+Add-File 'tools/client_release.py'
+Add-File 'tests/test_client_release.py'
+Add-File 'docs/client-updates.md'
+Add-File 'tests/test_download_stats.py'
+Add-File '.github/workflows/update-download-stats.yml'
+Add-File 'docs/download-stats.json'
+Add-File 'docs/downloads-total.svg'
+foreach ($name in @('tools/sync_runtimes.py', 'tests/test_runtime_sync.py', '.github/workflows/sync-runtimes.yml', 'docs/runtime-sync.md', 'cloud/runtime-catalog.json')) { Add-File $name }
 Add-Tree 'rust/src' @('.rs')
+Add-Tree 'help' @('.html', '.css', '.js')
+foreach ($name in @('community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore', 'community/wrangler.example.jsonc', 'community/README.md', 'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json', '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md')) { Add-File $name }
+Add-Tree 'community/src' @('.mjs', '.json')
+Add-Tree 'community/public' @('.html', '.css', '.js')
+Add-Tree 'community/tests' @('.mjs')
+Add-Tree 'community/migrations' @('.sql')
+foreach ($name in @('recommendations/package.json', 'recommendations/pnpm-lock.yaml', 'recommendations/.gitignore', 'recommendations/.dockerignore', 'recommendations/Dockerfile', 'recommendations/compose.yaml', 'recommendations/config.example', 'recommendations/nginx-location.conf', 'recommendations/README.md')) { Add-File $name }
+Add-Tree 'recommendations/src' @('.mjs')
+Add-File 'recommendations/src/game-directory.json'
+Add-File 'recommendations/src/preset-contracts.json'
+Add-Tree 'recommendations/public' @('.html', '.css', '.js')
+Add-Tree 'recommendations/public/icons' @('.svg')
+Add-File 'recommendations/public/icons/LICENSE'
+Add-Tree 'recommendations/tests' @('.mjs')
+Add-File 'recommendations/NODEMAILER-LICENSE'
 Add-Tree 'rust/assets' @('.json', '.jsonc', '.svg', '.png', '.ico', '.txt', '.md')
 Add-Tree 'vendor/gpui_fast_windows/src' @('.rs', '.hlsl')
 Add-Tree 'vendor/gpui_fast_windows/resources' @('.rc', '.xml', '.manifest', '.ico')
 foreach ($item in Get-ChildItem -LiteralPath (Join-Path $root 'tests') -File -Filter '*.rs') { Add-File "tests/$($item.Name)" }
-foreach ($version in @('420', '421', '422', '425')) { Add-Tree "tests/fixtures/catalog$version" @('.json') }
+Add-Tree 'tests/fixtures/catalog041' @('.ini')
+foreach ($version in @('420', '421', '422', '425', '429')) { Add-Tree "tests/fixtures/catalog$version" @('.json') }
 # Public cloud metadata and publish automation are separately reviewed source inputs.
 foreach ($name in @('cloud/schemes.json', 'tools/cloud_release.py', 'docs/cloud-publishing.md', '.github/scripts/mirror_gitee.py')) { Add-File $name $false }
 if (-not $ExcludeCloudMetadata) {
     Add-File 'update.json' $false
+    Add-File 'update-v2.json' $false
     Add-File 'cloud/catalog.json' $false
     Add-Tree 'cloud/indexes' @('.json')
+    Add-Tree 'cloud/v3' @('.json')
+    Add-Tree 'cloud/bundles' @('.json')
+    Add-File 'cloud/help.json' $false
+    Add-File 'cloud/game-names.json' $false
+    Add-Tree 'cloud/names' @('.json')
 }
 foreach ($name in @('.github/workflows/mirror-gitee.yml', '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml')) { Add-File $name $false }
-foreach ($name in @('docs/screenshot-home.png', 'docs/screenshot-home-zh.png', 'docs/screenshot-home-themes.png')) { Add-File $name $false }
+foreach ($name in @('docs/brand-banner.svg', 'docs/brand-banner.png', 'docs/download-en.svg', 'docs/download-zh.svg', 'docs/screenshot-home.png', 'docs/screenshot-home-zh.png')) { Add-File $name $false }
 
 $binaryExtensions = @('.png', '.ico')
 $findings = [Collections.Generic.List[string]]::new()

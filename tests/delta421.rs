@@ -21,7 +21,8 @@ fn new_cloud_capability_is_optional_and_generic_packages_stay_off() -> Result<()
     let bytes = fs::read(folder.join("catalog.json"))?;
     let index = fs::read(folder.join("index.json"))?;
     let catalog = serde_json::from_slice::<cloud::CompactCatalog>(&bytes)?.expand(&index)?;
-    assert_eq!(catalog.schemes().len(), 4);
+    assert_eq!(catalog.schemes().len(), 2);
+    assert_eq!(catalog.scheme_policies.len(), 4);
     assert_eq!(catalog.packages.len(), 19);
     assert_eq!(catalog.default_scheme, "upstream-0.3.5-310-9");
     assert!(
@@ -101,7 +102,7 @@ fn root() -> PathBuf {
 }
 fn context(exe: &Path) -> presets::Context {
     let c = cloud::bundled();
-    let mut p = c.scheme_policies[&c.default_scheme].clone();
+    let mut p = c.scheme_policies[SCHEME].clone();
     p.capabilities.insert(delta::CAPABILITY.into());
     presets::Context::new(SCHEME, &p, exe)
 }
@@ -375,7 +376,20 @@ fn managed_uninstall_retains_retry_record_and_ignores_edited_id() -> Result<()> 
         .share_mode(1)
         .open(cache.join("sl.common.dll"))?;
     assert!(cleanup::clean(&exe)?.starts_with("补丁已移除，缓存待清理"));
-    assert!(core::record(dir)?.unwrap().cache_pending);
+    let pending = core::record(dir)?.unwrap();
+    assert!(pending.cache_pending);
+    assert!(
+        pending
+            .cleanup_pending_reasons
+            .iter()
+            .any(|r| r.contains("占用") || r.contains("删除"))
+    );
+    let game = rtx_fg_manager::scanner::Game {
+        exe: exe.display().to_string(),
+        ..Default::default()
+    };
+    let display = rtx_fg_manager::deployment::inspect(&game, &rtx_fg_manager::cloud::bundled());
+    assert!(display.cleanup_pending && !display.cleanup_details.is_empty());
     assert!(!dir.join("version.dll").exists());
     assert!(!dir.join("自定义日志/native_123.jsonl").exists());
     assert_eq!(fs::read(dir.join("自定义日志/notes.txt"))?, b"user notes");

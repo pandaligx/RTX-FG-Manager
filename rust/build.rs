@@ -4,13 +4,10 @@ use std::{env, fs, io::Write, path::PathBuf};
 
 fn main() {
     println!("cargo:rerun-if-changed=rust/native");
-    // The native probe extension compiles MSVC-flavoured C++ and links D3D12.
-    // It is Windows-only; fail with a clear message instead of a compiler dump.
-    let target_windows = env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
     if env::var_os("CARGO_FEATURE_NATIVE_PROBES").is_some() {
         assert!(
-            target_windows,
-            "native-probes is Windows-only; build the Linux AppImage with default features. See BUILDING.md"
+            env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows"),
+            "native-probes requires Windows; build Linux with default features"
         );
         assert!(
             PathBuf::from("rust/native/probe_entry.cpp").is_file(),
@@ -64,14 +61,6 @@ fn main() {
             names.push(format!("payloads/{folder}/{name}"));
         }
     }
-    // `aria2c.exe` is a Windows executable fetched by tools/prepare-build.ps1.
-    // The Linux build deliberately uses the distribution's `aria2c` instead
-    // (see `assets::tool`), so it must not depend on that Windows payload being
-    // present. Order is preserved on Windows so the embedded table is unchanged.
-    if target_windows {
-        names.push("app/tools/aria2c.exe".to_owned());
-    }
-    names.push("app/tools/aria2.conf".to_owned());
     let mut code = String::from("pub static EMBEDDED: &[Embedded] = &[\n");
     for (index, name) in names.iter().enumerate() {
         let path = if name.starts_with("payloads/") {

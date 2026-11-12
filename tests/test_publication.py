@@ -20,19 +20,20 @@ def current_source_export_files():
     lists = re.findall(
         r'foreach \(\$name in @\((.*?)\)\) \{ Add-File \$name(?: \$false)? \}',
         script, re.S)
-    if len(lists) != 5:
+    if len(lists) != 8:
         raise AssertionError('Review the source exporter Add-File list structure')
     for group in lists:
         files.update(re.findall(r"'([^']+)'", group))
     files.update(re.findall(r"Add-File '([^']+)'", script))
     trees = re.findall(r"Add-Tree '([^']+)' @\(([^)]*)\)", script)
-    if len(trees) != 5:
+    if len(trees) != 18:
         raise AssertionError('Review the source exporter Add-Tree structure')
     for directory, group in trees:
         extensions = set(re.findall(r"'([^']+)'", group))
         files.update(p.relative_to(ROOT).as_posix()
                      for p in (ROOT / directory).rglob('*')
-                     if p.is_file() and p.suffix.lower() in extensions)
+                     if p.is_file() and p.suffix.lower() in extensions
+                     and not (directory == 'community/public' and p.relative_to(ROOT / directory).parts[0] == 'help'))
     files.update(p.relative_to(ROOT).as_posix() for p in (ROOT / 'tests').glob('*.rs'))
     fixture_list = re.search(r'foreach \(\$version in @\(([^)]*)\)\)', script)
     if not fixture_list:
@@ -59,8 +60,19 @@ class SourceAllowlistTests(unittest.TestCase):
                          'rust/assets/licenses/GPUI-FAST-LICENSE',
                          'rust/assets/encore-defaults.jsonc',
                          'rust/assets/encore-fields.json',
+                         'rust/assets/game-names.json', 'cloud/game-names.json',
+                         'tools/build_game_names.py', 'docs/game-names.md',
+                         'tools/game-name-overrides.json', 'tests/test_game_names.py',
+                         '.github/workflows/update-game-names.yml',
+                         'tools/sync_runtimes.py', 'tests/test_runtime_sync.py',
+                         '.github/workflows/sync-runtimes.yml',
+                         'docs/runtime-sync.md', 'cloud/runtime-catalog.json',
                          'tests/test_encore_cloud.py',
-                         'tests/v429_encore_cloud.rs'):
+                         'tests/v429_encore_cloud.rs',
+                         'recommendations/src/api.mjs', 'recommendations/Dockerfile',
+                         'recommendations/src/presets.mjs',
+                         'recommendations/src/preset-contracts.json',
+                         'recommendations/config.example', 'recommendations/NODEMAILER-LICENSE'):
             self.assertIn(required, files)
         self.assertEqual(sum(path.startswith('rust/assets/themes/') and path.endswith('.json')
                              for path in files), 21)
@@ -96,7 +108,10 @@ class SourceAllowlistTests(unittest.TestCase):
                      'development/gpui-fast-upgrade/license-review.md',
                      'payloads/version.dll', 'log/game.txt', 'rust/native/probe.cpp',
                      'AGENTS.md', 'agent.md', 'RELEASE_WORKFLOW.md',
-                     'tests/fixtures/catalog999/private.json'):
+                     'tests/fixtures/catalog999/private.json',
+                     'recommendations/.env', 'recommendations/data/recommendations.sqlite',
+                     'recommendations/node_modules/nodemailer/package.json',
+                     'recommendations/backups/backup.json'):
             self.assertFalse(mirror['allowed_source'](path), path)
 
 

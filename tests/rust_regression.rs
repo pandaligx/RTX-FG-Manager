@@ -480,7 +480,7 @@ fn normal_build_resources_and_proxy_selection_are_explicit() {
             .iter()
             .map(|r| r.name)
             .collect::<Vec<_>>(),
-        ["app/tools/aria2c.exe", "app/tools/aria2.conf"]
+        Vec::<&str>::new()
     );
 }
 #[test]
@@ -510,7 +510,7 @@ fn manifest() -> updater::Manifest {
     updater::Manifest{notes:Default::default(),schema:1,version:"4.0.0".into(),file:"RTXManager-v4.0.0-x64.exe".into(),bytes:1048576,sha256:"a".repeat(64),source:"github".into(),url:"https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.0.0/RTXManager-v4.0.0-x64.exe".into()}
 }
 #[test]
-fn malicious_updates_and_aria_options_rejected() {
+fn malicious_updates_rejected() {
     for url in [
         "http://github.com/a",
         "https://evil.test/a",
@@ -530,14 +530,6 @@ fn malicious_updates_and_aria_options_rejected() {
     for v in ["4.0", "4.0.0.1", "4.-1.2", "4.00000.0", "4.0.0/x"] {
         assert!(updater::version(v).is_err())
     }
-    let opts = updater::aria_options(
-        "enable-rpc=true\ncheck-certificate=false\ndir=C:\\Windows\non-download-complete=evil\nsplit=99\nasync-dns-server=127.0.0.1,8.8.8.8",
-    );
-    assert!(opts.contains(&"--split=30".into()));
-    assert!(!opts.iter().any(|s| s.contains("evil")
-        || s.contains("certificate")
-        || s.contains("rpc")
-        || s.contains("Windows")));
 }
 #[test]
 fn update_rename_rolls_back_without_overwriting_changed_target() -> Result<()> {
@@ -649,6 +641,42 @@ fn versioned_update_preserves_modified_destination_on_failed_launch() -> Result<
     );
     assert_eq!(fs::read(&new)?, b"external change");
     assert_eq!(fs::read(&backup)?, b"old");
+    Ok(())
+}
+
+#[test]
+fn update_keeps_existing_filename_and_rolls_back_without_breaking_shortcuts() -> Result<()> {
+    for name in [
+        "RTXManager-v4.3.18-x64.exe",
+        "RTXManager.exe",
+        "我的管理器.exe",
+    ] {
+        let d = tempfile::tempdir()?;
+        let target = d.path().join(name);
+        let stage = d.path().join("update.new");
+        let backup = d.path().join("update.previous");
+        let unrelated = d.path().join("RTXManager-v4.3.19-x64.exe");
+        fs::write(&target, b"old")?;
+        fs::write(&stage, b"new")?;
+        fs::write(&unrelated, b"unrelated")?;
+        assert!(
+            updater::replace_and_launch(&target, &stage, &backup, &core::hash(b"old"), || {
+                assert_eq!(fs::read(&target)?, b"new");
+                anyhow::bail!("new window did not become ready")
+            })
+            .is_err()
+        );
+        assert_eq!(fs::read(&target)?, b"old");
+        assert!(!backup.exists());
+        fs::write(&stage, b"new")?;
+        updater::replace_and_launch(&target, &stage, &backup, &core::hash(b"old"), || {
+            assert_eq!(fs::read(&target)?, b"new");
+            Ok(())
+        })?;
+        assert_eq!(fs::read(&target)?, b"new");
+        assert_eq!(fs::read(&unrelated)?, b"unrelated");
+        assert!(!backup.exists());
+    }
     Ok(())
 }
 
@@ -1136,21 +1164,158 @@ fn component_probe_distinguishes_super_resolution_and_frame_generation() {
 }
 
 #[test]
-fn welcome_only_for_new_users_and_dismissal_persists() -> Result<()> {
+fn initial_scan_only_for_new_users_and_dismissal_persists() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let mut state = preferences::load(dir.path())?;
-    assert_eq!(state["welcome_pending"], true);
-    state["welcome_pending"] = serde_json::json!(false);
+    assert_eq!(state["initial_scan_pending"], true);
+    state["initial_scan_pending"] = serde_json::json!(false);
     let store = preferences::Store::new(dir.path().into());
     store.save(state)?;
     store.finish()?;
-    assert_eq!(preferences::load(dir.path())?["welcome_pending"], false);
+    assert_eq!(
+        preferences::load(dir.path())?["initial_scan_pending"],
+        false
+    );
     core::atomic_json(
         &dir.path().join("games.json"),
-        &serde_json::json!({"schema":3,"games":[],"language":"ja"}),
+        &serde_json::json!({"schema":3,"games":[],"language":"ja","welcome_pending":true}),
     )?;
     let old = preferences::load(dir.path())?;
-    assert!(old.get("welcome_pending").is_none());
+    assert!(old.get("initial_scan_pending").is_none());
+    assert_eq!(old["welcome_pending"], true);
     assert_eq!(old["language"], "ja");
     Ok(())
+}
+
+#[test]
+fn component_probe_covers_engine_layouts_without_crossing_games() -> Result<()> {
+    // Names are deliberately generic: these are engine layouts, not game rules.
+    for (exe_relative, dll_relative) in [
+        ("Game.exe", "nvngx_dlss.dll"),
+        (
+            "Project/Binaries/Win64/Game.exe",
+            "Engine/Plugins/Marketplace/nvidia/DLSS/Binaries/ThirdParty/Win64/nvngx_dlss.dll",
+        ),
+        (
+            "Project/Binaries/Win64/Game.exe",
+            "Engine/Plugins/Runtime/Nvidia/Streamline/Binaries/ThirdParty/Win64/NVNGX_DLSS.DLL",
+        ),
+        ("Game.exe", "Game_Data/Plugins/x86_64/nvngx_dlss.dll"),
+        ("bin/x64_dx12/Game.exe", "bin/x64_dx12/nvngx_dlss.dll"),
+        (
+            "bin64/Game.exe",
+            "vendor/render/plugins/dlss/nvngx_dlss.dll",
+        ),
+    ] {
+        let dir = tempfile::tempdir()?;
+        let root = dir.path().join("GameA");
+        let exe = root.join(exe_relative);
+        let dll = root.join(dll_relative);
+        fs::create_dir_all(exe.parent().unwrap())?;
+        fs::create_dir_all(dll.parent().unwrap())?;
+        fs::write(&exe, b"never executed")?;
+        fs::write(&dll, b"component discovery only")?;
+        let evidence = scanner::inspect(&exe);
+        assert!(evidence.super_resolution, "{dll_relative}");
+        assert!(evidence.component_paths.iter().any(|p| p == &dll));
+        fs::remove_file(dll)?;
+        let neighbor = dir.path().join("GameB");
+        fs::create_dir(&neighbor)?;
+        fs::write(neighbor.join("nvngx_dlss.dll"), b"another game")?;
+        assert!(!scanner::inspect(&exe).super_resolution);
+    }
+    Ok(())
+}
+
+#[test]
+fn component_probe_does_not_confuse_wrappers_fg_nr_or_backups_with_sr() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let exe = game(dir.path());
+    for name in [
+        "sl.dlss.dll",
+        "nvngx_dlssg.dll",
+        "nvngx_dlssnr.dll",
+        "nvngx_dlssd.dll",
+        "sl.interposer.dll",
+    ] {
+        fs::write(dir.path().join(name), b"fixture")?;
+    }
+    for folder in ["backups", ".rtx-fg-nr", core::OWN] {
+        fs::create_dir(dir.path().join(folder))?;
+        fs::write(dir.path().join(folder).join("nvngx_dlss.dll"), b"backup")?;
+    }
+    let evidence = scanner::inspect(&exe);
+    assert!(!evidence.super_resolution);
+    assert!(evidence.super_resolution_plugin && evidence.frame_generation);
+    Ok(())
+}
+
+#[test]
+fn component_probe_reports_truncated_search_as_incomplete() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let exe = game(dir.path());
+    let deep = (0..19).fold(dir.path().to_path_buf(), |p, _| p.join("nested"));
+    fs::create_dir_all(&deep)?;
+    fs::write(deep.join("nvngx_dlss.dll"), b"fixture")?;
+    let evidence = scanner::inspect(&exe);
+    assert!(evidence.limited && !evidence.super_resolution);
+    Ok(())
+}
+
+#[test]
+#[ignore = "Read-only local game probe; set RTXFG_COMPONENT_PROBE explicitly"]
+fn component_probe_local_game() -> Result<()> {
+    let path = std::env::var("RTXFG_COMPONENT_PROBE")?;
+    let exe = Path::new(&path);
+    let evidence = scanner::inspect(exe);
+    println!("{evidence:#?}");
+    assert!(
+        evidence.super_resolution,
+        "Expected a locally supplied DLSS SR game"
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "Only started as a disposable process by the termination regression"]
+fn process_wait_fixture() {
+    if std::env::var("RTXFG_PROCESS_FIXTURE").as_deref() == Ok("1") {
+        std::thread::sleep(std::time::Duration::from_secs(30));
+    }
+}
+
+#[test]
+fn confirmed_process_termination_checks_path_and_creation_time() -> Result<()> {
+    use rtx_fg_manager::win;
+    use std::process::{Command, Stdio};
+    let exe = std::env::current_exe()?;
+    let mut child = Command::new(&exe)
+        .args(["--exact", "process_wait_fixture", "--ignored"])
+        .env("RTXFG_PROCESS_FIXTURE", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    let result = (|| -> Result<()> {
+        let entry = win::processes_in_directory(exe.parent().unwrap(), None)?
+            .into_iter()
+            .find(|p| p.pid == child.id())
+            .unwrap();
+        assert!(entry.can_terminate());
+        let mut wrong = entry.clone();
+        wrong.created = entry.created.map(|n| n + 1);
+        assert!(win::terminate_confirmed(&wrong).is_err());
+        assert!(child.try_wait()?.is_none());
+        wrong = entry.clone();
+        wrong.path = Some(exe.with_file_name("different.exe"));
+        assert!(win::terminate_confirmed(&wrong).is_err());
+        assert!(child.try_wait()?.is_none());
+        win::terminate_confirmed(&entry)?;
+        child.wait()?;
+        Ok(())
+    })();
+    // Only this test's child can be terminated on failure; no name-based taskkill.
+    let _ = child.kill();
+    let _ = child.wait();
+    result
 }

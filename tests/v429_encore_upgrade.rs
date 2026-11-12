@@ -52,12 +52,252 @@ fn old_install(target: &core::DeploymentTarget) -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn encore_full_uninstall_removes_empty_workspace_and_allows_reinstall() -> Result<()> {
+    for custom in [false, true] {
+        let (_temp, target) = fixture(custom)?;
+        for _ in 0..2 {
+            install_120(&target)?;
+            let own = target.directory.join(core::OWN);
+            assert!(own.join("cache").is_dir() && own.join("logs").is_dir());
+            fs::write(own.join("logs/frame_timing.txt"), b"old managed log")?;
+            let logs = target.directory.join("rtx-encore-logs");
+            fs::create_dir(&logs)?;
+            fs::write(logs.join("rtx-encore.log"), b"session")?;
+            assert!(cleanup::clean_outcome_at(&target)?.complete);
+            assert!(!own.exists(), "empty manager workspace must be removed");
+            assert!(!target.directory.join(encore::CONFIG).exists());
+            assert!(!logs.exists());
+            assert!(!target.directory.join("rtx-encore-runtimes").exists());
+            assert_eq!(core::status_at(&target), "未部署");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn full_uninstall_keeps_unknown_files_and_backups_but_prunes_empty_children() -> Result<()> {
+    let (_temp, target) = fixture(false)?;
+    install_120(&target)?;
+    let own = target.directory.join(core::OWN);
+    fs::write(own.join("original.dll.backup"), b"original backup")?;
+    let logs = target.directory.join("rtx-encore-logs");
+    fs::create_dir(&logs)?;
+    fs::write(logs.join("rtx-encore.log"), b"session")?;
+    fs::write(logs.join("manual-capture.csv"), b"keep capture")?;
+    assert!(cleanup::clean_outcome_at(&target)?.complete);
+    assert!(core::record(&target.directory)?.is_none());
+    assert!(!own.join("cache").exists() && !own.join("logs").exists());
+    assert_eq!(
+        fs::read(own.join("original.dll.backup"))?,
+        b"original backup"
+    );
+    assert_eq!(fs::read(logs.join("manual-capture.csv"))?, b"keep capture");
+    assert!(!target.directory.join(encore::CONFIG).exists());
+    install_120(&target)?;
+    assert!(cleanup::clean_outcome_at(&target)?.complete);
+    assert_eq!(
+        fs::read(own.join("original.dll.backup"))?,
+        b"original backup"
+    );
+    Ok(())
+}
+
 fn encore_files(proxy: &str) -> BTreeMap<String, Vec<u8>> {
     BTreeMap::from([
         (proxy.into(), pe(true, 2)),
         (encore::CONFIG.into(), br#"{"configVersion":4,"frameGeneration":{"mode":"game","multiplier":4},"overlay":{"showOverlay":false}}"#.to_vec()),
         (encore::NOTICES.into(), b"RTX Encore third-party license notices fixture\n".to_vec()),
     ])
+}
+
+fn install_120(target: &core::DeploymentTarget) -> Result<String> {
+    let mut files = encore_files("version.dll");
+    files.insert("version.dll".into(), pe(true, 3));
+    for name in encore::INTEL_FILES {
+        files.insert(
+            name.into(),
+            if name.ends_with(".dll") {
+                pe(true, 9)
+            } else {
+                b"Intel license".to_vec()
+            },
+        );
+    }
+    core::deploy_prepared_context_at_with_overrides(
+        target,
+        encore::BACKEND,
+        &["version.dll".into()],
+        None,
+        files,
+        Some("1.2.0"),
+        Some(&context(encore::PROFILE)),
+        None,
+        Some("1.2.0"),
+    )
+}
+
+#[test]
+fn encore130_multi_directory_upgrade_keeps_individual_settings_and_cleans_owned_files() -> Result<()>
+{
+    let (_temp, first) = fixture(false)?;
+    let plugin = first.directory.join("plugins");
+    fs::create_dir(&plugin)?;
+    let second = core::DeploymentTarget::custom(&first.game_exe, &plugin);
+    for (i, target) in [&first, &second].into_iter().enumerate() {
+        install_120(target)?;
+        let bytes = format!(
+            "{{\n// directory {i}\n\"configVersion\":4,\"neuralRendering\":{{\"core\":{{\"nrEngine\":\"opendlss\",\"nrEnabled\":true}},\"appearance\":{{\"nrIntensity\":{}}}}},\"menuState\":{{\"menuKey\":36}},\"vendor\":{i}}}",
+            if i == 0 { "0.5" } else { "1.5" }
+        );
+        fs::write(target.directory.join(encore::CONFIG), bytes)?;
+        fs::write(
+            target.directory.join("other-plugin.dll"),
+            b"keep unrelated plugin",
+        )?;
+    }
+    for target in [&first, &second] {
+        let mut files = encore_files("version.dll");
+        files.insert("version.dll".into(), pe(true, 4));
+        for name in encore::INTEL_FILES {
+            files.insert(
+                name.into(),
+                if name.ends_with(".dll") {
+                    pe(true, 9)
+                } else {
+                    b"Intel license".to_vec()
+                },
+            );
+        }
+        let message = core::deploy_prepared_context_at_with_overrides(
+            target,
+            encore::BACKEND,
+            &["version.dll".into()],
+            None,
+            files,
+            Some("1.3.0"),
+            Some(&context(encore::PROFILE)),
+            None,
+            Some("1.3.0"),
+        )?;
+        assert!(message.contains("OpenNR"));
+        assert!(core::status_at(target).starts_with("已部署"));
+        let path = target.directory.join(encore::CONFIG);
+        let current = fs::read(&path)?;
+        assert_eq!(encore::read(&current)?["nrEnabled"], "0");
+        assert_eq!(encore::read(&current)?["menuKey"], "36");
+        core::apply_parameters_at(
+            target,
+            &context(encore::PROFILE),
+            &BTreeMap::from([
+                ("nrEnabled".into(), "1".into()),
+                ("nrFoveation".into(), "1".into()),
+            ]),
+        )?;
+        assert_eq!(encore::read(&fs::read(path)?)?["nrEnabled"], "1");
+    }
+    assert_eq!(
+        encore::read(&fs::read(first.directory.join(encore::CONFIG))?)?["nrIntensity"],
+        "0.5"
+    );
+    assert_eq!(
+        encore::read(&fs::read(second.directory.join(encore::CONFIG))?)?["nrIntensity"],
+        "1.5"
+    );
+    for target in [&second, &first] {
+        assert!(cleanup::clean_outcome_at(target)?.complete);
+        assert!(!target.directory.join(encore::CONFIG).exists());
+        assert_eq!(
+            fs::read(target.directory.join("other-plugin.dll"))?,
+            b"keep unrelated plugin"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn intel_private_runtimes_upgrade_preserve_config_and_uninstall_by_ownership() -> Result<()> {
+    for upgrade_old in [false, true] {
+        let (_temp, target) = fixture(false)?;
+        if upgrade_old {
+            let mut old_files = encore_files("version.dll");
+            old_files.insert(encore::CONFIG.into(), br#"{"configVersion":4,"frameGeneration":{"mode":"game","multiplier":4,"flipMeteringBypass":false},"unknown":true}"#.to_vec());
+            core::deploy_prepared_context_at_with_overrides(
+                &target,
+                encore::BACKEND,
+                &["version.dll".into()],
+                None,
+                old_files,
+                Some("1.1.4"),
+                Some(&context(encore::PROFILE)),
+                None,
+                Some("1.1.4"),
+            )?;
+        }
+        let config = target.directory.join(encore::CONFIG);
+        let old = if upgrade_old {
+            Some(fs::read(&config)?)
+        } else {
+            None
+        };
+        fs::write(
+            target.directory.join("libxess.dll"),
+            b"game original Intel runtime",
+        )?;
+        install_120(&target)?;
+        if let Some(before) = old {
+            assert_eq!(fs::read(&config)?, before);
+        }
+        let record = core::record(&target.directory)?.unwrap();
+        record.validate()?;
+        assert_eq!(record.hashes.len(), 7);
+        for name in encore::INTEL_FILES {
+            assert!(target.directory.join(name).is_file());
+        }
+        let logs = target.directory.join("rtx-encore-logs");
+        fs::create_dir_all(&logs)?;
+        fs::write(logs.join("rtx-encore_frames_12345.jsonl"), b"generated")?;
+        fs::write(logs.join("rtx-encore_frames_user.jsonl"), b"manual")?;
+        assert!(cleanup::clean_outcome_at(&target)?.complete);
+        for name in encore::INTEL_FILES {
+            assert!(!target.directory.join(name).exists());
+        }
+        assert!(!target.directory.join("rtx-encore-runtimes").exists());
+        assert!(!logs.join("rtx-encore_frames_12345.jsonl").exists());
+        assert_eq!(
+            fs::read(logs.join("rtx-encore_frames_user.jsonl"))?,
+            b"manual"
+        );
+        assert_eq!(
+            fs::read(target.directory.join("libxess.dll"))?,
+            b"game original Intel runtime"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn intel_unknown_or_replaced_runtime_is_not_overwritten_or_deleted() -> Result<()> {
+    let (_temp, target) = fixture(false)?;
+    upgrade(&target, "version.dll", &BTreeMap::new())?;
+    let path = target.directory.join(encore::INTEL_FILES[0]);
+    fs::create_dir_all(path.parent().unwrap())?;
+    fs::write(&path, b"user runtime")?;
+    assert!(install_120(&target).is_err());
+    assert_eq!(fs::read(&path)?, b"user runtime");
+    fs::remove_file(&path)?;
+    install_120(&target)?;
+    fs::write(&path, b"changed after installation")?;
+    assert!(!cleanup::clean_outcome_at(&target)?.complete);
+    assert_eq!(fs::read(&path)?, b"changed after installation");
+    assert!(!target.directory.join(encore::INTEL_FILES[1]).exists());
+    let plan = rtx_fg_manager::cleanup_pending::prepare_at(&target, None)?;
+    assert_eq!(plan.paths().collect::<Vec<_>>(), vec![path.as_path()]);
+    rtx_fg_manager::cleanup_pending::delete_confirmed(&plan)?;
+    assert!(cleanup::retry_pending_at(&target)?.complete);
+    assert!(!target.directory.join("rtx-encore-runtimes").exists());
+    assert!(core::record(&target.directory)?.is_none());
+    Ok(())
 }
 
 fn upgrade(
@@ -191,21 +431,35 @@ fn repeated_encore_install_uses_latest_disk_document_and_does_not_replace_dll() 
             encore::BACKEND,
             &["version.dll".into()],
             None,
-            different,
+            different.clone(),
             Some("1.0.0"),
             Some(&context(encore::PROFILE)),
             None,
-            Some("1.0.0-beta.3"),
+            Some("1.0.0-beta.2"),
         )
         .is_err()
     );
     assert_eq!(fs::read(target.directory.join("version.dll"))?, pe(true, 2));
+    let before_upgrade = fs::read(&config)?;
+    core::deploy_prepared_context_at_with_overrides(
+        &target,
+        encore::BACKEND,
+        &["version.dll".into()],
+        None,
+        different,
+        Some("1.0.0"),
+        Some(&context(encore::PROFILE)),
+        None,
+        Some("1.0.0-beta.3"),
+    )?;
+    assert_eq!(fs::read(target.directory.join("version.dll"))?, pe(true, 3));
+    assert_eq!(fs::read(&config)?, before_upgrade);
     Ok(())
 }
 
 #[test]
-fn all_nineteen_entries_deploy_same_bytes_and_bink_originals_survive_removal() -> Result<()> {
-    for proxy in encore::PROXIES {
+fn supported_entries_deploy_prepared_bytes_and_bink_originals_survive_removal() -> Result<()> {
+    for proxy in encore::ENTRIES {
         let (_temp, target) = fixture(false)?;
         let hooked = match proxy {
             "binkw64.dll" => Some("binkw64Hooked.dll"),
@@ -227,10 +481,9 @@ fn all_nineteen_entries_deploy_same_bytes_and_bink_originals_survive_removal() -
             assert_eq!(fs::read(target.directory.join(name))?, pe(true, 7));
         }
     }
-    assert!(core::deployment_names(encore::BACKEND, &["rtx-encore.asi".into()]).is_err());
+    assert!(core::deployment_names(encore::BACKEND, &["unknown.asi".into()]).is_err());
     assert!(
-        core::deployment_names(encore::BACKEND, &["version.dll".into(), "dxgi.dll".into()])
-            .is_err()
+        core::deployment_names(encore::BACKEND, &["version.dll".into(), "dxgi.dll".into()]).is_ok()
     );
     Ok(())
 }
@@ -271,9 +524,32 @@ fn cleanup_retains_modified_notice_and_unrecognized_files_inside_logs() -> Resul
     let logs = target.directory.join("rtx-encore-logs");
     fs::create_dir(&logs)?;
     fs::write(logs.join("rtx-encore.log"), b"owned session")?;
+    fs::write(logs.join("rtx-encore-status.json"), b"{}")?;
     fs::write(logs.join("rtx-encore_perf.csv"), b"owned metrics")?;
     let rotated = "rtx-encore.log.previous-20261009-015707-625-12888.log";
     fs::write(logs.join(rotated), b"owned rotated session")?;
+    let dump = "rtx-encore-13512-134365138303574349.dump1.dmp";
+    fs::write(logs.join(dump), b"generated crash dump")?;
+    let extra = [
+        "rtx-encore.gpu-bootstrap.log",
+        "rtx-encore.log.previous-legacy.log",
+        "rtx-encore-13512-134365138303574349.calls.log",
+        "rtx-encore-13512-134365138303574349.exit.dmp",
+        "rtx-encore-13512-134365138303574349.gpu.dmp",
+        "rtx-encore-13512-134365138303574349.hang.dmp",
+    ];
+    for name in extra {
+        fs::write(logs.join(name), b"generated diagnostic")?;
+    }
+    let retained_dumps = [
+        "manual-capture.dmp",
+        "rtx-encore-user.dump1.dmp",
+        "rtx-encore-13512-134365138303574349.dmp",
+        "rtx-encore-13512-134365138303574349.dump1.dmp.backup",
+    ];
+    for name in retained_dumps {
+        fs::write(logs.join(name), b"user capture")?;
+    }
     fs::write(
         logs.join("rtx-encore.log.previous-user-notes.log"),
         b"user notes",
@@ -288,8 +564,16 @@ fn cleanup_retains_modified_notice_and_unrecognized_files_inside_logs() -> Resul
     assert!(outcome.complete);
     assert!(!target.directory.join("version.dll").exists());
     assert!(!logs.join("rtx-encore.log").exists());
+    assert!(!logs.join("rtx-encore-status.json").exists());
     assert!(!logs.join("rtx-encore_perf.csv").exists());
     assert!(!logs.join(rotated).exists());
+    assert!(!logs.join(dump).exists());
+    for name in extra {
+        assert!(!logs.join(name).exists(), "{name}");
+    }
+    for name in retained_dumps {
+        assert_eq!(fs::read(logs.join(name))?, b"user capture");
+    }
     assert_eq!(
         fs::read(logs.join("rtx-encore.log.previous-user-notes.log"))?,
         b"user notes"

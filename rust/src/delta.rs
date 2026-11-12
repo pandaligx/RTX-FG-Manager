@@ -182,16 +182,20 @@ pub fn clean_at(root: &Path, exe: &Path, ids: &[String], legacy: bool) -> Report
     let mut report = Report::default();
     for id in ids {
         let result = (|| -> Result<()> {
-            ensure!(
-                is_game(exe) && valid_id(id) && id == &cache_id(exe),
-                "组件缓存归属无效"
-            );
+            ensure!(valid_id(id), "组件缓存标识无效");
             let folder = core::no_links(&root.join("games").join(id))?;
-            if !folder.exists() {
+            // A stale record from a moved/copied game is already clean when
+            // its cache is absent. Validate ownership only before deletion.
+            if !folder.try_exists()? {
                 return Ok(());
             }
+            ensure!(
+                is_game(exe) && valid_id(id) && id == &cache_id(exe),
+                "此缓存记录对应的游戏路径与当前路径不同；已保留该目录，避免删除其他游戏的文件"
+            );
             if folder.join(OWNER).exists() {
-                read_owner(&folder)?;
+                read_owner(&folder)
+                    .context("缓存归属记录损坏或与游戏路径不符；已保留文件，请打开位置核对")?;
             }
             // The deployment record also proves ownership if owner.json is lost.
             let _lock = win::game_lock(&folder)?;

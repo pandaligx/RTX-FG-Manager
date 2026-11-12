@@ -3,15 +3,26 @@ use crate::platform::CommandExt;
 use crate::{core, win};
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
-#[cfg(windows)]
-use std::time::{Duration, Instant};
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
     sync::atomic::{AtomicBool, Ordering},
+    time::{Duration, Instant},
 };
 pub const REPO: &str = "pandaligx/RTX-FG-Manager";
+pub const GITCODE_REPO: &str = "gcw_qWIjmve7/RTX-FG-Manager";
+fn release_base(source: &str, version: &str) -> Result<String> {
+    let repo = match source {
+        "gitcode" => GITCODE_REPO,
+        "github" | "gitee" => REPO,
+        _ => bail!("更新来源无效"),
+    };
+    self::version(version)?;
+    Ok(format!(
+        "https://{source}.com/{repo}/releases/download/v{}",
+        version.trim_start_matches('v')
+    ))
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
     pub schema: u32,
@@ -40,15 +51,19 @@ pub fn version(s: &str) -> Result<[u16; 3]> {
 impl Manifest {
     pub fn validate(&self, tag: &str) -> Result<()> {
         ensure!(
-            self.schema == 1 && version(&self.version)? == version(tag)?,
+            matches!(self.schema, 1 | 2) && version(&self.version)? == version(tag)?,
             "更新清单与版本不匹配"
         );
         ensure!(
             self.file
-                == format!(
-                    "RTXManager-v{}-x64.exe",
-                    self.version.trim_start_matches('v')
-                )
+                == match self.schema {
+                    1 => format!(
+                        "RTXManager-v{}-x64.exe",
+                        self.version.trim_start_matches('v')
+                    ),
+                    2 => "RTXManager.exe".into(),
+                    _ => unreachable!("schema checked above"),
+                }
                 && core::valid_hash(&self.sha256.to_lowercase()),
             "更新清单文件或摘要无效"
         );
@@ -63,10 +78,18 @@ impl Manifest {
         Ok(())
     }
     pub fn same_file(&self, other: &Self) -> bool {
-        self.version == other.version
+        self.schema == other.schema
+            && self.version == other.version
             && self.file == other.file
             && self.bytes == other.bytes
             && self.sha256.eq_ignore_ascii_case(&other.sha256)
+    }
+    fn metadata_file(&self) -> &'static str {
+        if self.schema == 2 {
+            "update-v2.json"
+        } else {
+            "update.json"
+        }
     }
 }
 pub fn safe_url(s: &str) -> Result<reqwest::Url> {
@@ -103,34 +126,40 @@ fn release_with_fetch(
     // Public static files need neither an API quota nor an embedded account token.
     // Only the release publisher promotes these after verifying both sites.
     let urls = match source {
-        "gitee" => vec![format!("https://gitee.com/{REPO}/raw/main/update.json")],
+        "gitcode" => vec![format!(
+            "https://api.gitcode.com/api/v5/repos/{GITCODE_REPO}/raw/update-v2.json?ref=main"
+        )],
+        "gitee" => vec![format!("https://gitee.com/{REPO}/raw/main/update-v2.json")],
         "github" => vec![
-            format!("https://raw.githubusercontent.com/{REPO}/main/update.json"),
-            format!("https://github.com/{REPO}/releases/latest/download/update.json"),
+            format!("https://raw.githubusercontent.com/{REPO}/main/update-v2.json"),
+            format!("https://github.com/{REPO}/releases/latest/download/update-v2.json"),
         ],
         _ => bail!("更新来源无效"),
     };
+    let mut errors = Vec::new();
     for url in urls {
         ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
         let result = (|| -> Result<Manifest> {
             let mut m: Manifest = serde_json::from_value(fetch(&url, cancel)?)?;
             m.validate(&m.version)?;
+            // Legacy update.json is permanently pinned to the bridge. Falling
+            // back to it would falsely report "up to date" during a v2 outage.
+            // Schema 1 is accepted only for incoming legacy install tickets.
+            ensure!(m.schema == 2, "新更新通道清单格式无效");
             m.version = m.version.trim_start_matches('v').into();
             // Never accept a manifest-supplied EXE URL or source, even if the
             // JSON came from an official host. Construct the versioned route.
-            m.url = format!(
-                "https://{source}.com/{REPO}/releases/download/v{}/{}",
-                m.version, m.file
-            );
+            m.url = format!("{}/{}", release_base(source, &m.version)?, m.file);
             m.source = source.into();
             Ok(m)
         })();
         ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
-        if let Ok(m) = result {
-            return Ok(m);
+        match result {
+            Ok(m) => return Ok(m),
+            Err(error) => errors.push(error.to_string()),
         }
     }
-    bail!("更新信息暂时不可用")
+    bail!("{}", errors.join("；"))
 }
 pub fn check(choice: &str) -> Result<Option<Manifest>> {
     check_with_cancel(choice, &AtomicBool::new(false))
@@ -139,12 +168,16 @@ fn source_order(choice: &str) -> [&'static str; 2] {
     // An explicit GitHub preference is retained; auto/legacy settings now use
     // domestic first, independent of Windows region or VPN configuration.
     if choice == "github" {
-        ["github", "gitee"]
+        ["github", "gitcode"]
     } else {
-        ["gitee", "github"]
+        ["gitcode", "github"]
     }
 }
 pub fn check_with_cancel(choice: &str, cancel: &AtomicBool) -> Result<Option<Manifest>> {
+    // No Linux release channel exists yet. Never offer or launch a Windows EXE.
+    if cfg!(target_os = "linux") {
+        return Ok(None);
+    }
     check_with_fetch(choice, cancel, &mut get_json_with_cancel)
 }
 fn check_with_fetch(
@@ -157,33 +190,26 @@ fn check_with_fetch(
         ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
         match release_with_fetch(source, cancel, fetch) {
             Ok(m) => return Ok((version(&m.version)? > version(crate::VERSION)?).then_some(m)),
-            Err(_) => errors.push(format!("{source}: 更新信息暂时不可用")),
+            Err(error) => errors.push(format!("{source}: {error}")),
         }
     }
     ensure!(!cancel.load(Ordering::Relaxed), "检查更新已取消");
     bail!("检查更新失败，请稍后重试。{}", errors.join("；"))
 }
 fn mirror_release(m: &Manifest, source: &str, cancel: &AtomicBool) -> Result<Manifest> {
-    ensure!(["github", "gitee"].contains(&source), "更新来源无效");
-    let base = format!(
-        "https://{source}.com/{REPO}/releases/download/v{}",
-        m.version
-    );
+    let base = release_base(source, &m.version)?;
     let other: Manifest = serde_json::from_value(get_json_with_cancel(
-        &format!("{base}/update.json"),
+        &format!("{base}/{}", m.metadata_file()),
         cancel,
     )?)?;
     matching_mirror(m, source, other)
 }
 fn matching_mirror(m: &Manifest, source: &str, mut other: Manifest) -> Result<Manifest> {
-    ensure!(["github", "gitee"].contains(&source), "更新来源无效");
+    let base = release_base(source, &m.version)?;
     other.validate(&m.version)?;
     ensure!(m.same_file(&other), "更新附件尚未同步完成");
     other.source = source.into();
-    other.url = format!(
-        "https://{source}.com/{REPO}/releases/download/v{}/{}",
-        m.version, m.file
-    );
+    other.url = format!("{base}/{}", m.file);
     Ok(other)
 }
 pub fn verify(path: &Path, m: &Manifest) -> Result<()> {
@@ -200,68 +226,6 @@ pub fn verify(path: &Path, m: &Manifest) -> Result<()> {
         "更新文件版本不匹配"
     );
     Ok(())
-}
-pub fn aria_options(text: &str) -> Vec<String> {
-    let size_pattern = regex::Regex::new(r"^[1-9]\d?[KM]$").expect("fixed size pattern");
-    let mut result: std::collections::BTreeMap<String, String> =
-        std::collections::BTreeMap::from([
-            ("max-connection-per-server".into(), "30".into()),
-            ("split".into(), "30".into()),
-        ]);
-    for l in text.lines() {
-        let Some((k, v)) = l.split_once('=') else {
-            continue;
-        };
-        let (k, v) = (k.trim(), v.trim());
-        let value = match k {
-            "async-dns"
-            | "disable-ipv6"
-            | "enable-http2"
-            | "enable-doh-http2"
-            | "enable-http-pipelining"
-                if ["true", "false"].contains(&v) =>
-            {
-                Some(v.into())
-            }
-            "max-connection-per-server" | "split" => {
-                v.parse::<u32>().ok().map(|n| n.clamp(1, 30).to_string())
-            }
-            "min-split-size" | "piece-length" if size_pattern.is_match(v) => Some(v.into()),
-            "async-dns-mode" if ["multi", "single"].contains(&v) => Some(v.into()),
-            "uri-selector" if ["inorder", "feedback", "adaptive"].contains(&v) => Some(v.into()),
-            "async-dns-server" => {
-                let v = v
-                    .split(',')
-                    .map(|s| s.trim().parse::<std::net::IpAddr>())
-                    .collect::<std::result::Result<Vec<_>, _>>();
-                v.ok().filter(|v| !v.is_empty() && v.len() <= 8).map(|v| {
-                    v.iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(",")
-                })
-            }
-            _ => None,
-        };
-        if let Some(v) = value {
-            result.insert(k.into(), v);
-        }
-    }
-    // The bundled customized aria2 accepts 1..1024 connections (verified --help).
-    // Keep its signed configuration unchanged; update-specific settings are explicit.
-    for (key, value) in [
-        ("async-dns", "false"),
-        ("disable-ipv6", "false"),
-        ("split", "30"),
-        ("max-connection-per-server", "30"),
-        ("min-split-size", "1M"),
-    ] {
-        result.insert(key.into(), value.into());
-    }
-    result
-        .into_iter()
-        .map(|(k, v)| format!("--{k}={v}"))
-        .collect()
 }
 pub use crate::transfer::{Phase as DownloadPhase, Progress as DownloadProgress};
 
@@ -352,6 +316,9 @@ pub fn download_with_preference(
             policy: crate::transfer::UrlPolicy::Official,
         };
         let result = crate::transfer::download(&request, &path, cancel, |mut p| {
+            if let Some(file) = &mut p.file {
+                file.name = "RTXManager.exe".into();
+            }
             // A valid transport checksum is not an Authenticode verification.
             if p.phase == DownloadPhase::Complete {
                 p.phase = DownloadPhase::Verifying;
@@ -389,7 +356,7 @@ pub struct Ticket {
     pub data_dir: PathBuf,
 }
 fn launch(path: &Path, args: &[&std::ffi::OsStr]) -> Result<()> {
-    Command::new(path)
+    crate::executable_name::command(path)
         .args(args)
         .current_dir(path.parent().context("无效路径")?)
         .creation_flags(0x08000000)
@@ -397,20 +364,16 @@ fn launch(path: &Path, args: &[&std::ffi::OsStr]) -> Result<()> {
     Ok(())
 }
 pub fn install(path: &Path, m: &Manifest, data: &Path) -> Result<()> {
+    ensure!(
+        cfg!(windows),
+        "Linux AppImage 请手动更新，不使用 Windows 更新通道"
+    );
     verify(path, m)?;
     let target = core::no_links(&std::env::current_exe()?)?;
     let s = win::verify_signature(&target)?;
     ensure!(
         version(&s.version)? < version(&m.version)?,
         "当前版本无需更新"
-    );
-    let destination = target.with_file_name(&m.file);
-    ensure!(
-        target
-            .to_string_lossy()
-            .eq_ignore_ascii_case(&destination.to_string_lossy())
-            || !destination.exists(),
-        "新版文件名已被占用，未替换任何文件"
     );
     // Display-only notes must not enlarge the small, backward-compatible install ticket.
     let mut install_manifest = m.clone();
@@ -516,6 +479,7 @@ pub fn replace_named_and_launch(
 
 /// Called once after the new manager has drawn frames, with disk work off the UI thread.
 pub fn signal_ready(data: &Path) -> Result<()> {
+    crate::executable_name::signal_ready(data)?;
     let Ok(token) = std::env::var("RTXFG_UPDATE_READY") else {
         return Ok(());
     };
@@ -527,126 +491,111 @@ pub fn signal_ready(data: &Path) -> Result<()> {
     let ticket: Ticket =
         serde_json::from_value(core::read_json(&folder.join("install.json"), 16384)?)?;
     let exe = core::no_links(&std::env::current_exe()?)?;
-    ensure!(
-        exe == ticket.target.with_file_name(&ticket.manifest.file),
-        "Unexpected updated executable"
-    );
+    ensure!(exe == ticket.target, "Unexpected updated executable");
     verify(&exe, &ticket.manifest)?;
     core::atomic_json(
         &folder.join("ready.json"),
         &serde_json::json!({"pid":std::process::id(),"sha256":ticket.manifest.sha256}),
     )
 }
-pub fn apply(#[cfg_attr(not(windows), allow(unused_variables))] ticket: &Path) -> Result<()> {
-    // Windows replaces RTXManager.exe in place. A Linux AppImage is a single
-    // read-only squashfs image mounted by the kernel, so the running file cannot
-    // be overwritten — the user replaces the .AppImage itself. Reporting this
-    // explicitly is better than a confusing permission error mid-write.
-    #[cfg(not(windows))]
-    anyhow::bail!(
-        "Linux 版以 AppImage 分发：程序文件是只读的压缩镜像，无法自我替换。请从发布页下载新的 AppImage 覆盖旧文件。"
+pub fn apply(ticket: &Path) -> Result<()> {
+    let _cache_lock = crate::cache::operation_lock()?;
+    let ticket = core::no_links(ticket)?;
+    ensure!(
+        ticket.file_name().is_some_and(|s| s == "install.json"),
+        "更新安装记录无效"
     );
-    #[cfg(windows)]
-    {
-        let _cache_lock = crate::cache::operation_lock()?;
-        let ticket = core::no_links(ticket)?;
-        ensure!(
-            ticket.file_name().is_some_and(|s| s == "install.json"),
-            "更新安装记录无效"
-        );
-        let t: Ticket = serde_json::from_value(core::read_json(&ticket, 16384)?)?;
-        ensure!(
-            t.schema == 1
-                && t.parent > 0
-                && t.parent != std::process::id()
-                && core::valid_hash(&t.old_sha256),
-            "更新安装记录无效"
-        );
-        let folder = ticket.parent().context("无效路径")?;
-        let token = folder.file_name().context("无效路径")?.to_string_lossy();
-        ensure!(
-            token.len() == 32
-                && token.bytes().all(|c| c.is_ascii_hexdigit())
-                && folder == core::no_links(&t.data_dir.join("updates").join(token.as_ref()))?,
-            "更新暂存路径无效"
-        );
-        t.manifest.validate(crate::VERSION)?;
-        let source = core::no_links(&std::env::current_exe()?)?;
-        ensure!(source == folder.join(&t.manifest.file), "更新程序路径无效");
-        verify(&source, &t.manifest)?;
-        let target = core::no_links(&t.target)?;
-        ensure!(
-            target
-                .extension()
-                .is_some_and(|s| s.eq_ignore_ascii_case("exe"))
-                && version(&win::verify_signature(&target)?.version)? < version(crate::VERSION)?,
-            "更新目标无效"
-        );
-        win::wait_process(t.parent, 120000)?;
-        ensure!(
-            core::digest(&target)? == t.old_sha256,
-            "更新目标已变化，已停止替换"
-        );
-        let name = target.file_name().context("无效路径")?.to_string_lossy();
-        let destination = target.with_file_name(&t.manifest.file);
-        let stage = target.with_file_name(format!("{name}.{token}.new"));
-        let backup = target.with_file_name(format!("{name}.{token}.previous"));
-        ensure!(!stage.exists() && !backup.exists(), "更新备份路径冲突");
-        let mut src = fs::File::open(&source)?;
-        let mut dst = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&stage)?;
-        std::io::copy(&mut src, &mut dst)?;
-        dst.sync_all()?;
-        drop(dst);
-        verify(&stage, &t.manifest)?;
-        replace_named_and_launch(
-            &target,
-            &destination,
-            &stage,
-            &backup,
-            &t.old_sha256,
-            || {
-                let mut child = Command::new(&destination)
-                    .args(["--data-dir".as_ref(), t.data_dir.as_os_str()])
-                    .env("RTXFG_UPDATE_READY", token.as_ref())
-                    .current_dir(destination.parent().context("无效路径")?)
-                    .creation_flags(0x08000000)
-                    .spawn()?;
-                let start = Instant::now();
-                loop {
-                    if let Ok(ready) = core::read_json(&folder.join("ready.json"), 1024)
-                        && ready["pid"] == child.id()
-                        && ready["sha256"] == t.manifest.sha256
-                    {
-                        return Ok(());
-                    }
-                    if let Some(status) = child.try_wait()? {
-                        bail!("新版未能启动：{status}");
-                    }
-                    if start.elapsed() > Duration::from_secs(60) {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        bail!("新版启动超时，已恢复旧版");
-                    }
-                    std::thread::sleep(Duration::from_millis(100));
+    let t: Ticket = serde_json::from_value(core::read_json(&ticket, 16384)?)?;
+    ensure!(
+        t.schema == 1
+            && t.parent > 0
+            && t.parent != std::process::id()
+            && core::valid_hash(&t.old_sha256),
+        "更新安装记录无效"
+    );
+    let folder = ticket.parent().context("无效路径")?;
+    let token = folder.file_name().context("无效路径")?.to_string_lossy();
+    ensure!(
+        token.len() == 32
+            && token.bytes().all(|c| c.is_ascii_hexdigit())
+            && folder == core::no_links(&t.data_dir.join("updates").join(token.as_ref()))?,
+        "更新暂存路径无效"
+    );
+    t.manifest.validate(crate::VERSION)?;
+    let source = core::no_links(&std::env::current_exe()?)?;
+    ensure!(source == folder.join(&t.manifest.file), "更新程序路径无效");
+    verify(&source, &t.manifest)?;
+    let target = core::no_links(&t.target)?;
+    ensure!(
+        target
+            .extension()
+            .is_some_and(|s| s.eq_ignore_ascii_case("exe"))
+            && version(&win::verify_signature(&target)?.version)? < version(crate::VERSION)?,
+        "更新目标无效"
+    );
+    win::wait_process(t.parent, 120000)?;
+    ensure!(
+        core::digest(&target)? == t.old_sha256,
+        "更新目标已变化，已停止替换"
+    );
+    let name = target.file_name().context("无效路径")?.to_string_lossy();
+    // Retain the user's filename so shortcuts and pinned launchers keep working.
+    // The manifest filename identifies the verified download, not its destination.
+    let destination = target.clone();
+    let stage = target.with_file_name(format!("{name}.{token}.new"));
+    let backup = target.with_file_name(format!("{name}.{token}.previous"));
+    ensure!(!stage.exists() && !backup.exists(), "更新备份路径冲突");
+    let mut src = fs::File::open(&source)?;
+    let mut dst = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&stage)?;
+    std::io::copy(&mut src, &mut dst)?;
+    dst.sync_all()?;
+    drop(dst);
+    verify(&stage, &t.manifest)?;
+    replace_named_and_launch(
+        &target,
+        &destination,
+        &stage,
+        &backup,
+        &t.old_sha256,
+        || {
+            let mut child = crate::executable_name::command(&destination)
+                .args(["--data-dir".as_ref(), t.data_dir.as_os_str()])
+                .env("RTXFG_UPDATE_READY", token.as_ref())
+                .current_dir(destination.parent().context("无效路径")?)
+                .creation_flags(0x08000000)
+                .spawn()?;
+            let start = Instant::now();
+            loop {
+                if let Ok(ready) = core::read_json(&folder.join("ready.json"), 1024)
+                    && ready["pid"] == child.id()
+                    && ready["sha256"] == t.manifest.sha256
+                {
+                    return Ok(());
                 }
-            },
-        )?;
-        core::atomic_json(
-            &folder.join("installed.json"),
-            &serde_json::json!({"version":crate::VERSION,"backup":backup,"target":destination,"previous_target":target}),
-        )
-    }
+                if let Some(status) = child.try_wait()? {
+                    bail!("新版未能启动：{status}");
+                }
+                if start.elapsed() > Duration::from_secs(60) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    bail!("新版启动超时，已恢复旧版");
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        },
+    )?;
+    core::atomic_json(
+        &folder.join("installed.json"),
+        &serde_json::json!({"version":crate::VERSION,"backup":backup,"target":destination,"previous_target":target}),
+    )
 }
 
 #[cfg(test)]
 mod download_tests {
-    #![cfg(windows)]
     use super::*;
-    use crate::transfer::Readout;
-    use std::io::Write;
 
     fn checked_github_manifest() -> Manifest {
         Manifest {
@@ -663,29 +612,46 @@ mod download_tests {
         }
     }
 
+    fn fixed_manifest() -> Manifest {
+        Manifest {
+            schema: 2,
+            version: crate::VERSION.into(),
+            file: "RTXManager.exe".into(),
+            ..checked_github_manifest()
+        }
+    }
+
     #[test]
-    fn domestic_check_uses_static_json_without_api_or_github() -> Result<()> {
+    fn domestic_check_uses_anonymous_gitcode_file_without_github() -> Result<()> {
         let cancel = AtomicBool::new(false);
         let mut calls = Vec::new();
-        let mut supplied = checked_github_manifest();
+        let mut supplied = fixed_manifest();
         supplied.source = "untrusted".into();
         supplied.url = "https://example.invalid/untrusted.exe".into();
         let mut fetch = |url: &str, _: &AtomicBool| {
             calls.push(url.to_owned());
             Ok(serde_json::to_value(&supplied)?)
         };
-        let actual = release_with_fetch("gitee", &cancel, &mut fetch)?;
-        assert_eq!(actual.source, "gitee");
+        let actual = release_with_fetch("gitcode", &cancel, &mut fetch)?;
+        assert_eq!(actual.source, "gitcode");
         assert_eq!(
             actual.url,
-            format!("https://gitee.com/{REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe")
+            format!(
+                "https://gitcode.com/{GITCODE_REPO}/releases/download/v{}/RTXManager.exe",
+                crate::VERSION
+            )
         );
         // An older published manifest still counts as a successful check, and
         // must not fall through to the inaccessible overseas service.
         assert!(check_with_fetch("auto", &cancel, &mut fetch)?.is_none());
         assert_eq!(
             calls,
-            vec![format!("https://gitee.com/{REPO}/raw/main/update.json"); 2]
+            vec![
+                format!(
+                    "https://api.gitcode.com/api/v5/repos/{GITCODE_REPO}/raw/update-v2.json?ref=main"
+                );
+                2
+            ]
         );
         Ok(())
     }
@@ -695,12 +661,11 @@ mod download_tests {
         for malformed in [false, true] {
             let cancel = AtomicBool::new(false);
             let mut calls = Vec::new();
-            let mut m = checked_github_manifest();
+            let mut m = fixed_manifest();
             m.version = "9999.0.0".into();
-            m.file = "RTXManager-v9999.0.0-x64.exe".into();
             let mut fetch = |url: &str, _: &AtomicBool| {
                 calls.push(url.to_owned());
-                if url.starts_with("https://gitee.com/") {
+                if url.starts_with("https://api.gitcode.com/") {
                     if malformed {
                         return Ok(serde_json::json!({"message": "403 Forbidden"}));
                     }
@@ -711,26 +676,85 @@ mod download_tests {
             let result = check_with_fetch("domestic", &cancel, &mut fetch)?.unwrap();
             assert_eq!(result.source, "github");
             assert_eq!(calls.len(), 2);
-            assert!(calls[0].contains("gitee.com"));
+            assert!(calls[0].contains("api.gitcode.com"));
             assert!(calls[1].contains("raw.githubusercontent.com"));
-            assert!(!calls.iter().any(|u| u.contains("/api/")));
+            assert!(!calls.iter().any(|u| u.contains("access_token")));
         }
         Ok(())
     }
 
     #[test]
-    fn legacy_github_manifest_remains_a_fallback() -> Result<()> {
+    fn github_release_asset_remains_a_fallback() -> Result<()> {
         let mut calls = Vec::new();
         let mut fetch = |url: &str, _: &AtomicBool| {
             calls.push(url.to_owned());
             if url.contains("raw.githubusercontent.com") {
                 bail!("TLS connection failed");
             }
-            Ok(serde_json::to_value(checked_github_manifest())?)
+            Ok(serde_json::to_value(fixed_manifest())?)
         };
         release_with_fetch("github", &AtomicBool::new(false), &mut fetch)?;
         assert_eq!(calls.len(), 2);
-        assert!(calls[1].ends_with("/releases/latest/download/update.json"));
+        assert!(calls[1].ends_with("/releases/latest/download/update-v2.json"));
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_bridge_is_accepted_for_install_but_never_hides_a_new_update() -> Result<()> {
+        let legacy = checked_github_manifest();
+        legacy.validate(&legacy.version)?;
+        let mut calls = Vec::new();
+        let mut fetch = |url: &str, _: &AtomicBool| {
+            calls.push(url.to_owned());
+            Ok(serde_json::to_value(&legacy)?)
+        };
+        assert!(check_with_fetch("auto", &AtomicBool::new(false), &mut fetch).is_err());
+        assert!(calls.iter().all(|url| url.contains("update-v2.json")));
+        // Both supported install formats use the old ticket envelope, so the
+        // signed bridge installer can be launched by an unmodified old client.
+        for manifest in [legacy, fixed_manifest()] {
+            let json = serde_json::json!({"schema":1,"target":"game/manager.exe",
+                "old_sha256":"b".repeat(64),"manifest":manifest,"parent":123,
+                "data_dir":"data"});
+            let ticket: Ticket = serde_json::from_value(json)?;
+            assert_eq!(ticket.schema, 1);
+            ticket.manifest.validate(&ticket.manifest.version)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn fixed_filename_keeps_version_digest_and_schema_bound_to_the_mirror() -> Result<()> {
+        let current = fixed_manifest();
+        current.validate(&current.version)?;
+        assert_eq!(current.metadata_file(), "update-v2.json");
+        assert_eq!(checked_github_manifest().metadata_file(), "update.json");
+        let other = matching_mirror(&current, "gitcode", current.clone())?;
+        assert!(
+            other
+                .url
+                .ends_with(&format!("/v{}/RTXManager.exe", crate::VERSION))
+        );
+        for change in ["schema", "version", "hash", "bytes", "file"] {
+            let mut other = current.clone();
+            match change {
+                "schema" => other.schema = 1,
+                "version" => other.version = "9999.0.0".into(),
+                "hash" => other.sha256 = "b".repeat(64),
+                "bytes" => other.bytes += 1,
+                "file" => other.file = "../RTXManager.exe".into(),
+                _ => unreachable!(),
+            }
+            assert!(
+                matching_mirror(&current, "gitcode", other).is_err(),
+                "{change}"
+            );
+        }
+        for schema in [0, 1, 3, u32::MAX] {
+            let mut invalid = current.clone();
+            invalid.schema = schema;
+            assert!(invalid.validate(&invalid.version).is_err());
+        }
         Ok(())
     }
 
@@ -771,21 +795,21 @@ mod download_tests {
     fn changed_preference_selects_domestic_without_rewriting_checked_identity() -> Result<()> {
         let checked = checked_github_manifest();
         let original = checked.clone();
-        assert_eq!(source_order("github"), ["github", "gitee"]);
+        assert_eq!(source_order("github"), ["github", "gitcode"]);
         // The check has already completed on GitHub. A later source change
         // (including a cancelled download's retry) must not use checked.source.
-        for current_preference in ["domestic", "gitee", "auto"] {
+        for current_preference in ["domestic", "gitee", "gitcode", "auto"] {
             let [first, fallback] = source_order(current_preference);
-            assert_eq!((first, fallback), ("gitee", "github"));
+            assert_eq!((first, fallback), ("gitcode", "github"));
             let mut mirror_json = checked.clone();
             mirror_json.source.clear();
             mirror_json.url.clear();
             let active = matching_mirror(&checked, first, mirror_json)?;
-            assert_eq!(active.source, "gitee");
+            assert_eq!(active.source, "gitcode");
             assert_eq!(
                 active.url,
                 format!(
-                    "https://gitee.com/{REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
+                    "https://gitcode.com/{GITCODE_REPO}/releases/download/v4.2.4/RTXManager-v4.2.4-x64.exe"
                 )
             );
             assert!(checked.same_file(&active));
@@ -815,34 +839,6 @@ mod download_tests {
     }
 
     #[test]
-    fn readout_tracks_real_bytes_and_speed_with_fragmented_lines() -> Result<()> {
-        let temp = tempfile::tempdir()?;
-        let path = temp.path().join("console.log");
-        fs::write(&path, b"old session should not be replayed\n")?;
-        let mut readout = Readout::new(&path)?;
-        let mut log = fs::OpenOptions::new().append(true).open(&path)?;
-        // A sparse output can already be full length while only 1 MiB arrived.
-        fs::File::create(temp.path().join("sparse.exe"))?.set_len(90524944)?;
-        log.write_all(b"[#abcdef 1048576B/90524944B(1%) CN:30 DL:123")?;
-        assert!(readout.poll(90524944)?.is_none());
-        log.write_all(b"4567B ETA:1m]\r\n")?;
-        assert_eq!(readout.poll(90524944)?, Some((1048576, 1234567, 30)));
-        assert!(readout.poll(90524944)?.is_none());
-        log.write_all(b"[#abcdef 100/90524944(0%) CN:1 DL:0]\n")?;
-        assert_eq!(readout.poll(90524944)?, Some((100, 0, 1)));
-        // Invalid totals, overflowing integers and diagnostics are not progress.
-        for line in [
-            "[#abcdef 999/1(100%) CN:1 DL:10]",
-            "[#abcdef 1/2(50%) CN:1 DL:10]",
-            "ERROR 123/90524944 DL:1",
-            "[#abcdef 999999999999999999999999999999/90524944(0%) CN:1 DL:0]",
-        ] {
-            assert!(readout.parse(line, 90524944).is_none());
-        }
-        Ok(())
-    }
-
-    #[test]
     fn completion_waits_for_integrity_and_signature_verification() {
         let mut p = DownloadProgress {
             completed: 100,
@@ -855,24 +851,5 @@ mod download_tests {
         assert_eq!(p.percent(), 100.);
         p = DownloadProgress::default();
         assert_eq!(p.percent(), 0.);
-    }
-
-    #[test]
-    fn update_profile_uses_custom_aria30_without_untrusted_execution_options() {
-        let options = aria_options(include_str!("../../app/tools/aria2.conf"));
-        for expected in [
-            "--async-dns=false",
-            "--disable-ipv6=false",
-            "--split=30",
-            "--max-connection-per-server=30",
-            "--min-split-size=1M",
-        ] {
-            assert!(options.iter().any(|s| s == expected), "{expected}");
-        }
-        assert!(
-            !options
-                .iter()
-                .any(|s| s.contains("certificate") || s.contains("dot://"))
-        );
     }
 }

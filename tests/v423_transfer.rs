@@ -126,38 +126,6 @@ fn cache_is_not_trusted_by_length_alone_and_limits_are_enforced() -> Result<()> 
 
 #[test]
 fn progress_and_failure_reasons_do_not_invent_completed_bytes() {
-    assert_eq!(
-        transfer::Progress::parse_aria_line("[#abcdef 12B/100B(12%) CN:2 DL:40B ETA:2s]", 100),
-        Some((12, 40, 2))
-    );
-    assert!(
-        transfer::Progress::parse_aria_line("[#abcdef 101/100(100%) CN:2 DL:40]", 100).is_none()
-    );
-    assert!(transfer::Progress::parse_aria_line("[#abcdef 12/200(6%) CN:2 DL:40]", 100).is_none());
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(8), ""),
-        transfer::Failure::Range
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(22), "status=416"),
-        transfer::Failure::Range
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(24), ""),
-        transfer::Failure::Unauthorized
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(32), ""),
-        transfer::Failure::Integrity
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(1), "status=429"),
-        transfer::Failure::RateLimited
-    );
-    assert_eq!(
-        transfer::Failure::from_aria_log(Some(1), "certificate verification failed"),
-        transfer::Failure::Certificate
-    );
     let progress = transfer::Progress {
         completed: 100,
         total: 100,
@@ -172,7 +140,7 @@ fn compact_catalog() -> Result<(Value, Vec<u8>)> {
     let package = c
         .packages
         .iter()
-        .find(|p| p.scheme_id == c.default_scheme)
+        .find(|p| p.scheme_id == cloud::DELTA_SCHEME)
         .unwrap();
     let policy = &c.scheme_policies[&package.scheme_id];
     let index = serde_json::to_vec(&json!({"schema":1,"packages":[package]}))?;
@@ -239,49 +207,4 @@ fn invalid_default_or_index_is_not_silently_accepted() -> Result<()> {
             .is_err()
     );
     Ok(())
-}
-
-/// Linux has no embedded downloader, and requiring a system `aria2c` would make
-/// downloads impossible on machines without it. `transfer::download` must
-/// therefore not depend on any external binary. This asserts the failure is a
-/// network/URL error rather than "tool not found", which is what a hidden
-/// dependency on aria2 would produce.
-#[cfg(not(windows))]
-#[test]
-fn linux_download_does_not_require_an_external_downloader() -> Result<()> {
-    let temp = tempfile::tempdir()?;
-    let request = crate_request();
-    let error = transfer::download(
-        &request,
-        &temp.path().join("missing.zip"),
-        &AtomicBool::new(false),
-        |_| {},
-    )
-    .expect_err("download must fail against an unreachable host");
-    let text = format!("{error:#}").to_lowercase();
-    assert!(
-        !text.contains("aria2"),
-        "download must not depend on aria2: {text}"
-    );
-    assert!(
-        !text.contains("未找到") && !text.contains("no such file"),
-        "failure must be a network error, not a missing executable: {text}"
-    );
-    Ok(())
-}
-
-#[cfg(not(windows))]
-fn crate_request() -> transfer::Request {
-    transfer::Request {
-        sources: vec![transfer::Source {
-            name: "github".into(),
-            // Reserved for documentation (RFC 2606); guaranteed unroutable.
-            url: "https://example.invalid/RTXManager-v4.2.9-x64.zip".into(),
-        }],
-        bytes: Some(32 * 1024 * 1024),
-        sha256: Some("a".repeat(64)),
-        limit: 64 * 1024 * 1024,
-        metadata: false,
-        policy: transfer::UrlPolicy::Official,
-    }
 }

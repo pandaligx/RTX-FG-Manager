@@ -1,0 +1,30 @@
+[
+  {
+    "file": "nvngx_dlssnr.dll",
+    "version": "310.8.0",
+    "size": 165840496,
+    "sha256": "e16bcf15e16e13f527491cdf7845b2fe6521a738d8f7c9c721866a8496e1fc8e",
+    "archive": "zip",
+    "archiveSize": 112791043,
+    "archiveSha256": "34f55afce5e62dcd704e4a7dc71902414a76c72319cc6d2fdcd323264a5506d6",
+    "urls": [
+      "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/nvngx-dlssnr-310.8.0-34f55afce5e6.zip",
+      "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/nvngx-dlssnr-310.8.0-34f55afce5e6.zip"
+    ]
+  },
+  {
+    "file": "nvngx_dlssnr.dll",
+    "version": "310.9.16",
+    "size": 266424944,
+    "sha256": "2bc19bc09a7b89dd44f73e2ac0108fcc586e2154bdd0830f242f4f040e28789f",
+    "archive": "zip",
+    "archiveSize": 188430082,
+    "archiveSha256": "8a8d264bf8117f35fb475eb62732953c4fa5cbcdd0757e0c11c2029d07c7a3f1",
+    "urls": [
+      "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/nvngx-dlssnr-310.9.16-8a8d264bf811.zip",
+      "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/nvngx-dlssnr-310.9.16-8a8d264bf811.zip"
+    ],
+    "minMod": "1.1.0",
+    "note": "nr-two-networks"
+  }
+]

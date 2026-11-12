@@ -1,0 +1,98 @@
+{
+  "dlssg_sm86/backend/sm86_backend.dll": {
+    "sha256": [
+      "01eacb7dee04672353905bf4bb1c87fdc5e034e6b999afd389f834eafeb126b5",
+      "091b6f4c066e50c557cea4258eef14082cc7f8af6a885c676543081b6b563777"
+    ],
+    "image_sha256": [
+      "80ea88a62c13e278bd8beebf357fd886e54b781655725b1408c09a0ed4ccd951"
+    ]
+  },
+  "dlssg_sm86/kernels/fg_kernels.dll": {
+    "sha256": [
+      "33d0b12efa6d073a5f9523a48ba3eef816c2bceef89dbc15f860eb61185ac9ba",
+      "3fbff71e9ed2fde7b244db5718146c83022941c6ed093eadf9cafca6454b997b"
+    ],
+    "image_sha256": [
+      "765b118bd38761275382d16d7e662ba466807459dfe5d0c4dda3e06e7f2e6177"
+    ]
+  },
+  "dlssg_sm86/runtime/nvngx_dlssg.dll": {
+    "sha256": [
+      "cadee1aa6db3907babdc3285da2aebc4553d92b89c38ba3eae8abd8bba1bea72"
+    ],
+    "image_sha256": [
+      "7bebdfed7ee9f84895c5ea494138fe31979a5529c27f800a3b7f58ebddbfce95"
+    ]
+  },
+  "dlssg_sm86/xefg/xefg_kernels.dll": {
+    "sha256": [
+      "79b2f44d3cf85bec2183b98c1676091b2d772154ed78e01befc8e6cd5c4c09c0",
+      "f87988f07785dfc4929bc6357bd288ea5d5734e5ae56840c4fd97bdfa992b8bd"
+    ],
+    "image_sha256": [
+      "4032c67f1add51a2efd94fef052a452e3f60acb54d4da20146f02c37f10debea"
+    ]
+  },
+  "dlssg_sm86/sr/nvngx_dlss.dll": {
+    "sha256": [
+      "858ccff96360c3098db9264cd6f13d04a027e09b6ce7ad5bbc297570e824b4f2",
+      "d202b024cf5a809d4f6cb57b698ca61cdf7e7f664915a3794942042066d7cf72"
+    ],
+    "image_sha256": [
+      "1f79c3b95c9f33b45f92a9f16384eacae0990fabeeb7fe21ae1c617a169e0264"
+    ]
+  },
+  "dlssg_sm86/sr/sr_kernels.dll": {
+    "sha256": [
+      "3bc40177295a793a83e55db627cf16cb8070427ada7b044c0d398f7de80a5b8c",
+      "599f2d9b5da2e0fc1fab589aabf29f4081167671af4e8a51c632db673f72dcf7"
+    ],
+    "image_sha256": [
+      "588a4fe497d2d8a294aed0c679d54e041d5c06f74915aea35eba5a98d6173d2e"
+    ]
+  },
+  "dlssg_sm86/LICENSE.md": {
+    "sha256": [
+      "7537220f50c6430d953eda8bff01f0817014e604cb3607f3b62c786d070d8570"
+    ],
+    "image_sha256": []
+  },
+  "dlssg_sm86/THIRD_PARTY_NOTICES.txt": {
+    "sha256": [
+      "7b713d4449f50ff6dac8a26ff9af1d88600814dc5c35bfcf61416b9ec089614b",
+      "c8f2449237f0c556ab7b494ae131e534b39614b5d0f1e56e39d95353426ff2f7"
+    ],
+    "image_sha256": []
+  },
+  "rtx-encore-runtimes/intel/LICENSE.txt": {
+    "sha256": [
+      "784be42c39a4a4d03cf85d88e15e59d75828fca773ce45b8dbfffbd7eaf208df"
+    ],
+    "image_sha256": []
+  },
+  "rtx-encore-runtimes/intel/libxell.dll": {
+    "sha256": [
+      "d2030dcd694fda8f2ec7e044b13e6db8f0b56d4ba9113a5efad334e3f3ded8c7"
+    ],
+    "image_sha256": [
+      "3738639764ecbd304d1b7b4699fa9846a2d025fe7cc33b07c48eb349af7475cd"
+    ]
+  },
+  "rtx-encore-runtimes/intel/libxess.dll": {
+    "sha256": [
+      "251659dd84a3e84de67c886a4186e01f3eca49b00641906fe38bb6b807e5d5b7"
+    ],
+    "image_sha256": [
+      "01af14466c0433f04c8e417aa5167ed6cbb4bb84ee046ad084900ab7d274b5a0"
+    ]
+  },
+  "rtx-encore-runtimes/intel/libxess_fg.dll": {
+    "sha256": [
+      "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
+    ],
+    "image_sha256": [
+      "a9401fdc1145f72489ac9265666bb2cf46ca1d11828ff9d7232e37679364222a"
+    ]
+  }
+}

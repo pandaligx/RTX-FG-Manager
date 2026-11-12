@@ -72,11 +72,14 @@ fn exact_proxy_names_and_config_protocols_cannot_be_mixed() -> Result<()> {
             vec![name.to_owned(), transfusion::CONFIG.into()]
         );
     }
-    for names in [
-        vec!["version.dll".into(), "dxgi.dll".into()],
-        vec!["d3d12.dll".into()],
-        vec!["dbghelp.dll".into()],
-    ] {
+    assert!(
+        core::deployment_names(
+            transfusion::BACKEND,
+            &["version.dll".into(), "dxgi.dll".into()]
+        )
+        .is_ok()
+    );
+    for names in [vec!["d3d12.dll".into()], vec!["dbghelp.dll".into()]] {
         assert!(core::deployment_names(transfusion::BACKEND, &names).is_err());
     }
     assert!(

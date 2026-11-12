@@ -1,16 +1,43 @@
 # Windows manager compatibility patch
 
-Baseline: the published `gpui-fast-windows` **0.1.2** crate from crates.io
-(`gpui-fast-windows-0.1.2.crate` SHA-256
-`3151bd462aecf475efb28f951573a66e655749a3af8d69a66a30e0e8c03b569a`).
+For manager 4.3.29, `WindowsPlatform::without_direct_composition` explicitly
+selects the existing opaque HWND swap-chain path before any app window opens.
+The manager uses it for its opaque main and child windows: GamePP monitoring
+was observed to wash out a large region with the premultiplied composition
+swap chain; the same signed EXE using the HWND path rendered normally.
+The GPU device, D3D11 flip model, Fast drawing, resize/recovery, and first-frame
+behavior are unchanged. The default platform constructor and composition
+implementation remain intact. No global environment variable or GamePP
+setting is changed. This app policy does not support transparent backdrops or
+native composition surfaces; revisit it if such a feature is introduced.
+
+Baseline: the published `gpui-fast-windows` **0.1.14** crate from crates.io
+(`gpui-fast-windows-0.1.14.crate` SHA-256
+`a89bfdc3a922a29f83611fc7f01642533d35260a7f86aa9befb14f2b6dcca093`).
 The crate's Apache-2.0 `LICENSE`, README and original manifest are retained.
-The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.2`;
-only `publish = false` is changed locally.
+The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.14`
+and sets `publish = false`.
 
 The manager previously applied equivalent compatibility changes to Zed commit
 `1d217ee39d381ac101b7cf49d3d22451ac1093fe`. These changes are reapplied to the
 published Fast backend without replacing its rendering, composition, device
 recovery, scheduling or retained-layer implementations.
+For manager 4.3.6 they were rebased from the published 0.1.2 crate onto 0.1.10,
+retaining the newer rounded clipping, class names and foreign-message handling.
+For the unpublished 4.3.13 candidate they were rebased again onto 0.1.12.
+Both draw paths retain the new upstream frame scheduling after the local
+first-frame visibility hook; they must not be replaced by the older draw bodies.
+The unused upstream `HWND` import in `fast/composition.rs` is also removed.
+For manager 4.3.16, `fast/rounded_clip.rs` compiles its shader-path helper and
+`PathBuf` import only with `debug_assertions`, matching its sole caller. Release
+builds use embedded shaders; this removes an unused-function warning without
+changing either rendering path.
+The shared `fast/rounded_clip_fixtures.rs` test input is copied from
+the matching published `gpui-fast` 0.1.10 crate (Apache-2.0). The Windows pixel
+tests refer to that local copy instead of an absent sibling in the upstream
+monorepo. It is only compiled with `test-support`, not in a manager release.
+One interior 50% green sample accepts both 127 and 128 for Direct3D UNORM
+rounding; its other channels, opacity and all clip-edge checks remain exact.
 
 - `fast/startup.rs`: apply final window size while hidden, request a first frame
   after GPUI registers its frame callback, then defer native visibility until a
@@ -18,6 +45,8 @@ recovery, scheduling or retained-layer implementations.
   A renderer frame skipped during device recovery does not expose the window.
   Native focus preference is preserved. Deferral avoids synchronous size/focus
   callbacks while the renderer borrow and GPUI draw coordinator are held.
+  First-frame posts carry the platform validation token required by 0.1.10;
+  an untagged post would now be discarded, leaving the initial window hidden.
 - `fast/compat.rs`: resolve `GetDpiForWindow` and `GetSystemMetricsForDpi`
   dynamically; retain monitor-DPI/system-metric fallbacks on earlier Windows 10.
 - `fast/font_loader.rs` and `direct_write.rs`: preserve the earlier Windows 10
@@ -35,9 +64,37 @@ recovery, scheduling or retained-layer implementations.
   but its Jump List code still imports ICU's `u_strlen`. `destination_list.rs`
   replaces that call with a bounded Rust scan of the UTF-16 description buffer,
   preserving the old manager's lack of an external ICU loader dependency.
+- `events.rs` / `window.rs`: retire the AccessKit adapter during `WM_DESTROY`
+  and programmatic close, while the native handle is still valid. Otherwise
+  deferred window cleanup can keep its context alive after HWND destruction;
+  UI Automation queries triggered by returning focus to the parent can then
+  panic inside AccessKit's coordinate conversion. Live windows retain normal
+  accessibility support. Adapter destruction occurs outside the RefCell borrow.
 
 The font-byte lifetime/range tests and hidden-window placement regression are
 retained in the compatibility modules. Their execution on a development Windows
 machine does not establish older Windows 10, physical mixed-DPI, GPU or game
 compatibility. The application build's lockfile and release validation remain
 required.
+
+For manager 4.3.19 these changes are rebased onto Fast 0.1.13. The upstream
+device-loss/resize recovery, bounded text caches, redundant-frame suppression
+and legacy font lookup remain intact. The new `fast/font_fallback.rs` accepts
+the retained `IDWriteFactory3`; it uses APIs available on that interface.
+`DirectWriteComponents.factory` keeps upstream crate visibility so both font
+lookup paths share the same factory. No new minimum Windows version is imposed.
+The manager's application-level tests and GUI checks do not simulate actual
+device removal or establish older Windows 10/mixed-DPI compatibility.
+
+For manager 4.3.30 these changes are rebased onto Fast 0.1.14. The new upstream
+CPU color-glyph bitmap composition and glyph shaping remain intact: only the
+DirectWrite factory, font loader and color-enumerator capability adapter are
+retained. The text system no longer owns a Direct3D device or receives device
+recreation calls; the UI still uses D3D11. The upstream frame-worker wake after
+window registration and texture-size guards are retained. The manager continues
+to select opaque HWND presentation. No higher Windows requirement is introduced
+by these local patches; actual old-Windows validation remains a separate check.
+
+The published native test module writes JSON traces but omits its `serde_json`
+dev dependency. Declare it for test builds only, so the upstream Windows
+regressions can run; normal manager builds do not gain a runtime dependency.

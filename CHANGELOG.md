@@ -1,5 +1,274 @@
 # Changelog
 
+## 4.3.30
+
+- Update GPUI Kit to 0.9.1 and GPUI Fast to 0.1.14, incorporating improvements to input, text selection and glyphs, sliders, accessibility and rendering.
+- Refine settings language switching: refresh the search prompt in place while preserving the current page, and add a localized accessibility label to the font-size slider.
+- Retain the GamePP monitoring compatibility fix, Direct3D 11 GPU acceleration, and existing patch and download features.
+- Credit HeyBox creator “落日无序的米莉安” in About and both READMEs for sharing the manager and creating tutorials.
+
+## 4.3.29
+
+- Fix discoloration across the left game library when GamePP monitoring is enabled.
+- Present the manager's opaque windows through HWND swap chains while retaining Direct3D 11 GPU acceleration and GPUI Fast rendering. Preserve existing themes, child windows and patch operations.
+- Repair cloud build and game-name refresh checks, prevent Windows line-ending conversion from breaking catalog digests, and keep the name catalog and recommendation-service directory in sync.
+
+## 4.3.28
+
+- Integrate RTX Encore 2.2.0 with NIS, anti-aliasing, automatic frame generation and Overlay Studio controls, including versioned player-preset sharing. Preserve existing settings, comments and unknown fields.
+- Use Chinese in-game menu defaults for fresh/default installations when the manager resolves to Chinese, while preserving an explicitly selected menu language.
+- Select Encore components individually and remember choices per game. Preserve native Streamline; updating only frame generation or Intel components no longer replaces unselected components.
+- Fix an unknown GPU scheduling state on hybrid laptops where scheduling is enabled on the discrete GPU but differs on integrated adapters. Preserve failed-query safeguards and restart notifications.
+- Center notifications at the top and render release-note Markdown headings and lists. Success and user cancellation dismiss after 2 seconds; errors remain until dismissed.
+- Simplify GPU information: show the NVIDIA mark and model normally, or the modified model with an alias icon/label. Preserve other schemes, restoration and long-term update channels.
+
+## 4.3.27
+
+- Fix old player-shared parameters being reapplied after uninstalling and manually reinstalling a patch. A complete uninstall clears its saved parameters and drafts; retain new edits made before reinstalling and settings of installations that remain present.
+- Read back the actual settings after installation and guard fresh installs against stale caches, including clicks before the background refresh completes.
+- Allow Encore 2.x to replenish its shared ray-reconstruction runtime after uninstall, while retaining checks for other schemes and original-file restoration.
+
+## 4.3.26
+
+- Detect actual patch-file holders before uninstall, including external helpers retaining Encore logs. Confirm once to end the listed processes and retry; recover older incomplete uninstall records while preserving other games, unknown files and system services.
+- Fix installation targeting when checked games differ from the game shown in the inspector. Inspector actions target only that game; checked rows use explicit batch actions.
+- Add the NVIDIA mark with compact Actual/Alias tags, searchable desktop and CMP display names, and a reminder to restore the GPU name before driver updates. Thicken the recommendation border.
+- Reset by uninstalling recorded patches and restoring runtimes and GPU names before clearing app data. Delete reset backups after a successful restart; retain recovery records on failure.
+- Support RTX Encore 2.1.0, including live XeFG source pacing and version-gated parameter sharing. Preserve existing settings, comments and unknown fields.
+- Ask for independent added frame-generation and reconstruction engines on first install, with no preselection; keep settings on updates. Distinguish native super resolution from frame generation, complete runtimes at their actual locations and preserve the game's interposer.
+- Show a centered, cancellable download overlay with completed counts and a compact waiting/downloading/completed file list. Count shared ZIPs once and hide after all downloads finish; keep installation results and errors in top-right Alert notifications.
+- Move recommendation border colors smoothly around an antialiased rounded path over 8 seconds, with continuous color joins and no animation restart when opening menus. Respect reduced motion.
+- Restore live scan paths, directory counts and cancellation above the game list. On first launch, handle available updates first, then offer a one-time full scan in a centered dialog; shorten redundant interface copy.
+- Preserve native Rust downloads, other patch schemes, original-file restoration and long-term update channels.
+
+## 4.3.25
+
+- Replace the bundled aria2c executable with in-process Rust HTTP transfers, removing the external downloader startup dependency.
+- Use bounded concurrency, resumable blocks and retries for patches, runtimes and manager updates; fall back to a single stream when a server cannot serve ranges.
+- Preserve source preferences, verified cache reuse, size/SHA-256 checks and update signature verification. Cancellation, retries and concurrent requests never treat partial output as installable.
+- Keep the existing UI, game deployment and uninstall behavior, and long-term update channels.
+
+## 4.3.24
+
+- Show native Streamline plugin versions separately from the preserved game interposer. Clarify the distinction between native frame generation and Encore's optional added engine.
+- Keep the original full uninstall behavior: remove patch settings and owned logs. Clean empty manager cache folders for all patch schemes, including leftovers from older releases, while preserving unknown files and backups.
+- Keep runtime rows readable in smaller windows and scale the new controls with the application's font setting.
+
+## 4.3.23
+
+- Show the selected patch, parameters and runtimes beside the recommendation install button. Lock installation options while processing so the displayed selection stays consistent with the running task.
+- Show the latest edit date on revised player recommendations instead of only the original publication date.
+- Complete Encore 2.x runtime dependencies at their detected game locations. Update native Streamline plugins as a matched set while preserving the game's interposer; keep added frame generation separate from native integrations.
+- Add a runtime repair action for existing Encore installs. Preserve original backups, support missing managed files and multiple deployment folders, and restore owned components on removal.
+- Use a separate bounded installation scan for large games, include native DirectSR plugins, and validate Streamline layouts before updating SR/RR.
+
+## 4.3.22
+
+- Fix runtime version selection targeting another game after changing the library selection with a runtime window open. Update TLS, certificate, ZIP and XML dependencies with security fixes; remove unused dependencies from the retired community implementation.
+- Support RTX Encore 2.0.1, including experimental DLSS/XeSS reconstruction, Neural Rendering and frame generation for games without native integration. Keep these features off by default and check required components before applying settings.
+- Add the matched NVIDIA Streamline 2.14.16 / DLSS-G 310.9.16 package for added frame generation. Protect native integrations, track all six files together, and restore manager-owned components on uninstall, including multiple game folders and ASI installations.
+- Preserve JSONC comments, menu state and learned pacing. Support automatic X3/X4 pacing, Ultra 75% scaling, four motion estimators and eleven menu languages; extend parameter/runtime sharing while keeping older clients compatible.
+- Retain the existing interface, other patch schemes and the permanent 4.3.21 update bridge. This and future releases use the single `RTXManager.exe` download.
+
+## 4.3.21
+
+- Introduce a permanent update bridge: older clients first upgrade to 4.3.21; new clients use a separate update channel with the fixed `RTXManager.exe` filename. Starting with 4.3.22, each release needs only one EXE.
+- Preserve existing install paths, shortcuts, signature verification and startup rollback. Correct the update dialog's filename description. Published 4.3.20 assets remain unchanged.
+
+## 4.3.20
+
+- Fix MFG Unlocker 1.7.0 rejecting the entire configuration when the manager writes `optiScalerUi: "auto"` (#18). Automatic mode now omits this field; applying parameters also repairs affected existing configs without clearing the cache.
+- Add an optional one-time migration to `RTXManager.exe` in Settings, preserving recognized shortcut arguments and restoring the original filename on failure. Keep the existing update manifest compatible with older clients.
+
+## 4.3.19
+
+- Upgrade GPUI Kit to 0.9.0 and GPUI Fast to 0.1.13; preserve the manager's Windows compatibility patches.
+- Check shared runtime compatibility before installation. Unsupported DLSSNR or standalone XeSS is explained in the details window, with an option to deselect runtimes.
+- Open the install-options menu above its button. Automatic updates retain the installed EXE filename to preserve shortcuts (#17).
+
+## 4.3.18
+
+- Support RTX Encore 1.5.3: three-way V-Sync control, RR preset F (RR2), and updated Tensor Core requirements. Keep options tied to the installed patch version.
+- Convert legacy V-Sync settings and player shares without losing comments, unknown fields or menu state. Retire the RTX 20 Smooth Motion variant selector from Encore 1.5.1 onward.
+- Extend player parameter sharing while preserving older clients. Bound cache reads and fall back to an earlier valid cache if the newest one is damaged.
+- Preserve the existing interface, other patch schemes and private runtime deployment paths.
+
+## 4.3.17
+
+- Add the Bilibili profile of 坏坏的帅帅啊 to About and project acknowledgements.
+- Fix language and other dropdown choices being cancelled by focus loss between mouse-down and mouse-up. Preserve outside-click focus clearing, Tab navigation and multi-window behavior.
+- Refresh the Settings search placeholder immediately when switching languages, with prompts for all five interface languages.
+- Support RTX Encore 1.5.0: separate XeSS and XeFG Tensor Core controls, native Intel FG to DLSS-FG selection, Reflex mode and latency metrics. Gate settings by installed patch version and preserve JSONC comments, unknown fields and menu state.
+- Fix orphaned Dlssg_for_sm86 private components blocking reinstallation after a 0.4.0 uninstall. Recognize shipped private files, retain ownership for changed files, and offer scoped cleanup review instead of reporting a completed uninstall.
+- Include new Encore session diagnostics and game-specific MFG fault/hang dumps in uninstall cleanup. Preserve unrelated files, manual captures, other games and shared caches.
+- Extend player preset sharing for the new Encore settings while preserving older clients and existing player data.
+
+## 4.3.16
+
+- Show the renamed GPU only while its name differs from the original, and hide it after restoration. Remove empty GPU-scheduling feedback space to leave more room for patch options.
+- Fix unresponsive main-window controls after opening the theme picker and closing the separate Settings window. Cancel, confirmation and Esc now finish theme previews correctly.
+- Track theme-preview ownership separately from utility-window creation and reconcile modal state with live windows. Closing an unrelated window preserves the active interaction; recover stale interaction locks without discarding pending parameters.
+- Fix an unused-function warning in Release builds of the Windows rendering dependency.
+
+## 4.3.15
+
+- Fresh Dlssg_for_sm86 installations use the new bundle defaults after uninstalling, instead of replaying cached 0.4.0 values such as Optimized=2 into 0.4.1. Preserve existing installations and explicit edits. Align the GPU identity fields and separate sidebar selection backgrounds.
+- Fix multi-window control and dropdown routing, keep preset sections stable when expanding advanced options, and use proportionate vector logos. Show actual and renamed GPU names separately.
+- Keep player recommendations in a standalone window after installation. Combine installation into one split button with independent patch, parameter and runtime selections. Patch removal also restores manager-owned DLSS SR/RR/FG originals; preserve externally changed files for review.
+- Fix recommendation installation: read Windows runtime versions after closing temporary writers. Keep mixed or unlisted native game components with an explicit notice while installing the patch and applying shared parameters.
+- Move preferences into a separate GPUI Kit Settings window with search, categorized pages and a redesigned About page with the app logo. Align full recommendation details and sharing confirmation in compact tables that follow the configured font size; retain the previous DLSS/XeSS runtime window. Fix a possible exit when accessibility queries overlap window destruction.
+- Complete preset sharing for the MFG-Unlocker 1.6.1 compatibility option: capture applied settings, compare changed values, install the scheme alone, apply parameters alone or install and apply across game folders. Keep 1.7.0 available and reject settings unsupported by 1.6.1.
+- Preserve older clients' browsing and edits without discarding newer shared parameters. Retain existing offline recommendations when upgrading.
+- Retain Encore 1.4.5, which includes the 1.4.3 Streamline, Intel component recognition and NR input fixes. No configuration reset or extra patch downgrade is required; preserve original game files.
+
+## 4.3.14
+
+- Support the complete Dlssg_for_sm86 0.4.1 bundle, with XeSS 2X–4X, coarse flow from 4K and strict/automatic HUD-less input. Fresh installs default to Optimized=1, preset A and SR off. XeSS uses the bundled backend without extra Intel DLLs.
+- Keep installed 0.4.0 and 0.4.1 parameter contracts separate. Preserve configuration, comments and unknown fields during upgrades, migrate legacy HUD-less semantics once, and require a choice for SR modes without an equivalent. Retain transaction recovery.
+- Version shared 0.4.1 presets, explain legacy conversions and preserve parameters unseen by older clients. Clean the game's new logs and frame timings while retaining shared JIT caches, other mods and manual captures.
+- Integrate RTX Encore 1.4.5 and clarify Smooth Motion GPU/driver requirements, restart behavior and estimated counters without resetting JSONC settings. Prevent stale catalogs from downgrading the bundled baseline.
+
+## 4.3.13
+
+- Fix runtime ownership checks for Windows paths with mixed separators or casing. Recognize existing DLSS/XeSS backups without editing old records; preserve game boundaries, link rejection and file-hash checks during updates and recovery (#15).
+- Upgrade GPUI Kit to 0.8.1 while retaining the manager's Windows startup, DPI and font compatibility patches.
+- Redesign complete player setups with game icon/title, compact parameter and runtime tables, and full-width notes. Stack the tables on narrow windows or larger font settings; keep actions accessible while scrolling.
+- Synchronize recommendation and DLSS/XeSS windows with the configured font size. Use a continuously breathing players icon and a fine animated gradient border; retain hover/pressed states and respect motion settings.
+- Raise sharing notes to 5,000 Unicode characters. Older clients retain a 500-character preview and cannot accidentally erase unseen long notes.
+- Integrate the Encore 1.4.4 resource catalog. No documented configuration migration is required; retain existing values, comments and unknown fields. Keep original game compiler and Streamline files.
+
+## 4.3.12
+
+- Rebuild recommendation connections on refresh, honor Windows system proxies, and recover failed reads with IPv4 and an origin fallback that retains HTTPS hostname verification. Keep email, vote and share submissions from being automatically replayed.
+- Remember the last successful route across windows and restarts, avoiding repeated failed-route timeouts. Fall back again if that route stops working.
+- Distinguish connection timeouts and CDN web pages from API responses. Preserve old anonymous caches and login state, and replace cached recommendations after a successful refresh. Keep a small local connection report without account or game data.
+- Do not claim a game has no shared setups when loading failed.
+
+## 4.3.11
+
+- Share applied preset parameters with player recommendations. Show only changed settings in a compact default-to-player comparison, with separate Install and apply, Install scheme only, and Apply parameters only actions. Validate patch compatibility and runtime dependencies before applying across game folders.
+- Visualize numeric changes with comparison bars and discrete settings with value chips. Share installed DLSS / XeSS versions and their sources; complete setup uses matching supported versions instead of silently substituting newer files. Explain unavailable versions while keeping scheme-only installation available.
+- Compact the standalone DLSS / XeSS runtime window and add interactive folder buttons. Keep downloads, failures and retry controls in the same window.
+- Improve safe shutdown while cancelled update requests or utility windows remain active. Preserve waits for game-file writes and settings saves.
+- Refresh administration with a responsive light blue list/detail layout for desktop and mobile, parameter comparisons and runtime inventories. Preserve moderation, game associations and older-client support.
+
+## 4.3.10
+
+- Support MFG Unlocker 1.7.0 and RTX Encore 1.4.2, including their DLSS neural rendering, XeSS multi-frame generation and new settings. Preserve existing values, comments and unknown fields; gate settings by the installed patch version.
+- Move DLSS / XeSS runtime management into a movable standalone window that retains progress and results for consecutive operations. SR/RR/FG support current → target version comparison, historical versions, backup/update and restore.
+- Synchronize official NVIDIA SR/RR/FG catalogs to GitHub/GitCode daily. Recommend 310.9.16 and offer verified 310.9.1 history; keep Intel 3.0.2 and DLSSNR 310.9.16 tied to patch compatibility.
+- Fix stale caches leaving version selectors disabled after a successful refresh. Load catalogs asynchronously with retry and cache fallback, and improve cleanup when the utility window closes.
+- Manage DLSSNR installation/removal in the runtime window; unify Installed / Not installed and DLSSNR / XeSS labels. Preserve private patch directories, per-folder settings and recovery records.
+- Fix the old configuration-size limit for Encore snapshots after new settings were added; display the actual sm86-7 Vulkan package. Retain the native UI and combined download statistics.
+
+## 4.3.9
+
+- Support RTX Encore 1.3.0: opt-in foveated NR with four custom controls, and the experimental RTX 20 Smooth Motion V1/V2 selector (NVIDIA 621.01, DX12; restart required). Show controls only for supported patch versions.
+- Retire OpenNR settings for 1.3.0 while keeping older installations editable. Upgrading an OpenNR configuration turns NR off and explains how to enable NVIDIA NR explicitly; preserve comments, unknown fields, per-directory settings and transaction recovery.
+- Keep the 4.3.8 native interface. Add the online-game injection risk notice, improve game-name candidate searches with missing spaces or punctuation, and clarify that settings in player notes require manual configuration. NR runtime remains 310.9.16.
+
+- Choose the download source in Settings; remove the duplicate sidebar selector. Patches, NR runtimes and manager updates follow that preference, retaining fallback sources and offline caches. Match the risk notice to the smaller text above it.
+
+## 4.3.8
+
+- Support RTX Encore 1.2.2 with post-reconstruction sharpening mode and strength, off by default and shown only for supported versions. Preserve configuration/comments and complete bundles with dedicated proxies and shared Intel runtimes.
+- Refine the compact native layout: consistent settings icons and independent columns; clearer DLL entries and player hardware in recommendation details, retaining full notes and fixed footer actions.
+- Reorganize Settings into Appearance, Software updates, Game library and Cache maintenance, with aligned controls, a theme shortcut and a responsive single-column layout for smaller windows or larger text.
+- Fix recommendations remaining on offline records after a retained email session becomes invalid. Clear the rejected session and fetch public setups again; sign in when sharing or rating. Distinguish login expiry from connection failures.
+- Prevent a delayed recommendation request from clearing a newer sign-in. Keep local sign-out available during service outages and report errors saving the sign-out state.
+- Preserve pending parameter changes after a partial multi-folder apply; a successful first folder no longer hides failures in other folders.
+- Animate the sidebar's SVG thumbs-up when selecting a game or hovering over Player recommendations. Interface animations default to On; explicitly saved System/On/Off choices are preserved.
+
+## 4.3.7
+
+- Keep recommendation cards compact with a direct "View full details" button and legible default avatars. Present setup details in a compact table, with full-length notes, copying and fixed actions. Add a brief entrance fade to the recommendation button. Default to font size 13 while preserving saved preferences. Update to Encore 1.2.1, hide its retired compatibility policy and clarify Vulkan engine switching.
+
+- Support RTX Encore 1.2.0: experimental XeSS/XeFG engines, SR input controls and per-pass NR tuning. Gate new settings by the installed patch version and preserve JSONC comments and unknown fields. NR remains on 310.9.16.
+- Include official Intel runtimes in the complete Encore bundle, in a private directory with transaction recovery and ownership-based removal. Clean generated frame-time JSONL logs while retaining game-owned files.
+- Display recommendation publication dates and rank by useful votes. Selecting a setup that needs a GPU display-name change opens explicit guidance and retains the requirement in the inspector.
+- Keep historical shares readable. Confirm use of a newer version of the same project; retain the author's tested version. Removed projects and unavailable loaders cannot be applied automatically. The service remains compatible with older clients.
+
+
+## 4.3.6
+
+- Fix the Windows file picker rejecting some protected Xbox / Game Pass executables before validation. Recognize the sp26 renderer under the known COD package identity, retaining manifest, architecture and directory checks without substituting launchers or changing game permissions.
+- Reuse verified game identities for recommendations, including recognized non-Steam games. Choose once when uncertain and correct the association later. Shares can specify platform and edition; administrators can associate game aliases and undo the latest association without losing setups or feedback.
+
+- Add reversible reports with reasons and temporary hiding after reports from three distinct verified emails, pending admin review. Monitor the verification-email service. Recognize the standalone Wuthering Waves client by its installation directory without renaming unrelated Client executables.
+- Add per-game recommendation cards, collapsed by default, with patch schemes, DLL entries, GPU-name guidance and NR. Preview before choosing a setup; verify an email to share notes or leave reversible useful/not-useful feedback. Authors can edit or delete their own shares, retaining feedback across edits. Select common email suffixes. Administrators can search, filter suspected duplicates, hide or delete setups. Retain a local browsing cache for outages.
+- Upgrade GPUI Kit to 0.8.0 and GPUI Fast to 0.1.10, incorporating upstream text layout, dropdown, tooltip and retained-rendering fixes.
+- Retain the current layout, font sizing, resizable sidebar and mouse/Tab focus behavior. Rebase the manager's Windows startup, DPI and font compatibility patches onto the new renderer.
+- Show full deployment paths in the library, wrapping long paths. Slightly enlarge game icons and scale them with the font size. Open each folder with its folder icon; double-clicking a game row no longer opens a folder.
+- Add folder hover/open feedback, place NR status alongside deployment status and remove its tooltip. Recognize the WeGame QQ Speed installation and its 64-bit game executable without requiring DLSS components.
+- Extend discovery to Godot, Source/Source 2 and verified CRYENGINE layouts, and use platform-declared game entries independently of DLSS. Exclude additional launchers, tools and servers; match folder-button hover/press feedback to the parameter-settings button.
+- Fix NR installation reaching only the first folder of a multi-folder game. Reuse one download across all deployment folders and remove owned NR from all of them, preserving per-folder ownership and original-file restoration. The inspector distinguishes partial from complete installation.
+- Existing patch resources and per-game configurations remain unchanged.
+- Replace generic review warnings with specific causes and per-game actions. Residual cleanup explains its scope before execution, preserves working folders and independent NR, and stops if a patch has been reinstalled. Technical file details remain available in a collapsed section.
+- Recover legacy single-DLL records saved during failed cleanup, retaining file-scope validation so cleanup can be retried after files are unlocked.
+
+## 4.3.5
+
+- Support MFG Unlocker 1.6.1: DLSS SR/RR presets, RTX 30 pacing and an experimental per-game FG option. Preserve unknown JSON/INI fields and recover interrupted edits. New settings require MFG 1.6+.
+- Remove this game’s MFG current/previous logs and interval traces from both its executable directory and the legacy TEMP location; preserve other games and unknown files.
+- Update RTX Encore resources to 1.1.4, including the Witcher 3 DX12 startup fix from 1.1.3 and the neural-rendering flicker/menu-cursor fixes from 1.1.4. Keep the existing configuration protocol and NR 310.9.16. Game upgrades remain user initiated.
+
+## 4.3.4
+
+- Fix [#11](https://github.com/pandaligx/RTX-FG-Manager/issues/11): installed patch versions in the game library now use deployment records, matching the per-folder tooltip. Updating the manager or cloud catalog no longer makes an older installed patch appear updated; different installed versions across folders remain visible.
+
+## 4.3.3
+
+- Show one path line per deployment folder in compact game rows, with rescan updates saved. Deployment status sits between the game name and paths at the same text size. A compact gear beside the name opens parameter settings with hover, pressed and open feedback.
+- Expand game naming through launcher records, local localized metadata and reviewed multi-signal rules. Add offline Chinese names, manual overrides and bilingual search; preserve uncertain originals. The GitHub/GitCode name catalog can update independently.
+- Move GPU model editing into a centered dialog opened from the inspector. Mouse interaction has no focus ring; Tab navigation retains a thin border.
+- Clear pending edits when values return to their original state. Discard unapplied drafts without repeated restart warnings; provide owned-cleanup details and retry.
+- Improve Xbox/GDK identity, protected-executable guidance and Minecraft Launcher icons. Add the hardware-accelerated GPU scheduling switch with reboot feedback that clears when reverted to the current boot state.
+- Support RTX Encore 1.1.2's smooth X3/X4 field migration. Recommend Neural Rendering 310.9.16 while retaining explicit older-version selection and recovery.
+
+See [game naming coverage and limits](docs/game-names.md). Updating the manager does not automatically replace installed game patches.
+
+## 4.3.2
+
+- Drag game rows to reorder the library; save the order and retain positions on rescan. Removal confirmation shows game icons, display names and paths using the configured font size.
+- Hide terminal `.exe` suffixes consistently in game labels while preserving real paths.
+- Exclude D3D12 compiler helpers and prefer The Witcher 3's `bin/x64_dx12/witcher3.exe`; repair saved targets and retain cleanup access to previously managed folders.
+- Adapt signed RTX Encore 1.1.0: Fast SR, NR A/B models, NR hotkey and legacy preset migration, preserving comments, unknown fields and menu state.
+- Offer optional NR 310.8.0 / 310.9.16 downloads with GitCode/GitHub fallback, verified cache, original-file backup and uninstall recovery. NR remains off by default; game output/depth requirements still apply.
+- Clean owned Encore session status files while retaining unknown/manual files. Raise the complete-archive size limit and prevent stale catalogs from downgrading bundled resources.
+- Compact DLSS Neural Rendering sidebar with installed status and independent uninstall; broaden bounded DLSS component discovery for engine/plugin layouts.
+- Keep pending-edit feedback, reset controls and Apply in a fixed parameter footer. Warn before closing with unapplied changes; valid drafts remain available.
+- Explain pending game cleanup and offer scoped retry. List blocking background processes and allow confirmed, identity-checked termination followed by retry.
+
+See [Encore 1.1.0 and Neural Rendering](docs/encore-1.1.0.md). Manager checks do not establish game/GPU compatibility or performance.
+
+## 4.3.1
+
+- Adapt signed RTX Encore 1.0.0 stable and MFG-Unlocker 1.5.0-hotfix.1, retaining the complete dlssg_for_sm86 0.4.0 and custom Delta Force/Vulkan routes.
+- Add three Encore opt-in controls: disableInGameMenu, logDxgiWrappers and crashDetails. All default off and require restart. Preserve existing JSONC bytes on upgrade, including comments and menu state.
+- Recognize Encore's generated session dump filenames during owned uninstall; retain unknown/manual captures and files beyond the safe cleanup size bound.
+- Rework navigation and inspector layout: default compact sidebar, static brand, resizable panels, game title/icon, GPU/HAGS on the right, theme switch in the title bar, and font size 12–18. Fix title-bar misalignment after resizing text.
+- Remove community recommendations, embedded help and the bottom log panel. Restore the single configuration editor. Retire initial/0.2.6 new-install choices and the GPU-series selector; retain legacy cleanup.
+- Permit multiple supported DLL entries while preserving ASI/plugin exclusivity. Remove game uses a trash icon without a count. Correct duplicate Encore version headings and dropdown/tooltip layout.
+- Fix metadata requests on services rejecting HEAD. Prefer GitCode, then GitHub. Distribute each scheme as one complete ZIP in the fixed Resources release; retain compatible older-client manifests.
+- Rebuild English/Chinese documentation with current workflows, menus, recovery guidance and retained GitHub download badges.
+
+Manager updates do not automatically replace game patches. Validation covers file/configuration transactions and the Windows UI; it is not game/GPU or anti-cheat validation.
+
+## 4.3.0
+
+- Changelog opens online release notes using the domestic/GitHub source preference. Remove the old embedded changelog dialog so published notes can change independently of client signing.
+
+- dlssg_for_sm86 0.4.0, MFG Unlocker 1.5.0 and RTX Encore rc.3, retaining legacy schemes and managed configuration migration.
+- Transactional component deployment, dedicated proxies/ASI, exclusive OptiScaler 10 plugin mode with conditional restoration, and game-owned log cleanup.
+- Advisory GPU detection with unrestricted scheme selection and manual legacy component choice.
+- Retire the first-release installation option while preserving legacy recognition and cleanup; interactive web help covers all six remaining schemes.
+- Separate Player configurations entry with simplified sharing; local settings, named configurations, selected import diffs, exact-byte undo and operation history remain under Preset parameters.
+- Independently updated offline HTML help with WebView2 and browser fallback.
+- Independent signed community identities; match only GPU model and driver version, then working confirmations and likes. Refresh every 30 seconds, with publication preview, revision-specific interactions and moderation.
+- GitCode domestic resources, GitHub fallback and Gitee transition; older client metadata remains compatible.
+
+Released on 2026-10-15. These changes do not establish game/GPU performance or anti-cheat compatibility. The community and embedded help described here were removed in 4.3.1.
+
 ## 4.2.9
 
 Adapt [RTX MFG 1.4.2](https://github.com/dashdogy/RTX40MFG-Unlock/releases/tag/v1.4.2) and [RTX Encore 1.0.0-beta.2](https://github.com/SilyNoMeta/rtx-encore), which succeeds DLSSG-Transfusion 1.4.5.3. Existing scheme identities and per-game selections are retained.

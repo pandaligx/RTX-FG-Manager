@@ -11,7 +11,7 @@ use std::{
 pub const OWN: &str = ".rtx-fg-v3";
 pub const MARKER: &str = "install.json";
 pub const INI: &str = "dlssg_sm86.ini";
-pub const PROXIES: [&str; 20] = [
+pub const PROXIES: [&str; 22] = [
     "version.dll",
     "winmm.dll",
     "dinput8.dll",
@@ -32,8 +32,10 @@ pub const PROXIES: [&str; 20] = [
     "xinput1_4.dll",
     "xinput9_1_0.dll",
     "xinputuap.dll",
+    crate::mfg_plugin::ENTRY,
+    "rtx-encore.asi",
 ];
-pub const BACKENDS: [&str; 10] = [
+pub const BACKENDS: [&str; 11] = [
     "native20",
     "native30",
     "native_x6_20",
@@ -41,6 +43,7 @@ pub const BACKENDS: [&str; 10] = [
     "rtx20",
     "rtx30",
     "upstream_sm86",
+    crate::upstream040::BACKEND,
     crate::rtxmfg::BACKEND,
     crate::transfusion::BACKEND,
     crate::encore::BACKEND,
@@ -105,7 +108,10 @@ pub fn no_links(path: &Path) -> Result<PathBuf> {
     Ok(p)
 }
 fn pe_machine(path: &Path, dll: bool) -> Result<u16> {
-    let mut file = File::open(path)?;
+    let mut file = match File::open(path) {
+        Ok(file) => file,
+        Err(error) => return unreadable_pe_machine(path, dll, error),
+    };
     let size = file.metadata()?.len();
     let mut h = [0; 64];
     file.read_exact(&mut h).context("EXE 文件头不完整")?;
@@ -124,6 +130,103 @@ fn pe_machine(path: &Path, dll: bool) -> Result<u16> {
         "EXE / DLL 类型不匹配"
     );
     Ok(u16::from_le_bytes([h[4], h[5]]))
+}
+fn unreadable_pe_machine(path: &Path, dll: bool, error: std::io::Error) -> Result<u16> {
+    if !dll && error.kind() == std::io::ErrorKind::PermissionDenied {
+        // GDK flat installs can expose writable game folders while a declared
+        // EXE remains encrypted. Require an exact declaration or a bounded,
+        // package-specific renderer rule; never substitute a launcher path.
+        no_links(path)?;
+        if fs::metadata(path)?.is_file()
+            && let Some(game) = crate::xbox::identified(path)
+        {
+            return Ok(game.machine);
+        }
+        return Err(error).context(crate::xbox::access_hint(path));
+    }
+    Err(error).with_context(|| format!("无法读取文件：{}", path.display()))
+}
+
+#[cfg(test)]
+mod protected_exe_tests {
+    use super::*;
+
+    #[test]
+    fn xbox_protected_nested_exe_requires_its_own_declaration() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("Xbox/Call of Duty/Content");
+        fs::create_dir_all(root.join("sp26")).unwrap();
+        let main = root.join("cod.exe");
+        let game = root.join("sp26/sp26-cod.exe");
+        for exe in [&main, &game] {
+            fs::write(exe, b"synthetic protected bytes").unwrap();
+        }
+        let config = root.join("MicrosoftGame.config");
+        fs::write(&config, r#"<Game><ExecutableList><Executable Name="cod.exe" TargetDeviceFamily="PC"/></ExecutableList></Game>"#).unwrap();
+        let denied = || std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            unreadable_pe_machine(&main, false, denied()).unwrap(),
+            0x8664
+        );
+        assert!(unreadable_pe_machine(&game, false, denied()).is_err());
+        fs::write(&config, r#"<Game><ExecutableList><Executable Name="cod.exe" TargetDeviceFamily="PC"/><Executable Name="sp26\sp26-cod.exe" TargetDeviceFamily="PC"/></ExecutableList></Game>"#).unwrap();
+        assert_eq!(
+            unreadable_pe_machine(&game, false, denied()).unwrap(),
+            0x8664
+        );
+        assert_eq!(crate::xbox::declared(&game).unwrap().exe, game);
+        // The declaration never overrides invalid readable bytes or a DLL check.
+        assert!(pe_machine(&game, false).is_err());
+        assert!(unreadable_pe_machine(&game, true, denied()).is_err());
+        assert!(
+            unreadable_pe_machine(&game, false, std::io::Error::from_raw_os_error(32)).is_err()
+        );
+        fs::remove_file(&game).unwrap();
+        assert!(unreadable_pe_machine(&game, false, denied()).is_err());
+    }
+
+    #[test]
+    fn xbox_protected_exe_keeps_manifest_architecture_and_package_boundary() {
+        let temp = tempfile::tempdir().unwrap();
+        let exe = temp.path().join("Content/sub/game.exe");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        fs::write(&exe, b"synthetic protected bytes").unwrap();
+        let config = temp.path().join("Content/MicrosoftGame.config");
+        let denied = || std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        fs::write(&config, r#"<Game><ExecutableList><Executable Name="sub\game.exe" TargetDeviceFamily="PC" Architecture="ARM64"/></ExecutableList></Game>"#).unwrap();
+        assert_eq!(
+            unreadable_pe_machine(&exe, false, denied()).unwrap(),
+            0xaa64
+        );
+        fs::write(
+            exe.parent().unwrap().join("MicrosoftGame.config"),
+            "<Game/>",
+        )
+        .unwrap();
+        assert!(unreadable_pe_machine(&exe, false, denied()).is_err());
+        assert!(unreadable_pe_machine(&config, false, denied()).is_err());
+    }
+
+    #[test]
+    fn xbox_cod_renderer_rule_handles_denied_read_without_accepting_corrupt_pe() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("Content");
+        let exe = root.join("sp26/sp26-cod.exe");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        fs::write(&exe, b"synthetic protected bytes").unwrap();
+        fs::write(root.join("bootstrapper.exe"), b"fixture only").unwrap();
+        fs::write(root.join("MicrosoftGame.config"), r#"<Game><Identity Name="38985CA0.COREBase" Publisher="CN=07A9AC0F-5502-4D92-BA69-01D5D39D1E92"/><ExecutableList><Executable Name="bootstrapper.exe" TargetDeviceFamily="PC"/></ExecutableList><StoreId>9N201KQXS5BM</StoreId></Game>"#).unwrap();
+        let denied = || std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            unreadable_pe_machine(&exe, false, denied()).unwrap(),
+            0x8664
+        );
+        assert!(unreadable_pe_machine(&exe, true, denied()).is_err());
+        assert!(library_location(&exe).is_err());
+        assert!(pe64(&exe, false).is_err());
+        fs::remove_file(root.join("bootstrapper.exe")).unwrap();
+        assert!(unreadable_pe_machine(&exe, false, denied()).is_err());
+    }
 }
 pub fn pe64(path: &Path, dll: bool) -> Result<()> {
     ensure!(
@@ -259,32 +362,40 @@ pub fn deployment_directory(directory: &Path) -> Result<PathBuf> {
     );
     Ok(p)
 }
-pub fn assert_target_stopped(target: &DeploymentTarget) -> Result<()> {
-    // Each group can deploy once to a shared plugin folder while still having
-    // multiple real game processes. Do not derive these guards from destinations.
+pub fn blocking_processes(target: &DeploymentTarget) -> Result<Vec<win::BlockingProcess>> {
+    let mut processes = BTreeMap::new();
     for exe in std::iter::once(&target.game_exe).chain(&target.guard_exes) {
-        let game_dir = exe.parent().context("无效游戏路径")?;
-        let names = if exe == &target.game_exe && !target.is_custom() {
-            win::running_in_directory(game_dir)?
+        let dir = exe.parent().context("无效游戏路径")?;
+        let expected = if exe == &target.game_exe && !target.is_custom() {
+            None
         } else {
-            win::running_in_directory_or_missing(game_dir, exe)?
+            Some(exe.as_path())
         };
-        ensure!(
-            names.is_empty(),
-            "请先完全退出游戏及同目录程序：{}",
-            names.join(", ")
-        );
+        for p in win::processes_in_directory(dir, expected)? {
+            processes.insert(p.pid, p);
+        }
     }
     if target.is_custom() {
-        let names = win::running_in_directory(&target.directory)?;
-        ensure!(
-            names.is_empty(),
-            "请先完全退出游戏及同目录程序：{}",
-            names.join(", ")
-        );
+        for p in win::processes_in_directory(&target.directory, None)? {
+            processes.insert(p.pid, p);
+        }
     }
+    Ok(processes.into_values().collect())
+}
+pub fn assert_target_stopped(target: &DeploymentTarget) -> Result<()> {
+    let processes = blocking_processes(target)?;
+    ensure!(
+        processes.is_empty(),
+        "请先完全退出游戏及同目录程序：{}",
+        processes
+            .iter()
+            .map(|p| format!("{} (PID {})", p.name, p.pid))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     Ok(())
 }
+
 pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
     ensure!(
         !proxies.is_empty() && proxies.len() <= PROXIES.len(),
@@ -320,6 +431,9 @@ pub fn config_name(backend: &str) -> &'static str {
 /// that protocol to a previously installed backend merely because its ID matches.
 pub fn backend_matches_profile(backend: &str, profile: &str) -> bool {
     match profile {
+        crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 => {
+            backend == crate::upstream040::BACKEND
+        }
         crate::encore::PROFILE => backend == crate::encore::BACKEND,
         crate::transfusion::PROFILE => backend == crate::transfusion::BACKEND,
         crate::rtxmfg::PROFILE => backend == crate::rtxmfg::BACKEND,
@@ -345,26 +459,51 @@ pub fn folder(backend: &str) -> Result<&str> {
 pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>> {
     folder(backend)?;
     let mut names = normalize_proxies(proxies)?;
+    ensure!(
+        !names.iter().any(|n| n.ends_with(".asi")) || names.len() == 1,
+        "ASI 插件与 DLL 加载入口不能同时安装"
+    );
+    if backend == crate::upstream040::BACKEND {
+        ensure!(
+            names
+                .iter()
+                .all(|n| crate::upstream040::PROXIES.contains(&n.as_str())),
+            "0.4.0 不提供所选代理入口"
+        );
+        names.push(INI.into());
+        names.extend(
+            crate::upstream040::COMPONENTS
+                .iter()
+                .map(|s| (*s).to_owned()),
+        );
+        return Ok(names);
+    }
     if backend == crate::encore::BACKEND {
         ensure!(
-            names.len() == 1 && crate::encore::PROXIES.contains(&names[0].as_str()),
-            "RTX Encore 只允许一个 DLL 入口"
+            names
+                .iter()
+                .all(|n| crate::encore::ENTRIES.contains(&n.as_str())),
+            "RTX Encore 不提供所选入口"
         );
         names.extend([crate::encore::CONFIG.into(), crate::encore::NOTICES.into()]);
         return Ok(names);
     }
     if backend == crate::transfusion::BACKEND {
         ensure!(
-            names.len() == 1 && crate::transfusion::PROXIES.contains(&names[0].as_str()),
-            "DLSSG-Transfusion 只允许一个入口"
+            names
+                .iter()
+                .all(|n| crate::transfusion::PROXIES.contains(&n.as_str())),
+            "DLSSG-Transfusion 不提供所选入口"
         );
         names.push(crate::transfusion::CONFIG.into());
         return Ok(names);
     }
     if backend == crate::rtxmfg::BACKEND {
         ensure!(
-            names.len() == 1 && crate::rtxmfg::PROXIES.contains(&names[0].as_str()),
-            "RTX40 方案只允许一个入口"
+            names
+                .iter()
+                .all(|n| crate::rtxmfg::ENTRIES.contains(&n.as_str())),
+            "MFG Unlocker 不提供所选入口"
         );
         names.push(crate::rtxmfg::CONFIG.into());
         return Ok(names);
@@ -394,6 +533,9 @@ pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>
     names.push(INI.into());
     Ok(names)
 }
+pub fn stage_name(name: &str) -> String {
+    format!("{}.stage", name.replace('/', "__"))
+}
 pub fn package(backend: &str, proxies: &[String]) -> Result<BTreeMap<String, Vec<u8>>> {
     let root = folder(backend)?;
     let mut out = BTreeMap::new();
@@ -408,6 +550,7 @@ pub fn configure_package(backend: &str, out: &mut BTreeMap<String, Vec<u8>>) -> 
     // Bundled upstream runtimes default to the user cache. Moving their extracted
     // components next to a game changes DLL loading behavior (reported by ZZZ).
     if backend == "upstream_sm86"
+        || backend == crate::upstream040::BACKEND
         || backend == crate::rtxmfg::BACKEND
         || backend == crate::transfusion::BACKEND
         || backend == crate::encore::BACKEND
@@ -507,7 +650,7 @@ pub struct Record {
     pub upstream_version: Option<String>,
     #[serde(default = "default_proxy")]
     pub proxy: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub proxies: Vec<String>,
     pub hashes: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -520,6 +663,8 @@ pub struct Record {
     pub delta_legacy_cache: bool,
     #[serde(default)]
     pub cache_pending: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cleanup_pending_reasons: Vec<String>,
 }
 fn default_proxy() -> String {
     "version.dll".into()
@@ -575,7 +720,19 @@ impl Record {
         );
         let p = normalize_proxies(&self.selected())?;
         ensure!(self.proxy == p[0], "部署记录的 DLL 入口不一致");
-        let names = deployment_names(&self.backend, &p)?;
+        let mut names = deployment_names(&self.backend, &p)?;
+        if self.backend == crate::encore::BACKEND
+            && crate::encore::INTEL_FILES
+                .iter()
+                .any(|n| self.hashes.contains_key(*n))
+        {
+            names.extend(crate::encore::INTEL_FILES.iter().map(|n| (*n).to_owned()));
+        }
+        if self.backend == crate::rtxmfg::BACKEND
+            && self.hashes.contains_key(crate::rtxmfg::NOTICES)
+        {
+            names.push(crate::rtxmfg::NOTICES.into());
+        }
         ensure!(
             self.hashes.len() == names.len()
                 && names
@@ -605,7 +762,13 @@ pub fn record(directory: &Path) -> Result<Option<Record>> {
     let data = read_json(&p, 20000)?;
     if let Some(proxies) = data.get("proxies") {
         ensure!(
-            proxies.as_array().is_some_and(|a| !a.is_empty()),
+            proxies.as_array().is_some_and(|a| {
+                !a.is_empty()
+                    // Older cleanup serialized a legacy single-entry record
+                    // with an empty list. The explicit entry and exact owned
+                    // file set still pass Record::validate below.
+                    || data.get("proxy").and_then(serde_json::Value::as_str).is_some()
+            }),
             "部署记录的 DLL 入口无效"
         );
     }
@@ -649,7 +812,10 @@ pub fn preflight_install_at(target: &DeploymentTarget, proxies: &[String]) -> Re
     let target = target.validate(true)?;
     assert_target_stopped(&target)?;
     let dir = &target.directory;
-    if crate::encore_upgrade::has_pending(dir)? || crate::rtxmfg_upgrade::has_pending(dir)? {
+    if crate::encore_upgrade::has_pending(dir)?
+        || crate::rtxmfg_upgrade::has_pending(dir)?
+        || crate::upstream040_upgrade::has_pending(dir)?
+    {
         // A transaction may already have published the new entry while its
         // marker still describes the old one. The locked recovery below must
         // reconcile this state; ordinary collision checks cannot classify it.
@@ -695,8 +861,22 @@ pub fn apply_parameters_at(
     assert_target_stopped(&target)?;
     crate::encore_upgrade::recover_locked(&target)?;
     crate::rtxmfg_upgrade::recover_locked(&target)?;
+    crate::rtxmfg_settings::recover_locked(&target)?;
+    crate::upstream040_upgrade::recover_locked(&target)?;
     let record = record(dir)?.context("请先安装当前方案再应用参数")?;
     target.validate_record(&record)?;
+    if record.backend == crate::upstream040::BACKEND {
+        ensure!(
+            context.profile
+                == crate::upstream040::profile_for_version(
+                    record
+                        .upstream_version
+                        .as_deref()
+                        .or(record.payload_version.as_deref())
+                ),
+            "已安装补丁的参数协议已变化，请刷新后再应用"
+        );
+    }
     ensure!(
         record.scheme_id.as_deref() == Some(context.scheme.as_str()),
         "已部署方案不同，请先安装当前方案"
@@ -712,7 +892,39 @@ pub fn apply_parameters_at(
     let ini = no_links(&dir.join(config_name(&record.backend)))?;
     ensure!(ini.metadata()?.len() <= 1024 * 1024, "INI 文件过大");
     let before = fs::read(&ini)?;
-    let after = context.configure(&before, values)?;
+    let after = if record.backend == crate::encore::BACKEND {
+        crate::encore::configure_for_version(
+            &before,
+            values,
+            record
+                .upstream_version
+                .as_deref()
+                .or(record.payload_version.as_deref()),
+        )?
+    } else {
+        context.configure(&before, values)?
+    };
+    if record.backend == crate::encore::BACKEND
+        && crate::encore::supports_200(
+            record
+                .upstream_version
+                .as_deref()
+                .or(record.payload_version.as_deref()),
+        )
+    {
+        crate::runtime_files::validate_encore_features(&target, &after)?;
+    }
+    if record.backend == crate::rtxmfg::BACKEND {
+        crate::rtxmfg_settings::preflight(
+            &target,
+            record
+                .upstream_version
+                .as_deref()
+                .or(record.payload_version.as_deref()),
+            values,
+        )?;
+        return crate::rtxmfg_settings::apply_locked(&target, Some((&before, &after)), values);
+    }
     if before == after {
         return Ok(());
     }
@@ -732,7 +944,10 @@ pub fn status_at(target: &DeploymentTarget) -> String {
     fn inner(target: &DeploymentTarget) -> Result<String> {
         let target = target.validate(false)?;
         let dir = &target.directory;
-        if crate::encore_upgrade::has_pending(dir)? || crate::rtxmfg_upgrade::has_pending(dir)? {
+        if crate::encore_upgrade::has_pending(dir)?
+            || crate::rtxmfg_upgrade::has_pending(dir)?
+            || crate::upstream040_upgrade::has_pending(dir)?
+        {
             return Ok("升级未完成 / 可恢复原安装".into());
         }
         if let Some(r) = record(dir)? {
@@ -763,7 +978,10 @@ pub fn status_at(target: &DeploymentTarget) -> String {
                     .map(|v| format!(" @{v}"))
                     .unwrap_or_default(),
                 r.selected().join(", "),
-                if edited {
+                if r.backend == crate::rtxmfg::BACKEND && crate::rtxmfg_settings::has_pending(dir)?
+                {
+                    " / 参数待恢复，请重新应用或卸载"
+                } else if edited {
                     " / 配置已修改，可正常卸载"
                 } else {
                     ""
@@ -790,6 +1008,9 @@ pub fn status_at(target: &DeploymentTarget) -> String {
             .any(|n| dir.join(n).exists())
         {
             return Ok("已有手动补丁或其他 MOD / 卸载会自动识别本项目文件".into());
+        }
+        if crate::cleanup::orphaned_components(dir) {
+            return Ok("已有手动补丁或其他 MOD / 发现旧版配套文件，请先卸载清理".into());
         }
         Ok("未部署".into())
     }
@@ -880,7 +1101,21 @@ pub fn deploy_prepared_context_at_with_overrides(
     upstream_version: Option<&str>,
 ) -> Result<String> {
     let config = config_name(backend);
-    let expected = deployment_names(backend, proxies)?;
+    let mut expected = deployment_names(backend, proxies)?;
+    if backend == crate::encore::BACKEND
+        && crate::encore::INTEL_FILES
+            .iter()
+            .any(|n| data.contains_key(*n))
+    {
+        ensure!(
+            crate::encore::supports_120(upstream_version),
+            "此 Encore 版本不支持 Intel 配套组件"
+        );
+        expected.extend(crate::encore::INTEL_FILES.iter().map(|n| (*n).to_owned()));
+    }
+    if backend == crate::rtxmfg::BACKEND && crate::mfg_plugin::supported(upstream_version) {
+        expected.push(crate::rtxmfg::NOTICES.into());
+    }
     ensure!(
         data.keys()
             .cloned()
@@ -898,6 +1133,27 @@ pub fn deploy_prepared_context_at_with_overrides(
     assert_target_stopped(&target)?;
     crate::encore_upgrade::recover_locked(&target)?;
     crate::rtxmfg_upgrade::recover_locked(&target)?;
+    crate::rtxmfg_settings::recover_locked(&target)?;
+    crate::upstream040_upgrade::recover_locked(&target)?;
+    let no_overrides = crate::presets::Values::new();
+    if backend == crate::encore::BACKEND {
+        data.insert(
+            config.into(),
+            crate::encore::configure_for_version(
+                &data[config],
+                explicit_overrides.unwrap_or(&no_overrides),
+                upstream_version.or(payload_version),
+            )?,
+        );
+    }
+    let mfg_overrides = explicit_overrides.unwrap_or(&no_overrides);
+    if backend == crate::rtxmfg::BACKEND {
+        crate::rtxmfg_settings::preflight(
+            &target,
+            upstream_version.or(payload_version),
+            mfg_overrides,
+        )?;
+    }
     let mut existing = record(dir)?;
     if let Some(record) = &existing {
         target.validate_record(record)?;
@@ -920,6 +1176,14 @@ pub fn deploy_prepared_context_at_with_overrides(
         Vec::new()
     };
     let selected = normalize_proxies(proxies)?;
+    let mfg_plugin = backend == crate::rtxmfg::BACKEND && selected == [crate::mfg_plugin::ENTRY];
+    if mfg_plugin {
+        ensure!(
+            crate::mfg_plugin::supported(upstream_version),
+            "此 MFG 版本不支持插件模式"
+        );
+        crate::mfg_plugin::validate_host(&target)?;
+    }
     if matches!(backend, crate::rtxmfg::BACKEND | crate::encore::BACKEND) {
         for (proxy, original) in [
             ("binkw64.dll", "binkw64Hooked.dll"),
@@ -949,9 +1213,13 @@ pub fn deploy_prepared_context_at_with_overrides(
     }
     let root = no_links(&dir.join(OWN))?;
     if backend == crate::encore::BACKEND
-        && let Some(old) = existing
-            .as_ref()
-            .filter(|r| r.backend == crate::transfusion::BACKEND)
+        && let Some(old) = existing.as_ref().filter(|r| {
+            r.backend == crate::transfusion::BACKEND
+                || (r.backend == crate::encore::BACKEND
+                    && data.iter().any(|(n, bytes)| {
+                        n != crate::encore::CONFIG && r.hashes.get(n) != Some(&hash(bytes))
+                    }))
+        })
     {
         let new = Record {
             schema: 3,
@@ -967,6 +1235,7 @@ pub fn deploy_prepared_context_at_with_overrides(
             delta_cache_ids: Vec::new(),
             delta_legacy_cache: false,
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
         return crate::encore_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides);
     }
@@ -974,7 +1243,9 @@ pub fn deploy_prepared_context_at_with_overrides(
         && let Some(old) = existing.as_ref().filter(|record| {
             record.backend == crate::rtxmfg::BACKEND
                 && record.selected() == selected
-                && record.hashes.get(&selected[0]) != Some(&hash(&data[&selected[0]]))
+                && selected
+                    .iter()
+                    .any(|n| record.hashes.get(n) != Some(&hash(&data[n])))
         })
     {
         ensure!(
@@ -997,13 +1268,49 @@ pub fn deploy_prepared_context_at_with_overrides(
             delta_cache_ids: Vec::new(),
             delta_legacy_cache: false,
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
-        return crate::rtxmfg_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides);
+        let message =
+            crate::rtxmfg_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides)?;
+        crate::rtxmfg_settings::apply_locked(&target, None, mfg_overrides)?;
+        return Ok(message);
+    }
+    if let Some(old) = existing.as_ref()
+        && backend == crate::upstream040::BACKEND
+        && (old.backend != backend
+            || selected
+                .iter()
+                .any(|n| old.hashes.get(n) != Some(&hash(&data[n]))))
+    {
+        let new = Record {
+            schema: 3,
+            backend: backend.into(),
+            game_exe: target.record_exe(),
+            payload_version: payload_version.map(str::to_owned),
+            upstream_version: upstream_version.map(str::to_owned),
+            proxy: selected[0].clone(),
+            proxies: selected.clone(),
+            hashes: data.iter().map(|(n, b)| (n.clone(), hash(b))).collect(),
+            cleanup_dirs: BTreeMap::new(),
+            scheme_id: context.map(|c| c.scheme.clone()),
+            delta_cache_ids: Vec::new(),
+            delta_legacy_cache: false,
+            cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
+        };
+        return crate::upstream040_upgrade::upgrade_locked(
+            &target,
+            old,
+            new,
+            data,
+            explicit_overrides,
+        );
     }
     // Adopt only identical, recognized proxies. This changes no game binary,
     // while allowing an already-tested manual package to retain custom INI text.
     if existing.is_none()
         && backend != crate::encore::BACKEND
+        && !mfg_plugin
         && context.is_some()
         && dir.join(config).is_file()
         && selected.iter().all(|name| {
@@ -1011,6 +1318,10 @@ pub fn deploy_prepared_context_at_with_overrides(
             crate::cleanup::known_proxy(&path).unwrap_or(false)
                 && digest(&path).is_ok_and(|h| h == hash(&data[name]))
         })
+        && data
+            .iter()
+            .filter(|(name, _)| name.as_str() != config && !selected.contains(name))
+            .all(|(name, bytes)| digest(&dir.join(name)).is_ok_and(|h| h == hash(bytes)))
         && ![
             ".rtx-fg-script.json",
             ".rtx-fg-manager.json",
@@ -1047,6 +1358,7 @@ pub fn deploy_prepared_context_at_with_overrides(
             delta_cache_ids: delta_cache_ids.clone(),
             delta_legacy_cache: context.is_some_and(|c| c.delta),
             cache_pending: false,
+            cleanup_pending_reasons: Vec::new(),
         };
         fs::create_dir_all(&root)?;
         write_new(&root.join(MARKER), &serde_json::to_vec(&r)?)?;
@@ -1068,13 +1380,28 @@ pub fn deploy_prepared_context_at_with_overrides(
                 let current = fs::read(&ini)?;
                 let updated = if backend == crate::encore::BACKEND {
                     let empty = crate::presets::Values::new();
-                    crate::encore::configure(&current, explicit_overrides.unwrap_or(&empty))?
+                    crate::encore::configure_for_version(
+                        &current,
+                        explicit_overrides.unwrap_or(&empty),
+                        r.upstream_version
+                            .as_deref()
+                            .or(r.payload_version.as_deref()),
+                    )?
                 } else if backend == crate::rtxmfg::BACKEND {
                     if let Some(values) = explicit_overrides.filter(|v| !v.is_empty()) {
                         crate::rtxmfg::configure(&current, values)?
                     } else {
                         current.clone()
                     }
+                } else if backend == crate::upstream040::BACKEND {
+                    crate::upstream040::migrate_versions(
+                        &current,
+                        r.upstream_version
+                            .as_deref()
+                            .or(r.payload_version.as_deref()),
+                        upstream_version.or(payload_version),
+                        explicit_overrides,
+                    )?
                 } else {
                     crate::presets::merge_context(&current, &data[config], backend, context)?
                 };
@@ -1091,6 +1418,14 @@ pub fn deploy_prepared_context_at_with_overrides(
                     // Persist ownership before replacing the INI, so a crash
                     // cannot orphan runtime files released by the new settings.
                     atomic_json(&root.join(MARKER), &r)?;
+                }
+                if backend == crate::rtxmfg::BACKEND {
+                    crate::rtxmfg_settings::apply_locked(
+                        &target,
+                        Some((&current, &updated)),
+                        mfg_overrides,
+                    )?;
+                    return Ok("参数已应用；下次启动游戏生效。".into());
                 }
                 if current != updated {
                     let stage = no_links(&root.join(format!("{config}.config-stage")))?;
@@ -1110,6 +1445,7 @@ pub fn deploy_prepared_context_at_with_overrides(
         bail!("已有部署或未完成操作，请先清理再重新部署")
     }
     if backend == "upstream_sm86"
+        || backend == crate::upstream040::BACKEND
         || backend == crate::rtxmfg::BACKEND
         || backend == crate::transfusion::BACKEND
         || backend == crate::encore::BACKEND
@@ -1127,6 +1463,7 @@ pub fn deploy_prepared_context_at_with_overrides(
     }
     let conflicts = if backend.starts_with("native")
         || backend == "upstream_sm86"
+        || backend == crate::upstream040::BACKEND
         || backend == crate::rtxmfg::BACKEND
         || backend == crate::transfusion::BACKEND
         || backend == crate::encore::BACKEND
@@ -1160,7 +1497,7 @@ pub fn deploy_prepared_context_at_with_overrides(
     }
     for n in data.keys() {
         ensure!(
-            !no_links(&root.join(format!("{n}.stage")))?.exists(),
+            !no_links(&root.join(stage_name(n)))?.exists(),
             "存在待恢复的临时文件，请先卸载补丁"
         );
     }
@@ -1179,19 +1516,35 @@ pub fn deploy_prepared_context_at_with_overrides(
         delta_cache_ids,
         delta_legacy_cache: false,
         cache_pending: false,
+        cleanup_pending_reasons: Vec::new(),
     };
     r.validate()?;
     write_new(&root.join(MARKER), &serde_json::to_vec(&r)?)?;
     let mut published = Vec::new();
     let outcome = (|| -> Result<()> {
+        if mfg_plugin {
+            crate::mfg_plugin::enable_locked(&target)?;
+        }
         fs::create_dir_all(root.join("cache"))?;
         fs::create_dir_all(root.join("logs"))?;
-        for (n, b) in &data {
-            let stage = root.join(format!("{n}.stage"));
+        // Publish entry points last: the game must never see a loadable proxy
+        // before its configuration and bundled runtime components are present.
+        let entries = r.selected();
+        let mut ordered = data.iter().collect::<Vec<_>>();
+        ordered.sort_by_key(|(name, _)| entries.contains(name));
+        for (n, b) in ordered {
+            let stage = root.join(stage_name(n));
             write_new(&stage, b)?;
             let dst = no_links(&dir.join(n))?;
+            if let Some(parent) = dst.parent() {
+                fs::create_dir_all(parent)?;
+                no_links(parent)?;
+            }
             win::rename_no_replace(&stage, &dst)?;
             published.push(n.clone());
+        }
+        if backend == crate::rtxmfg::BACKEND {
+            crate::rtxmfg_settings::apply_locked(&target, None, mfg_overrides)?;
         }
         Ok(())
     })();
@@ -1201,6 +1554,11 @@ pub fn deploy_prepared_context_at_with_overrides(
             if q.is_file() && digest(&q)? == r.hashes[n] {
                 let _ = fs::remove_file(q);
             }
+        }
+        if mfg_plugin && let Err(restore) = crate::mfg_plugin::restore_locked(&target) {
+            return Err(e.context(format!(
+                "部署未完成，OptiScaler 设置待恢复：{restore}；请重试卸载"
+            )));
         }
         return Err(e.context("部署未完成；恢复记录已保留，请先卸载补丁"));
     }

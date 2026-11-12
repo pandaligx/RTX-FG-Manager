@@ -6,12 +6,14 @@ use rtx_fg_manager::{cleanup, core, presets};
 use std::collections::BTreeMap;
 use std::{fs, path::Path};
 #[test]
-fn compact_catalog_expands_three_schemes_and_checks_index() -> Result<()> {
+fn compact_catalog_retains_three_policies_and_hides_retired_initial_scheme() -> Result<()> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/catalog420");
     let bytes = fs::read(root.join("catalog.json"))?;
     let index = fs::read(root.join("index.json"))?;
     let c = serde_json::from_slice::<cloud::CompactCatalog>(&bytes)?.expand(&index)?;
-    assert_eq!(c.schemes().len(), 3);
+    assert_eq!(c.schemes().len(), 1);
+    assert_eq!(c.scheme_policies.len(), 3);
+    assert!(c.schemes().iter().all(|p| p.scheme_id != "initial"));
     assert_eq!(c.packages.len(), 13);
     assert_eq!(c.default_scheme, "upstream-0.3.5-310-9");
     assert_eq!(c.proxies("initial"), vec!["version.dll"]);
@@ -122,6 +124,8 @@ fn clear_cache_keeps_library_ini_and_cleanup_identities() -> Result<()> {
         runtime.join("cloud/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.zip"),
         runtime.join("cloud/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.domestic.download.zip.aria2"),
         data.join("updates/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/RTXManager-v4.1.2-x64.exe"),
+        runtime.join("cloud/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.zip.rtx-part.json"),
+        data.join("updates/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/RTXManager.exe.rtx-part.json"),
     ] {
         fs::write(p, b"cache")?;
     }
@@ -134,8 +138,8 @@ fn clear_cache_keeps_library_ini_and_cleanup_identities() -> Result<()> {
         fs::write(p, b"keep")?;
     }
     let r = cache::clean_scoped(&runtime, &data)?;
-    assert_eq!(r.files, 3);
-    assert_eq!(r.bytes, 15);
+    assert_eq!(r.files, 5);
+    assert_eq!(r.bytes, 25);
     assert_eq!(r.skipped, 0);
     assert_eq!(fs::read(data.join("games.json"))?, b"keep");
     assert_eq!(fs::read(runtime.join("cloud-identities.json"))?, b"keep");

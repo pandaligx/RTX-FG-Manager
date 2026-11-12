@@ -1,25 +1,55 @@
 //! Official component icons plus the requested Bilibili brand exception, all offline.
 use gpui::{AssetSource, SharedString};
 use std::borrow::Cow;
+// The default component bundle excludes catalog-only icons.
+gpui::assets::icon_assets!(RecommendationAssets, [UsersRound, Download]);
 pub struct Assets;
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
+        if let Some(bytes) = RecommendationAssets.load(path)? {
+            return Ok(Some(bytes));
+        }
+        if path == "app/manager-backplate.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!(
+                "../assets/manager-backplate.svg"
+            ))));
+        }
         if path == "app/manager.png" {
             return Ok(Some(Cow::Borrowed(include_bytes!("../assets/manager.png"))));
         }
         if path == "app/refresh.svg" {
             return Ok(Some(Cow::Borrowed(include_bytes!("../assets/refresh.svg"))));
         }
+        if path == "app/trash.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!("../assets/trash.svg"))));
+        }
         if path == "app/bilibili.svg" {
             return Ok(Some(Cow::Borrowed(include_bytes!(
                 "../assets/bilibili.svg"
+            ))));
+        }
+        if path == "app/nvidia.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!("../assets/nvidia.svg"))));
+        }
+        if path == "app/gpu-disguise.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!(
+                "../assets/gpu-disguise.svg"
             ))));
         }
         gpui::assets::Assets.load(path)
     }
     fn list(&self, path: &str) -> anyhow::Result<Vec<SharedString>> {
         let mut files = gpui::assets::Assets.list(path)?;
-        for name in ["app/manager.png", "app/refresh.svg", "app/bilibili.svg"] {
+        files.extend(RecommendationAssets.list(path)?);
+        for name in [
+            "app/manager.png",
+            "app/manager-backplate.svg",
+            "app/refresh.svg",
+            "app/trash.svg",
+            "app/bilibili.svg",
+            "app/nvidia.svg",
+            "app/gpu-disguise.svg",
+        ] {
             if name.starts_with(path) {
                 files.push(name.into());
             }
@@ -44,6 +74,8 @@ mod tests {
         }
         for path in [
             "icons/cpu.svg",
+            "icons/users-round.svg",
+            "app/trash.svg",
             "icons/github.svg",
             "icons/layout-dashboard.svg",
             "icons/triangle-alert.svg",

@@ -131,6 +131,46 @@ pub fn from_wide(s: &[u16]) -> String {
     String::from_utf16_lossy(s)
 }
 
+pub fn reduced_motion() -> bool {
+    false
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockingProcess {
+    pub pid: u32,
+    pub name: String,
+    pub path: Option<PathBuf>,
+    pub created: Option<u64>,
+}
+impl BlockingProcess {
+    pub fn holds_patch_files(&self) -> bool {
+        false
+    }
+    pub fn can_terminate(&self) -> bool {
+        false
+    }
+}
+pub fn processes_in_directory(
+    dir: &Path,
+    expected_exe: Option<&Path>,
+) -> Result<Vec<BlockingProcess>> {
+    Ok(running_in_directory_impl(dir, expected_exe)?
+        .into_iter()
+        .map(|name| BlockingProcess {
+            pid: 0,
+            name,
+            path: None,
+            created: None,
+        })
+        .collect())
+}
+pub fn processes_holding_files(_paths: &[PathBuf]) -> Result<Vec<BlockingProcess>> {
+    anyhow::bail!("Linux 尚不支持精确检查文件占用，请先退出游戏及其辅助进程")
+}
+pub fn terminate_confirmed(_process: &BlockingProcess) -> Result<()> {
+    anyhow::bail!("Linux 请手动退出游戏；管理器不终止无法确认身份的进程")
+}
+
 // ---------------------------------------------------------------------------
 // Advisory file locks (replacing named kernel mutexes)
 // ---------------------------------------------------------------------------

@@ -9,7 +9,11 @@ mod game_icons;
 mod game_icons;
 mod ui;
 mod ui_assets;
+mod ui_focus;
 mod ui_themes;
+// Supplement Kit translations without modifying the pinned framework sources.
+rust_i18n::i18n!("rust/assets/component-locales", fallback = "en");
+
 fn main() {
     if let Err(e) = run() {
         if std::env::args().any(|s| {
@@ -24,6 +28,9 @@ fn main() {
                 "--download-check",
                 "--cloud-check",
                 "--update-check",
+                "--catalog-check",
+                "--metadata-check",
+                "--bundle-check",
             ]
             .contains(&s.as_str())
         }) {
@@ -39,8 +46,59 @@ fn run() -> anyhow::Result<()> {
     use rtx_fg_manager::{core, hags, preferences, scanner, updater, win};
     use std::{path::PathBuf, sync::atomic::AtomicBool};
     let args: Vec<_> = std::env::args().collect();
+    #[cfg(target_os = "linux")]
+    if let Some(index) = args.iter().position(|arg| arg == "--wine-prefix") {
+        let prefix = args.get(index + 1).context("--wine-prefix 缺少目录")?;
+        win::set_prefix(std::path::Path::new(prefix))?;
+    }
     let arg = |n: usize| args.get(n).context("缺少命令参数");
     match args.get(1).map(String::as_str) {
+        Some("--reset-manager") => rtx_fg_manager::reset::apply(&PathBuf::from(arg(2)?)),
+        Some("--rename-manager") => rtx_fg_manager::executable_name::apply(&PathBuf::from(arg(2)?)),
+        Some("--bundle-check") => {
+            // Prepare one chosen entry in the download cache, never deploy it.
+            let catalog = rtx_fg_manager::cloud::bundled();
+            let scheme = arg(2)?;
+            anyhow::ensure!(
+                catalog.schemes().iter().any(|p| &p.scheme_id == scheme),
+                "Unknown scheme"
+            );
+            let mut events = Vec::new();
+            let prepared = rtx_fg_manager::cloud::prepare(
+                &catalog,
+                scheme,
+                1,
+                &["version.dll".into()],
+                &AtomicBool::new(false),
+                |event| events.push(event),
+            )?;
+            core::atomic_json(
+                &PathBuf::from(arg(3)?),
+                &serde_json::json!({
+                    "scheme":scheme, "version":prepared.version,
+                    "files":prepared.files.keys().collect::<Vec<_>>(), "events":events,
+                    "deployed":false
+                }),
+            )
+        }
+        Some("--catalog-check") => {
+            // Metadata only. Never loop over payloads or install into games.
+            let catalog = rtx_fg_manager::cloud::refresh()?;
+            core::atomic_json(&PathBuf::from(arg(2)?), &serde_json::to_value(catalog)?)
+        }
+        Some("--metadata-check") => {
+            let bytes = rtx_fg_manager::transfer::fetch_metadata(
+                vec![rtx_fg_manager::transfer::Source {
+                    name: "diagnostic".into(),
+                    url: arg(2)?.clone(),
+                }],
+                rtx_fg_manager::transfer::UrlPolicy::Official,
+                &AtomicBool::new(false),
+                |_| {},
+            )?;
+            let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+            core::atomic_json(&PathBuf::from(arg(3)?), &value)
+        }
         Some("--update-check") => {
             // Read-only updater smoke check; never downloads or starts an EXE.
             let manifest = updater::release(arg(2)?)?;
@@ -215,5 +273,35 @@ fn run() -> anyhow::Result<()> {
             }
             ui::run(data, smoke)
         }
+    }
+}
+
+#[cfg(test)]
+mod component_locale_tests {
+    #[test]
+    fn settings_search_extension_keeps_upstream_fallbacks() {
+        use gpui::component as gpui_component;
+        rust_i18n::extend!(gpui_component);
+        for (locale, expected) in [
+            ("en", "Search..."),
+            ("zh-CN", "搜索..."),
+            ("ja", "検索..."),
+            ("ko", "검색..."),
+            ("ru", "Поиск..."),
+        ] {
+            assert_eq!(
+                gpui_component::_rust_i18n_translate(locale, "Settings.search_placeholder"),
+                expected
+            );
+        }
+        // Extending one prompt must not replace the framework's other messages.
+        assert_eq!(
+            gpui_component::_rust_i18n_translate("zh-CN", "Settings.Reset All"),
+            "重置全部"
+        );
+        assert_eq!(
+            gpui_component::_rust_i18n_translate("ru", "Settings.Reset All"),
+            "Сбросить все"
+        );
     }
 }

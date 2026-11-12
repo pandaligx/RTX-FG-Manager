@@ -19,11 +19,27 @@ use crate::fast::layers::TileCache;
 /// The layer tiles `scene` composites, in the order it lists them.
 pub(crate) fn composited_tiles(scene: &Scene) -> impl Iterator<Item = (LayerKey, TileCoord)> + '_ {
     let has_layers = !scene.layers.frames.is_empty();
-    scene
+    let direct = scene
         .polychrome_sprites
         .iter()
         .take_while(move |_| has_layers)
-        .filter_map(|sprite| decode_layer_tile(sprite.tile.texture_id, sprite.tile.tile_id))
+        .filter_map(|sprite| decode_layer_tile(sprite.tile.texture_id, sprite.tile.tile_id));
+    if !scene
+        .polychrome_sprites
+        .iter()
+        .any(|sprite| crate::fast::rounded_clip::group(scene, sprite.tile.texture_id).is_some())
+    {
+        return itertools::Either::Left(direct);
+    }
+    let mut tiles: Vec<_> = direct.collect();
+    for sprite in &scene.polychrome_sprites {
+        if let Some(child) = crate::fast::rounded_clip::group(scene, sprite.tile.texture_id)
+            .and_then(|frame| frame.content.scene())
+        {
+            tiles.extend(composited_tiles(child));
+        }
+    }
+    itertools::Either::Right(tiles.into_iter())
 }
 
 /// Whether sprites of `texture` are layer tiles rather than atlas sprites.

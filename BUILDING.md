@@ -1,5 +1,34 @@
 # Build the Rust manager / 编译 Rust 管理器
 
+## Linux AppImage (experimental / 实验性)
+
+The Linux port shares the current manager source and uses a native GPUI window.
+Build on Ubuntu 22.04 or newer with the dependencies listed in
+`.github/workflows/build-linux.yml`, then run:
+
+```sh
+cargo build --locked --release --target x86_64-unknown-linux-gnu
+WINEPREFIX=/absolute/path/to/prefix target/x86_64-unknown-linux-gnu/release/RTXManager
+APPIMAGETOOL=/absolute/path/to/appimagetool packaging/build-appimage.sh
+```
+
+Use an explicit Wine/Proton prefix (`WINEPREFIX` or `--wine-prefix`) and add the
+game's Windows EXE or set `RTXFG_ROOTS` to its host installation directory.
+This does not install DLLs into native ELF games or configure Proton launch options.
+The host supplies Vulkan drivers, X11/Wayland, FreeType, Fontconfig and xkbcommon.
+Windows updates, HAGS, native GPU probes, DPAPI login storage and Windows-only
+leftover/handle repair are unavailable. Linux never offers a Windows EXE update
+or claims Windows Authenticode trust. Keep recovery files when an operation is
+unsupported. Community browsing and portable configuration editing remain available.
+
+Linux 构建为实验性独立 AppImage，使用当前源码；需明确选择 Wine/Proton 前缀，
+不代表所有游戏已实测。不自动更新 Windows EXE，不修改宿主系统显卡驱动或 GPU 调度。
+Windows 的签名、渲染、更新通道和发布工作流保持原实现。
+
+The Linux workflow produces a temporary CI artifact only. It never signs or
+publishes a release and cannot modify update manifests. Windows regressions still
+run independently in `build.yml`; do not skip them when maintaining this port.
+
 The manager is a Windows x64 Rust/GPUI application. A normal build does not require Python, CUDA, Vulkan or NGX SDKs, game files, or the historical `development/` tree. It does require the native Windows compiler and SDK used by GPUI and Windows resources.
 
 管理器采用 Rust/GPUI。普通编译不依赖 Python、CUDA、Vulkan/NGX SDK、游戏文件或历史开发目录；需要 Visual Studio C++ 生成工具和 Windows SDK。
@@ -8,7 +37,7 @@ The manager is a Windows x64 Rust/GPUI application. A normal build does not requ
 
 - Windows 10/11 x64; Visual Studio 2022 Build Tools with **Desktop development with C++**, an x64 MSVC toolset, and Windows SDK.
 - Rustup. `rust-toolchain.toml` pins the compiler, target, Clippy and rustfmt; do not replace this with an untested nightly toolchain.
-- Use a Developer PowerShell for Visual Studio. Network access is needed for Cargo dependencies and the initial pinned downloader resource. Administrator elevation is not required for normal compilation.
+- Use a Developer PowerShell for Visual Studio. Network access is needed for Cargo dependencies. Administrator elevation is not required for normal compilation.
 
 ```powershell
 git clone https://github.com/pandaligx/RTX-FG-Manager.git
@@ -21,9 +50,9 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked --release
 ```
 
-Output: `target/x86_64-pc-windows-msvc/release/RTXManager.exe`. The result is **unsigned**. Release signing is separate; never rebuild over a publisher-signed release. Normal debug and release builds embed only the pinned aria2 executable and its configuration, not game DLLs.
+Output: `target/x86_64-pc-windows-msvc/release/RTXManager.exe`. The result is **unsigned**. Release signing is separate; never rebuild over a publisher-signed release. Normal debug and release builds embed neither a downloader executable nor game DLLs.
 
-`prepare-build.ps1` fetches the unchanged publisher-signed aria2 binary identified by size and SHA-256 in `tools/build-resources.json`. This makes the manager's input reproducible; **it does not claim that this historical aria2 binary can be reproduced from source**. Its original build/source records were not retained; see `THIRD_PARTY_NOTICES.txt`. Bootstrap may use Windows HTTPS download once, because aria2 cannot download itself before it exists. Once prepared, resource downloads use the verified aria2 executable. Existing mismatched files cause a clear error and are not overwritten automatically.
+Downloads use Rust HTTPS requests with a shared 30-connection limit, checked redirects, resumable blocks, and mandatory payload integrity checks. `prepare-build.ps1` remains a no-op compatibility entry point for existing build scripts. Historical aria2 resources are not embedded or executed by the current manager.
 
 ## Optional tests using released, signed binaries
 
@@ -51,126 +80,18 @@ cargo build --locked --features native-probes,fixture-tests
 
 `RTXFG_NGX_INCLUDE` must contain `nvsdk_ngx_params.h` and its required `nvsdk_ngx_defs.h`; `RTXFG_VULKAN_INCLUDE` must contain `vulkan/vulkan.h`. `native-probes` alone can inspect an explicitly supplied, recognized game deployment; the historical default diagnostic payload requires `fixture-tests`. Builds without `native-probes` return an explicit unsupported-build error for the internal native self-test commands. Native tests need real Windows GPU/driver support; compilation and filesystem tests do not establish hardware compatibility.
 
-## Building on Linux as a Wine prefix manager / Linux 版（Wine 前缀管理器）
-
-The Linux build is not a native port of the Windows API. It manages a Wine
-prefix: games live in `<prefix>/drive_c/`, and the manager edits the Windows
-registry directly in `<prefix>/system.reg` (HKLM) and `<prefix>/user.reg`
-(HKCU). Deploying, replacing and removing files works as it does on Windows, and
-registry-backed features edit those `.reg` files. Anything with no honest Wine
-equivalent fails with a clear message instead of reporting false success.
-
-Linux 版不是 Windows API 的原生移植，而是 **Wine 前缀管理器**：游戏位于
-`<prefix>/drive_c/`，注册表通过直接编辑 `<prefix>/system.reg`（HKLM）与
-`<prefix>/user.reg`（HKCU）生效。
-
-Requirements: a Linux x64 host, Rustup with the `x86_64-unknown-linux-gnu`
-target, and the following distribution packages (also the CI list):
-
-```bash
-sudo apt-get install -y --no-install-recommends \
-  build-essential pkg-config ca-certificates curl wget file \
-  libfreetype-dev libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev \
-  libxcb1-dev libxcb-xkb-dev libwayland-dev squashfs-tools desktop-file-utils zsync
-```
-
-`clang` is not required: the only `bindgen` in the dependency graph is
-macOS-gated. Neither is `libvulkan-dev`, because the renderer dlopens
-`libvulkan.so.1` at runtime. A working Vulkan ICD is required at runtime and
-comes from the host (`mesa-vulkan-drivers`, or `lavapipe` as a software
-fallback). Never bundle a GPU driver or a Vulkan ICD into the AppImage.
-
-`.cargo/config.toml` pins `build.target = "x86_64-pc-windows-msvc"` to keep the
-Windows build reproducible. Cargo documents that `--target` overrides it, so a
-Linux build **must** pass the target explicitly:
-
-```bash
-rustup target add x86_64-unknown-linux-gnu
-cargo test  --offline --target x86_64-unknown-linux-gnu
-cargo clippy --offline --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
-cargo build --release --target x86_64-unknown-linux-gnu
-```
-
-Output: `target/x86_64-unknown-linux-gnu/release/RTXManager`. Note the target
-subdirectory: it is not `target/release/`.
-
-The downloader differs by platform. The Windows build embeds the verified,
-publisher-signed `aria2c.exe` from `tools/build-resources.json`, so it needs no
-system tool. The Linux build downloads with the bundled `reqwest` client, so it
-needs neither. Fetch the Windows resource with `tools/prepare-build.ps1`; the
-Linux build does not require it.
-
-### Wine prefix selection
-
-The manager resolves its prefix in this order: the prefix chosen in the UI, then
-`RTXFG_PREFIX`, then `WINEPREFIX`, then `~/.wine`. A non-prefix directory is
-rejected with a clear error. Use `--data-dir` to override the settings/library
-location, which defaults to `$XDG_DATA_HOME/rtx-fg-manager`
-(`~/.local/share/rtx-fg-manager`); extracted runtime files use
-`$XDG_CACHE_HOME/rtx-fg-manager/runtime`.
-
-### What the Linux build cannot do
-
-These are reported explicitly, never silently skipped:
-
-- **Authenticode signature trust.** `--signature` and the updater's publisher
-  check report `linux-not-verifiable`. The embedded `FileVersion`/`InternalName`
-  are still read in pure Rust, and the SHA-256 and size checks are unchanged, so
-  update downloads stay integrity-checked. A publisher identity, however, cannot
-  be established outside Windows.
-- **UAC elevation.** A Wine prefix is user-owned, so `ensure_admin` is a no-op
-  and GPU-name changes apply in-process.
-- **HAGS / hardware-accelerated GPU scheduling.** A Wine prefix exposes no such
-  scheduler; the UI shows "无法确认" and the settings deep-link fails with an
-  explanation.
-- **Windows Error Reporting event log.** `wevtutil.exe` has no prefix
-  equivalent; diagnostic exports record a note and continue.
-- **Windows settings URIs.** `ms-settings:` links are rejected with an error.
-
-The GPU display-name feature *is* implemented: a Wine prefix stores the display
-adapter database as text (`System\ControlSet00N\Enum\PCI\VEN_10DE&...` with
-`DeviceDesc`, plus `Control\Class\{4D36E968-...}` with `DriverDesc`), so the
-existing backup/restore record schema is reused against those keys.
-
-### AppImage
-
-```bash
-cargo build --locked --release --target x86_64-unknown-linux-gnu
-packaging/build-appimage.sh
-```
-
-The script assembles the AppDir manually and runs `appimagetool` (override its
-location with `APPIMAGETOOL=`). It requires `file`, `mksquashfs` and
-`desktop-file-validate` on `PATH`.
-
-`usr/lib` is intentionally **empty**. The release binary's verified `DT_NEEDED`
-entries are only `libxkbcommon`, `libxkbcommon-x11`, `libxcb`, `libgcc_s`,
-`libm`, `libc` and the loader. `--as-needed` even drops `libfontconfig` and
-`libfreetype`, which the GUI stack dlopens rather than links. The AppImage
-excludelist forbids redistributing glibc, `libgcc_s`, `libstdc++` and the
-graphics-driver libraries, and lists `libxcb`/`libfontconfig` too, so the host
-supplies them. **Never bundle a Vulkan ICD or a GPU driver**: `wgpu` dlopens
-`libvulkan.so.1` and enumerates `/usr/share/vulkan/icd.d`, so a working host
-driver (`mesa-vulkan-drivers`, or `lavapipe` as a software fallback) is required
-at runtime.
-
-`.github/workflows/build-linux.yml` builds on **ubuntu-22.04** on purpose: an
-AppImage cannot run on a distribution older than the one that built it, so a
-newer runner would silently drop support for older distributions. It also sets
-`APPIMAGE_EXTRACT_AND_RUN=1`, because GitHub runners do not provide FUSE, and
-passes `--locked` rather than `--offline`, since the repository vendors no
-registry.
-
-
-
 ## Source and CI boundaries
 
-Keep `Cargo.lock`, `.cargo/config.toml`, Rust sources/assets, current JSON language resources, and `vendor/gpui_fast_windows` together. GPUI Kit 0.7.1 is pinned to commit `4921e5b69834e45592c9772c57f39a29ada7de2f`; its `gpui-fast` feature selects the Fast backend, resolved to crates.io 0.1.2. Shared GPUI Pre support crates remain pinned to 0.3.8. The Windows vendor patch starts from the published Fast 0.1.2 crate and retains the manager's first-frame, DPI and font compatibility changes. These retained changes do not establish a new Windows 10 or physical multi-monitor test result. The former Zed Windows and sum-tree patches are no longer build inputs or part of this source export.
+Keep `Cargo.lock`, `.cargo/config.toml`, Rust sources/assets, current JSON language resources, and `vendor/gpui_fast_windows` together. GPUI Kit 0.9.1 is pinned to commit `39ab849a93b5f15507b969164d49891db8d5b470`; its `gpui-fast` feature selects the Fast backend, resolved to crates.io 0.1.14. Shared GPUI Pre support crates are pinned to 0.3.12. The Windows vendor patch starts from the published Fast 0.1.14 crate and retains the manager's first-frame, DPI and font compatibility changes alongside the upstream frame scheduler. These retained changes do not establish a new Windows 10 or physical multi-monitor test result. The former Zed Windows and sum-tree patches are no longer build inputs or part of this source export.
 
-The GPUI Pre 0.3.8 sum-tree, ztracing, ztracing-macro and zlog packages are Apache-2.0, including their recorded Zed source revision. The former GPL-only tracing-chain workaround is therefore unnecessary. Preserve the actual upstream license files and local change notes.
+The GPUI Pre 0.3.9 sum-tree, ztracing and ztracing-macro packages are Apache-2.0. The former GPL-only tracing-chain workaround is therefore unnecessary. Preserve the actual upstream license files and local change notes.
 
-The 21 offline theme sets in `rust/assets/themes` are copied from the same pinned Kit commit. Their 36 variants plus Kit's two defaults provide 38 color variants. The sidebar uses Kit's `Command` component for one searchable list and ephemeral hover/keyboard previews. Only confirmation persists the selected name and mode; cancellation restores saved preferences, and a generation token rejects stale deferred callbacks. Suspend system-theme polling during previews. Keep independent light/dark selections through `Theme::update`; unavailable selections fall back to the matching mode's default. Preserve theme source attribution, license and embedded JSON files with the Rust source.
+For Windows renderer/font regressions, run `cargo test --manifest-path vendor/gpui_fast_windows/Cargo.toml --features test-support fast:: -- --test-threads=1`, then repeat with the `direct_write::` filter. The backend has test-only dependencies and is tested as a standalone crate, with its own generated lockfile; the manager's root lockfile and release features remain separate. These checks need Direct3D or WARP and the upstream test dependencies; they do not execute game patches. The interactive GPU-reset test remains opt-in. Build the distributable from the project root without this test feature. The vendored pixel fixtures come from the same Fast 0.1.10 release.
+
+The 21 offline theme sets in `rust/assets/themes` remain pinned to Kit commit `4921e5b69834e45592c9772c57f39a29ada7de2f`. Their 36 variants plus Kit's two defaults provide 38 color variants. The sidebar uses Kit's `Command` component for one searchable list and ephemeral hover/keyboard previews. Only confirmation persists the selected name and mode; cancellation restores saved preferences, and a generation token rejects stale deferred callbacks. Suspend system-theme polling during previews. Keep independent light/dark selections through `Theme::update`; unavailable selections fall back to the matching mode's default. Preserve theme source attribution, license and embedded JSON files with the Rust source.
 
 The GitHub Windows workflow builds an **unsigned test artifact**, never signs, publishes, or replaces the release update manifest. Signed EXE and game DLL releases remain separate from source commits.
+
+The manager's opaque Windows UI explicitly uses the backend's HWND swap-chain path for monitoring-overlay compatibility. D3D11 hardware rendering and GPUI Fast remain enabled. This does not change system environment variables or monitoring settings; native composition surfaces and transparent backdrops would need separate integration before use.
 
 Secrets, certificates/private keys, local logs, game binaries, historical development outputs and runtime caches must not be committed. The published source export uses an explicit file allowlist in addition to `.gitignore`. DLL ownership records used for safe cleanup are required application data and are not disposable build caches.

@@ -1,20 +1,17 @@
 //! Per-game configuration edits and bounded, local-only diagnostic exports.
-#[cfg(windows)]
 use crate::platform::CommandExt;
 use crate::{cleanup, core, selftest, win};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-#[cfg(windows)]
-use std::process::{Command, Stdio};
-#[cfg(windows)]
-use std::time::{Duration, Instant};
 use std::{
     collections::BTreeSet,
     fs,
     io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
+    process::{Command, Stdio},
     sync::atomic::{AtomicBool, Ordering},
+    time::{Duration, Instant},
 };
 #[derive(Clone, Copy)]
 pub enum Encoding {
@@ -140,6 +137,27 @@ pub fn edit_ini(bytes: &[u8], section: &str, key: &str, value: &str) -> Result<V
         }
     }
     Ok(encode_ini(&lines.concat(), encoding))
+}
+/// Remove exactly one key without rewriting unrelated lines or changing encoding.
+pub fn remove_ini_key(bytes: &[u8], section: &str, key: &str) -> Result<Vec<u8>> {
+    let (text, encoding) = decode_ini(bytes)?;
+    ini_value(&text, section, key)?; // Reject ambiguous duplicate sections/keys.
+    let mut inside = false;
+    let mut result = String::new();
+    for line in text.split_inclusive('\n') {
+        let s = line.trim();
+        if s.starts_with('[') && s.ends_with(']') {
+            inside = s[1..s.len() - 1].trim().eq_ignore_ascii_case(section);
+        } else if inside
+            && !s.starts_with([';', '#'])
+            && s.split_once('=')
+                .is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(key))
+        {
+            continue;
+        }
+        result.push_str(line);
+    }
+    Ok(encode_ini(&result, encoding))
 }
 pub fn game_level(exe: &Path) -> Result<Option<u8>> {
     let path = core::location(exe, false)?
@@ -320,15 +338,6 @@ pub fn matching_events(xml: &str, exe: &Path) -> Vec<String> {
         .map(|m| m.as_str().to_string())
         .collect()
 }
-/// The Windows Error Reporting application log is a Win32 service. A Wine
-/// prefix has no equivalent, so the Linux build reports that explicitly and the
-/// exporter records it as a note instead of fabricating an empty event list.
-#[cfg(not(windows))]
-fn events(exe: &Path, cancel: &AtomicBool) -> Result<Vec<String>> {
-    let _ = (exe, cancel);
-    anyhow::bail!("Windows 错误事件日志在 Linux 版不可用；已跳过应用事件采集")
-}
-#[cfg(windows)]
 fn events(exe: &Path, cancel: &AtomicBool) -> Result<Vec<String>> {
     let temp = tempfile::tempfile()?;
     let reader = temp.try_clone()?;
@@ -365,7 +374,7 @@ pub fn export(
     cancel: &AtomicBool,
     progress: impl Fn(String),
 ) -> Result<()> {
-    use zip::{ZipWriter, write::FileOptions};
+    use zip::{ZipWriter, write::SimpleFileOptions};
     let target = core::no_links(target)?;
     ensure!(
         target
@@ -392,7 +401,7 @@ pub fn export(
             .any(|p| core::key(p) == core::key(&target)),
         "导出文件不能覆盖日志源文件"
     );
-    let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     let mut temp = tempfile::NamedTempFile::new_in(parent)?;
     let mut archive = ZipWriter::new(temp.as_file_mut());
     let mut files = BTreeSet::new();
@@ -650,7 +659,6 @@ pub fn export(
     );
     archive.write_all(&manifest)?;
     archive.finish()?;
-    drop(archive);
     temp.as_file().sync_all()?;
     temp.persist(target)?;
     Ok(())

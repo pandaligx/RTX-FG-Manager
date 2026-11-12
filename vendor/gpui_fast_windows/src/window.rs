@@ -56,6 +56,7 @@ pub struct WindowsWindowState {
 
     pub callbacks: Callbacks,
     pub frame_signal: Arc<PlatformFrameSignal>,
+    pub(crate) fast_frame_request: Arc<crate::fast::frame_schedule::FrameRequest>,
     pub input_handler: Cell<Option<PlatformInputHandler>>,
     pub ime_enabled: Cell<bool>,
     pub pending_surrogate: Cell<Option<u16>>,
@@ -92,6 +93,7 @@ pub struct WindowsWindowState {
     pub(crate) show_after_first_present: Cell<bool>,
     hwnd: HWND,
     pub(crate) a11y: RefCell<Option<A11yState>>,
+    pub mouse_position: Cell<Point<Pixels>>,
 }
 
 pub(crate) struct WindowsWindowInner {
@@ -157,8 +159,10 @@ impl WindowsWindowState {
         let fullscreen = None;
         let initial_placement = None;
 
-        let direct_manipulation = DirectManipulationHandler::new(hwnd, scale_factor)
-            .context("initializing Direct Manipulation")?;
+        let fast_frame_request = crate::fast::frame_schedule::new_request(&draw_coordinator);
+        let direct_manipulation =
+            DirectManipulationHandler::new(hwnd, scale_factor, Arc::clone(&fast_frame_request))
+                .context("initializing Direct Manipulation")?;
 
         Ok(Self {
             origin: Cell::new(origin),
@@ -172,6 +176,7 @@ impl WindowsWindowState {
             min_size,
             callbacks,
             frame_signal: Arc::new(PlatformFrameSignal::new()),
+            fast_frame_request,
             input_handler: Cell::new(input_handler),
             ime_enabled: Cell::new(true),
             pending_surrogate: Cell::new(pending_surrogate),
@@ -194,6 +199,7 @@ impl WindowsWindowState {
             draw_coordinator,
             direct_manipulation,
             a11y: RefCell::new(None),
+            mouse_position: Cell::new(Point::default()),
         })
     }
 
@@ -406,6 +412,7 @@ pub(crate) struct Callbacks {
     pub(crate) hovered_status_change: Cell<Option<Box<dyn FnMut(bool)>>>,
     pub(crate) resize: Cell<Option<Box<dyn FnMut(Size<Pixels>, f32)>>>,
     pub(crate) moved: Cell<Option<Box<dyn FnMut()>>>,
+    pub(crate) display_changed: Cell<Option<Box<dyn FnMut()>>>,
     pub(crate) should_close: Cell<Option<Box<dyn FnMut() -> bool>>>,
     pub(crate) close: Cell<Option<Box<dyn FnOnce()>>>,
     pub(crate) hit_test_window_control: Cell<Option<Box<dyn FnMut() -> Option<WindowControlArea>>>>,
@@ -611,6 +618,10 @@ impl rwh::HasDisplayHandle for WindowsWindow {
 impl Drop for WindowsWindow {
     fn drop(&mut self) {
         self.0.dialog_owner.close();
+        // Programmatic closes also retire accessibility providers before HWND
+        // destruction; the async dialog-owner drain can retain this Rc longer.
+        let a11y = self.0.state.a11y.borrow_mut().take();
+        drop(a11y);
         unsafe { ShowWindowAsync(self.0.hwnd, SW_HIDE).ok().log_err() };
         // `DestroyWindow` below sends `WM_SHOWWINDOW`; without a callback the
         // resulting visibility report has nothing to notify.
@@ -968,13 +979,21 @@ impl PlatformWindow for WindowsWindow {
         self.state.is_fullscreen()
     }
 
+    fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
+        crate::fast::frame_schedule::frame_waker(self)
+    }
+
+    fn schedule_frame(&self) {
+        crate::fast::frame_schedule::schedule_frame(self)
+    }
+
     fn on_request_frame(&self, callback: Box<dyn FnMut(RequestFrameOptions)>) {
         self.state.callbacks.request_frame.set(Some(callback));
         crate::fast::startup::request_first_frame(self);
     }
 
     fn on_input(&self, callback: Box<dyn FnMut(PlatformInput) -> DispatchEventResult>) {
-        self.state.callbacks.input.set(Some(callback));
+        crate::fast::frame_schedule::on_input(self, callback)
     }
 
     fn on_active_status_change(&self, callback: Box<dyn FnMut(bool)>) {
@@ -1000,6 +1019,10 @@ impl PlatformWindow for WindowsWindow {
 
     fn on_resize(&self, callback: Box<dyn FnMut(Size<Pixels>, f32)>) {
         self.state.callbacks.resize.set(Some(callback));
+    }
+
+    fn on_display_changed(&self, callback: Box<dyn FnMut()>) {
+        self.state.callbacks.display_changed.set(Some(callback));
     }
 
     fn on_moved(&self, callback: Box<dyn FnMut()>) {
@@ -1032,10 +1055,12 @@ impl PlatformWindow for WindowsWindow {
 
     fn draw(&self, scene: &Scene) {
         crate::fast::startup::draw(self, scene);
+        crate::fast::frame_schedule::schedule_frame(self);
     }
 
     fn draw_composed(&self, scene: ComposedScene<'_>) {
-        crate::fast::composition::draw_composed(self, scene)
+        crate::fast::composition::draw_composed(self, scene);
+        crate::fast::frame_schedule::schedule_frame(self);
     }
 
     fn enable_window_composition(&self) -> anyhow::Result<()> {
@@ -1050,7 +1075,7 @@ impl PlatformWindow for WindowsWindow {
         crate::fast::composition::set_composition_order(self, surfaces)
     }
 
-    #[cfg(any(test, feature = "test-support"))]
+    #[cfg(feature = "test-support")]
     fn render_to_image(&self, scene: &Scene) -> anyhow::Result<image::RgbaImage> {
         self.state
             .renderer
@@ -1430,7 +1455,7 @@ enum WindowOpenState {
     Windowed,
 }
 
-pub(crate) const WINDOW_CLASS_NAME: PCWSTR = w!("Zed::Window");
+pub(crate) const WINDOW_CLASS_NAME: PCWSTR = crate::fast::class_names::WINDOW;
 
 fn register_window_class(icon_handle: HICON) {
     static ONCE: Once = Once::new();

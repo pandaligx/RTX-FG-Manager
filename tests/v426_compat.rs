@@ -15,7 +15,10 @@ fn v426_only_replaces_rtxmfg_and_keeps_previous_resources_immutable() -> Result<
     let prior: Value = serde_json::from_slice(bytes)?;
     let packages = prior["packages"].as_array().unwrap();
     assert_eq!(packages.len(), 21);
-    let current = cloud::bundled();
+    // Freeze the historical 4.2.x comparison. New 4.3 component replacements
+    // have separate coverage in v430_resources, without rewriting old evidence.
+    let current: cloud::Catalog =
+        serde_json::from_str(include_str!("fixtures/catalog429/catalog.json"))?;
     current.validate()?;
     let mut preserved = 0;
     for old in packages {

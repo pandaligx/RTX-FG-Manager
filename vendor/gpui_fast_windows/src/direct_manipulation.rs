@@ -1,5 +1,7 @@
+// Modified by Longbridge for gpui-fast.
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::Result;
 use gpui::*;
@@ -20,16 +22,21 @@ const DEFAULT_VIEWPORT_SIZE: i32 = 1000;
 
 pub(crate) struct DirectManipulationHandler {
     manager: IDirectManipulationManager,
-    update_manager: IDirectManipulationUpdateManager,
-    viewport: IDirectManipulationViewport,
+    pub(crate) update_manager: IDirectManipulationUpdateManager,
+    pub(crate) viewport: IDirectManipulationViewport,
     _handler_cookie: u32,
     window: HWND,
     scale_factor: Rc<Cell<f32>>,
     pending_events: Rc<RefCell<Vec<PlatformInput>>>,
+    pub(crate) fast_manipulation: crate::fast::frame_schedule::ManipulationFrames,
 }
 
 impl DirectManipulationHandler {
-    pub fn new(window: HWND, scale_factor: f32) -> Result<Self> {
+    pub fn new(
+        window: HWND,
+        scale_factor: f32,
+        fast_frame_request: Arc<crate::fast::frame_schedule::FrameRequest>,
+    ) -> Result<Self> {
         unsafe {
             let manager: IDirectManipulationManager =
                 CoCreateInstance(&DirectManipulationManager, None, CLSCTX_INPROC_SERVER)?;
@@ -71,6 +78,7 @@ impl DirectManipulationHandler {
                     window,
                     Rc::clone(&scale_factor),
                     Rc::clone(&pending_events),
+                    Arc::clone(&fast_frame_request),
                 )
                 .into();
 
@@ -86,6 +94,9 @@ impl DirectManipulationHandler {
                 window,
                 scale_factor,
                 pending_events,
+                fast_manipulation: crate::fast::frame_schedule::ManipulationFrames::new(
+                    fast_frame_request,
+                ),
             })
         }
     }
@@ -101,14 +112,13 @@ impl DirectManipulationHandler {
             if GetPointerType(pointer_id, &mut pointer_type).is_ok() && pointer_type == PT_TOUCHPAD
             {
                 self.viewport.SetContact(pointer_id).log_err();
+                crate::fast::frame_schedule::ManipulationFrames::contact(&self.fast_manipulation);
             }
         }
     }
 
     pub fn update(&self) {
-        unsafe {
-            self.update_manager.Update(None).log_err();
-        }
+        crate::fast::frame_schedule::update_manipulation(self);
     }
 
     pub fn drain_events(&self) -> Vec<PlatformInput> {
@@ -143,6 +153,7 @@ struct DirectManipulationEventHandler {
     last_y_offset: Cell<f32>,
     scroll_phase: Cell<TouchPhase>,
     pending_events: Rc<RefCell<Vec<PlatformInput>>>,
+    fast_frame_request: Arc<crate::fast::frame_schedule::FrameRequest>,
 }
 
 impl DirectManipulationEventHandler {
@@ -150,6 +161,7 @@ impl DirectManipulationEventHandler {
         window: HWND,
         scale_factor: Rc<Cell<f32>>,
         pending_events: Rc<RefCell<Vec<PlatformInput>>>,
+        fast_frame_request: Arc<crate::fast::frame_schedule::FrameRequest>,
     ) -> Self {
         Self {
             window,
@@ -160,6 +172,7 @@ impl DirectManipulationEventHandler {
             last_y_offset: Cell::new(0.0),
             scroll_phase: Cell::new(TouchPhase::Started),
             pending_events,
+            fast_frame_request,
         }
     }
 
@@ -170,11 +183,12 @@ impl DirectManipulationEventHandler {
             GestureKind::Scroll => {
                 self.pending_events
                     .borrow_mut()
-                    .push(PlatformInput::ScrollWheel(ScrollWheelEvent {
+                    .push(PlatformInput::Scroll(ScrollEvent {
                         position,
                         delta: ScrollDelta::Pixels(point(px(0.0), px(0.0))),
                         modifiers,
                         touch_phase: TouchPhase::Ended,
+                        source: ScrollSource::Pointer,
                     }));
             }
             GestureKind::Pinch => {
@@ -213,6 +227,7 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
         if current == previous {
             return Ok(());
         }
+        crate::fast::frame_schedule::FrameRequest::request(&self.fast_frame_request);
 
         // A new gesture interrupted inertia, so end the old sequence.
         if current == DIRECTMANIPULATION_RUNNING && previous == DIRECTMANIPULATION_INERTIA {
@@ -324,11 +339,12 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
                 self.scroll_phase.set(TouchPhase::Moved);
                 self.pending_events
                     .borrow_mut()
-                    .push(PlatformInput::ScrollWheel(ScrollWheelEvent {
+                    .push(PlatformInput::Scroll(ScrollEvent {
                         position,
                         delta: ScrollDelta::Pixels(point(px(dx), px(dy))),
                         modifiers,
                         touch_phase,
+                        source: ScrollSource::Pointer,
                     }));
             }
             GestureKind::Pinch => {

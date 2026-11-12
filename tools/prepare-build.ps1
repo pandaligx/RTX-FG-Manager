@@ -1,4 +1,5 @@
 [CmdletBinding()]
 param([switch]$VerifyOnly)
 $ErrorActionPreference = 'Stop'
-& (Join-Path $PSScriptRoot 'Get-VerifiedResources.ps1') -Manifest (Join-Path $PSScriptRoot 'build-resources.json') -Destination (Join-Path $PSScriptRoot '../app/tools') -VerifyOnly:$VerifyOnly
+# Kept as a compatible CI/bootstrap entry point. Downloads are implemented in Rust.
+Write-Output 'No external downloader is required for the current manager build.'

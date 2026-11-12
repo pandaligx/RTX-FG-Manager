@@ -55,14 +55,51 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
     target.validate_record(&j.old)?;
     target.validate_record(&j.new)?;
     ensure!(
-        j.old.backend == transfusion::BACKEND
-            && j.new.backend == encore::BACKEND
+        matches!(
+            j.old.backend.as_str(),
+            transfusion::BACKEND | encore::BACKEND
+        ) && j.new.backend == encore::BACKEND
             && j.old.scheme_id.as_deref() == Some(SCHEME)
             && j.new.scheme_id.as_deref() == Some(SCHEME)
             && !j.old.cache_pending
             && !j.new.cache_pending,
         "升级恢复记录的方案不匹配"
     );
+    if j.old.backend == encore::BACKEND {
+        ensure!(
+            j.old.selected() == j.new.selected(),
+            "Encore 升级需保持入口；换入口前请先卸载"
+        );
+        let old = j
+            .old
+            .upstream_version
+            .as_ref()
+            .or(j.old.payload_version.as_ref())
+            .context("旧 Encore 缺少版本")?;
+        let new = j
+            .new
+            .upstream_version
+            .as_ref()
+            .or(j.new.payload_version.as_ref())
+            .context("新 Encore 缺少版本")?;
+        let component_only = semver::Version::parse(new)? == semver::Version::parse(old)?
+            && j.old
+                .hashes
+                .iter()
+                .filter(|(n, _)| {
+                    n.as_str() != encore::CONFIG && !encore::INTEL_FILES.contains(&n.as_str())
+                })
+                .all(|(n, h)| j.new.hashes.get(n) == Some(h))
+            && j.new
+                .hashes
+                .keys()
+                .filter(|n| !encore::INTEL_FILES.contains(&n.as_str()))
+                .all(|n| j.old.hashes.contains_key(n));
+        ensure!(
+            semver::Version::parse(new)? > semver::Version::parse(old)? || component_only,
+            "Encore 只允许升级到更高版本"
+        );
+    }
     ensure!(
         j.old.cleanup_dirs.is_empty()
             && j.old.delta_cache_ids.is_empty()
@@ -82,7 +119,7 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
     );
     for (name, hash) in &j.before {
         ensure!(
-            name == transfusion::CONFIG || j.old.hashes.get(name) == Some(hash),
+            name == core::config_name(&j.old.backend) || j.old.hashes.get(name) == Some(hash),
             "原 DLL 与升级归属记录不一致"
         );
     }
@@ -94,13 +131,13 @@ fn transaction_files(j: &Journal) -> BTreeMap<String, String> {
     files.extend(
         j.before
             .iter()
-            .map(|(n, h)| (format!("old.{n}"), h.clone())),
+            .map(|(n, h)| (format!("old.{}", n.replace('/', "__")), h.clone())),
     );
     files.extend(
         j.new
             .hashes
             .iter()
-            .map(|(n, h)| (format!("next.{n}"), h.clone())),
+            .map(|(n, h)| (format!("next.{}", n.replace('/', "__")), h.clone())),
     );
     files
 }
@@ -196,7 +233,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
                 "原文件位置已被其他文件占用：{name}"
             );
             ensure!(
-                matches(&work.join(format!("old.{name}")), hash)?,
+                matches(&work.join(format!("old.{}", name.replace('/', "__"))), hash)?,
                 "原件备份缺失或已改变：{name}"
             );
         }
@@ -216,7 +253,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
     for (name, hash) in &j.before {
         let path = core::no_links(&target.directory.join(name))?;
         if !path.exists() {
-            let backup = core::no_links(&work.join(format!("old.{name}")))?;
+            let backup = core::no_links(&work.join(format!("old.{}", name.replace('/', "__"))))?;
             ensure!(matches(&backup, hash)?, "原件备份在恢复期间改变：{name}");
             win::rename_no_replace(&backup, &path)?;
         }
@@ -242,11 +279,11 @@ pub fn upgrade_locked(
     target.validate_record(old)?;
     target.validate_record(&new)?;
     ensure!(
-        old.backend == transfusion::BACKEND
+        matches!(old.backend.as_str(), transfusion::BACKEND | encore::BACKEND)
             && new.backend == encore::BACKEND
             && old.scheme_id.as_deref() == Some(SCHEME)
             && new.scheme_id.as_deref() == Some(SCHEME),
-        "只有本管理器记录的 Transfusion 安装可以原位升级"
+        "只有本管理器记录的 Transfusion 或 Encore 安装可以原位升级"
     );
     let dir = &target.directory;
     let root = core::no_links(&dir.join(core::OWN))?;
@@ -260,31 +297,77 @@ pub fn upgrade_locked(
     for (name, hash) in &old.hashes {
         let bytes = checked_bytes(
             &dir.join(name),
-            if name == transfusion::CONFIG {
+            if name == core::config_name(&old.backend) {
                 1024 * 1024
             } else {
                 MAX_FILE
             },
         )?;
         ensure!(
-            name == transfusion::CONFIG || core::hash(&bytes) == *hash,
+            name == core::config_name(&old.backend) || core::hash(&bytes) == *hash,
             "旧补丁 DLL 已变化，请先检查再升级"
         );
         originals.insert(name.clone(), bytes);
     }
     let empty = presets::Values::new();
-    let migrated = encore::migrate(
-        originals
-            .get(transfusion::CONFIG)
-            .context("旧配置文件缺失")?,
+    let original = originals
+        .get(core::config_name(&old.backend))
+        .context("旧配置文件缺失")?;
+    let retired_open = encore::supports_130(
+        new.upstream_version
+            .as_deref()
+            .or(new.payload_version.as_deref()),
+    ) && encore::used_open_nr(original)?;
+    let migrated = if old.backend == encore::BACKEND {
+        let needs_nr_migration = new
+            .upstream_version
+            .as_deref()
+            .or(new.payload_version.as_deref())
+            .and_then(|v| semver::Version::parse(v).ok())
+            .is_some_and(|v| v >= semver::Version::new(1, 1, 0));
+        if needs_nr_migration {
+            encore::migrate_nr(original)?
+        } else {
+            original.clone()
+        }
+    } else {
+        encore::migrate(original, &empty)?
+    };
+    let migrated = encore::configure_for_version(
+        &migrated,
         explicit_overrides.unwrap_or(&empty),
+        new.upstream_version
+            .as_deref()
+            .or(new.payload_version.as_deref()),
     )?;
+    let migrated = if new
+        .upstream_version
+        .as_deref()
+        .or(new.payload_version.as_deref())
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(1, 1, 2))
+    {
+        encore::migrate_frame_pacing(&migrated)?
+    } else {
+        migrated
+    };
     ensure!(migrated.len() <= 1024 * 1024, "迁移后配置超过大小限制");
-    files.insert(encore::CONFIG.into(), migrated);
+    let unchanged_patch = old.backend == encore::BACKEND
+        && old.upstream_version == new.upstream_version
+        && old.payload_version == new.payload_version
+        && explicit_overrides.is_none_or(|v| v.is_empty());
+    files.insert(
+        encore::CONFIG.into(),
+        if unchanged_patch {
+            original.clone()
+        } else {
+            migrated
+        },
+    );
     ensure!(
         files.iter().all(|(name, bytes)| !bytes.is_empty()
             && bytes.len() as u64
-                <= if name.ends_with(".dll") {
+                <= if name.ends_with(".dll") || name.ends_with(".asi") {
                     MAX_FILE
                 } else {
                     1024 * 1024
@@ -342,11 +425,17 @@ pub fn upgrade_locked(
         core::write_new(&work.join("old.install.json"), &marker_bytes)?;
         checkpoint("marker-backup")?;
         for (name, bytes) in &originals {
-            core::write_new(&work.join(format!("old.{name}")), bytes)?;
+            core::write_new(
+                &work.join(format!("old.{}", name.replace('/', "__"))),
+                bytes,
+            )?;
             checkpoint(&format!("backup:{name}"))?;
         }
         for (name, bytes) in &files {
-            core::write_new(&work.join(format!("next.{name}")), bytes)?;
+            core::write_new(
+                &work.join(format!("next.{}", name.replace('/', "__"))),
+                bytes,
+            )?;
             checkpoint(&format!("stage:{name}"))?;
         }
         core::assert_target_stopped(target)?;
@@ -360,7 +449,7 @@ pub fn upgrade_locked(
                 "升级前原文件已变化：{name}"
             );
             ensure!(
-                matches(&work.join(format!("old.{name}")), hash)?,
+                matches(&work.join(format!("old.{}", name.replace('/', "__"))), hash)?,
                 "原件备份核验失败：{name}"
             );
         }
@@ -373,11 +462,16 @@ pub fn upgrade_locked(
         // The DLL is exposed last so an accidental launch cannot observe the
         // new runtime with an absent configuration or license notice.
         let mut names = files.keys().collect::<Vec<_>>();
-        names.sort_by_key(|n| n.ends_with(".dll"));
+        names.sort_by_key(|n| j.new.selected().contains(n));
         for name in names {
-            let stage = core::no_links(&work.join(format!("next.{name}")))?;
+            let stage = core::no_links(&work.join(format!("next.{}", name.replace('/', "__"))))?;
             ensure!(matches(&stage, &j.new.hashes[name])?, "升级暂存文件已变化");
-            win::rename_no_replace(&stage, &core::no_links(&dir.join(name))?)?;
+            let destination = core::no_links(&dir.join(name))?;
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent)?;
+                core::no_links(parent)?;
+            }
+            win::rename_no_replace(&stage, &destination)?;
             checkpoint(&format!("publish:{name}"))?;
         }
         core::assert_target_stopped(target)?;
@@ -406,7 +500,11 @@ pub fn upgrade_locked(
             }
         };
     }
-    Ok("已升级至 RTX Encore；保留并迁移原配置，重新启动游戏后生效".into())
+    Ok(if retired_open {
+        "已升级至 RTX Encore；旧 OpenNR 已移除，神经渲染已关闭。如需使用，请在参数设置中手动开启 NVIDIA NR。"
+    } else {
+        "已升级至 RTX Encore；保留并迁移原配置，重新启动游戏后生效"
+    }.into())
 }
 
 fn checkpoint(_name: &str) -> Result<()> {
@@ -500,15 +598,203 @@ mod tests {
         visit(root, root, &mut map)?;
         Ok(map)
     }
+
+    #[test]
+    fn encore_110_upgrade_moves_old_nr_model_without_resetting_configuration() -> Result<()> {
+        let (_temp, target) = fixture()?;
+        install(&target)?;
+        let original = b"{\n// keep this\n\"configVersion\":4,\"neuralRendering\":{\"core\":{\"nrEnabled\":false},\"advanced\":{\"nrPreset\":1}},\"vendor\":42}";
+        fs::write(target.directory.join(encore::CONFIG), original)?;
+        core::deploy_prepared_context_at_with_overrides(
+            &target,
+            encore::BACKEND,
+            &["dinput8.dll".into()],
+            None,
+            BTreeMap::from([
+                ("dinput8.dll".into(), pe(true, 3)),
+                (encore::CONFIG.into(), encore::DEFAULT_CONFIG.to_vec()),
+                (encore::NOTICES.into(), b"updated notices".to_vec()),
+            ]),
+            Some("1.1.0"),
+            Some(&context(encore::PROFILE)),
+            None,
+            Some("1.1.0"),
+        )?;
+        let current = fs::read(target.directory.join(encore::CONFIG))?;
+        assert_eq!(encore::read(&current)?["dlssNrPreset"], "a");
+        assert_eq!(encore::read(&current)?["nrEnabled"], "0");
+        assert!(String::from_utf8_lossy(&current).contains("// keep this"));
+        assert_eq!(crate::jsonc::Document::parse(&current)?.value["vendor"], 42);
+        Ok(())
+    }
+    #[test]
+    fn encore_prerelease_upgrade_preserves_exact_jsonc_and_rejects_downgrade() -> Result<()> {
+        let (_temp, target) = fixture()?;
+        install(&target)?;
+        let original = b"\xef\xbb\xbf{\r\n// user comment\r\n\"configVersion\":4,\"frameGeneration\":{\"mode\":\"fixed\",\"multiplier\":3},\"menuState\":{\"menuKey\":36,\"window\":123},\"unknown\":true}\r\n";
+        fs::write(target.directory.join(encore::CONFIG), original)?;
+        let upgrade = |version: &str, identity| {
+            core::deploy_prepared_context_at_with_overrides(
+                &target,
+                encore::BACKEND,
+                &["dinput8.dll".into()],
+                None,
+                BTreeMap::from([
+                    ("dinput8.dll".into(), pe(true, identity)),
+                    (encore::CONFIG.into(), encore::DEFAULT_CONFIG.to_vec()),
+                    (encore::NOTICES.into(), b"updated notices".to_vec()),
+                ]),
+                Some("1.0.0"),
+                Some(&context(encore::PROFILE)),
+                None,
+                Some(version),
+            )
+        };
+        upgrade("1.0.0-rc.3", 3)?;
+        assert_eq!(fs::read(target.directory.join(encore::CONFIG))?, original);
+        upgrade("1.0.0", 4)?;
+        assert_eq!(fs::read(target.directory.join(encore::CONFIG))?, original);
+        assert_eq!(
+            core::record(&target.directory)?
+                .unwrap()
+                .upstream_version
+                .as_deref(),
+            Some("1.0.0")
+        );
+        let installed = snapshot(&target.directory)?;
+        assert!(upgrade("1.0.0-rc.3", 3).is_err());
+        assert!(upgrade("1.0.0-beta.2", 5).is_err());
+        assert_eq!(snapshot(&target.directory)?, installed);
+        let logs = target.directory.join("rtx-encore-logs");
+        fs::create_dir_all(&logs)?;
+        fs::write(
+            logs.join("rtx-encore-13512-134365138303574349.crash.log"),
+            b"generated exception",
+        )?;
+        fs::write(
+            logs.join("rtx-encore-13512-134365138303574349.log"),
+            b"generated session",
+        )?;
+        fs::write(logs.join("manual-capture.csv"), b"user capture")?;
+        crate::cleanup::clean_at(&target)?;
+        assert_eq!(fs::read_dir(logs)?.count(), 1);
+        Ok(())
+    }
     fn fault(point: &str, crash: bool) {
         FAULT.with(|f| *f.borrow_mut() = Some((point.into(), crash)));
     }
     fn clear_fault() {
         FAULT.with(|f| *f.borrow_mut() = None);
     }
+
+    #[test]
+    fn private_runtime_staging_and_publication_failures_restore_originals() -> Result<()> {
+        for crash in [false, true] {
+            for point in [
+                "stage:rtx-encore-runtimes/intel/libxess.dll",
+                "publish:rtx-encore-runtimes/intel/libxess_fg.dll",
+            ] {
+                let (_temp, target) = fixture()?;
+                install(&target)?;
+                let before = snapshot(&target.directory)?;
+                let mut files = BTreeMap::from([
+                    ("dinput8.dll".into(), pe(true, 7)),
+                    (encore::CONFIG.into(), encore::DEFAULT_CONFIG.to_vec()),
+                    (encore::NOTICES.into(), b"updated license".to_vec()),
+                ]);
+                for name in encore::INTEL_FILES {
+                    files.insert(
+                        name.into(),
+                        if name.ends_with(".dll") {
+                            pe(true, 8)
+                        } else {
+                            b"Intel license".to_vec()
+                        },
+                    );
+                }
+                fault(point, crash);
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    core::deploy_prepared_context_at_with_overrides(
+                        &target,
+                        encore::BACKEND,
+                        &["dinput8.dll".into()],
+                        None,
+                        files,
+                        Some("1.2.0"),
+                        Some(&context(encore::PROFILE)),
+                        None,
+                        Some("1.2.0"),
+                    )
+                }));
+                clear_fault();
+                if crash {
+                    assert!(result.is_err(), "{point}");
+                    assert!(recover(&target)?);
+                } else {
+                    assert!(result.unwrap().is_err(), "{point}");
+                }
+                assert_eq!(snapshot(&target.directory)?, before, "{point}");
+            }
+        }
+        Ok(())
+    }
     fn recover(target: &core::DeploymentTarget) -> Result<bool> {
         let _lock = win::game_lock(&target.directory)?;
         recover_locked(target)
+    }
+
+    #[test]
+    fn open_nr_130_migration_rolls_back_exact_bytes_on_failure_or_interruption() -> Result<()> {
+        for crash in [false, true] {
+            for point in [
+                "stage:rtx-encore.jsonc",
+                "remove:rtx-encore.jsonc",
+                "publish:dinput8.dll",
+            ] {
+                let (_temp, target) = fixture()?;
+                install(&target)?;
+                fs::write(target.directory.join(encore::CONFIG), b"\xef\xbb\xbf{\r\n// old engine\r\n\"configVersion\":4,\"neuralRendering\":{\"core\":{\"nrEngine\":\"opendlss\",\"nrEnabled\":true}},\"vendor\":99}\r\n")?;
+                let before = snapshot(&target.directory)?;
+                let mut files = BTreeMap::from([
+                    ("dinput8.dll".into(), pe(true, 3)),
+                    (encore::CONFIG.into(), encore::DEFAULT_CONFIG.to_vec()),
+                    (encore::NOTICES.into(), b"new license".to_vec()),
+                ]);
+                for name in encore::INTEL_FILES {
+                    files.insert(
+                        name.into(),
+                        if name.ends_with(".dll") {
+                            pe(true, 4)
+                        } else {
+                            b"Intel license".to_vec()
+                        },
+                    );
+                }
+                fault(point, crash);
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    core::deploy_prepared_context_at_with_overrides(
+                        &target,
+                        encore::BACKEND,
+                        &["dinput8.dll".into()],
+                        None,
+                        files,
+                        Some("1.3.0"),
+                        Some(&context(encore::PROFILE)),
+                        None,
+                        Some("1.3.0"),
+                    )
+                }));
+                clear_fault();
+                if crash {
+                    assert!(result.is_err());
+                    assert!(recover(&target)?);
+                } else {
+                    assert!(result.unwrap().is_err());
+                }
+                assert_eq!(snapshot(&target.directory)?, before, "{point}");
+            }
+        }
+        Ok(())
     }
 
     #[test]

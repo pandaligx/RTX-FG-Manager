@@ -2,10 +2,6 @@
 //! but never loaded, and the synthetic game EXE is never launched. This does
 //! not test Authenticode trust, a game, a graphics API or GPU compatibility.
 //! No downloads or production-cache writes occur; callers supply both ZIPs.
-// These regressions exercise Win32 share modes and handles directly, so the
-// whole test binary is Windows-only. It compiles to nothing on other targets.
-#![cfg(windows)]
-
 use anyhow::{Context, Result, ensure};
 use rtx_fg_manager::{cleanup, cloud, core, deployment, presets, rtxmfg, rtxmfg_upgrade, scanner};
 use serde_json::json;
