@@ -62,7 +62,7 @@ class EncoreCloudTests(unittest.TestCase):
         paths = {tuple(field["path"]) for field in fields}
         native_paths = set(leaves(config()))
         # The bundled schema-4 fixture remains usable for older Encore versions.
-        # 2.2 adds optional fields which are absent until explicitly configured.
+        # 2.2 and 2.3 add optional fields absent until explicitly configured.
         new_paths = {
             "overrideAutoFrameGeneration": ("frameGeneration", "overrideAutoFrameGeneration"),
             **{key: ("superResolutionSharpening", key) for key in (
@@ -76,7 +76,16 @@ class EncoreCloudTests(unittest.TestCase):
         new_fields = [field for field in fields if field.get("since") == "2.2.0"]
         self.assertEqual({field["key"]: tuple(field["path"]) for field in new_fields}, new_paths)
         self.assertTrue(all(field.get("optional") is True for field in new_fields))
-        self.assertEqual(len(fields), 155 + len(new_paths))
+        paths_230 = {
+            **{key: ("xefg", key) for key in (
+                "xefgSourcePacingMode", "xefgSourcePacingLossPercent",
+                "xefgSourcePacingManualDetection", "xefgSourcePacingManualAdjustments")},
+            "nrExposureMode": ("neuralRendering", "appearance", "nrExposureMode"),
+        }
+        fields_230 = [field for field in fields if field.get("since") == "2.3.0"]
+        self.assertEqual({field["key"]: tuple(field["path"]) for field in fields_230}, paths_230)
+        self.assertTrue(all(field.get("optional") is True for field in fields_230))
+        self.assertEqual(len(fields), 155 + len(new_paths) + len(paths_230))
         self.assertEqual(
             {field["key"] for field in fields if field.get("since") == "1.5.0"},
             {"xessTensorCores", "xefgTensorCores"},
@@ -93,7 +102,7 @@ class EncoreCloudTests(unittest.TestCase):
         self.assertEqual(native_paths - paths, {("configVersion",), ("frameGeneration", "multiplier"),
                                                ("frameGeneration", "flipMeteringLearned")})
         retired = {tuple(f["path"]) for f in fields if f["key"] == "nrEngine" or f["key"].startswith("nrOpen")}
-        self.assertEqual(paths - native_paths, retired | set(new_paths.values()) | {
+        self.assertEqual(paths - native_paths, retired | set(new_paths.values()) | set(paths_230.values()) | {
             ("menuState", "menuKey"), ("menuState", "menuLanguage"),
             ("smoothMotion", "smoothMotionForce"), ("smoothMotion", "smoothMotionTuringVariant"),
             ("nativeMenuFeatures", "vsyncOff"), ("providerPatchPolicy",),
