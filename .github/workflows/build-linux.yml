@@ -66,8 +66,8 @@ jobs:
         # --target is mandatory here too: .cargo/config.toml pins the Windows
         # triple, so without it this would try to build for Windows and fail.
         run: |
-          cargo test --locked --target x86_64-unknown-linux-gnu --lib
-          cargo test --locked --target x86_64-unknown-linux-gnu --test v429_encore_config --test v4328_encore220 --test gpu_alias_linux_e2e
+          timeout 15m cargo test --locked --target x86_64-unknown-linux-gnu --lib -- --nocapture
+          timeout 15m cargo test --locked --target x86_64-unknown-linux-gnu --test v429_encore_config --test v4328_encore220 --test gpu_alias_linux_e2e -- --nocapture
 
       - name: Clippy
         run: cargo clippy --locked --lib --bin RTXManager --target x86_64-unknown-linux-gnu -- -D warnings

@@ -48,7 +48,10 @@ impl Install {
         let root = core::key(&self.root);
         let exe = core::key(Path::new(&game.exe));
         let game_root = core::key(Path::new(&game.root));
-        if !exe.starts_with(&(root.trim_end_matches('\\').to_string() + "\\")) {
+        let separator = std::path::MAIN_SEPARATOR;
+        if !exe
+            .starts_with(&(root.trim_end_matches(separator).to_string() + &separator.to_string()))
+        {
             return false;
         }
         if self
@@ -65,9 +68,9 @@ impl Install {
             return true;
         }
         // Allow a scanner's binary-only root, not an unrelated child game in a compilation.
-        let prefix = root.trim_end_matches('\\').to_string() + "\\";
+        let prefix = root.trim_end_matches(separator).to_string() + &separator.to_string();
         game_root.strip_prefix(&prefix).is_some_and(|rest| {
-            rest.split('\\').all(|part| {
+            rest.split(separator).all(|part| {
                 [
                     "bin", "binaries", "win64", "wingdk", "x64", "x64_dx12", "program",
                 ]
@@ -196,7 +199,11 @@ pub(crate) fn wegame_renderer(exe: &Path) -> Option<Install> {
     Some(record)
 }
 fn absolute(value: &str) -> Option<PathBuf> {
-    let p = PathBuf::from(value.replace('/', "\\"));
+    let p = if cfg!(windows) {
+        PathBuf::from(value.replace('/', "\\"))
+    } else {
+        PathBuf::from(value)
+    };
     (p.is_absolute() && !p.to_string_lossy().starts_with("\\\\") && core::no_links(&p).is_ok())
         .then_some(p)
 }
