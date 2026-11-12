@@ -164,7 +164,7 @@ pub fn processes_in_directory(
 pub fn processes_holding_files(paths: &[PathBuf]) -> Result<Vec<BlockingProcess>> {
     let targets = paths
         .iter()
-        .map(|p| fs::canonicalize(p))
+        .map(fs::canonicalize)
         .collect::<std::io::Result<std::collections::BTreeSet<_>>>()?;
     if targets.is_empty() {
         return Ok(Vec::new());
