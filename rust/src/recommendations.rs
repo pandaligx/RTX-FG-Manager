@@ -1452,6 +1452,7 @@ mod tests {
         for status in [200, 401, 403, 502] {
             let data = tempfile::tempdir().unwrap();
             let token = "s".repeat(43);
+            #[cfg(windows)]
             save_test_session(data.path(), &token, chrono::Utc::now().timestamp() + 86400);
             let game = card("RTX 3060", "581.80", 1).content.game;
             let (origin, server) = mock_service(vec![
@@ -1465,7 +1466,7 @@ mod tests {
                 .browse(&game, &cloud::bundled(), 0, false, false)
                 .unwrap_err();
             assert!(allows_offline_cache(&error));
-            assert!(client.logged_in());
+            assert_eq!(client.logged_in(), cfg!(windows));
             assert!(client.cached(&game, &cloud::bundled()).is_none());
             let report = fs::read_to_string(client.root.join("connection-status.json")).unwrap();
             assert!(
@@ -1481,7 +1482,7 @@ mod tests {
                     .browse(&game, &cloud::bundled(), 0, false, false)
                     .is_ok()
             );
-            assert!(client.logged_in());
+            assert_eq!(client.logged_in(), cfg!(windows));
             assert_eq!(server.join().unwrap().len(), 4);
         }
     }

@@ -90,6 +90,7 @@ Add-File 'docs/download-stats.json'
 Add-File 'docs/downloads-total.svg'
 foreach ($name in @('tools/sync_runtimes.py', 'tests/test_runtime_sync.py', '.github/workflows/sync-runtimes.yml', 'docs/runtime-sync.md', 'cloud/runtime-catalog.json')) { Add-File $name }
 Add-Tree 'rust/src' @('.rs')
+foreach ($name in @('.github/workflows/build-linux.yml', 'packaging/AppRun', 'packaging/build-appimage.sh', 'packaging/rtx-fg-manager.desktop', 'packaging/rtx-fg-manager.png')) { Add-File $name }
 Add-Tree 'help' @('.html', '.css', '.js')
 foreach ($name in @('community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore', 'community/wrangler.example.jsonc', 'community/README.md', 'tools/gitcode_publish.py', 'tools/gitcode_ci.py', 'tools/build_v430_resources.py', 'tools/build_help.py', 'tests/test_gitcode_publish.py', 'tests/fixtures/cloud-v3-catalog.json', '.github/workflows/mirror-gitcode.yml', 'docs/gitcode-publishing.md')) { Add-File $name }
 Add-Tree 'community/src' @('.mjs', '.json')

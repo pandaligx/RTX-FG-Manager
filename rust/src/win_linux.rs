@@ -873,6 +873,17 @@ mod platform_regressions {
         assert_eq!(from_wide(&wide("显卡")), "显卡");
     }
     #[test]
+    fn different_case_game_directories_do_not_share_ownership() {
+        assert_ne!(
+            crate::core::key(Path::new("/games/Game")),
+            crate::core::key(Path::new("/games/game"))
+        );
+        assert!(!crate::core::within(
+            Path::new("/games/Game/save"),
+            Path::new("/games/game")
+        ));
+    }
+    #[test]
     fn own_open_file_is_reported_but_not_terminable() -> Result<()> {
         let temp = tempfile::tempdir()?;
         let path = temp.path().join("owned.log");

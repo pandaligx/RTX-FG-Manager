@@ -74,7 +74,7 @@
   "4K 起使用粗光流": "Coarse flow from 4K",
   "严格要求无 HUD 输入": "Require HUD-less input",
   "0.4.x 各代理使用对应文件，组件共用完整包。允许多选；上游建议只放一个入口，多选兼容性需自行测试。": "Each 0.4.x proxy uses its own file and shares a complete component bundle. Multiple selections are allowed; upstream recommends one entry point.",
-  "需要 R580 或更新驱动。XeSS 使用随包后端，无需另装 Intel DLL；RGBA16F 后缓冲不支持，不会自动切回 DLSS。": "Requires R580 or newer. XeSS uses the bundled backend, without extra Intel DLLs. RGBA16F backbuffers are unsupported; there is no automatic DLSS fallback.",
+  "游戏内要开启 DLSS + DLSS 帧生成，超分辨率依旧使用 DLSS，DLSS 帧生成内部替换为原生 Xe 多帧生成，因此画质最佳。": "Enable DLSS + DLSS Frame Generation in the game. Super Resolution still uses DLSS, while DLSS Frame Generation is internally replaced by native Xe Multi Frame Generation for the best image quality.",
   "默认关闭。M/L 会覆盖全部画质档，质量、平衡和 DLAA 下可能更慢。旧版 On 和作用档位已取消。": "Off by default. M/L overrides all quality modes and may be slower in Quality, Balanced and DLAA. Legacy On and tier selection were removed.",
   "严格模式下，游戏缺少无 HUD 输入可能直接退出；通常使用自动。": "Strict mode can terminate a game that lacks HUD-less input. Auto is recommended.",
   "游戏仍可选择更低倍率；旧代仅 2X 的 DLSS-G 接口可能不受支持，换新 DLL 不等于更新游戏接口。": "The game can choose a lower multiplier. Legacy 2X-only DLSS-G interfaces may be unsupported; replacing DLLs does not upgrade the game interface.",

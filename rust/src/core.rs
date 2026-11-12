@@ -85,7 +85,13 @@ pub fn valid_hash(s: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 pub fn key(p: &Path) -> String {
-    p.to_string_lossy().replace('/', "\\").to_lowercase()
+    let normalized = p.to_string_lossy().replace('/', "\\");
+    if cfg!(windows) {
+        normalized.to_lowercase()
+    } else {
+        // Host paths are case-sensitive even when the game uses Wine.
+        normalized
+    }
 }
 pub fn within(p: &Path, root: &Path) -> bool {
     let p = key(p);
