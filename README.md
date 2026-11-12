@@ -21,11 +21,13 @@
 
 <a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.31"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
+[Download Linux x86_64 AppImage (experimental)](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage)
+
 </div>
 
 ---
 
-> **4.3.31 · Portable Windows x64 app. Download the signed EXE from the release links below. The manager and its patches have separate release versions.**
+> **4.3.31 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -43,19 +45,28 @@
 
 ## Download
 
-**Version 4.3.31** · Windows 10 / 11 x64
+**Version 4.3.31** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
 | **GitCode** | [Open 4.3.31 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.31) | Default domestic source |
 | **GitHub** | [Open 4.3.31 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.31) | Primary project and fallback |
+| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage) | Linux x86_64 domestic mirror |
+| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage) | Linux x86_64 download |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
-Download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
+On Windows, download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 ### Linux (experimental)
 
-Build the native GPUI / AppImage port from the same source using the [build instructions](BUILDING.md#linux-appimage-experimental--实验性). [Linux CI](https://github.com/pandaligx/RTX-FG-Manager/actions/workflows/build-linux.yml) provides temporary test artifacts. Select an explicit Wine / Proton prefix and the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope.
+Download **`RTXManager-4.3.31-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
+
+```sh
+chmod +x RTXManager-4.3.31-x86_64.AppImage
+./RTXManager-4.3.31-x86_64.AppImage --wine-prefix "/path/to/prefix"
+```
+
+Replace the prefix with the game's actual Wine directory; Steam Proton normally uses `steamapps/compatdata/<AppID>/pfx`. Add the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope. Releases include a separate `SHA256SUMS-linux.txt`; see the [Linux instructions](BUILDING.md#linux-appimage-experimental--实验性) for dependencies, running without FUSE and source builds.
 
 Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 

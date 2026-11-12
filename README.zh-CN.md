@@ -21,11 +21,13 @@
 
 <a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.31"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
+[下载 Linux x86_64 AppImage（实验性）](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage)
+
 </div>
 
 ---
 
-> **4.3.31 · Windows x64 便携版。从下方发行页下载签名 EXE 即可。管理器与各补丁的版本分别管理。**
+> **4.3.31 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -43,19 +45,28 @@
 
 ## 下载
 
-**版本 4.3.31** · Windows 10 / 11 x64
+**版本 4.3.31** · Windows 10 / 11 x64 · Linux x86_64（实验性）
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
 | **GitCode** | [打开 4.3.31 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.31) | 国内默认下载源 |
 | **GitHub** | [打开 4.3.31 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.31) | 主项目与备用源 |
+| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage) | Linux x86_64 国内下载 |
+| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage) | Linux x86_64 备用下载 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
-下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
+Windows 用户下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
 ### Linux（实验性）
 
-支持从同一源码构建原生 GPUI / AppImage，参考[构建说明](BUILDING.md#linux-appimage-experimental--实验性)；[Linux CI](https://github.com/pandaligx/RTX-FG-Manager/actions/workflows/build-linux.yml) 提供临时测试产物。需要明确指定 Wine / Proton 前缀，并添加游戏的 Windows EXE；不用于原生 Linux ELF 游戏，也不自动配置 Proton 启动参数。
+下载上方 **`RTXManager-4.3.31-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
+
+```sh
+chmod +x RTXManager-4.3.31-x86_64.AppImage
+./RTXManager-4.3.31-x86_64.AppImage --wine-prefix "/path/to/prefix"
+```
+
+将前缀路径替换为游戏实际使用的 Wine 目录；Steam Proton 通常选择 `steamapps/compatdata/<AppID>/pfx`。再添加游戏的 Windows EXE，不用于原生 Linux ELF 游戏，也不自动配置 Proton 启动参数。发行页提供独立的 `SHA256SUMS-linux.txt`；依赖、免 FUSE 启动和源码构建见[Linux 说明](BUILDING.md#linux-appimage-experimental--实验性)。
 
 Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
 

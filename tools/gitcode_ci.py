@@ -37,9 +37,13 @@ def main():
                     continue
                 if name.endswith('.exe'):
                     continue
+                # Linux executables are also published locally from a verified
+                # tag build; they must not enter the Windows metadata pipeline.
+                if not payload and name == f'RTXManager-{tag.removeprefix("v")}-x86_64.AppImage':
+                    continue
                 if not re.fullmatch(r'[A-Za-z0-9._-]{1,160}', name):
                     raise RuntimeError('Unsafe release asset name')
-                if not payload and name not in ('update.json', 'update-v2.json', 'SHA256SUMS.txt', 'third-party-info.json'):
+                if not payload and name not in ('update.json', 'update-v2.json', 'SHA256SUMS.txt', 'SHA256SUMS-linux.txt', 'third-party-info.json'):
                     raise RuntimeError('Unexpected stable release asset')
                 if asset['size'] > (512 if payload else 2) * 1024 * 1024:
                     raise RuntimeError('Unexpected asset size')

@@ -14,6 +14,42 @@ pub=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pub)
 
 
+class ClientAssetRoutingTests(unittest.TestCase):
+    def run_release(self, names):
+        ci_spec = importlib.util.spec_from_file_location('gitcode_ci_test',
+            Path(__file__).resolve().parents[1] / 'tools/gitcode_ci.py')
+        ci = importlib.util.module_from_spec(ci_spec)
+        with patch.dict('sys.modules', {'gitcode_publish': pub}):
+            ci_spec.loader.exec_module(ci)
+        release = dict(name='4.3.31', body='Reviewed release', targetCommitish='main',
+                       assets=[dict(name=name, size=size) for name, size in names])
+        env = dict(RELEASE_TAG='v4.3.31', DESTINATION_TAG='', PAYLOADS='false', ASSET_NAME='')
+        with patch.dict(os.environ, env), \
+                patch.object(pub, 'sync_source'), patch.object(pub, 'sync_release_tag'), \
+                patch.object(pub, 'create_release'), patch.object(pub, 'mirror_assets'), \
+                patch.object(ci.subprocess, 'check_output', return_value=json.dumps(release)), \
+                patch.object(ci.subprocess, 'run') as download:
+            ci.main()
+        return [call.args[0][call.args[0].index('--pattern') + 1]
+                for call in download.call_args_list]
+
+    def test_linux_executable_stays_local_and_windows_channels_are_preserved(self):
+        names = [('RTXManager.exe', 48_000_000),
+                 ('RTXManager-4.3.31-x86_64.AppImage', 24_000_000),
+                 ('SHA256SUMS-linux.txt', 120), ('update.json', 2400), ('update-v2.json', 5100)]
+        self.assertEqual(self.run_release(names),
+                         ['SHA256SUMS-linux.txt', 'update.json', 'update-v2.json'])
+
+    def test_unrelated_or_wrong_version_linux_executable_is_rejected(self):
+        for name in ('unreviewed.AppImage', 'RTXManager-4.3.30-x86_64.AppImage'):
+            with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, 'Unexpected stable'):
+                self.run_release([(name, 100)])
+
+    def test_linux_checksum_keeps_small_asset_size_limit(self):
+        with self.assertRaisesRegex(RuntimeError, 'Unexpected asset size'):
+            self.run_release([('SHA256SUMS-linux.txt', 2 * 1024 * 1024 + 1)])
+
+
 class MergeHistoryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

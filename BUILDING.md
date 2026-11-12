@@ -2,6 +2,20 @@
 
 ## Linux AppImage (experimental / 实验性)
 
+Prebuilt 4.3.31 AppImage / 已构建下载：[GitHub](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage) · [GitCode](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage). The release has a separate `SHA256SUMS-linux.txt`.
+
+Requires x86_64 and glibc 2.35 or newer. The host must provide Vulkan-capable graphics
+drivers and the X11/Wayland, FreeType, Fontconfig, xcb and xkbcommon libraries.
+The package does not bundle a driver or Wine/Proton. Use the game's existing prefix.
+无需编译；先赋予 AppImage 执行权限，并使用游戏已有的 Wine/Proton 前缀。
+若系统没有 FUSE，可解包后运行 / If FUSE is unavailable:
+
+```sh
+chmod +x RTXManager-4.3.31-x86_64.AppImage
+./RTXManager-4.3.31-x86_64.AppImage --appimage-extract
+./squashfs-root/AppRun --wine-prefix "/path/to/prefix"
+```
+
 The Linux port shares the current manager source and uses a native GPUI window.
 Build on Ubuntu 22.04 or newer with the dependencies listed in
 `.github/workflows/build-linux.yml`, then run:
@@ -25,9 +39,11 @@ Linux 构建为实验性独立 AppImage，使用当前源码；需明确选择 W
 不代表所有游戏已实测。不自动更新 Windows EXE，不修改宿主系统显卡驱动或 GPU 调度。
 Windows 的签名、渲染、更新通道和发布工作流保持原实现。
 
-The Linux workflow produces a temporary CI artifact only. It never signs or
-publishes a release and cannot modify update manifests. Windows regressions still
-run independently in `build.yml`; do not skip them when maintaining this port.
+The Linux workflow produces a temporary CI artifact only. A maintainer separately
+publishes the tested artifact from the exact release tag as a permanent AppImage
+attachment. The workflow never signs or publishes a release and cannot modify
+update manifests. Windows regressions still run independently in `build.yml`;
+do not skip them when maintaining this port.
 
 ## Windows x64
 
