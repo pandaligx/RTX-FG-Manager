@@ -104,7 +104,7 @@ jobs:
           desktop-file-validate squashfs-root/rtx-fg-manager.desktop
           mkdir -p "$RUNNER_TEMP/rtxfg-empty-games"
           squashfs-root/AppRun --scan "$RUNNER_TEMP/rtxfg-scan.json" "$RUNNER_TEMP/rtxfg-empty-games"
-          python3 -c 'import json,sys; assert json.load(open(sys.argv[1])) == []' "$RUNNER_TEMP/rtxfg-scan.json"
+          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["rows"] == [] and r["directories"] == 1 and r["skipped"] == 0 and not r["cancelled"], r' "$RUNNER_TEMP/rtxfg-scan.json"
 
       - uses: actions/upload-artifact@v4
         with:
