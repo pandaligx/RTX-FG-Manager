@@ -292,8 +292,8 @@ def transient_unreferenced_bundle_indexes(root, review, baseline, final, history
     """Ignore abandoned candidate indexes in metadata transitions, not source review.
 
     They must be absent from both published endpoints and never referenced by
-    any catalog in the entire pending history. Every original tree still passes
-    the source/content allowlist before this projection is used.
+    any catalog in the pending main history. New side-branch content and every
+    main checkpoint still pass source review before this projection is used.
     """
     referenced = set()
     candidates = set()
@@ -326,14 +326,11 @@ def sync_source(root):
         previous = review.git(root, 'rev-parse', 'FETCH_HEAD')
         if not review.ancestor(root, previous, source):
             raise RuntimeError('GitCode has diverged; fast-forward required')
-        seen = set()
         before = review.tree_entries(root, previous)
         final = review.tree_entries(root, source)
-        history = [review.tree_entries(root, commit) for commit in
-                   review.git(root, 'rev-list', '--reverse', previous + '..' + source).splitlines()]
+        history = source_publication_history(root, review, previous, source)
         abandoned = transient_unreferenced_bundle_indexes(root, review, before, final, history)
         for entries in history:
-            review.validate_tree(root, entries, seen)
             entries = {path: value for path, value in entries.items() if path not in abandoned}
             verify_client_metadata(root, review, before, entries)
             # Legacy catalogs are a transition contract. Schema 3 references
@@ -349,6 +346,41 @@ def sync_source(root):
         if not refs or refs.split()[0] != source:
             raise RuntimeError('GitCode source readback mismatch')
         print('GitCode source fast-forward verified: ' + source)
+
+
+def source_publication_history(root, review, previous, source):
+    """Review all newly introduced content; promote metadata along main only.
+
+    An old feature branch inherits obsolete files and catalogs from its base.
+    Those blobs are already in the mirror's history, not new publications.
+    Check each new entry against every parent so even a forbidden file added
+    and deleted on a side branch is rejected. Validate the entire final tree.
+    """
+    lineage = review.git(root, 'rev-list', '--first-parent', source).splitlines()
+    if previous not in lineage:
+        raise RuntimeError('GitCode baseline must be on the main first-parent history')
+    trees = {}
+
+    def tree(commit):
+        if commit not in trees:
+            trees[commit] = review.tree_entries(root, commit)
+        return trees[commit]
+
+    seen = set()
+    review.validate_tree(root, tree(source), seen)
+    commits = review.git(root, 'rev-list', '--reverse', '--topo-order',
+                         previous + '..' + source).splitlines()
+    for commit in commits:
+        parents = review.git(root, 'rev-list', '--parents', '-n', '1', commit).split()[1:]
+        parent_trees = [tree(parent) for parent in parents]
+        introduced = {path: entry for path, entry in tree(commit).items()
+                      if not any(parent.get(path) == entry for parent in parent_trees)}
+        review.validate_tree(root, introduced, seen)
+    history = [tree(commit) for commit in reversed(lineage[:lineage.index(previous)])]
+    # Every published main checkpoint must pass the full current allowlist.
+    for entries in history:
+        review.validate_tree(root, entries, seen)
+    return history
 
 
 def sync_release_tag(root, tag):

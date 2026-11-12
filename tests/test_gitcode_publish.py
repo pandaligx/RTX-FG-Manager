@@ -2,6 +2,7 @@ import importlib.util
 import hashlib
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +12,94 @@ from unittest.mock import patch, Mock
 spec=importlib.util.spec_from_file_location('gitcode_publish',Path(__file__).resolve().parents[1]/'tools/gitcode_publish.py')
 pub=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pub)
+
+
+class MergeHistoryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        spec = importlib.util.spec_from_file_location('source_review',
+            Path(__file__).resolve().parents[1] / '.github/scripts/mirror_gitee.py')
+        self.review = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.review)
+        self.git('init', '-b', 'main')
+        self.git('config', 'user.name', 'Publication test')
+        self.git('config', 'user.email', 'test@example.invalid')
+        self.write('README.md', 'base')
+        self.write('app/tools/aria2.conf', 'legacy published configuration')
+        self.write('cloud/catalog.json', '{"version":"old"}')
+        self.commit('legacy base')
+        self.git('branch', 'feature')
+        self.git('rm', 'app/tools/aria2.conf')
+        self.write('cloud/catalog.json', '{"version":"current"}')
+        self.previous = self.commit('published main')
+        self.git('switch', 'feature')
+
+    def git(self, *args):
+        return subprocess.check_output(['git', '-C', str(self.root), *args],
+            stderr=subprocess.PIPE, text=True, encoding='utf-8').strip()
+
+    def write(self, path, content):
+        target = self.root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding='utf-8')
+
+    def commit(self, message):
+        self.git('add', '.')
+        self.git('commit', '-m', message)
+        return self.git('rev-parse', 'HEAD')
+
+    def merge(self):
+        self.git('switch', 'main')
+        self.git('merge', '--no-ff', 'feature', '-m', 'merge feature')
+        return self.git('rev-parse', 'HEAD')
+
+    def history(self, source):
+        return pub.source_publication_history(self.root, self.review, self.previous, source)
+
+    def test_old_feature_inheritance_does_not_roll_back_publication_metadata(self):
+        self.write('rust/src/new_feature.rs', 'pub fn feature() {}')
+        self.commit('feature')
+        source = self.merge()
+        history = self.history(source)
+        self.assertEqual(history, [self.review.tree_entries(self.root, source)])
+        self.assertNotIn('app/tools/aria2.conf', history[0])
+        self.assertEqual(history[0]['cloud/catalog.json'],
+                         self.review.tree_entries(self.root, self.previous)['cloud/catalog.json'])
+
+    def test_forbidden_side_branch_file_is_rejected_even_after_deletion(self):
+        self.write('private.key', 'private test fixture')
+        self.commit('unsafe addition')
+        self.git('rm', 'private.key')
+        self.commit('remove unsafe addition')
+        with self.assertRaisesRegex(RuntimeError, 'allowlist rejected: private.key'):
+            self.history(self.merge())
+
+    def test_changed_obsolete_file_is_not_grandfathered(self):
+        self.write('app/tools/aria2.conf', 'new unreviewed content')
+        self.commit('modify legacy file')
+        self.git('rm', 'app/tools/aria2.conf')
+        self.commit('remove modified file')
+        with self.assertRaisesRegex(RuntimeError, 'allowlist rejected: app/tools/aria2.conf'):
+            self.history(self.merge())
+
+    def test_safe_blob_under_forbidden_path_is_still_rejected(self):
+        self.write('private.key', 'base')
+        self.commit('reuse existing blob at unsafe path')
+        self.git('rm', 'private.key')
+        self.commit('remove renamed blob')
+        with self.assertRaisesRegex(RuntimeError, 'allowlist rejected: private.key'):
+            self.history(self.merge())
+
+    def test_main_checkpoints_are_in_order(self):
+        self.write('rust/src/new_feature.rs', 'pub fn feature() {}')
+        self.commit('feature')
+        merged = self.merge()
+        self.write('README.md', 'after merge')
+        after = self.commit('main update')
+        self.assertEqual(self.history(after), [self.review.tree_entries(self.root, merged),
+                                              self.review.tree_entries(self.root, after)])
 
 
 class PublicationTests(unittest.TestCase):
