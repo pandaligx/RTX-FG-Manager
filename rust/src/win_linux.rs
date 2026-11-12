@@ -124,11 +124,15 @@ pub fn drives() -> Vec<PathBuf> {
 // ---------------------------------------------------------------------------
 
 pub fn wide(s: impl AsRef<OsStr>) -> Vec<u16> {
-    s.as_ref().to_string_lossy().encode_utf16().collect()
+    s.as_ref()
+        .to_string_lossy()
+        .encode_utf16()
+        .chain(Some(0))
+        .collect()
 }
 
 pub fn from_wide(s: &[u16]) -> String {
-    String::from_utf16_lossy(s)
+    String::from_utf16_lossy(&s[..s.iter().position(|c| *c == 0).unwrap_or(s.len())])
 }
 
 pub fn reduced_motion() -> bool {
@@ -141,10 +145,11 @@ pub struct BlockingProcess {
     pub name: String,
     pub path: Option<PathBuf>,
     pub created: Option<u64>,
+    locked: bool,
 }
 impl BlockingProcess {
     pub fn holds_patch_files(&self) -> bool {
-        false
+        self.locked
     }
     pub fn can_terminate(&self) -> bool {
         false
@@ -154,18 +159,47 @@ pub fn processes_in_directory(
     dir: &Path,
     expected_exe: Option<&Path>,
 ) -> Result<Vec<BlockingProcess>> {
-    Ok(running_in_directory_impl(dir, expected_exe)?
-        .into_iter()
-        .map(|name| BlockingProcess {
-            pid: 0,
-            name,
-            path: None,
-            created: None,
-        })
-        .collect())
+    scan_processes(dir, expected_exe)
 }
-pub fn processes_holding_files(_paths: &[PathBuf]) -> Result<Vec<BlockingProcess>> {
-    anyhow::bail!("Linux 尚不支持精确检查文件占用，请先退出游戏及其辅助进程")
+pub fn processes_holding_files(paths: &[PathBuf]) -> Result<Vec<BlockingProcess>> {
+    let targets = paths
+        .iter()
+        .map(|p| fs::canonicalize(p))
+        .collect::<std::io::Result<std::collections::BTreeSet<_>>>()?;
+    if targets.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut found = Vec::new();
+    for (index, entry) in fs::read_dir("/proc")?.enumerate() {
+        ensure!(index < PROC_SCAN_LIMIT, "进程过多，无法完成占用检查");
+        let entry = entry?;
+        let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
+            continue;
+        };
+        let Ok(fds) = fs::read_dir(entry.path().join("fd")) else {
+            continue;
+        };
+        if fds
+            .take(65536)
+            .flatten()
+            .any(|fd| fs::read_link(fd.path()).is_ok_and(|p| targets.contains(&p)))
+        {
+            let path = fs::read_link(entry.path().join("exe")).ok();
+            let name = path
+                .as_ref()
+                .and_then(|p| p.file_name())
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|| format!("进程 {pid}"));
+            found.push(BlockingProcess {
+                pid,
+                name,
+                path,
+                created: None,
+                locked: true,
+            });
+        }
+    }
+    Ok(found)
 }
 pub fn terminate_confirmed(_process: &BlockingProcess) -> Result<()> {
     anyhow::bail!("Linux 请手动退出游戏；管理器不终止无法确认身份的进程")
@@ -393,12 +427,27 @@ pub fn instance_lock(data: &Path) -> Result<GameLock> {
 // ---------------------------------------------------------------------------
 
 /// Renames without overwriting: fails when the destination already exists.
-/// `rename(2)` on Linux already refuses to clobber, which is the exact
-/// `MOVEFILE_WRITE_THROUGH`-without-replace semantic the Windows backend uses.
+/// The kernel performs the existence check and rename as one operation.
+/// Ordinary rename(2) overwrites a target and is unsafe for original backups.
 pub fn rename_no_replace(src: &Path, dst: &Path) -> Result<()> {
-    ensure!(!dst.exists(), "目标已存在，未替换任何文件");
-    fs::rename(src, dst)
-        .with_context(|| format!("无法移动 {} -> {}", src.display(), dst.display()))?;
+    use std::{ffi::CString, os::unix::ffi::OsStrExt};
+    let source = CString::new(src.as_os_str().as_bytes())?;
+    let destination = CString::new(dst.as_os_str().as_bytes())?;
+    // SAFETY: Both NUL-terminated paths live through this call. No pointer is
+    // retained; RENAME_NOREPLACE applies equally to files and directories.
+    let result = unsafe {
+        libc::renameat2(
+            libc::AT_FDCWD,
+            source.as_ptr(),
+            libc::AT_FDCWD,
+            destination.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        )
+    };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error())
+            .with_context(|| format!("无法移动 {} -> {}", src.display(), dst.display()));
+    }
     sync_parent(dst)
 }
 
@@ -444,13 +493,17 @@ pub fn running_in_directory_or_missing(dir: &Path, expected_exe: &Path) -> Resul
 }
 
 fn running_in_directory_impl(dir: &Path, expected_exe: Option<&Path>) -> Result<Vec<String>> {
+    Ok(scan_processes(dir, expected_exe)?
+        .into_iter()
+        .map(|p| p.name)
+        .collect())
+}
+fn scan_processes(dir: &Path, expected_exe: Option<&Path>) -> Result<Vec<BlockingProcess>> {
     let dir = fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
     let mut names = Vec::new();
     let rows = match fs::read_dir("/proc") {
         Ok(rows) => rows,
-        // Non-Linux or restricted /proc: report no evidence instead of failing
-        // every code path that asks whether a game is running.
-        Err(_) => return Ok(names),
+        Err(error) => return Err(error).context("无法检查 /proc 中的运行进程"),
     };
     let mut visited = 0;
     for row in rows.flatten() {
@@ -500,9 +553,13 @@ fn running_in_directory_impl(dir: &Path, expected_exe: Option<&Path>) -> Result<
             } else {
                 name
             };
-            if !names.iter().any(|n: &String| n.eq_ignore_ascii_case(&name)) {
-                names.push(name);
-            }
+            names.push(BlockingProcess {
+                pid: pid.parse()?,
+                name,
+                path: Some(exe),
+                created: None,
+                locked: false,
+            });
         }
     }
     if let Some(expected) = expected_exe
@@ -512,7 +569,7 @@ fn running_in_directory_impl(dir: &Path, expected_exe: Option<&Path>) -> Result<
         // Missing expected executable with no running holder is the normal
         // state during an interrupted update; nothing to add.
     }
-    names.sort();
+    names.sort_by_key(|p| p.pid);
     Ok(names)
 }
 
@@ -782,4 +839,50 @@ pub(crate) fn hive_values(
     }
     let file = crate::wine_reg::RegFile::open(&path)?;
     Ok(file.values(key))
+}
+
+#[cfg(test)]
+mod platform_regressions {
+    use super::*;
+    #[test]
+    fn no_replace_keeps_existing_file_directory_and_link() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let source = temp.path().join("source");
+        let target = temp.path().join("target");
+        fs::write(&source, b"new")?;
+        fs::write(&target, b"original")?;
+        assert!(rename_no_replace(&source, &target).is_err());
+        assert_eq!(fs::read(&target)?, b"original");
+        fs::remove_file(&target)?;
+        std::os::unix::fs::symlink(temp.path().join("missing"), &target)?;
+        assert!(rename_no_replace(&source, &target).is_err());
+        assert!(fs::symlink_metadata(&target)?.file_type().is_symlink());
+        fs::remove_file(&target)?;
+        rename_no_replace(&source, &target)?;
+        assert_eq!(fs::read(&target)?, b"new");
+        fs::create_dir(&source)?;
+        let directory = temp.path().join("directory");
+        fs::create_dir(&directory)?;
+        assert!(rename_no_replace(&source, &directory).is_err());
+        assert!(source.is_dir() && directory.is_dir());
+        Ok(())
+    }
+    #[test]
+    fn utf16_alias_value_matches_windows_terminator() {
+        assert_eq!(wide("GPU"), vec![71, 80, 85, 0]);
+        assert_eq!(from_wide(&wide("显卡")), "显卡");
+    }
+    #[test]
+    fn own_open_file_is_reported_but_not_terminable() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let path = temp.path().join("owned.log");
+        let _open = File::create(&path)?;
+        let holders = processes_holding_files(&[path])?;
+        let current = holders
+            .iter()
+            .find(|p| p.pid == std::process::id())
+            .context("missing holder")?;
+        assert!(current.holds_patch_files() && !current.can_terminate());
+        Ok(())
+    }
 }

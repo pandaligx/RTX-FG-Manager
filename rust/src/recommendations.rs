@@ -1343,6 +1343,7 @@ mod tests {
         });
         (origin, worker)
     }
+    #[cfg(windows)]
     fn save_test_session(data: &Path, token: &str, expires_at: i64) {
         let root = data.join("recommendations");
         fs::create_dir_all(&root).unwrap();
@@ -1776,6 +1777,7 @@ mod tests {
         assert_eq!(requests.iter().filter(|r| r.starts_with("POST")).count(), 1);
     }
     #[test]
+    #[cfg(windows)]
     fn retained_revoked_login_refreshes_public_cards_and_clears_saved_login() {
         let data = tempfile::tempdir().unwrap();
         save_test_session(
@@ -1820,6 +1822,7 @@ mod tests {
         assert!(!requests[2].to_ascii_lowercase().contains("authorization:"));
     }
     #[test]
+    #[cfg(windows)]
     fn valid_login_keeps_personal_feedback_and_saved_session() {
         let data = tempfile::tempdir().unwrap();
         save_test_session(
@@ -1843,6 +1846,7 @@ mod tests {
         assert_eq!(server.join().unwrap().len(), 1);
     }
     #[test]
+    #[cfg(windows)]
     fn private_filters_and_writes_never_retry_anonymously_or_use_cache() {
         for operation in ["mine", "reported", "vote"] {
             let data = tempfile::tempdir().unwrap();
@@ -1877,6 +1881,7 @@ mod tests {
         }
     }
     #[test]
+    #[cfg(windows)]
     fn only_service_outages_allow_offline_cache_without_discarding_login() {
         for (status, body, offline) in [
             (503, json!({"error":"unavailable"}), true),
@@ -1902,6 +1907,7 @@ mod tests {
         }
     }
     #[test]
+    #[cfg(windows)]
     fn local_expiry_and_late_rejection_cannot_restore_or_clear_the_wrong_session() {
         let data = tempfile::tempdir().unwrap();
         save_test_session(
@@ -1934,6 +1940,7 @@ mod tests {
         assert!(!client.root.join("session.json").exists());
     }
     #[test]
+    #[cfg(windows)]
     fn closed_window_request_cannot_delete_a_new_windows_saved_login() {
         let data = tempfile::tempdir().unwrap();
         let expires = chrono::Utc::now().timestamp() + 86400;
@@ -1948,6 +1955,7 @@ mod tests {
         assert!(Client::new(data.path()).unwrap().logged_in());
     }
     #[test]
+    #[cfg(windows)]
     fn logout_removes_local_session_even_if_server_unavailable_or_already_revoked() {
         for status in [503, 401] {
             let data = tempfile::tempdir().unwrap();
@@ -2078,6 +2086,7 @@ mod tests {
         assert!(public_text("https://download.invalid/file.dll", 80, false).is_err());
     }
     #[test]
+    #[cfg(windows)]
     fn saved_session_is_dpapi_protected() {
         let input = b"test-opaque-session";
         let sealed = unseal(input, true).unwrap();

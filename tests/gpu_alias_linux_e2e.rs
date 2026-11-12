@@ -1,7 +1,5 @@
-//! End-to-end GPU display-name aliasing against a COPY of a real Wine prefix.
-//! Never touches the user's live prefix: the test copies system.reg to a temp
-//! prefix first and asserts the rename/restore cycle and the backup record.
-#![cfg(not(windows))]
+//! End-to-end GPU display-name aliasing against a synthetic Wine prefix.
+#![cfg(target_os = "linux")]
 use rtx_fg_manager::{gpu_alias, wine_reg};
 
 fn copy_prefix(source: &std::path::Path, dest: &std::path::Path) -> anyhow::Result<()> {
@@ -16,25 +14,37 @@ fn copy_prefix(source: &std::path::Path, dest: &std::path::Path) -> anyhow::Resu
 
 #[test]
 fn rename_and_restore_cycle_updates_a_copied_prefix_registry() -> anyhow::Result<()> {
-    let Ok(live) = rtx_fg_manager::win::prefix() else {
-        eprintln!("skipped: no Wine prefix configured");
-        return Ok(());
-    };
-    if !wine_reg::hive_path(&live, wine_reg::Hive::Machine).is_file() {
-        eprintln!("skipped: prefix has no system.reg");
-        return Ok(());
-    }
-    let work = std::env::temp_dir().join(format!("rtxfg-e2e-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&work);
+    let temp = tempfile::tempdir()?;
+    let live = temp.path().join("original");
+    std::fs::create_dir(&live)?;
+    std::fs::write(
+        live.join("system.reg"),
+        r#"WINE REGISTRY Version 2
+
+[System\\Select]
+"Current"=dword:00000001
+
+[System\\ControlSet001\\Enum\\PCI\\VEN_10DE&DEV_25A2\\00000000]
+"ClassGUID"="{4D36E968-E325-11CE-BFC1-08002BE10318}"
+"DeviceDesc"="NVIDIA GeForce RTX 3050 Laptop GPU"
+"Driver"="{4d36e968-e325-11ce-bfc1-08002be10318}\\0000"
+
+[System\\ControlSet001\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000]
+"DriverDesc"="NVIDIA GeForce RTX 3050 Laptop GPU"
+"HardwareInformation.AdapterString"="NVIDIA GeForce RTX 3050 Laptop GPU"
+"DriverVersion"="test"
+"InfPath"="test.inf"
+
+[Software\\Unrelated]
+"keep"="untouched"
+"#,
+    )?;
+    let work = temp.path().join("working");
     copy_prefix(&live, &work)?;
     rtx_fg_manager::win::set_prefix(&work)?;
 
     let devices = gpu_alias::enumerate()?;
-    if devices.is_empty() {
-        eprintln!("skipped: copied prefix has no NVIDIA display adapter");
-        let _ = std::fs::remove_dir_all(&work);
-        return Ok(());
-    }
+    assert_eq!(devices.len(), 1);
     let target = devices[0].clone();
     let original = target.name.clone();
 
@@ -55,8 +65,7 @@ fn rename_and_restore_cycle_updates_a_copied_prefix_registry() -> anyhow::Result
     );
 
     // A backup record must exist so restore is possible.
-    let restored = gpu_alias::apply(renamed, None)?;
-    assert!(restored.contains("还原"));
+    gpu_alias::restore_all()?;
     let after = gpu_alias::enumerate()?
         .into_iter()
         .find(|d| d.instance.eq_ignore_ascii_case(&target.instance))
@@ -73,6 +82,6 @@ fn rename_and_restore_cycle_updates_a_copied_prefix_registry() -> anyhow::Result
     wine_reg::RegFile::open(&wine_reg::hive_path(&work, wine_reg::Hive::Machine))
         .expect("registry remains parseable after the cycle");
 
-    let _ = std::fs::remove_dir_all(&work);
+    assert_eq!(std::fs::read(live.join("system.reg"))?, before);
     Ok(())
 }

@@ -19,8 +19,23 @@ jobs:
     # building on a newer runner would silently drop support for older distros.
     runs-on: ubuntu-22.04
     timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
     steps:
       - uses: actions/checkout@v4
+
+      - name: Restore Linux build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-pr-${{ github.ref_name }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            linux-pr-${{ github.ref_name }}-${{ hashFiles('Cargo.lock') }}-
 
       - name: Install build dependencies
         run: |
@@ -94,3 +109,13 @@ jobs:
           path: dist/*.AppImage
           if-no-files-found: error
           retention-days: 7
+
+      - name: Save Linux build cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-pr-${{ github.ref_name }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}

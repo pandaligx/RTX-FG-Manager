@@ -4558,7 +4558,7 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
         gpui::Application::with_platform(Rc::new(platform))
     };
     #[cfg(target_os = "linux")]
-    let application = gpui::Application::new();
+    let application = gpui::application();
     application
         .with_assets(crate::ui_assets::Assets)
         .run(move |cx| {

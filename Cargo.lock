@@ -5748,6 +5748,7 @@ dependencies = [
  "gpui-fast-windows",
  "gpui-kit",
  "image",
+ "libc",
  "libloading",
  "quick-xml",
  "regex",
