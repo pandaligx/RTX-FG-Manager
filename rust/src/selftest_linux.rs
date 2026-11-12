@@ -5,7 +5,7 @@
 //! `creation_flags(0x08000000)`. Both are replaced here by POSIX process
 //! groups: every child is spawned with `CommandExt::process_group(0)`, so its
 //! pid is also its process-group id, and a timeout or a cancel retires the
-//! whole group with `kill -9 -<pid>`. The public API, the JSON contract and the
+//! whole group with `kill(2)`. The public API, the JSON contract and the
 //! report layout match the Windows module exactly.
 //!
 //! The `native-probes` feature is Windows-only (`build.rs` asserts it), so on
@@ -31,22 +31,15 @@ struct OwnedChild(Child);
 
 /// Retire the process group led by `process`.
 ///
-/// `libc` is not a dependency, so the group kill goes through the system `kill`
-/// utility: `kill -9 -<pid>` targets the group whose id equals the child's pid,
-/// which is exactly the group created by `process_group(0)`. When the utility
-/// cannot be run at all (missing from PATH, sandbox), fall back to signalling
-/// the direct child so the caller still makes progress.
+/// Only signal the group while the owned child is still its leader. Calling
+/// the syscall directly avoids command-line ambiguity for negative PIDs and
+/// never uses zero (the caller's group) as a fallback.
 fn kill_group(process: &mut Child) {
-    let pid = process.id();
-    let signalled = Command::new("kill")
-        .arg("-9")
-        .arg(format!("-{pid}"))
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false);
+    let signalled = i32::try_from(process.id()).is_ok_and(|pid| {
+        // SAFETY: A positive child PID is checked against its current group.
+        // The child has not been reaped, so its PID cannot have been reused.
+        unsafe { pid > 1 && libc::getpgid(pid) == pid && libc::kill(-pid, libc::SIGKILL) == 0 }
+    });
     if !signalled {
         let _ = process.kill();
     }
