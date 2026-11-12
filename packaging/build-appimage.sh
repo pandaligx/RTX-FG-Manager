@@ -14,7 +14,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/Cargo.toml" | head -1)
+version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/Cargo.toml" | head -1 | tr -d '\r')
 target_dir="${CARGO_TARGET_DIR:-$root/target}"
 binary="$target_dir/x86_64-unknown-linux-gnu/release/RTXManager"
 out="$root/dist"
