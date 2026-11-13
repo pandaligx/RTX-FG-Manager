@@ -873,6 +873,8 @@ impl Client {
             .http(network)?
             .request(method.clone(), format!("{}{route}", self.origin()))
             .header("X-RTXFG-Feedback", "16")
+            .header("X-RTXFG-Delta041", "1")
+            .header("X-RTXFG-MFG171", "1")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
         if method == Method::GET {
@@ -984,11 +986,13 @@ impl Client {
     }
     fn cache_path(&self, id: &str) -> PathBuf {
         self.root
-            .join(format!("{:x}.setup-v7.json", Sha256::digest(id.as_bytes())))
+            .join(format!("{:x}.setup-v9.json", Sha256::digest(id.as_bytes())))
     }
     pub fn cached(&self, game: &GameIdentity, catalog: &cloud::Catalog) -> Option<Page> {
         let digest = format!("{:x}", Sha256::digest(game.id.as_bytes()));
         let mut p = [
+            "setup-v9.json",
+            "setup-v8.json",
             "setup-v7.json",
             "setup-v6.json",
             "setup-v5.json",

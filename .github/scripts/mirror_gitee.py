@@ -47,6 +47,7 @@ ALLOWED = {
     'community/package.json', 'community/pnpm-lock.yaml', 'community/.gitignore',
     'community/wrangler.example.jsonc', 'community/README.md', 'cloud/help.json',
     'update.json', 'update-v2.json', 'tools/client_release.py', 'tests/test_client_release.py', 'docs/client-updates.md',
+    'update-linux.json', 'tools/linux_release.py', 'tools/test_linux_update.py', 'tests/test_linux_release.py',
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.gitignore', '.gitattributes',
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json',

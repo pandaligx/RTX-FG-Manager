@@ -16,8 +16,10 @@ impl Context {
             scheme: scheme.into(),
             profile: policy.parameter_profile.clone(),
             delta_capable: policy.capabilities.contains(crate::delta::CAPABILITY),
-            delta: policy.parameter_profile == "upstream035"
-                && policy.capabilities.contains(crate::delta::CAPABILITY)
+            delta: matches!(
+                policy.parameter_profile.as_str(),
+                "upstream035" | crate::upstream040::PROFILE_041
+            ) && policy.capabilities.contains(crate::delta::CAPABILITY)
                 && crate::delta::is_game(exe),
         }
     }
@@ -59,24 +61,44 @@ impl Context {
         let mut out = configure(bytes, &self.profile, &values)?;
         if self.delta_capable {
             let n = if self.delta {
-                values
+                let configured = read_values(&out, &self.profile)?;
+                let count = configured
                     .get("max_generated_frames")
                     .map(String::as_str)
-                    .unwrap_or("3")
+                    .unwrap_or("3");
+                // A migration without UI overrides must retain the INI's
+                // explicit count, while respecting Delta's 4X ceiling.
+                if matches!(count, "4" | "5") {
+                    "3".to_owned()
+                } else {
+                    count.to_owned()
+                }
             } else {
-                "0"
+                "0".to_owned()
             };
+            if self.delta {
+                out = crate::diagnostics::edit_ini(
+                    &out,
+                    "FrameGeneration",
+                    "MaxGeneratedFrames",
+                    &n,
+                )?;
+            }
             out = crate::diagnostics::edit_ini(
                 &out,
                 "Compatibility",
                 "DeltaForceGeneratedFrames",
-                n,
+                &n,
             )?;
             out = crate::diagnostics::edit_ini(
                 &out,
                 "Compatibility",
                 "DeltaForcePrivateStreamline",
-                if matches!(n, "2" | "3") { "1" } else { "0" },
+                if matches!(n.as_str(), "2" | "3") {
+                    "1"
+                } else {
+                    "0"
+                },
             )?;
         }
         Ok(out)

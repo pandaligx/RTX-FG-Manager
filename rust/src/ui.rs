@@ -2201,10 +2201,12 @@ impl Manager {
                     .map(|(_, l)| *l)
                     .unwrap_or(value);
                 let old_mfg = context.profile == rtx_fg_manager::rtxmfg::PROFILE
-                    && mfg_version
-                        .as_ref()
-                        .is_some_and(|v| *v < semver::Version::new(1, 7, 0))
-                    && rtx_fg_manager::rtxmfg::is_170_key(param.key);
+                    && mfg_version.as_ref().is_some_and(|v| {
+                        (*v < semver::Version::new(1, 7, 0)
+                            && rtx_fg_manager::rtxmfg::is_170_key(param.key))
+                            || (*v < semver::Version::new(1, 7, 1)
+                                && rtx_fg_manager::rtxmfg::is_171_key(param.key))
+                    });
                 let disabled = self.c.busy
                     || self.c.read_only
                     || old_mfg
@@ -2328,7 +2330,7 @@ impl Manager {
             .flex_shrink_0()
             .child(title)
             .when(self.c.boolean("preset_help_open", false), |d| d.child(Alert::info("preset-inline-help", self.t(if context.profile == rtx_fg_manager::rtxmfg::PROFILE {
-                "MFG 1.7：Backspace 打开菜单；插件可使用 OptiScaler 菜单。NR 与独立 XeSS 多帧生成需另装运行库。Vulkan 的 DLSS 动态倍率不可用，独立 XeMFG 动态倍率另行支持。"
+                "独立 MFG 按 Backspace；OptiScaler 插件使用其菜单。NR 与独立 XeSS 多帧生成需另装运行库。1.7.1 插件支持配套 OptiScaler 的 XeMFG 提供器；帧生成输出在 OptiScaler 中选择。"
             } else if context.profile == rtx_fg_manager::transfusion::PROFILE {
                 "默认跟随游戏；固定倍率可选2X—6X，5X/6X可能增加显存与延迟。Ctrl+Alt+2/3/4切换倍率，Ctrl+Alt+G跟随游戏，Ctrl+Alt+D切换动态。RTX20及旧显卡Vulkan仍需实机验证。"
             } else if context.delta {
@@ -2394,7 +2396,7 @@ impl Manager {
             );
         }
         let proxy_hint = if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
-            "MFG 菜单 Backspace。DLL 可多选，OptiScaler 插件与 DLL 模式互斥。上游建议只装一个副本，多选可能重复加载。"
+            "普通安装选择一个 DLL，Backspace 打开菜单。已有 OptiScaler 10 才选择插件；1.7.1 会备份并更新配套主文件，卸载时恢复。"
         } else if self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE {
             "Encore 菜单 Insert。DLL 可多选，ASI 与 DLL 模式互斥。上游建议单入口，多选可能重复加载或崩溃。Bink 需保留原始 Hooked 文件。"
         } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
@@ -3696,7 +3698,7 @@ impl Manager {
             sections = vec![
                 (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
                 (self.t("使用说明"), self.t("MFG 1.7 支持 NR 与独立 XeSS 多帧生成。运行库可在右侧单独安装；管理器参数需退出游戏后应用。独立 XeMFG 使用时请关闭游戏原生 FSR/XeSS 帧生成。")),
-                (self.t("兼容性"), self.t("MFG Unlocker 使用独立 JSON。独立代理按 Backspace；OptiScaler 10 插件使用 OptiScaler 菜单。两种入口只能选择一种，管理器不会安装 OptiScaler。实际可用功能由显卡、驱动和游戏决定。")),
+                (self.t("兼容性"), self.t("普通 MFG 只需一个 DLL；插件需要先安装完整的 OptiScaler 10，管理器会更新配套主文件并安装 MFG 插件。两种模式互斥，功能取决于显卡、驱动和游戏。")),
             ];
         } else if profile == rtx_fg_manager::presets::MFG_VULKAN {
             sections.remove(2);

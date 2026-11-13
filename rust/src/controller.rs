@@ -4419,13 +4419,30 @@ impl Controller {
                         continue;
                     }
                     self.download = Some(p);
-                    self.update_status = "更新下载完成，已验证签名".into();
-                    self.log("更新下载完成，已验证签名");
+                    let verified = if cfg!(target_os = "linux") {
+                        "更新下载完成，已校验文件"
+                    } else {
+                        "更新下载完成，已验证签名"
+                    };
+                    self.update_status = verified.into();
+                    self.log(verified);
                     self.install_pending = self.install_requested && self.smoke.is_none();
                 }
                 Event::DownloadProgress(p) => {
                     if let Some(t) = &mut self.tasks.update {
-                        t.download("RTXManager.exe".into(), p.clone());
+                        let file =
+                            self.update
+                                .as_ref()
+                                .map(|m| m.file.clone())
+                                .unwrap_or_else(|| {
+                                    if cfg!(target_os = "linux") {
+                                        "RTXManager.AppImage"
+                                    } else {
+                                        "RTXManager.exe"
+                                    }
+                                    .into()
+                                });
+                        t.download(file, p.clone());
                     }
                     if !self.update_cancel.load(Ordering::Relaxed) {
                         self.update_status = p.label().into();

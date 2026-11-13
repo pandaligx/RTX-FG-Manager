@@ -43,7 +43,7 @@ def main():
                     continue
                 if not re.fullmatch(r'[A-Za-z0-9._-]{1,160}', name):
                     raise RuntimeError('Unsafe release asset name')
-                if not payload and name not in ('update.json', 'update-v2.json', 'SHA256SUMS.txt', 'SHA256SUMS-linux.txt', 'third-party-info.json'):
+                if not payload and name not in ('update.json', 'update-v2.json', 'update-linux.json', 'SHA256SUMS.txt', 'SHA256SUMS-linux.txt', 'third-party-info.json'):
                     raise RuntimeError('Unexpected stable release asset')
                 if asset['size'] > (512 if payload else 2) * 1024 * 1024:
                     raise RuntimeError('Unexpected asset size')

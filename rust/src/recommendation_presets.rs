@@ -26,6 +26,7 @@ pub const PROFILES: &[(&str, &str)] = &[
     ("upstream-0.3.5-310-9", crate::upstream040::PROFILE),
     ("upstream-0.3.5-310-9", crate::upstream040::PROFILE_041),
     ("rtxfg-0.3.5-dx12-vulkan", "upstream035"),
+    (cloud::DELTA_041_SCHEME, crate::upstream040::PROFILE_041),
     ("pipotoufik-mfg-vulkan-sm86-7", presets::MFG_VULKAN),
 ];
 
@@ -495,7 +496,10 @@ pub fn shareable(profile: &str, key: &str) -> bool {
     }
     PROFILES.iter().any(|(_, p)| *p == profile)
         && presets::parameters(profile).iter().any(|p| p.key == key)
-        && !matches!(key, "rtx_opti_ui" | "overlay" | "debug" | "logging")
+        && !matches!(
+            key,
+            "rtx_opti_ui" | "rtx_diagnostic_logging" | "overlay" | "debug" | "logging"
+        )
 }
 
 pub fn supported(profile: &str, key: &str, version: &str) -> bool {
@@ -706,6 +710,8 @@ pub fn numeric_range(profile: &str, key: &str) -> Option<(f64, f64)> {
             "rtx_target" | "rtx_reflex_limit" | "rtx_xemfg_target" => Some((0., 1000.)),
             "rtx_nr_scale" => Some((0., 200.)),
             "rtx_nr_intensity" => Some((0., 1.)),
+            "rtx_nr_structure" | "rtx_nr_tone" => Some((0., 2.)),
+            "rtx_nr_character" => Some((-1., 2.)),
             _ => None,
         };
     }
@@ -756,10 +762,12 @@ pub fn contracts() -> Value {
                     "rtx_target" | "rtx_reflex_limit" | "rtx_xemfg_target"
                 ) {
                     rule = json!({"number":true,"min":0,"max":1000,"integer":true});
-                } else if matches!(p.key, "rtx_nr_scale" | "rtx_nr_intensity") {
-                    rule = json!({"number":true,"min":0,"max":if p.key == "rtx_nr_scale" {200} else {1}});
+                } else if let Some((min, max)) = numeric_range(profile, p.key) {
+                    rule = json!({"number":true,"min":min,"max":max});
                 }
-                if rtxmfg::is_170_key(p.key) {
+                if rtxmfg::is_171_key(p.key) {
+                    rule["since"] = json!("1.7.1");
+                } else if rtxmfg::is_170_key(p.key) {
                     rule["since"] = json!("1.7.0");
                 } else if rtxmfg::is_sidecar_key(p.key)
                     || matches!(p.key, "rtx_sr_preset" | "rtx_rr_preset")
@@ -789,7 +797,7 @@ pub fn contracts() -> Value {
             fields.insert(p.key.into(), rule);
         }
         let contract = json!({"profile":profile,"fields":fields});
-        if profile == crate::upstream040::PROFILE_041 {
+        if scheme == "upstream-0.3.5-310-9" && profile == crate::upstream040::PROFILE_041 {
             result.get_mut(scheme).expect("legacy contract comes first")["from_041"] = contract;
         } else {
             result.insert(scheme.into(), contract);

@@ -34,6 +34,7 @@ pub mod i18n;
 pub mod jsonc;
 #[cfg(windows)]
 mod manager_shortcuts;
+pub mod mfg_host;
 pub mod mfg_plugin;
 pub mod operation_history;
 #[cfg(target_os = "linux")]

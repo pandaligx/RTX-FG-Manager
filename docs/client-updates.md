@@ -6,6 +6,7 @@
 | --- | --- | --- | --- |
 | 4.3.20 及更早 | `update.json`（永久保留 4.3.21） | `v4.3.21/RTXManager-v4.3.21-x64.exe` | 先升级到 4.3.21，再检查更新 |
 | 4.3.21 及以后 | `update-v2.json`（schema 2） | `v版本号/RTXManager.exe` | 直接升级最新正式版 |
+| Linux AppImage 4.3.32 及以后 | `update-linux.json`（schema 3） | `v版本号/RTXManager-版本号-x86_64.AppImage` | 检查、下载并重启更新 |
 
 4.3.21 两个文件名对应同一份签名原件，只签名一次。旧安装更新后保留自己的文件名、路径和快捷方式；需要统一名称时，可在设置中主动迁移。不会强制改名。
 
@@ -33,3 +34,15 @@ Schema 1 installation tickets remain accepted by the new installer, allowing an 
 Modern clients check only the modern channel, falling back between GitCode and GitHub. They never silently treat the frozen bridge as the latest version when the modern service is unavailable. Network errors remain visible and can be retried.
 
 Tests cover old/new manifest contracts, retained legacy latest-release fallback, future fixed-name packaging, source promotion guards, Windows replacement/rollback and existing shortcut behavior. Unsigned candidate tests cannot prove an Authenticode-gated signed upgrade. After signing, complete isolated legacy-to-bridge and fixed-path restart checks before publishing, without modifying users' games or shortcuts.
+
+## Linux AppImage channel / 独立更新通道
+
+4.3.31 及更早的 Linux 版需手动下载一次新版。4.3.32 起，直接运行的 AppImage 使用独立 schema 3 清单，跟随设置中的 GitCode/GitHub 来源，校验大小、SHA-256、x86_64 与 Type 2 格式后更新。保留原文件名、数据目录及 Wine 前缀；新版确认窗口已启动后才删除旧文件，启动失败回滚。解包运行、链接路径或不可写安装目录保留手动更新提示。Linux 不使用 Windows Authenticode，也不会下载 EXE。
+
+Prepare the successful Linux CI artifact from the exact release commit:
+
+```sh
+python tools/linux_release.py --appimage dist/RTXManager-4.3.32-x86_64.AppImage --version 4.3.32 --notes release-notes.json --output linux-release
+```
+
+Upload the AppImage from the publisher machine to **both** release pages, verify the full bytes, then upload `SHA256SUMS-linux.txt` and `update-linux.json`. Promote only that Linux channel after both copies pass. Publish it alongside the Windows release while retaining the two Windows manifests unchanged. The publishing tools reject channel swaps, rollbacks and changes to an already published same-version identity. CI creates unsigned test artifacts; it does not promote an update channel or upload the Windows EXE.

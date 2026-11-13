@@ -82,6 +82,9 @@ Add-File '.github/workflows/update-game-names.yml'
 Add-File 'docs/game-names.md'
 Add-File 'tools/update_download_stats.py'
 Add-File 'tools/client_release.py'
+Add-File 'tools/linux_release.py'
+Add-File 'tools/test_linux_update.py'
+Add-File 'tests/test_linux_release.py'
 Add-File 'tests/test_client_release.py'
 Add-File 'docs/client-updates.md'
 Add-File 'tests/test_download_stats.py'
@@ -122,6 +125,7 @@ foreach ($name in @('cloud/schemes.json', 'tools/cloud_release.py', 'docs/cloud-
 if (-not $ExcludeCloudMetadata) {
     Add-File 'update.json' $false
     Add-File 'update-v2.json' $false
+    Add-File 'update-linux.json' $false
     Add-File 'cloud/catalog.json' $false
     Add-Tree 'cloud/indexes' @('.json')
     Add-Tree 'cloud/v3' @('.json')

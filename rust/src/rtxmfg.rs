@@ -10,10 +10,11 @@ pub const CONFIG: &str = "RTXMFG-Universal.json";
 pub const NOTICES: &str = "MFG-Unlocker-NOTICES.txt";
 pub const UI_CONFIG: &str = "RTX40MFG-UI.ini";
 /// Fixed upstream sidecars only; never derive deletion targets from JSON values.
-pub const SIDECARS: [&str; 3] = [
+pub const SIDECARS: [&str; 4] = [
     "RTXMFG-Universal.status.json",
     "RTX40MFG-UI.ini",
     "RTX40MFG-UI-layout.ini",
+    "RTXMFG-Dlss5Presets.txt",
 ];
 pub const PROXIES: [&str; 19] = [
     "version.dll",
@@ -166,6 +167,7 @@ pub fn parameters() -> Vec<Parameter> {
         },
     ];
     fields.extend(parameters_170());
+    fields.extend(parameters_171());
     fields
 }
 
@@ -196,9 +198,9 @@ fn parameters_170() -> Vec<Parameter> {
         field(
             "rtx_nr_preset",
             "dlss5Preset",
-            "NR 模型预设",
+            "NR 网络预设",
             "0",
-            vec![("0", "运行库默认"), ("1", "A"), ("2", "B")],
+            vec![("0", "运行库默认"), ("1", "质量"), ("2", "快速")],
         ),
         field(
             "rtx_nr_scale_auto",
@@ -245,13 +247,7 @@ fn parameters_170() -> Vec<Parameter> {
                 ("10", "10"),
             ],
         ),
-        field(
-            "rtx_nr_half",
-            "dlss5Boost",
-            "NR 隔帧处理（DX12）",
-            "0",
-            switch(),
-        ),
+        field("rtx_nr_half", "dlss5Boost", "NR 隔帧处理", "0", switch()),
         field(
             "rtx_xemfg",
             "xemfgStandalone",
@@ -323,10 +319,86 @@ fn parameters_170() -> Vec<Parameter> {
                 ("auto", "自动"),
                 ("optiscaler", "仅 OptiScaler"),
                 ("rtxmfg", "仅 MFG Unlocker"),
-                ("shared", "共享菜单"),
+                ("shared", "保留独立 MFG 菜单"),
             ],
         ),
     ]
+}
+
+fn parameters_171() -> Vec<Parameter> {
+    let field = |key, ini_key, label, default, choices| Parameter {
+        key,
+        section: "",
+        ini_key,
+        label,
+        default,
+        choices,
+    };
+    let strength = || {
+        vec![
+            ("0", "0%"),
+            ("0.5", "50%"),
+            ("1", "100%"),
+            ("1.5", "150%"),
+            ("2", "200%"),
+        ]
+    };
+    vec![
+        field(
+            "rtx_nr_model",
+            "dlss5Model",
+            "NR 外观模型",
+            "0",
+            vec![("0", "A"), ("1", "B"), ("2", "C")],
+        ),
+        field(
+            "rtx_nr_structure",
+            "dlss5StructureIntensity",
+            "NR 结构强度",
+            "1",
+            strength(),
+        ),
+        field(
+            "rtx_nr_tone",
+            "dlss5ToneIntensity",
+            "NR 色调强度",
+            "1",
+            strength(),
+        ),
+        field(
+            "rtx_nr_character_mask",
+            "dlss5CharacterMask",
+            "NR 人物保护",
+            "1",
+            vec![("0", "关闭"), ("1", "开启")],
+        ),
+        field(
+            "rtx_nr_character",
+            "dlss5CharacterIntensity",
+            "NR 人物强度",
+            "-1",
+            vec![
+                ("-1", "跟随结构强度"),
+                ("0", "0%"),
+                ("0.5", "50%"),
+                ("1", "100%"),
+                ("1.5", "150%"),
+                ("2", "200%"),
+            ],
+        ),
+        Parameter {
+            key: "rtx_diagnostic_logging",
+            section: "Diagnostics",
+            ini_key: "Logging",
+            label: "诊断日志",
+            default: "0",
+            choices: vec![("0", "关闭"), ("1", "开启")],
+        },
+    ]
+}
+
+pub fn is_171_key(key: &str) -> bool {
+    parameters_171().iter().any(|p| p.key == key)
 }
 
 pub fn is_170_key(key: &str) -> bool {
@@ -334,8 +406,11 @@ pub fn is_170_key(key: &str) -> bool {
 }
 fn json_value(key: &str, value: &str) -> Result<Value> {
     Ok(match key {
-        "rtx_nr" | "rtx_nr_scale_auto" | "rtx_nr_half" => json!(value == "1"),
-        "rtx_nr_scale" | "rtx_nr_intensity" => json!(value.parse::<f64>()?),
+        "rtx_nr" | "rtx_nr_scale_auto" | "rtx_nr_half" | "rtx_nr_character_mask" => {
+            json!(value == "1")
+        }
+        "rtx_nr_scale" | "rtx_nr_intensity" | "rtx_nr_structure" | "rtx_nr_tone"
+        | "rtx_nr_character" => json!(value.parse::<f64>()?),
         "rtx_opti_ui" => json!(value),
         _ => json!(value.parse::<u32>()?),
     })
@@ -435,17 +510,32 @@ pub fn valid_value(key: &str, value: &str) -> bool {
         && !value.is_empty()
         && value.bytes().all(|b| b.is_ascii_digit())
         && value.parse::<u32>().is_ok_and(|n| n <= 1000))
-        || (matches!(key, "rtx_nr_scale" | "rtx_nr_intensity")
-            && value.parse::<f64>().is_ok_and(|n| {
-                n.is_finite() && n >= 0. && n <= if key == "rtx_nr_scale" { 200. } else { 1. }
-            }))
+        || (matches!(
+            key,
+            "rtx_nr_scale"
+                | "rtx_nr_intensity"
+                | "rtx_nr_structure"
+                | "rtx_nr_tone"
+                | "rtx_nr_character"
+        ) && value.parse::<f64>().is_ok_and(|n| {
+            n.is_finite()
+                && n >= if key == "rtx_nr_character" { -1. } else { 0. }
+                && n <= match key {
+                    "rtx_nr_scale" => 200.,
+                    "rtx_nr_intensity" => 1.,
+                    _ => 2.,
+                }
+        }))
         || parameters()
             .iter()
             .any(|p| p.key == key && p.choices.iter().any(|(v, _)| *v == value))
 }
 
 pub fn is_sidecar_key(key: &str) -> bool {
-    matches!(key, "rtx_flip_metering" | "rtx_gpu_override")
+    matches!(
+        key,
+        "rtx_flip_metering" | "rtx_gpu_override" | "rtx_diagnostic_logging"
+    )
 }
 
 pub fn help(key: &str) -> Option<&'static str> {
@@ -454,13 +544,19 @@ pub fn help(key: &str) -> Option<&'static str> {
             "需要 MFG 1.7+ 和 NR 运行库；右侧可单独下载安装。游戏需启用 DLSS SR、DLAA 或 RR；Backspace 打开菜单。",
         ),
         "rtx_nr_stage" => Some(
-            "Vulkan 仅支持自动或超分后；隔帧处理仅适用于 DX12 超分前/后。高级画质控制可在游戏内菜单调整。",
+            "Vulkan 使用自动或超分后；1.7.1 支持 DX11 神经渲染和隔帧处理。DX11 菜单需要 Windows 10 1703 或更新系统。",
         ),
         "rtx_xemfg" => Some(
             "需要右侧安装 XeSS 3.0.2 运行库，重启游戏生效。独立模式不需要 OptiScaler；插件模式请在 OptiScaler 中选择 XeFG。",
         ),
         "rtx_xemfg_dynamic" => Some(
             "独立 XeMFG 支持 DX12/Vulkan；Vulkan 仅使用 DLSS 超分输入。游戏原生 FSR/XeSS 帧生成应关闭。",
+        ),
+        "rtx_nr_model" => Some(
+            "A/B/C 控制外观；质量/快速是独立的网络预设。命名预设和导出代码可在游戏内菜单操作。",
+        ),
+        "rtx_opti_ui" => Some(
+            "配套 OptiScaler 10 默认使用其 MFG Unlocker 页签；保留独立菜单会显示原 MFG 菜单。独立 DLL 模式按 Backspace。",
         ),
         "rtx_sr_preset" | "rtx_rr_preset" => {
             Some("需要 MFG 1.6+ 及游戏支持的 DLSS 功能；预设不会安装 SR/RR 运行库。")
@@ -474,6 +570,13 @@ pub fn help(key: &str) -> Option<&'static str> {
 }
 
 pub fn validate_version(version: Option<&str>, values: &Values) -> Result<()> {
+    ensure!(
+        version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .is_some_and(|v| v >= semver::Version::new(1, 7, 1))
+            || !values.keys().any(|k| is_171_key(k)),
+        "这些参数需要 MFG Unlocker 1.7.1 或更新版本，请先升级补丁"
+    );
     ensure!(
         version
             .and_then(|v| semver::Version::parse(v).ok())
