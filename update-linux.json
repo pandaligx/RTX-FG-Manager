@@ -1,11 +1,11 @@
 {
   "schema": 3,
-  "version": "4.3.32",
-  "file": "RTXManager-4.3.32-x86_64.AppImage",
-  "bytes": 22366712,
-  "sha256": "d4c455d20a8e687b971cea8f3c2c7e0e8cf2fb3c1f2a704dabf6cda115056c80",
+  "version": "4.3.33",
+  "file": "RTXManager-4.3.33-x86_64.AppImage",
+  "bytes": 22370808,
+  "sha256": "051a08d711628d919873d0ce3a1e382b6ac15866cda9dd0d4869074d2509fecc",
   "notes": {
-    "zh-CN": "- 新增 Dlssg_for_sm86 0.4.1 三角洲 / Vulkan 方案，保留旧 0.3.5 和标准 0.4.1；改善桥接资源复用、释放与预算管理。\n- 升级 MFG Unlocker 1.7.1，补齐 NR 外观与人物参数、诊断日志开关及新版参数分享。\n- 已有 OptiScaler 10 的插件安装可同步配套主 DLL，保留原名称、备份与卸载恢复；普通独立 DLL 安装方式不变。\n- Linux AppImage 增加应用内更新、完整性校验、重启确认和启动失败回滚；旧 Linux 用户首次需手动下载本版。\n- 保持现有 Windows 界面、渲染与自动更新流程。双平台安装包分别发布。",
-    "en": "- Add the Dlssg_for_sm86 0.4.1 Delta Force / Vulkan option while retaining custom 0.3.5 and standard 0.4.1. Improve bridge resource reuse, retirement and memory-budget handling.\n- Update MFG Unlocker to 1.7.1 with NR appearance and character settings, local diagnostic logging and compatible preset sharing.\n- Plugin installation into an existing OptiScaler 10 setup can update its paired host DLL while retaining its loading name and restoring the original on uninstall. Standalone proxy installation remains unchanged.\n- Add a separate Linux AppImage update channel with integrity checks, startup acknowledgement and rollback after launch failure. Earlier Linux versions require one manual download of this version.\n- Preserve the existing Windows UI, renderer and update flow. Windows and Linux packages are published independently."
+    "zh-CN": "- 适配 RTX Encore 2.4.0：四遍神经渲染独立处理位置与33–100%自定义 DLSS 比例，参数分享同步支持。\n- 修复自定义三角洲 0.4.1 的旧 FG 运行库配对，私有 Streamline 升级2.14.16；DLSS增加5X/6X，默认保持4X，XeSS最高4X。\n- 同方案旧修订可原位升级并保留参数；改进新旧私有缓存归属清理，卸载后重新安装恢复默认值。\n- 保留原版0.4.1、旧三角洲0.3.5及其他方案；原有界面、更新通道和下载统计保持。",
+    "en": "- Adapt RTX Encore 2.4.0 per-pass neural rendering placement and 33–100% custom DLSS scaling, including shared presets.\n- Pair the custom Delta Force 0.4.1 entry with private Streamline 2.14.16 and the bundled FG runtime. Add DLSS 5X/6X; keep 4X as the default and the XeSS maximum.\n- Upgrade the previous custom revision in place while preserving settings. Track both private cache revisions per game; uninstalling and reinstalling restores defaults.\n- Keep standard 0.4.1, legacy custom 0.3.5, other schemes, the current interface, update channels and combined download statistics.\n\nValidation: targeted file-system and synthetic GPU tests; no claim of RTX 3060 Delta Force gameplay or a long-duration 6GB VRAM test."
   }
 }
