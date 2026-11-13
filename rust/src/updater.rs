@@ -824,7 +824,10 @@ mod download_tests {
                 "{change}"
             );
         }
-        for schema in [0, 1, 3, u32::MAX] {
+        for schema in [0, 1, 2, 3, u32::MAX]
+            .into_iter()
+            .filter(|schema| *schema != current.schema)
+        {
             let mut invalid = current.clone();
             invalid.schema = schema;
             assert!(invalid.validate(&invalid.version).is_err());
