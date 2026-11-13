@@ -1124,6 +1124,15 @@ pub fn deploy_prepared_context_at_with_overrides(
     if backend == crate::rtxmfg::BACKEND && crate::mfg_plugin::supported(upstream_version) {
         expected.push(crate::rtxmfg::NOTICES.into());
     }
+    if backend == crate::rtxmfg::BACKEND && data.contains_key(crate::mfg_host::PAYLOAD) {
+        ensure!(
+            upstream_version
+                .and_then(|v| semver::Version::parse(v).ok())
+                .is_some_and(|v| v >= semver::Version::new(1, 7, 1)),
+            "此版本不支持配套 OptiScaler"
+        );
+        expected.push(crate::mfg_host::PAYLOAD.into());
+    }
     ensure!(
         data.keys()
             .cloned()
@@ -1131,6 +1140,12 @@ pub fn deploy_prepared_context_at_with_overrides(
             == expected.into_iter().collect(),
         "部署文件范围无效"
     );
+    // A bundled host is only a candidate for explicit ASI mode, never a game proxy.
+    let mfg_host = if backend == crate::rtxmfg::BACKEND {
+        data.remove(crate::mfg_host::PAYLOAD)
+    } else {
+        None
+    };
     if let Some(v) = payload_version {
         crate::updater::version(v)?;
     }
@@ -1191,6 +1206,9 @@ pub fn deploy_prepared_context_at_with_overrides(
             "此 MFG 版本不支持插件模式"
         );
         crate::mfg_plugin::validate_host(&target)?;
+        if let Some(bytes) = &mfg_host {
+            crate::mfg_host::preflight(&target, bytes, existing.is_some())?;
+        }
     }
     if matches!(backend, crate::rtxmfg::BACKEND | crate::encore::BACKEND) {
         for (proxy, original) in [
@@ -1531,6 +1549,9 @@ pub fn deploy_prepared_context_at_with_overrides(
     let mut published = Vec::new();
     let outcome = (|| -> Result<()> {
         if mfg_plugin {
+            if let Some(bytes) = &mfg_host {
+                crate::mfg_host::install_locked(&target, bytes)?;
+            }
             crate::mfg_plugin::enable_locked(&target)?;
         }
         fs::create_dir_all(root.join("cache"))?;

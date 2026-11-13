@@ -253,10 +253,44 @@ test('Sharing rejects private, cross-project, unsupported, malformed and out-of-
   const missing=shared();delete missing.presets.defaults.nrEnabled;assert.throws(()=>recipe(missing));
   const old=shared();old.presets.values.nrOpenFast='1';old.presets.defaults.nrOpenFast='0';assert.throws(()=>recipe(old));
 });
+test('Delta 041 snapshots stay readable for old clients and survive their edits',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...content(),scheme:'rtxfg-0.4.1-dx12-vulkan',patchVersion:'0.4.1',
+    presets:{schema:1,profile:'upstream041',values:{fg_engine:'DLSS',optimized:'1'},defaults:{fg_engine:'DLSS',optimized:'1'}}};
+  const modern={'x-rtxfg-delta041':'1'};
+  const created=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',16,modern);
+  assert.deepEqual(created.content.presets,c.presets);
+  const path='/v1/recipes/'+created.id;
+  const old=await f.call('GET',path,null,u.token,'test-ip',16);
+  assert.equal(Object.hasOwn(old.content,'presets'),false);
+  old.content.notes='Edited by old client';
+  await f.call('PUT',path,{revision:old.revision,content:old.content},u.token,'test-ip',16);
+  const current=await f.call('GET',path,null,u.token,'test-ip',16,modern);
+  assert.deepEqual(current.content.presets,c.presets);
+  const list=await f.call('GET','/v1/recipes?game=steam:292030',null,null,'test-ip',16);
+  assert.equal(Object.hasOwn(list.items[0].content,'presets'),false);
+});
+
+test('MFG 171 look parameters survive old-client metadata edits without breaking their lists',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...content(),scheme:'rtx40mfg-1.3.3-hf2',patchVersion:'1.7.1',
+    presets:{schema:1,profile:'rtxmfg_universal_133',values:{rtx_nr_model:'2',rtx_nr_structure:'1.5'},defaults:{rtx_nr_model:'0',rtx_nr_structure:'1'}}};
+  const modern={'x-rtxfg-mfg171':'1'};
+  const created=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',16,modern);
+  assert.deepEqual(created.content.presets,c.presets);
+  const path='/v1/recipes/'+created.id;
+  const old=await f.call('GET',path,null,u.token,'test-ip',16);
+  assert.equal(Object.hasOwn(old.content,'presets'),false);
+  old.content.notes='Old-client description';
+  await f.call('PUT',path,{revision:old.revision,content:old.content},u.token,'test-ip',16);
+  const current=await f.call('GET',path,null,u.token,'test-ip',16,modern);
+  assert.deepEqual(current.content.presets,c.presets);
+});
+
 function fixture(t,extra={}) {
   const db=openStore(':memory:');t.after(()=>db.close());let clock=1800000000;const mail=[];
   const api=createApi(db,{secret:'unit-test-'.repeat(5),now:()=>clock,sendCode:async(email,code)=>mail.push({email,code}),adminEmail:'admin@example.com',...extra});
-  const call=(method,path,body,token,ip='test-ip',feedback=false)=>api({method,url:new URL(path,'http://localhost'),body,headers:{...(token?{authorization:'Bearer '+token}:{}),...(feedback?{'x-rtxfg-feedback':feedback===true?'2':String(feedback)}:{})},ip});
+  const call=(method,path,body,token,ip='test-ip',feedback=false,extraHeaders={})=>api({method,url:new URL(path,'http://localhost'),body,headers:{...extraHeaders,...(token?{authorization:'Bearer '+token}:{}),...(feedback?{'x-rtxfg-feedback':feedback===true?'2':String(feedback)}:{})},ip});
   const login=async(email='player@example.com')=>{const c=await call('POST','/v1/auth/code',{email});const m=mail.at(-1);return call('POST','/v1/auth/verify',{challenge:c.challenge,code:m.code});};
   return {db,mail,call,login,tick:s=>{clock+=s;}};
 }

@@ -169,6 +169,19 @@ fn restored(before: &[u8], applied: &[u8], current: &[u8]) -> Result<Vec<u8>> {
 /// Run after removing the owned ASI, before deleting install.json. Missing or
 /// user-modified INI files are never resurrected. Failures retain both journals.
 pub fn restore_locked(target: &core::DeploymentTarget) -> Result<()> {
+    let host_journal = core::no_links(
+        &target
+            .directory
+            .join(core::OWN)
+            .join(crate::mfg_host::JOURNAL),
+    )?;
+    if host_journal.exists() {
+        ensure!(
+            !core::no_links(&target.directory.join(ENTRY))?.exists(),
+            "MFG 插件文件仍存在，OptiScaler 主文件恢复暂缓"
+        );
+    }
+    crate::mfg_host::restore_locked(target)?;
     let path = core::no_links(&target.directory.join(core::OWN).join(JOURNAL))?;
     if !path.exists() {
         return Ok(());

@@ -59,6 +59,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      - name: Linux release channel contracts
+        run: python3 -B -m unittest discover -s tests -p test_linux_release.py -v
+
       - name: Check Linux library and desktop application
         run: cargo check --locked --target x86_64-unknown-linux-gnu --lib --bin RTXManager
 

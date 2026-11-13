@@ -27,6 +27,9 @@ VERIFIED = set()
 _protocol_spec = importlib.util.spec_from_file_location('client_release', Path(__file__).with_name('client_release.py'))
 client_release = importlib.util.module_from_spec(_protocol_spec)
 _protocol_spec.loader.exec_module(client_release)
+_linux_spec = importlib.util.spec_from_file_location('linux_release', Path(__file__).with_name('linux_release.py'))
+linux_release = importlib.util.module_from_spec(_linux_spec)
+_linux_spec.loader.exec_module(linux_release)
 
 
 def artifact_size_limit(url):
@@ -222,11 +225,18 @@ def verify_update(data):
     verify(f'https://github.com/{GH_REPO}/releases/download/v{v}/{m["file"]}', m['bytes'], m['sha256'])
 
 
+def verify_linux_update(data):
+    m = linux_release.checked(data)
+    for url in (asset_url(GC_REPO, 'v' + m['version'], m['file']),
+                f'https://github.com/{GH_REPO}/releases/download/v{m["version"]}/{m["file"]}'):
+        verify(url, m['bytes'], m['sha256'])
+
+
 def mirror_assets(folder, repo, tag, allow_exe=False):
     files = list(Path(folder).iterdir())
     if not files or any(not p.is_file() or p.is_symlink() for p in files):
         raise RuntimeError('Asset directory must contain only reviewed regular files')
-    channels = ('update.json', 'update-v2.json')
+    channels = ('update.json', 'update-v2.json', linux_release.CHANNEL)
     if repo == GC_REPO and re.fullmatch(r'v\d{1,4}\.\d{1,4}\.\d{1,4}', tag) and tuple(map(int, tag[1:].split('.'))) >= (4, 3, 21):
         modern = client_release.checked((Path(folder) / 'update-v2.json').read_bytes(), 'update-v2.json')
         legacy = (Path(folder) / 'update.json').read_bytes()
@@ -243,12 +253,27 @@ def mirror_assets(folder, repo, tag, allow_exe=False):
         if path.suffix.lower() == '.exe' and not allow_exe:
             continue
         if path.name in channels:
-            client_release.checked(path.read_bytes(), path.name)
-            verify_update(path.read_bytes())
+            if path.name == linux_release.CHANNEL:
+                m = linux_release.checked(path.read_bytes())
+                if tag != 'v' + m['version'] or repo != GC_REPO:
+                    raise RuntimeError('Linux manifest must match its client release tag')
+                verify_linux_update(path.read_bytes())
+            else:
+                client_release.checked(path.read_bytes(), path.name)
+                verify_update(path.read_bytes())
         upload(repo, tag, path, allow_exe)
 
 
 def verify_client_metadata(root, review, before, entries):
+    channel = linux_release.CHANNEL
+    update, old = entries.get(channel), before.get(channel)
+    if update != old:
+        if not update:
+            raise RuntimeError('Cannot remove the Linux update channel')
+        raw = review.git(root, 'cat-file', 'blob', update[2], binary=True)
+        previous = review.git(root, 'cat-file', 'blob', old[2], binary=True) if old else None
+        linux_release.transition(previous, raw)
+        verify_linux_update(raw)
     for channel in ('update.json', 'update-v2.json'):
         update = entries.get(channel)
         old = before.get(channel)

@@ -45,6 +45,7 @@ export const schemes = {
   'mfg-unlocker-1.6.1-compat': [...universal, 'OptiScaler/plugins/MFGUnlocker.asi'],
   'upstream-0.3.5-310-9': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
   'rtxfg-0.3.5-dx12-vulkan': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
+  'rtxfg-0.4.1-dx12-vulkan': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
   'pipotoufik-mfg-vulkan-sm86-7': ['version.dll'],
 };
 export const NOTES_LIMIT = 5000;

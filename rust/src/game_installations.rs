@@ -664,8 +664,13 @@ mod tests {
     #[test]
     fn battlenet_bounded_wire_and_build_info() {
         fn field(tag: u8, data: &[u8]) -> Vec<u8> {
-            assert!(data.len() < 128);
-            let mut b = vec![tag, data.len() as u8];
+            let mut b = vec![tag];
+            let mut len = data.len();
+            while len >= 128 {
+                b.push((len as u8 & 0x7f) | 0x80);
+                len >>= 7;
+            }
+            b.push(len as u8);
             b.extend(data);
             b
         }

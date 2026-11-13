@@ -15,6 +15,8 @@ pub const DOMESTIC: &str = "https://api.gitcode.com/api/v5/repos/gcw_qWIjmve7/RT
 pub const GITHUB: &str =
     "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/bundles/catalog.json";
 pub const DELTA_SCHEME: &str = "rtxfg-0.3.5-dx12-vulkan";
+/// A separate identity keeps the tested 0.3.5 fallback and its parameters intact.
+pub const DELTA_041_SCHEME: &str = "rtxfg-0.4.1-dx12-vulkan";
 
 fn source_name(url: &str) -> &'static str {
     match reqwest::Url::parse(url)
@@ -379,8 +381,10 @@ impl Catalog {
             );
             ensure!(
                 !policy.capabilities.contains(crate::delta::CAPABILITY)
-                    || policy.parameter_profile == "upstream035",
-                "Delta capability requires the 0.3.5 protocol"
+                    || policy.parameter_profile == "upstream035"
+                    || (p.scheme_id == DELTA_041_SCHEME
+                        && policy.parameter_profile == crate::upstream040::PROFILE_041),
+                "Delta capability requires a supported custom protocol"
             );
             ensure!(
                 match policy.parameter_profile.as_str() {
@@ -487,11 +491,19 @@ impl Catalog {
             let intel = encore && crate::encore::supports_120(p.upstream_version.as_deref());
             let mfg_notice = policy.parameter_profile == crate::rtxmfg::PROFILE
                 && crate::mfg_plugin::supported(p.upstream_version.as_deref());
+            let mfg_host = mfg_notice
+                && p.files.iter().any(|f| f.name == crate::mfg_host::PAYLOAD)
+                && p.upstream_version
+                    .as_ref()
+                    .and_then(|v| semver::Version::parse(v).ok())
+                    .is_some_and(|v| v >= semver::Version::new(1, 7, 1));
             ensure!(
                 core::PROXIES.contains(&p.proxy.as_str())
                     && p.files.len()
                         == if intel {
                             7
+                        } else if mfg_host {
+                            4
                         } else if encore || mfg_notice {
                             3
                         } else {
@@ -532,6 +544,9 @@ impl Catalog {
             }
             if mfg_notice {
                 expected_entries.insert(crate::rtxmfg::NOTICES);
+            }
+            if mfg_host {
+                expected_entries.insert(crate::mfg_host::PAYLOAD);
             }
             ensure!(
                 p.files
@@ -665,8 +680,9 @@ impl Catalog {
                     && seen.insert(&p.scheme_id)
             })
             .collect();
-        const ORDER: [&str; 5] = [
+        const ORDER: [&str; 6] = [
             "upstream-0.3.5-310-9",
+            DELTA_041_SCHEME,
             "rtxfg-0.3.5-dx12-vulkan",
             "pipotoufik-mfg-vulkan-sm86-7",
             "rtx40mfg-1.3.3-hf2",
@@ -1628,6 +1644,7 @@ mod tests {
         assert!((0..3).all(|series| !c.supports_series("native-0.2.6-stable", series)));
         let expected = vec![
             "upstream-0.3.5-310-9",
+            DELTA_041_SCHEME,
             "rtxfg-0.3.5-dx12-vulkan",
             "pipotoufik-mfg-vulkan-sm86-7",
             "rtx40mfg-1.3.3-hf2",

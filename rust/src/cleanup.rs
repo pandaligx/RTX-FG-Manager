@@ -904,6 +904,8 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     let mut stage_pending = Vec::new();
     if record.backend == crate::rtxmfg::BACKEND && record.selected() == [crate::mfg_plugin::ENTRY] {
         allowed.insert(crate::mfg_plugin::JOURNAL.into());
+        allowed.insert(crate::mfg_host::JOURNAL.into());
+        allowed.insert(crate::mfg_host::BACKUP.into());
     }
     for name in record.hashes.keys() {
         let n = core::stage_name(name);
