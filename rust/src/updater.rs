@@ -245,7 +245,7 @@ pub fn verify(path: &Path, m: &Manifest) -> Result<()> {
     #[cfg(target_os = "linux")]
     {
         ensure!(m.schema == LINUX_SCHEMA, "Linux 更新不能使用 Windows 程序");
-        return verify_appimage(path);
+        verify_appimage(path)
     }
     #[cfg(not(target_os = "linux"))]
     {
