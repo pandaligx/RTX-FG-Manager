@@ -19,15 +19,15 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.31"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.32"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
 
-[下载 Linux x86_64 AppImage（实验性）](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage)
+[下载 Linux x86_64 AppImage（实验性）](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.32/RTXManager-4.3.32-x86_64.AppImage)
 
 </div>
 
 ---
 
-> **4.3.31 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
+> **4.3.32 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
 
@@ -45,36 +45,36 @@
 
 ## 下载
 
-**版本 4.3.31** · Windows 10 / 11 x64 · Linux x86_64（实验性）
+**版本 4.3.32** · Windows 10 / 11 x64 · Linux x86_64（实验性）
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.31 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.31) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.31 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.31) | 主项目与备用源 |
-| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage) | Linux x86_64 国内下载 |
-| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.31/RTXManager-4.3.31-x86_64.AppImage) | Linux x86_64 备用下载 |
+| **GitCode** | [打开 4.3.32 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.32) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.32 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.32) | 主项目与备用源 |
+| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.32/RTXManager-4.3.32-x86_64.AppImage) | Linux x86_64 国内下载 |
+| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.32/RTXManager-4.3.32-x86_64.AppImage) | Linux x86_64 备用下载 |
 | **Gitee** | [历史版本](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | 保留旧文件，不再发布新版 |
 
 Windows 用户下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
 ### Linux（实验性）
 
-下载上方 **`RTXManager-4.3.31-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
+下载上方 **`RTXManager-4.3.32-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
 
 ```sh
-chmod +x RTXManager-4.3.31-x86_64.AppImage
-./RTXManager-4.3.31-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.32-x86_64.AppImage
+./RTXManager-4.3.32-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 将前缀路径替换为游戏实际使用的 Wine 目录；Steam Proton 通常选择 `steamapps/compatdata/<AppID>/pfx`。再添加游戏的 Windows EXE，不用于原生 Linux ELF 游戏，也不自动配置 Proton 启动参数。发行页提供独立的 `SHA256SUMS-linux.txt`；依赖、免 FUSE 启动和源码构建见[Linux 说明](BUILDING.md#linux-appimage-experimental--实验性)。
 
 Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
 
-## 4.3.31 更新亮点
+## 4.3.32 更新亮点
 
-- 适配 RTX Encore 2.3.0 的 NR Final image、曝光模式、FSR 1 和 XeFG 帧节奏参数，同步玩家参数分享，保留已有配置。
-- 0.4.1 的 XeSS 引擎说明仅在选择 XeSS 时显示，默认 DLSS 选项保持简洁。
-- 合入实验性 Linux / AppImage 支持；Windows 的渲染、签名和更新流程保持原有实现。
+- 新增 Dlssg_for_sm86 0.4.1 三角洲 / Vulkan 方案，改善资源复用与显存预算管理，保留旧自定义 0.3.5。
+- 升级 MFG Unlocker 1.7.1，补齐 NR 参数及分享。独立安装方式不变；插件模式仅为已有完整 OptiScaler 10 的游戏同步配套主 DLL。
+- Linux AppImage 新增独立自动更新、完整性校验与启动失败回滚；旧 Linux 用户首次手动下载本版，Windows 更新流程保持不变。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -85,9 +85,10 @@ Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存
 | 方案 | 主要说明 | 参数 / 菜单 |
 | :--- | :--- | :--- |
 | **Dlssg_for_sm86 · 0.4.1** | 完整组件包，含 XeSS 2X–4X；新安装默认 `Optimized=1`、预设 A、SR 关闭。 | 管理器 / INI |
+| **Dlssg_for_sm86 · 0.4.1 · 额外支持三角洲专用 · DX12/Vulkan** | 自定义桥接升级；保留旧 0.3.5。Vulkan XeSS 改变分辨率需重启游戏。 | 管理器 / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
-| **MFG-Unlocker · 1.7.0** | 独立 DLL 或已有 OptiScaler 10 的插件模式，两者互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
+| **MFG-Unlocker · 1.7.1** | 普通安装仍使用独立 DLL；已有完整 OptiScaler 10 时可选插件模式，备份并更新配套主文件。两种模式互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **RTX Encore · 2.3.0** | SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG 与 Frame Pacing；可实验性地为无原生 DLSS 的游戏添加功能。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
@@ -102,7 +103,7 @@ Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存
 | Dlssg_for_sm86 · 0.4.1 | 支持；新 FG 内核缺少真实 Turing 验证 | 主要支持与测试系列 | 提供 PTX 路径，未实机验证 | 提供 PTX 路径，未实机验证 |
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 本项目保留的自定义适配 | 本项目保留的自定义适配 | 本项目提供 SM89 适配 | 未确认支持 |
 | Dlssg_for_sm86-MFG-version · Vulkan | 上游目标系列 | 上游目标系列 | 上游未明确保证 | 上游未明确保证 |
-| MFG-Unlocker · 1.7.0 / 1.6.1 | DLSS MFG 实验性 | 支持 DLSS MFG | 支持 DLSS MFG | 原生 MFG，提供倍率等控制 |
+| MFG-Unlocker · 1.7.1 / 1.6.1 | DLSS MFG 实验性 | 支持 DLSS MFG | 支持 DLSS MFG | 原生 MFG，提供倍率等控制 |
 | RTX Encore · 2.3.0 | FG / NR 实验性；Smooth Motion 受驱动限制 | 支持 FG / NR；有 Fast SR 与 Smooth Motion 路线 | 支持 FG / NR；NVIDIA 原生 Smooth Motion | 按功能支持；Vulkan NR 仍待实机验证 |
 
 依据：[Dlssg_for_sm86 运行要求与限制](https://github.com/sdli1995/dlssg_for_sm86#运行要求)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。三角洲方案属于本项目保留的自定义包，不能将其适配范围等同于上游原版。表格用于选型，不代表管理器完成了各显卡和游戏的实机验证。

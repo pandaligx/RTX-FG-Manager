@@ -4,7 +4,7 @@ name: Build Linux AppImage
 # Linux packaging failure can never block or alter the signed Windows release.
 on:
   push:
-    branches: [main, codex/v4332-mfg171-linux-update]
+    branches: [main]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:

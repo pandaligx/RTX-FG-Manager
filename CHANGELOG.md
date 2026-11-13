@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.32
+
+- Add a custom Dlssg_for_sm86 0.4.1 Delta Force / Vulkan option while retaining custom 0.3.5 and standard 0.4.1. Improve bridge resource reuse, retirement and budget handling.
+- Integrate MFG Unlocker 1.7.1 NR appearance and character settings, diagnostic logging and player-preset sharing. Standalone DLL installation remains unchanged.
+- Plugin mode can back up and update the paired host in a complete existing OptiScaler 10 setup, restoring the original on uninstall. It does not install the entire OptiScaler package.
+- Add a separate Linux AppImage update channel with integrity checks, startup confirmation and failure recovery. Earlier Linux versions require one manual download. Preserve Windows UI, rendering and update channels.
+
 ## 4.3.31
 
 - Integrate RTX Encore 2.3.0 NR Final image, game motion vectors, exposure modes, FSR 1 and four XeFG pacing controls. Use updated defaults for fresh installs while preserving explicit settings, JSONC comments and unknown fields during upgrades.
