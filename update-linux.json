@@ -1,0 +1,11 @@
+{
+  "schema": 3,
+  "version": "4.3.32",
+  "file": "RTXManager-4.3.32-x86_64.AppImage",
+  "bytes": 22366712,
+  "sha256": "d4c455d20a8e687b971cea8f3c2c7e0e8cf2fb3c1f2a704dabf6cda115056c80",
+  "notes": {
+    "zh-CN": "- 新增 Dlssg_for_sm86 0.4.1 三角洲 / Vulkan 方案，保留旧 0.3.5 和标准 0.4.1；改善桥接资源复用、释放与预算管理。\n- 升级 MFG Unlocker 1.7.1，补齐 NR 外观与人物参数、诊断日志开关及新版参数分享。\n- 已有 OptiScaler 10 的插件安装可同步配套主 DLL，保留原名称、备份与卸载恢复；普通独立 DLL 安装方式不变。\n- Linux AppImage 增加应用内更新、完整性校验、重启确认和启动失败回滚；旧 Linux 用户首次需手动下载本版。\n- 保持现有 Windows 界面、渲染与自动更新流程。双平台安装包分别发布。",
+    "en": "- Add the Dlssg_for_sm86 0.4.1 Delta Force / Vulkan option while retaining custom 0.3.5 and standard 0.4.1. Improve bridge resource reuse, retirement and memory-budget handling.\n- Update MFG Unlocker to 1.7.1 with NR appearance and character settings, local diagnostic logging and compatible preset sharing.\n- Plugin installation into an existing OptiScaler 10 setup can update its paired host DLL while retaining its loading name and restoring the original on uninstall. Standalone proxy installation remains unchanged.\n- Add a separate Linux AppImage update channel with integrity checks, startup acknowledgement and rollback after launch failure. Earlier Linux versions require one manual download of this version.\n- Preserve the existing Windows UI, renderer and update flow. Windows and Linux packages are published independently."
+  }
+}
