@@ -49,6 +49,14 @@ class ClientAssetRoutingTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'Unexpected asset size'):
             self.run_release([('SHA256SUMS-linux.txt', 2 * 1024 * 1024 + 1)])
 
+    def test_reviewed_license_notice_is_mirrored_with_small_asset_limit(self):
+        self.assertEqual(self.run_release([('THIRD_PARTY_NOTICES.txt', 92_440)]),
+                         ['THIRD_PARTY_NOTICES.txt'])
+        with self.assertRaisesRegex(RuntimeError, 'Unexpected asset size'):
+            self.run_release([('THIRD_PARTY_NOTICES.txt', 2 * 1024 * 1024 + 1)])
+        with self.assertRaisesRegex(RuntimeError, 'Unexpected stable'):
+            self.run_release([('private-notes.txt', 100)])
+
 
 class MergeHistoryTests(unittest.TestCase):
     def setUp(self):
