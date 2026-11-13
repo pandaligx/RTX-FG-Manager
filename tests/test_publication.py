@@ -47,6 +47,19 @@ def current_source_export_files():
 
 
 class SourceAllowlistTests(unittest.TestCase):
+    def test_live_catalog_keeps_every_bundled_scheme_and_archive(self):
+        bundled = json.loads((ROOT / 'rust/cloud-catalog.json').read_text('utf-8-sig'))
+        compact = json.loads((ROOT / 'cloud/bundles/catalog.json').read_text('utf-8-sig'))
+        schemes = {scheme['id']: scheme for scheme in compact['schemes']}
+        self.assertEqual(set(schemes), set(bundled['scheme_policies']),
+                         'A cloud refresh must not hide a scheme shipped in this client')
+        for scheme_id, policy in bundled['scheme_policies'].items():
+            with self.subTest(scheme=scheme_id):
+                self.assertEqual(schemes[scheme_id]['profile'], policy['parameter_profile'])
+                archives = {package['archive'] for package in bundled['packages']
+                            if package['scheme_id'] == scheme_id}
+                self.assertEqual(set(schemes[scheme_id]['archives']), archives)
+
     def test_current_reviewed_export_is_accepted_by_the_source_mirror(self):
         files = current_source_export_files()
         for required in ('Cargo.toml', 'Cargo.lock', 'rust/src/ui_themes.rs',

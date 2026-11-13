@@ -40,6 +40,26 @@
     },
     {
       "archives": [
+        "rtxfg-0.4.1-dx12-vulkan-complete-39e6d45eb9c7.zip"
+      ],
+      "capabilities": [
+        "delta_force_mfg_v1"
+      ],
+      "defaults": {},
+      "id": "rtxfg-0.4.1-dx12-vulkan",
+      "min_manager_version": "4.3.32",
+      "name": "Dlssg_for_sm86 · 0.4.1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "names": {
+        "en": "Dlssg_for_sm86 · 0.4.1 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.1 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.1 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.1 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.1 · 额外支持三角洲专用 · DX12/Vulkan"
+      },
+      "profile": "upstream041"
+    },
+    {
+      "archives": [
         "rtxfg-0.3.5-dx12-vulkan-complete-e67e9e65c7d4.zip"
       ],
       "capabilities": [
