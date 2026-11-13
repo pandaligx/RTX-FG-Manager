@@ -47,7 +47,7 @@ jobs:
             build-essential pkg-config ca-certificates curl wget file \
             libfreetype-dev libfontconfig1-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libxcb1-dev libxcb-xkb-dev libwayland-dev \
-            squashfs-tools desktop-file-utils zsync
+            squashfs-tools desktop-file-utils zsync xvfb xauth libvulkan1 mesa-vulkan-drivers
 
       - name: Install pinned toolchain
         run: |
@@ -70,7 +70,7 @@ jobs:
         # triple, so without it this would try to build for Windows and fail.
         run: |
           timeout 15m cargo test --locked --target x86_64-unknown-linux-gnu --lib -- --nocapture --test-threads=2
-          timeout 15m cargo test --locked --target x86_64-unknown-linux-gnu --test v429_encore_config --test v4328_encore220 --test gpu_alias_linux_e2e -- --nocapture --test-threads=2
+          timeout 15m cargo test --locked --target x86_64-unknown-linux-gnu --test v429_encore_config --test v4328_encore220 --test gpu_alias_linux_e2e --test v4332_mfg171 -- --nocapture --test-threads=2
 
       - name: Clippy
         run: cargo clippy --locked --lib --bin RTXManager --target x86_64-unknown-linux-gnu -- -D warnings
@@ -108,6 +108,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/rtxfg-empty-games"
           squashfs-root/AppRun --scan "$RUNNER_TEMP/rtxfg-scan.json" "$RUNNER_TEMP/rtxfg-empty-games"
           python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["rows"] == [] and r["directories"] == 1 and r["skipped"] == 0 and not r["cancelled"], r' "$RUNNER_TEMP/rtxfg-scan.json"
+
+      - name: AppImage update restart and rollback
+        run: xvfb-run -a -s '-screen 0 1280x800x24' python3 tools/test_linux_update.py dist/*.AppImage
 
       - uses: actions/upload-artifact@v4
         with:

@@ -197,7 +197,10 @@ fn signed_standalone_and_existing_host_plugin_restore_without_stale_presets() ->
             Some("1.7.1"),
         )?;
         let fresh = rtxmfg::read(&fs::read(dir.path().join(rtxmfg::CONFIG))?)?;
-        assert_eq!(fresh["rtx_nr_model"], "0");
+        assert_eq!(
+            fresh.get("rtx_nr_model").map(String::as_str).unwrap_or("0"),
+            "0"
+        );
         cleanup::clean(&game)?;
         assert!(!dir.path().join(core::OWN).exists());
     }

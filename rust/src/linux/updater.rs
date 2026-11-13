@@ -91,6 +91,31 @@ fn copy_executable(source: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
+// AppImage runtimes may keep a launcher process while AppRun runs in a child.
+// Accept readiness only from that child tree, never from an unrelated PID.
+fn ready_process(value: &serde_json::Value, launched: u32) -> bool {
+    let Some(mut pid) = value.as_u64().and_then(|n| u32::try_from(n).ok()) else {
+        return false;
+    };
+    for _ in 0..64 {
+        if pid == launched {
+            return Path::new(&format!("/proc/{pid}")).exists();
+        }
+        let Ok(status) = fs::read_to_string(format!("/proc/{pid}/status")) else {
+            return false;
+        };
+        let parent = status.lines().find_map(|line| {
+            line.strip_prefix("PPid:")
+                .and_then(|s| s.trim().parse::<u32>().ok())
+        });
+        match parent {
+            Some(parent) if parent > 1 && parent != pid => pid = parent,
+            _ => return false,
+        }
+    }
+    false
+}
+
 pub(super) fn install(path: &Path, manifest: &Manifest, data: &Path) -> Result<()> {
     verify(path, manifest)?;
     ensure!(
@@ -132,7 +157,7 @@ pub(super) fn install(path: &Path, manifest: &Manifest, data: &Path) -> Result<(
     let start = Instant::now();
     loop {
         if let Ok(ready) = core::read_json(&folder.join("helper-ready.json"), 1024)
-            && ready["pid"] == child.id()
+            && ready_process(&ready["pid"], child.id())
             && ready["sha256"] == ticket.manifest.sha256
         {
             return Ok(());
@@ -254,7 +279,7 @@ pub(super) fn apply(path: &Path) -> Result<()> {
         let start = Instant::now();
         loop {
             if let Ok(ready) = core::read_json(&folder.join("ready.json"), 1024)
-                && ready["pid"] == child.id()
+                && ready_process(&ready["pid"], child.id())
                 && ready["sha256"] == ticket.manifest.sha256
             {
                 return Ok(());
@@ -286,6 +311,31 @@ pub(super) fn apply(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn readiness_accepts_only_live_launcher_tree() -> Result<()> {
+        assert!(ready_process(
+            &serde_json::json!(std::process::id()),
+            std::process::id()
+        ));
+        assert!(!ready_process(&serde_json::json!(1), std::process::id()));
+        assert!(!ready_process(
+            &serde_json::json!(u64::MAX),
+            std::process::id()
+        ));
+        let mut child = Command::new("sleep").arg("20").spawn()?;
+        assert!(ready_process(
+            &serde_json::json!(child.id()),
+            std::process::id()
+        ));
+        child.kill()?;
+        child.wait()?;
+        assert!(!ready_process(
+            &serde_json::json!(child.id()),
+            std::process::id()
+        ));
+        Ok(())
+    }
 
     fn envelope(path: &Path) -> Result<()> {
         let mut bytes = vec![0u8; 1024 * 1024];

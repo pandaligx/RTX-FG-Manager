@@ -801,13 +801,13 @@ mod download_tests {
     fn fixed_filename_keeps_version_digest_and_schema_bound_to_the_mirror() -> Result<()> {
         let current = fixed_manifest();
         current.validate(&current.version)?;
-        assert_eq!(current.metadata_file(), "update-v2.json");
+        assert_eq!(current.metadata_file(), ACTIVE_METADATA);
         assert_eq!(checked_github_manifest().metadata_file(), "update.json");
         let other = matching_mirror(&current, "gitcode", current.clone())?;
         assert!(
             other
                 .url
-                .ends_with(&format!("/v{}/RTXManager.exe", crate::VERSION))
+                .ends_with(&format!("/v{}/{}", crate::VERSION, current.file))
         );
         for change in ["schema", "version", "hash", "bytes", "file"] {
             let mut other = current.clone();

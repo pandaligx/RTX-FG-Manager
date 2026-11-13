@@ -39,6 +39,13 @@ Linux 构建为实验性独立 AppImage，使用当前源码；需明确选择 W
 不代表所有游戏已实测。不自动更新 Windows EXE，不修改宿主系统显卡驱动或 GPU 调度。
 Windows 的签名、渲染、更新通道和发布工作流保持原实现。
 
+From 4.3.32, a directly launched AppImage checks the independent `update-linux.json`
+channel, verifies its hash and architecture, and replaces itself with a restart
+handshake and rollback on startup failure. The installation directory must be
+writable. Extracted or symlinked installations require manual replacement.
+Existing 4.3.31 Linux users must download a new AppImage once to gain this updater.
+See [client update channels](docs/client-updates.md#linux-appimage-channel--独立更新通道).
+
 The Linux workflow produces a temporary CI artifact only. A maintainer separately
 publishes the tested artifact from the exact release tag as a permanent AppImage
 attachment. The workflow never signs or publishes a release and cannot modify

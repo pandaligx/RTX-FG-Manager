@@ -8,6 +8,8 @@
 
 ## 宝塔部署
 
+4.3.32 增加 `X-RTXFG-MFG171: 1` 与 `X-RTXFG-Delta041: 1` 能力头，支持 MFG 1.7.1 新 NR 外观/结构/色调/人物设置与自定义三角洲 0.4.1 参数。缺少对应能力的旧客户端不接收它不认识的参数快照；仅编辑同方案同版本备注时保留原快照。诊断日志、快捷键和本机路径不分享。数据库结构和现有玩家数据不变；部署前仍需备份。
+
 1. 将本目录放到服务器独立目录，例如 `/www/rtxfg-recommendations`。不要放进现有网站的公开目录。
 2. 运行 `node src/init.mjs 发件邮箱 管理员邮箱`，生成权限为 `600` 的 `.env` 和随机 `AUTH_SECRET`，然后填写 SMTP 授权码。初始化不会覆盖已有配置。也可手动复制 `config.example`，使用 `openssl rand -hex 32` 生成密钥。这些内容只留在服务器上。
 3. 在该目录执行 `docker compose up -d --build`，用 `docker compose ps` 确认健康状态。

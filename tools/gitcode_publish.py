@@ -252,6 +252,11 @@ def mirror_assets(folder, repo, tag, allow_exe=False):
     for path in sorted(files, key=lambda p: (p.name in channels, p.name == 'update-v2.json')):
         if path.suffix.lower() == '.exe' and not allow_exe:
             continue
+        if path.suffix == '.AppImage':
+            if repo != GC_REPO or path.name != f'RTXManager-{tag.removeprefix("v")}-x86_64.AppImage':
+                raise RuntimeError('Unexpected Linux client attachment')
+            if not allow_exe:
+                continue  # Like the EXE, the publisher uploads this locally.
         if path.name in channels:
             if path.name == linux_release.CHANNEL:
                 m = linux_release.checked(path.read_bytes())
