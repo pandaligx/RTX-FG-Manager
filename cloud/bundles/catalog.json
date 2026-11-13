@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 77627,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-3443edfaa7859223bb61.json",
-    "sha256": "0ad5082730951ff2dba80bdbb226db48001bdb8793a1857ba94f86a75f8c1a2e",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-3443edfaa7859223bb61.json"
+    "bytes": 77939,
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-af7807495e8364c101a9.json",
+    "sha256": "d88c3d993ac57bca64cf66496220464e9430c3fb99732ee0f3eb2b6a6712c6ed",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-af7807495e8364c101a9.json"
   },
-  "revision": "bundles-3443edfaa7859223bb61",
+  "revision": "bundles-af7807495e8364c101a9",
   "schema": 3,
   "schemes": [
     {
@@ -40,14 +40,15 @@
     },
     {
       "archives": [
-        "rtxfg-0.4.1-dx12-vulkan-complete-39e6d45eb9c7.zip"
+        "rtxfg-0.4.1-dx12-vulkan-r2-complete-6c339ad97364.zip"
       ],
       "capabilities": [
-        "delta_force_mfg_v1"
+        "delta_force_mfg_v1",
+        "delta_force_mfg_6x_v1"
       ],
       "defaults": {},
       "id": "rtxfg-0.4.1-dx12-vulkan",
-      "min_manager_version": "4.3.32",
+      "min_manager_version": "4.3.33",
       "name": "Dlssg_for_sm86 · 0.4.1 · 额外支持三角洲专用 · DX12/Vulkan",
       "names": {
         "en": "Dlssg_for_sm86 · 0.4.1 · Delta Force support · DX12/Vulkan",
@@ -118,7 +119,7 @@
     },
     {
       "archives": [
-        "rtx-encore-2.3.0-complete-8d42266ff443.zip"
+        "rtx-encore-2.4.0-complete-e8e331779f4a.zip"
       ],
       "capabilities": [
         "encore_dedicated_entries"
@@ -257,14 +258,14 @@
         "xefgUiHandling": "interpolate"
       },
       "id": "dlssg-transfusion-1.4.5.3",
-      "min_manager_version": "4.3.31",
-      "name": "RTX Encore · 2.3.0",
+      "min_manager_version": "4.3.33",
+      "name": "RTX Encore · 2.4.0",
       "names": {
-        "en": "RTX Encore · 2.3.0",
-        "ja": "RTX Encore · 2.3.0",
-        "ko": "RTX Encore · 2.3.0",
-        "ru": "RTX Encore · 2.3.0",
-        "zh": "RTX Encore · 2.3.0"
+        "en": "RTX Encore · 2.4.0",
+        "ja": "RTX Encore · 2.4.0",
+        "ko": "RTX Encore · 2.4.0",
+        "ru": "RTX Encore · 2.4.0",
+        "zh": "RTX Encore · 2.4.0"
       },
       "profile": "rtx_encore_json_v4",
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"

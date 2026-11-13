@@ -14,6 +14,32 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('Encore 2.4 placements and scale stay private to capable clients and survive old edits',async t=>{
+  const f=fixture(t),u=await f.login(),modern={'x-rtxfg-encore240':'1'};
+  const c={...shared(),patchVersion:'2.4.0',presets:{schema:1,profile:'rtx_encore_json_v4',
+    values:{nrPass1Placement:'before-sr',nrPass2Placement:'present',dlssCustomScale:'33'},
+    defaults:{nrPass1Placement:'inherit',nrPass2Placement:'inherit',dlssCustomScale:'67'}}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',16,modern);
+  assert.deepEqual(posted.content.presets,c.presets);
+  const path='/v1/recipes/'+posted.id;
+  const old=await f.call('GET',path,null,u.token,'test-ip',16);
+  assert.equal(old.content.presets,undefined);
+  old.content.notes='Edited by an older client';
+  await f.call('PUT',path,{revision:1,content:old.content},u.token,'test-ip',16);
+  assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',16,modern)).content.presets,c.presets);
+  assert.throws(()=>recipe({...c,patchVersion:'2.3.0'}));
+  for(const value of ['32','101','NaN']) {
+    const bad=structuredClone(c);bad.presets.values.dlssCustomScale=value;
+    assert.throws(()=>recipe(bad));
+  }
+  const scaleOnly={...c,presets:{schema:1,profile:c.presets.profile,
+    values:{dlssCustomScale:'49'},defaults:{dlssCustomScale:'67'}}};
+  assert.throws(()=>recipe({...scaleOnly,patchVersion:'2.3.0'}));
+  const second=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:scaleOnly},u.token,'test-ip',16,modern);
+  assert.equal((await f.call('GET','/v1/recipes/'+second.id,null,u.token,'test-ip',16)).content.presets,undefined);
+  assert.equal((await f.call('GET','/v1/capabilities')).encore240,1);
+});
+
 test('Encore 2.3 settings round trip and legacy edits retain hidden parameters',async t=>{
   const f=fixture(t),u=await f.login();
   const c={...shared(),patchVersion:'2.3.0',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrPlacement:'present',presentOpticalFlow:'game',dlssWithoutGameDlssEngine:'fsr1',nrExposureMode:'measured',xefgSourcePacingMode:'manual',xefgSourcePacingLossPercent:'6',xefgSourcePacingManualDetection:'0',xefgSourcePacingManualAdjustments:'1'},defaults:{nrPlacement:'after-sr',presentOpticalFlow:'game',dlssWithoutGameDlssEngine:'dlss',nrExposureMode:'auto',xefgSourcePacingMode:'auto',xefgSourcePacingLossPercent:'4',xefgSourcePacingManualDetection:'1',xefgSourcePacingManualAdjustments:'1'}}};
@@ -269,6 +295,24 @@ test('Delta 041 snapshots stay readable for old clients and survive their edits'
   assert.deepEqual(current.content.presets,c.presets);
   const list=await f.call('GET','/v1/recipes?game=steam:292030',null,null,'test-ip',16);
   assert.equal(Object.hasOwn(list.items[0].content,'presets'),false);
+});
+
+test('Delta 6X shares retain 4X defaults and protect older clients',async t=>{
+  const f=fixture(t),u=await f.login();
+  const c={...content(),scheme:'rtxfg-0.4.1-dx12-vulkan',patchVersion:'0.4.1+rtxfg.2',
+    presets:{schema:1,profile:'upstream041',values:{fg_engine:'DLSS',max_generated_frames:'5'},defaults:{fg_engine:'DLSS',max_generated_frames:'3'}}};
+  const modern={'x-rtxfg-delta041':'1','x-rtxfg-delta6':'1'},legacy={'x-rtxfg-delta041':'1'};
+  const created=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',16,modern);
+  assert.deepEqual(created.content.presets,c.presets);
+  const path='/v1/recipes/'+created.id;
+  const old=await f.call('GET',path,null,u.token,'test-ip',16,legacy);
+  assert.equal(old.content.presets,undefined);
+  old.content.notes='Legacy note edit';
+  await f.call('PUT',path,{revision:old.revision,content:old.content},u.token,'test-ip',16,legacy);
+  assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',16,modern)).content.presets,c.presets);
+  const xess=structuredClone(c);xess.presets.values.fg_engine='XeSS';
+  assert.throws(()=>recipe(xess));
+  assert.equal((await f.call('GET','/v1/capabilities')).delta6,1);
 });
 
 test('MFG 171 look parameters survive old-client metadata edits without breaking their lists',async t=>{

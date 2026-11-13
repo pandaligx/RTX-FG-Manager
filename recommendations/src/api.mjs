@@ -16,7 +16,7 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
-    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, mfg161:1, mfg171:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, notesLimit:NOTES_LIMIT };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, notesLimit:NOTES_LIMIT };
     if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
@@ -28,7 +28,14 @@ export function createApi(db, options) {
     // Older test clients reject unknown JSON fields. Opt in to the feedback extension.
     const feedback=headers['x-rtxfg-feedback'];
     const delta041=headers['x-rtxfg-delta041']==='1';
+    const supportsDelta6=headers['x-rtxfg-delta6']==='1';
+    const delta6=content=>content.scheme==='rtxfg-0.4.1-dx12-vulkan' && content.presets
+      && ['values','defaults'].some(part=>Number(content.presets[part]?.max_generated_frames)>3);
     const mfg171=headers['x-rtxfg-mfg171']==='1';
+    const supportsEncore240=headers['x-rtxfg-encore240']==='1';
+    const encore240=p=>p?.profile==='rtx_encore_json_v4' && ['values','defaults'].some(part=>
+      [1,2,3,4].some(n=>Object.hasOwn(p[part],`nrPass${n}Placement`))
+      || Object.hasOwn(p[part],'dlssCustomScale') && Number(p[part].dlssCustomScale)<50);
     const newMfg=p=>p?.profile==='rtxmfg_universal_133' && ['values','defaults'].some(part=>['rtx_nr_model','rtx_nr_structure','rtx_nr_tone','rtx_nr_character_mask','rtx_nr_character'].some(k=>Object.hasOwn(p[part],k)));
     const newEncore=p=>p?.profile==='rtx_encore_json_v4' && (['xessTensorCores','xefgTensorCores','reflexMode','overlayShowLatency'].some(k=>Object.hasOwn(p.values,k)) || p.values.frameGenerationEngine==='dlss-fg' || p.defaults.frameGenerationEngine==='dlss-fg');
     const encore153=p=>p?.profile==='rtx_encore_json_v4' && (Object.hasOwn(p.values,'vsync') || p.values.dlssRrPreset==='f' || p.defaults.dlssRrPreset==='f');
@@ -53,7 +60,9 @@ export function createApi(db, options) {
       if(!['15','16'].includes(feedback) && encore220(result.content.presets)) delete result.content.presets;
       if(feedback!=='16' && encore230(result.content.presets)) delete result.content.presets;
       if(!delta041 && result.content.scheme==='rtxfg-0.4.1-dx12-vulkan') delete result.content.presets;
+      if(!supportsDelta6 && delta6(result.content)) delete result.content.presets;
       if(!mfg171 && newMfg(result.content.presets)) delete result.content.presets;
+      if(!supportsEncore240 && encore240(result.content.presets)) delete result.content.presets;
       if(crossStore && requested) {
         need(games.resolve(requested)===games.resolve(row.game),'game_mismatch');
         result.content.game={id:requested,name:games.describe(requested).name};
@@ -157,7 +166,9 @@ export function createApi(db, options) {
       const content=recipe(body.content); need(games.resolve(content.game.id)===games.resolve(row.game),'game_cannot_change');
       const original=JSON.parse(row.content);content.game=original.game;
       if(!delta041 && original.scheme==='rtxfg-0.4.1-dx12-vulkan' && original.scheme===content.scheme && original.patchVersion===content.patchVersion && original.presets) content.presets=original.presets;
+      if(!supportsDelta6 && delta6(original) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
       if(!mfg171 && newMfg(original.presets) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
+      if(!supportsEncore240 && encore240(original.presets) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
       // Old clients only received a bounded excerpt. Never overwrite the full text
       // with that excerpt, or silently erase its unseen remainder during edits.
       if(!['8','9','10','11','12','13','14','15','16'].includes(feedback) && [...original.notes].length>500) {

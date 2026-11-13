@@ -20,6 +20,7 @@ fn context() -> presets::Context {
         profile: "upstream035".into(),
         delta: false,
         delta_capable: false,
+        delta_six: false,
     }
 }
 fn files() -> BTreeMap<String, Vec<u8>> {

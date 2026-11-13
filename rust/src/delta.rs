@@ -11,6 +11,8 @@ use std::{
 };
 
 pub const CAPABILITY: &str = "delta_force_mfg_v1";
+pub const SIX_X_CAPABILITY: &str = "delta_force_mfg_6x_v1";
+pub const SIX_X_VERSION: &str = "0.4.1+rtxfg.2";
 pub const GAME: &str = "DeltaForceClient-Win64-Shipping.exe";
 pub const REVISION: &str = "Streamline-2.7.32-c39569d4a2a70434";
 pub const ID_KEY: &str = "DeltaForceRuntimeId";
@@ -19,7 +21,14 @@ const OWNER: &str = "owner.json";
 #[derive(Deserialize)]
 struct Manifest {
     files: BTreeMap<String, String>,
+    #[serde(default)]
+    revisions: BTreeMap<String, BTreeMap<String, String>>,
     proxy_images: Vec<String>,
+    #[serde(default)]
+    upstream041_images: Vec<String>,
+}
+pub fn supports_six_x(version: &str) -> bool {
+    version == SIX_X_VERSION
 }
 fn manifest() -> &'static Manifest {
     static VALUE: OnceLock<Manifest> = OnceLock::new();
@@ -30,6 +39,15 @@ fn manifest() -> &'static Manifest {
 }
 pub fn known_image(image: &str) -> bool {
     manifest().proxy_images.iter().any(|v| v == image)
+}
+pub fn image_scheme(image: &str) -> Option<&'static str> {
+    if manifest().upstream041_images.iter().any(|v| v == image) {
+        Some(crate::cloud::DELTA_041_SCHEME)
+    } else if known_image(image) {
+        Some(crate::cloud::DELTA_SCHEME)
+    } else {
+        None
+    }
 }
 pub fn is_game(exe: &Path) -> bool {
     exe.file_name()
@@ -111,7 +129,7 @@ impl Report {
         self.pending.push(format!("{}：{error}", path.display()));
     }
 }
-fn recognized_component(path: &Path) -> Result<bool> {
+fn recognized_component(path: &Path, files: &BTreeMap<String, String>) -> Result<bool> {
     let name = path.file_name().unwrap_or_default().to_string_lossy();
     let base = if let Some((base, suffix)) = name.split_once(".tmp-") {
         // Only complete, byte-identical runtime writes. Partial/unknown files
@@ -129,14 +147,13 @@ fn recognized_component(path: &Path) -> Result<bool> {
         name.as_ref()
     };
     Ok(path.metadata()?.len() <= 8 * 1024 * 1024
-        && manifest()
-            .files
+        && files
             .get(base)
             .is_some_and(|expected| core::digest(path).is_ok_and(|actual| &actual == expected)))
 }
 /// Acquire DELETE access before deleting any member. A running proxy holds
 /// FILE_SHARE_READ only, so its complete runtime survives a concurrent cleanup.
-fn clean_revision(folder: &Path) -> Report {
+fn clean_revision(folder: &Path, files: &BTreeMap<String, String>) -> Report {
     let mut report = Report::default();
     let result = (|| -> Result<()> {
         core::no_links(folder)?;
@@ -147,7 +164,7 @@ fn clean_revision(folder: &Path) -> Report {
         let mut opened: Vec<(PathBuf, File)> = Vec::new();
         for item in fs::read_dir(folder)?.take(128) {
             let path = core::no_links(&item?.path())?;
-            if !path.is_file() || !recognized_component(&path)? {
+            if !path.is_file() || !recognized_component(&path, files)? {
                 report.defer(&path, "保留未知文件");
                 continue;
             }
@@ -158,7 +175,7 @@ fn clean_revision(folder: &Path) -> Report {
                 .share_mode(0x5)
                 .open(&path)
                 .with_context(|| format!("组件被占用或不可删除：{}", path.display()))?;
-            ensure!(recognized_component(&path)?, "组件内容已变化");
+            ensure!(recognized_component(&path, files)?, "组件内容已变化");
             opened.push((path, file));
         }
         for (path, file) in opened {
@@ -175,6 +192,13 @@ fn clean_revision(folder: &Path) -> Report {
     })();
     if let Err(e) = result {
         report.defer(folder, e);
+    }
+    report
+}
+fn clean_revisions(folder: &Path) -> Report {
+    let mut report = clean_revision(&folder.join(REVISION), &manifest().files);
+    for (revision, files) in &manifest().revisions {
+        report.merge(clean_revision(&folder.join(revision), files));
     }
     report
 }
@@ -199,7 +223,7 @@ pub fn clean_at(root: &Path, exe: &Path, ids: &[String], legacy: bool) -> Report
             }
             // The deployment record also proves ownership if owner.json is lost.
             let _lock = win::game_lock(&folder)?;
-            let result = clean_revision(&folder.join(REVISION));
+            let result = clean_revisions(&folder);
             let complete = result.pending.is_empty();
             report.merge(result);
             if complete {
@@ -219,7 +243,7 @@ pub fn clean_at(root: &Path, exe: &Path, ids: &[String], legacy: bool) -> Report
         }
     }
     if legacy {
-        report.merge(clean_revision(&root.join(REVISION)));
+        report.merge(clean_revision(&root.join(REVISION), &manifest().files));
     }
     report
 }
@@ -245,7 +269,7 @@ pub fn clear_available() -> Result<Report> {
                 // Clear-cache keeps the owner so subsequent lazy extraction
                 // remains discoverable. Uninstall removes it with its record.
                 let _lock = win::game_lock(&path)?;
-                report.merge(clean_revision(&path.join(REVISION)));
+                report.merge(clean_revisions(&path));
                 Ok(())
             })();
             if let Err(e) = result {
@@ -255,6 +279,6 @@ pub fn clear_available() -> Result<Report> {
     }
     // Only this exact legacy runtime revision; hashed old installer backups are
     // outside this operation. Held runtime handles prevent deletion while in use.
-    report.merge(clean_revision(&root.join(REVISION)));
+    report.merge(clean_revision(&root.join(REVISION), &manifest().files));
     Ok(report)
 }

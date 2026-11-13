@@ -9,6 +9,7 @@ pub struct Context {
     pub profile: String,
     pub delta: bool,
     pub delta_capable: bool,
+    pub delta_six: bool,
 }
 impl Context {
     pub fn new(scheme: &str, policy: &crate::cloud::Policy, exe: &Path) -> Self {
@@ -16,6 +17,8 @@ impl Context {
             scheme: scheme.into(),
             profile: policy.parameter_profile.clone(),
             delta_capable: policy.capabilities.contains(crate::delta::CAPABILITY),
+            delta_six: policy.parameter_profile == crate::upstream040::PROFILE_041
+                && policy.capabilities.contains(crate::delta::SIX_X_CAPABILITY),
             delta: matches!(
                 policy.parameter_profile.as_str(),
                 "upstream035" | crate::upstream040::PROFILE_041
@@ -36,12 +39,16 @@ impl Context {
                 ("2", "3X"),
                 ("3", "4X（推荐）"),
             ];
+            if self.delta_six {
+                count.choices.extend([("4", "5X"), ("5", "6X")]);
+            }
         }
         fields
     }
     pub fn normalize(&self, values: &mut Values) -> bool {
         let mut changed = normalize(&self.profile, values);
         if self.delta
+            && !self.delta_six
             && matches!(
                 values.get("max_generated_frames").map(String::as_str),
                 Some("4" | "5")
@@ -55,6 +62,18 @@ impl Context {
     pub fn parameter_enabled(&self, key: &str, values: &Values) -> bool {
         parameter_enabled(&self.profile, key, values)
     }
+    pub fn validate_installed(&self, version: Option<&str>, values: &Values) -> Result<()> {
+        ensure!(
+            !(self.delta
+                && self.delta_six
+                && values
+                    .get("max_generated_frames")
+                    .is_some_and(|v| matches!(v.as_str(), "4" | "5"))
+                && !version.is_some_and(crate::delta::supports_six_x)),
+            "当前三角洲补丁入口最高支持4X，请先安装新版专用方案再应用5X/6X参数"
+        );
+        Ok(())
+    }
     pub fn configure(&self, bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
         let mut values = values.clone();
         self.normalize(&mut values);
@@ -66,9 +85,11 @@ impl Context {
                     .get("max_generated_frames")
                     .map(String::as_str)
                     .unwrap_or("3");
-                // A migration without UI overrides must retain the INI's
-                // explicit count, while respecting Delta's 4X ceiling.
-                if matches!(count, "4" | "5") {
+                // Old entries cannot implement 5X/6X. XeSS retains its 4X
+                // limit even when migrating an INI without explicit overrides.
+                if matches!(count, "4" | "5")
+                    && (!self.delta_six || configured.get("fg_engine").is_some_and(|v| v == "XeSS"))
+                {
                     "3".to_owned()
                 } else {
                     count.to_owned()
@@ -94,7 +115,9 @@ impl Context {
                 &out,
                 "Compatibility",
                 "DeltaForcePrivateStreamline",
-                if matches!(n.as_str(), "2" | "3") {
+                if matches!(n.as_str(), "2" | "3")
+                    || (self.delta && self.profile == crate::upstream040::PROFILE_041)
+                {
                     "1"
                 } else {
                     "0"
@@ -113,6 +136,9 @@ pub fn policy_for_version(
     version: Option<&str>,
 ) -> crate::cloud::Policy {
     let mut policy = policy.clone();
+    if version.is_some_and(|v| !crate::delta::supports_six_x(v)) {
+        policy.capabilities.remove(crate::delta::SIX_X_CAPABILITY);
+    }
     if policy.parameter_profile == crate::encore::PROFILE && version.is_some() {
         policy.defaults.insert(
             "flipMeteringBypass".into(),
@@ -674,8 +700,10 @@ pub fn inspect_at(
                 continue;
             }
             let bytes = std::fs::read(&path)?;
-            if crate::cleanup::image_digest(&bytes).is_some_and(|h| crate::delta::known_image(&h)) {
-                scheme = Some("rtxfg-0.3.5-dx12-vulkan".into());
+            if let Some(found) =
+                crate::cleanup::image_digest(&bytes).and_then(|h| crate::delta::image_scheme(&h))
+            {
+                scheme = Some(found.into());
                 break;
             }
             let sha = crate::core::hash(&bytes);

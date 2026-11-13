@@ -151,6 +151,14 @@ The following original Streamline/NVIDIA notices are retained from the
 previous public release. They apply to the corresponding separate payload
 components, not to the Rust manager under MIT.
 
+Delta Force private runtime 2.14.16 (custom 0.4.1 revision rtxfg.2)
+Source: https://github.com/NVIDIA-RTX/Streamline/releases/tag/v2.14.16
+Files: sl.interposer.dll, sl.common.dll, sl.dlss_g.dll, sl.reflex.dll,
+sl.pcl.dll, sl.dlss.dll and sl.nis.dll. NVIDIA binary bytes are unchanged;
+the custom entry extracts them into a separate per-game cache. The matching
+SDK license is distributed in the complete custom bundle. Original game
+files are not overwritten. The older 0.3.5 distribution remains on 2.7.32.
+
 Delta Force private runtime 2.7.32
 Source: https://github.com/NVIDIAGameWorks/Streamline/releases/tag/v2.7.32
 Seven matching official components are embedded unchanged in the extended proxies:

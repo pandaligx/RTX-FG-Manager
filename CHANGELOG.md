@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.33
+
+- Adapt RTX Encore 2.4.0 per-pass neural rendering placement and 33–100% custom DLSS scaling, including shared presets.
+- Pair the custom Delta Force 0.4.1 entry with private Streamline 2.14.16 and the bundled FG runtime. Add DLSS 5X/6X; keep 4X as the default and the XeSS maximum.
+- Upgrade the previous custom revision in place while preserving settings. Track both private cache revisions per game; uninstalling and reinstalling restores defaults.
+- Keep standard 0.4.1, legacy custom 0.3.5, other schemes, the current interface, update channels and combined download statistics.
+
 ## 4.3.32
 
 - Add a custom Dlssg_for_sm86 0.4.1 Delta Force / Vulkan option while retaining custom 0.3.5 and standard 0.4.1. Improve bridge resource reuse, retirement and budget handling.

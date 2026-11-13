@@ -2179,12 +2179,13 @@ impl Manager {
                 );
             }
             if context.delta {
-                common = common.child(
-                    div()
-                        .text_xs()
-                        .text_color(cx.theme().primary)
-                        .child(self.t("三角洲专项：默认4X；可选跟随游戏、2X、3X、4X。")),
-                );
+                common = common.child(div().text_xs().text_color(cx.theme().primary).child(
+                    self.t(if context.delta_six {
+                        "三角洲专项：默认4X；DLSS最高6X，XeSS最高4X。"
+                    } else {
+                        "三角洲专项：默认4X；可选跟随游戏、2X、3X、4X。"
+                    }),
+                ));
             }
             fields = fields.child(
                 div()
@@ -2333,6 +2334,8 @@ impl Manager {
                 "独立 MFG 按 Backspace；OptiScaler 插件使用其菜单。NR 与独立 XeSS 多帧生成需另装运行库。1.7.1 插件支持配套 OptiScaler 的 XeMFG 提供器；帧生成输出在 OptiScaler 中选择。"
             } else if context.profile == rtx_fg_manager::transfusion::PROFILE {
                 "默认跟随游戏；固定倍率可选2X—6X，5X/6X可能增加显存与延迟。Ctrl+Alt+2/3/4切换倍率，Ctrl+Alt+G跟随游戏，Ctrl+Alt+D切换动态。RTX20及旧显卡Vulkan仍需实机验证。"
+            } else if context.delta && context.delta_six {
+                "三角洲默认4X；DLSS可选跟随游戏、2X—6X，XeSS最高4X。高倍率会增加显存占用，实际帧数与延迟取决于游戏。"
             } else if context.delta {
                 "三角洲可选跟随游戏、2X、3X、4X，默认4X。4X不是保证四倍FPS，开启后的延迟需实测；旧组件已加载时会保留原运行时。"
             } else if context.profile == rtx_fg_manager::presets::MFG_VULKAN {
@@ -3683,7 +3686,7 @@ impl Manager {
         let context = self.c.preset_context(self.c.focus.as_deref().unwrap_or(""));
         let mut sections = vec![
             (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
-            (self.t("倍率上限"),self.t(if context.delta {"三角洲可选跟随游戏、2X、3X、4X，默认4X。4X不是保证四倍FPS，开启后的延迟需实测；旧组件已加载时会保留原运行时。"} else {"默认最多 4X；上游方案可设 5X/6X，实际倍率由游戏自身插件请求，不会增加游戏菜单。"})),
+            (self.t("倍率上限"),self.t(if context.delta && context.delta_six {"三角洲默认4X；DLSS可选跟随游戏、2X—6X，XeSS最高4X。高倍率会增加显存占用，实际帧数与延迟取决于游戏。"} else if context.delta {"三角洲可选跟随游戏、2X、3X、4X，默认4X。4X不是保证四倍FPS，开启后的延迟需实测；旧组件已加载时会保留原运行时。"} else {"默认最多 4X；上游方案可设 5X/6X，实际倍率由游戏自身插件请求，不会增加游戏菜单。"})),
             (self.t("日志级别"),self.t("默认 1 只记录错误；2 用于诊断；3 记录详细过程。0.2.6 的 Vulkan 桥接日志暂不受此开关控制。")),
             (self.t("怎样生效"),self.t("仅保存当前游戏、当前方案的参数。完全退出游戏后点击安装补丁以应用；已部署相同 DLL 时只更新这些参数，保留其他 INI 内容。恢复默认只重置这里的选项。")),
         ];
@@ -3728,7 +3731,9 @@ impl Manager {
             sections.insert(1,(self.t("初始方案"),self.t("RTX20 使用 SM75 R2，RTX30 使用原始 SM86。只提供补丁开关、倍率上限和日志级别，不支持新版内核档位或 UI 重组。")));
         }
         if context.delta {
-            sections.insert(1, (self.t("三角洲专项"), self.t("本扩展方案通过同一倍率选项联动三角洲专项：跟随游戏和2X使用原始运行时，3X/4X使用独立缓存中的多帧组件。不会增加游戏菜单或覆盖原游戏组件；更改后退出游戏并点安装应用。")));
+            sections.insert(1, (self.t("三角洲专项"), self.t(if context.delta_six {
+                "三角洲使用独立缓存中的 Streamline 2.14.16 与配套帧生成运行库，不覆盖游戏原文件。更改后需完全退出游戏并应用参数。"
+            } else { "本扩展方案通过同一倍率选项联动三角洲专项：跟随游戏和2X使用原始运行时，3X/4X使用独立缓存中的多帧组件。不会增加游戏菜单或覆盖原游戏组件；更改后退出游戏并点安装应用。" })));
         }
         sections.push((self.t("卸载与缓存"), self.t("卸载会清理本游戏已确认归属的补丁、配置、日志和独立组件缓存。被占用或未知文件会保留并提示，稍后可重试卸载或清理缓存。其他游戏和旧测试还原备份不会整目录删除。")));
         let view = cx.entity().downgrade();

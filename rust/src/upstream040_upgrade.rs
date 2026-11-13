@@ -11,6 +11,28 @@ const JOURNAL: &str = "upstream040-upgrade.json";
 const WORK: &str = "upstream040-upgrade";
 const MAX_FILE: u64 = 128 * 1024 * 1024;
 
+fn matching_scheme(old: &core::Record, new: &core::Record) -> bool {
+    old.scheme_id == new.scheme_id
+        && matches!(
+            old.scheme_id.as_deref(),
+            Some(SCHEME | crate::cloud::DELTA_041_SCHEME)
+        )
+}
+
+fn custom_revision_upgrade(old: &core::Record, new: &core::Record) -> bool {
+    old.scheme_id.as_deref() == Some(crate::cloud::DELTA_041_SCHEME)
+        && matching_scheme(old, new)
+        && old.backend == upstream040::BACKEND
+        && old
+            .upstream_version
+            .as_deref()
+            .or(old.payload_version.as_deref())
+            == Some("0.4.1")
+        && new.upstream_version.as_deref() == Some(crate::delta::SIX_X_VERSION)
+        && old.payload_version.as_deref() == Some("0.4.1")
+        && new.payload_version.as_deref() == Some("0.4.1")
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Journal {
@@ -59,8 +81,7 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
             j.old.backend.as_str(),
             "upstream_sm86" | upstream040::BACKEND
         ) && j.new.backend == upstream040::BACKEND
-            && j.old.scheme_id.as_deref() == Some(SCHEME)
-            && j.new.scheme_id.as_deref() == Some(SCHEME)
+            && matching_scheme(&j.old, &j.new)
             && !j.old.cache_pending
             && !j.new.cache_pending,
         "升级恢复记录的方案不匹配"
@@ -87,7 +108,8 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
         .as_deref()
         .context("新版缺少版本记录")?;
     ensure!(
-        crate::updater::version(new_version)? > crate::updater::version(old_version)?,
+        crate::updater::version(new_version)? > crate::updater::version(old_version)?
+            || custom_revision_upgrade(&j.old, &j.new),
         "dlssg 0.4.x 只允许升级到更高版本；已有文件未覆盖"
     );
     ensure!(
@@ -97,12 +119,22 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
             .any(|n| j.old.hashes.get(n) != j.new.hashes.get(n)),
         "dlssg 0.4.x DLL 内容未变化"
     );
+    let delta_owner = if j.new.scheme_id.as_deref() == Some(crate::cloud::DELTA_041_SCHEME) {
+        let expected = if crate::delta::is_game(&target.game_exe) {
+            vec![crate::delta::cache_id(&target.game_exe)]
+        } else {
+            Vec::new()
+        };
+        j.new.delta_cache_ids == expected
+            && j.old.delta_cache_ids.iter().all(|id| expected.contains(id))
+    } else {
+        j.old.delta_cache_ids.is_empty() && j.new.delta_cache_ids.is_empty()
+    };
     ensure!(
         j.old.cleanup_dirs.is_empty()
-            && j.old.delta_cache_ids.is_empty()
+            && delta_owner
             && !j.old.delta_legacy_cache
             && j.new.cleanup_dirs.is_empty()
-            && j.new.delta_cache_ids.is_empty()
             && !j.new.delta_legacy_cache,
         "升级恢复记录含有不适用的清理归属"
     );
@@ -278,8 +310,7 @@ pub fn upgrade_locked(
     ensure!(
         matches!(old.backend.as_str(), "upstream_sm86" | upstream040::BACKEND)
             && new.backend == upstream040::BACKEND
-            && old.scheme_id.as_deref() == Some(SCHEME)
-            && new.scheme_id.as_deref() == Some(SCHEME),
+            && matching_scheme(old, &new),
         "只有本管理器记录的 dlssg 0.4.x 安装可以原位升级"
     );
     let dir = &target.directory;
@@ -307,7 +338,7 @@ pub fn upgrade_locked(
         originals.insert(name.clone(), bytes);
     }
     let original_config = originals.get(core::INI).context("旧配置文件缺失")?;
-    let updated = upstream040::migrate_versions(
+    let mut updated = upstream040::migrate_versions(
         original_config,
         old.upstream_version
             .as_deref()
@@ -317,6 +348,27 @@ pub fn upgrade_locked(
             .or(new.payload_version.as_deref()),
         explicit_overrides,
     )?;
+    if new.scheme_id.as_deref() == Some(crate::cloud::DELTA_041_SCHEME) {
+        let context = presets::Context {
+            scheme: crate::cloud::DELTA_041_SCHEME.into(),
+            profile: upstream040::PROFILE_041.into(),
+            delta: crate::delta::is_game(&target.game_exe),
+            delta_capable: true,
+            delta_six: new
+                .upstream_version
+                .as_deref()
+                .is_some_and(crate::delta::supports_six_x),
+        };
+        updated = context.configure(&updated, &presets::Values::new())?;
+        if context.delta {
+            updated = crate::diagnostics::edit_ini(
+                &updated,
+                "Compatibility",
+                crate::delta::ID_KEY,
+                &crate::delta::cache_id(&target.game_exe),
+            )?;
+        }
+    }
     ensure!(updated.len() <= 1024 * 1024, "更新后配置超过大小限制");
     files.insert(core::INI.into(), updated);
     ensure!(
@@ -512,6 +564,7 @@ mod tests {
             profile: upstream040::PROFILE.into(),
             delta: false,
             delta_capable: false,
+            delta_six: false,
         }
     }
     fn fixture() -> Result<(tempfile::TempDir, core::DeploymentTarget)> {
@@ -621,6 +674,104 @@ mod tests {
             None,
             Some("0.4.1"),
         )
+    }
+
+    #[cfg(windows)]
+    fn install_delta_revision(target: &core::DeploymentTarget, modern: bool) -> Result<String> {
+        let mut files = bundle();
+        files.insert("version.dll".into(), pe(true, if modern { 6 } else { 5 }));
+        files.insert(
+            core::INI.into(),
+            include_bytes!("../../tests/fixtures/catalog041/dlssg_sm86.ini").to_vec(),
+        );
+        let context = presets::Context {
+            scheme: crate::cloud::DELTA_041_SCHEME.into(),
+            profile: upstream040::PROFILE_041.into(),
+            delta: true,
+            delta_capable: true,
+            delta_six: modern,
+        };
+        core::deploy_prepared_context_at_with_overrides(
+            target,
+            upstream040::BACKEND,
+            &["version.dll".into()],
+            None,
+            files,
+            Some("0.4.1"),
+            Some(&context),
+            None,
+            Some(if modern {
+                crate::delta::SIX_X_VERSION
+            } else {
+                "0.4.1"
+            }),
+        )
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn delta_revision_upgrade_preserves_settings_ownership_and_rolls_back() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let dir = temp.path().join("DeltaForce/Binaries/Win64");
+        fs::create_dir_all(&dir)?;
+        let exe = dir.join(crate::delta::GAME);
+        fs::write(&exe, pe(false, 0))?;
+        let target = core::DeploymentTarget::for_game(&exe);
+        install_delta_revision(&target, false)?;
+        let config = dir.join(core::INI);
+        let user = b"; keep my settings\r\n[General]\r\nEnabled=1\r\n[FrameGeneration]\r\nEngine=DLSS\r\nMaxGeneratedFrames=1\r\n[Custom]\r\nMine=42\r\n";
+        fs::write(&config, user)?;
+        let before = snapshot(&dir)?;
+        for point in [
+            "journal",
+            "marker-backup",
+            "remove:version.dll",
+            "publish:version.dll",
+        ] {
+            for crash in [false, true] {
+                fault(point, crash);
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    install_delta_revision(&target, true)
+                }));
+                clear_fault();
+                if crash {
+                    assert!(result.is_err());
+                    recover(&target)?;
+                } else {
+                    assert!(result.unwrap().is_err());
+                }
+                assert_eq!(snapshot(&dir)?, before, "{point}");
+            }
+        }
+        install_delta_revision(&target, true)?;
+        let record = core::record(&dir)?.unwrap();
+        assert_eq!(
+            record.upstream_version.as_deref(),
+            Some(crate::delta::SIX_X_VERSION)
+        );
+        assert_eq!(record.delta_cache_ids, vec![crate::delta::cache_id(&exe)]);
+        let updated = fs::read_to_string(&config)?;
+        assert!(updated.contains("Mine=42") && updated.contains("keep my settings"));
+        assert!(updated.contains("DeltaForcePrivateStreamline=1"));
+        assert_eq!(
+            upstream040::read_041(updated.as_bytes())?["max_generated_frames"],
+            "1"
+        );
+        let installed = snapshot(&dir)?;
+        assert!(
+            install_delta_revision(&target, false).is_err(),
+            "Never downgrade a custom revision"
+        );
+        assert!(install041(&target).is_err(), "Never cross schemes in-place");
+        assert_eq!(snapshot(&dir)?, installed);
+        assert!(crate::cleanup::clean_outcome_at(&target)?.complete);
+        install_delta_revision(&target, true)?;
+        assert_eq!(
+            upstream040::read_041(&fs::read(config)?)?["max_generated_frames"],
+            "3"
+        );
+        assert!(crate::cleanup::clean_outcome_at(&target)?.complete);
+        Ok(())
     }
     #[test]
     fn upgrade041_is_transactional_and_uninstall_cleans_new_logs_only() -> Result<()> {

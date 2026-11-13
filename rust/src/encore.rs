@@ -78,6 +78,8 @@ pub struct Field {
     pub kind: FieldKind,
     pub default: String,
     pub min: Option<f64>,
+    #[serde(default)]
+    pub min_before: Option<MinimumBefore>,
     pub max: Option<f64>,
     pub choices: Vec<Choice>,
     pub restart: bool,
@@ -88,6 +90,24 @@ pub struct Field {
     pub since: Option<String>,
     #[serde(default)]
     pub until: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MinimumBefore {
+    pub version: String,
+    pub value: f64,
+}
+
+pub fn minimum_for_version(field: &Field, version: Option<&str>) -> Option<f64> {
+    if let Some(old) = &field.min_before
+        && !version
+            .and_then(|v| semver::Version::parse(v).ok())
+            .zip(semver::Version::parse(&old.version).ok())
+            .is_some_and(|(current, since)| current >= since)
+    {
+        return Some(old.value);
+    }
+    field.min
 }
 pub fn fields() -> &'static [Field] {
     static FIELDS: OnceLock<Vec<Field>> = OnceLock::new();
@@ -201,6 +221,10 @@ pub fn choice_available(choice: &Choice, version: Option<&str>) -> bool {
 pub fn value_available(key: &str, value: &str, version: Option<&str>) -> bool {
     field(key).is_some_and(|f| {
         field_available(f, version)
+            && (f.min_before.is_none()
+                || value.parse::<f64>().is_ok_and(|n| {
+                    minimum_for_version(f, version).is_none_or(|minimum| n >= minimum)
+                }))
             && (f.kind != FieldKind::Choice
                 || f.choices
                     .iter()
@@ -337,6 +361,17 @@ pub fn field_enabled(key: &str, values: &Values, _gpu: Option<i32>) -> bool {
                 .zip(v.parse::<u32>().ok())
                 .is_some_and(|(a, b)| a >= b)
         } else if let Some((k, v)) = dep.split_once('=') {
+            if k == "nrPlacement"
+                && let Some(pass) = key
+                    .strip_prefix("nrPass")
+                    .and_then(|s| s.strip_suffix("Preset"))
+            {
+                let placement = format!("nrPass{pass}Placement");
+                let effective = get(&placement)
+                    .filter(|p| *p != "inherit")
+                    .or_else(|| get(k));
+                return effective == Some(v);
+            }
             get(k) == Some(v)
                 || k == "dlssWithoutGameDlssEngine" && v == "nis" && get(k) == Some("fsr1")
                 || k == "nrEnabled" && v == "1" && get("nrWithoutGameDlss") == Some("1")

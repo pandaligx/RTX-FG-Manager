@@ -63,7 +63,7 @@ fn three_protocols_named_export_selected_import_and_conflict_aware_undo() -> Res
             proxy:"version.dll".into(),proxies:vec!["version.dll".into()],hashes,cleanup_dirs:BTreeMap::new(),scheme_id:Some(scheme.into()),
             delta_cache_ids:vec![],delta_legacy_cache:false,cache_pending:false,cleanup_pending_reasons:vec![]};
         core::write_new(&target.directory.join(core::OWN).join(core::MARKER),&serde_json::to_vec(&record)?)?;
-        let context=presets::Context {scheme:scheme.into(),profile:protocol.into(),delta:false,delta_capable:false};
+        let context=presets::Context {scheme:scheme.into(),profile:protocol.into(),delta:false,delta_capable:false,delta_six:false};
         let snapshot=store::snapshot(&target,&context,"steam:1234","Quality: original")?;
         store::save_named(&target,&snapshot)?;
         assert_eq!(store::named(&target,"steam:1234",scheme,protocol)?.len(),1);

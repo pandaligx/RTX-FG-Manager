@@ -1,6 +1,16 @@
 {
-  "自动": ["Automatic", "Автоматически", "自動", "자동"],
-  "手动": ["Manual", "Вручную", "手動", "수동"],
+  "自动": [
+    "Automatic",
+    "Автоматически",
+    "自動",
+    "자동"
+  ],
+  "手动": [
+    "Manual",
+    "Вручную",
+    "手動",
+    "수동"
+  ],
   "运行库默认": [
     "Runtime default",
     "По умолчанию в библиотеке",
@@ -3318,5 +3328,47 @@
     "For compatible scene-linear DLSS inputs. Fresh installs use Auto; existing files without this key keep Game exposure.",
     "For compatible scene-linear DLSS inputs. Fresh installs use Auto; existing files without this key keep Game exposure.",
     "For compatible scene-linear DLSS inputs. Fresh installs use Auto; existing files without this key keep Game exposure."
+  ],
+  "NR 第 1 遍处理位置": [
+    "NR pass 1 placement",
+    "Положение прохода NR 1",
+    "NR 第 1 パスの位置",
+    "NR 1차 처리 위치"
+  ],
+  "NR 第 2 遍处理位置": [
+    "NR pass 2 placement",
+    "Положение прохода NR 2",
+    "NR 第 2 パスの位置",
+    "NR 2차 처리 위치"
+  ],
+  "NR 第 3 遍处理位置": [
+    "NR pass 3 placement",
+    "Положение прохода NR 3",
+    "NR 第 3 パスの位置",
+    "NR 3차 처리 위치"
+  ],
+  "NR 第 4 遍处理位置": [
+    "NR pass 4 placement",
+    "Положение прохода NR 4",
+    "NR 第 4 パスの位置",
+    "NR 4차 처리 위치"
+  ],
+  "自定义 DLSS 渲染比例；2.4.0 起支持 33–100%，旧版为 50–100%。": [
+    "Custom DLSS render scale: 33–100% from 2.4.0; 50–100% on older versions.",
+    "Масштаб DLSS: 33–100% начиная с 2.4.0; 50–100% в старых версиях.",
+    "DLSS 描画倍率：2.4.0 以降は 33–100%、旧版は 50–100%。",
+    "DLSS 렌더링 비율: 2.4.0부터 33–100%, 이전 버전은 50–100%."
+  ],
+  "NIS / FSR 1：2.4.0 支持兼容的 DirectX 11 / 12、Vulkan 及 SDR / HDR10 / scRGB；旧版仅 DirectX 11 SDR。会处理已绘制的游戏界面。": [
+    "NIS / FSR 1: 2.4.0 supports compatible DX11/12 and Vulkan in SDR/HDR10/scRGB; older versions require DX11 SDR. Includes already-rendered HUD.",
+    "NIS / FSR 1: в 2.4.0 — совместимые DX11/12 и Vulkan, SDR/HDR10/scRGB; ранее только DX11 SDR. Обрабатывает уже нарисованный HUD.",
+    "NIS / FSR 1：2.4.0 は対応 DX11/12・Vulkan の SDR/HDR10/scRGB。旧版は DX11 SDR のみ。描画済み HUD も処理します。",
+    "NIS / FSR 1: 2.4.0은 호환 DX11/12·Vulkan의 SDR/HDR10/scRGB 지원. 이전 버전은 DX11 SDR만 지원하며 그려진 HUD도 처리합니다."
+  ],
+  "继承全局或单独选择；按 Pre-SR、Post-SR、Final image 顺序处理。混合位置需兼容的游戏 DLSS；Vulkan 切到 Final image 后需重启。": [
+    "Inherit or set per pass. Runs Pre-SR, Post-SR, then Final image. Mixed placements require compatible game DLSS; restart Vulkan after selecting Final image.",
+    "Наследовать или выбрать для прохода. Порядок: Pre-SR, Post-SR, Final image. Нужен совместимый DLSS игры; после выбора Final image перезапустите Vulkan.",
+    "全体を継承、または個別指定。Pre-SR、Post-SR、Final image の順。混在には対応ゲーム DLSS が必要。Vulkan で Final image 選択後は再起動。",
+    "전체 설정 상속 또는 개별 선택. Pre-SR, Post-SR, Final image 순서. 혼합에는 호환 게임 DLSS가 필요하며 Vulkan에서 Final image 선택 후 재시작하세요."
   ]
 }

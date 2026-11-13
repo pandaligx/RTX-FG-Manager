@@ -969,6 +969,22 @@ impl Controller {
     }
     fn parameter_policy(&self, exe: &str, scheme: &str) -> cloud::Policy {
         let mut policy = self.catalog.scheme_policies[scheme].clone();
+        if let Some(installed) = self.deployments.get(exe)
+            && installed.schemes.contains(scheme)
+            && installed
+                .parameter_versions
+                .get(scheme)
+                .is_none_or(|versions| {
+                    versions.is_empty()
+                        || versions
+                            .iter()
+                            .any(|v| !rtx_fg_manager::delta::supports_six_x(v))
+                })
+        {
+            policy
+                .capabilities
+                .remove(rtx_fg_manager::delta::SIX_X_CAPABILITY);
+        }
         if let Some((epoch, profile)) = self.disk_profiles.get(&(exe.into(), scheme.into()))
             && *epoch == self.status_epoch
         {
@@ -1184,7 +1200,9 @@ impl Controller {
                             .and_then(Value::as_u64)
                             .and_then(|v| u32::try_from(v).ok())
                     });
-                let clamp = context.delta && old_count.is_some_and(|v| (4..=5).contains(&v));
+                let clamp = context.delta
+                    && !context.delta_six
+                    && old_count.is_some_and(|v| (4..=5).contains(&v));
                 if saved.is_none() || clamp {
                     updates.push((
                         game.exe.clone(),
@@ -4094,7 +4112,8 @@ impl Controller {
                                 policy,
                                 std::path::Path::new(&exe),
                             );
-                            if context.normalize(&mut values) && context.delta {
+                            if context.normalize(&mut values) && context.delta && !context.delta_six
+                            {
                                 let game = self.games.iter_mut().find(|g| g.exe == exe).unwrap();
                                 if game.extra.get("delta_clamp_notified") != Some(&json!(true)) {
                                     game.extra
@@ -6792,6 +6811,47 @@ mod tests {
         assert_eq!(restarted.preset_values(exe)["optimized"], "1");
         restarted.close();
         restarted.tick_close();
+    }
+
+    #[test]
+    fn delta_six_x_choices_follow_installed_entry_revision_in_every_directory() {
+        let (_dir, mut c) = controller();
+        let scheme = cloud::DELTA_041_SCHEME;
+        let exe = "C:/Games/DeltaForce/Binaries/Win64/DeltaForceClient-Win64-Shipping.exe";
+        let mut policy = c.catalog.scheme_policies[rtx_fg_manager::upstream040::SCHEME].clone();
+        policy.parameter_profile = rtx_fg_manager::upstream040::PROFILE_041.into();
+        policy
+            .capabilities
+            .insert(rtx_fg_manager::delta::CAPABILITY.into());
+        policy
+            .capabilities
+            .insert(rtx_fg_manager::delta::SIX_X_CAPABILITY.into());
+        c.catalog.scheme_policies.insert(scheme.into(), policy);
+        assert!(
+            c.parameter_policy(exe, scheme)
+                .capabilities
+                .contains(rtx_fg_manager::delta::SIX_X_CAPABILITY)
+        );
+        for versions in [
+            vec!["0.4.1"],
+            vec![rtx_fg_manager::delta::SIX_X_VERSION],
+            vec!["0.4.1", rtx_fg_manager::delta::SIX_X_VERSION],
+        ] {
+            let mut installed = rtx_fg_manager::deployment::Snapshot::default();
+            installed.schemes.insert(scheme.into());
+            installed.parameter_versions.insert(
+                scheme.into(),
+                versions.iter().map(|v| v.to_string()).collect(),
+            );
+            c.deployments.insert(exe.into(), installed);
+            let actual = c
+                .parameter_policy(exe, scheme)
+                .capabilities
+                .contains(rtx_fg_manager::delta::SIX_X_CAPABILITY);
+            assert_eq!(actual, versions == [rtx_fg_manager::delta::SIX_X_VERSION]);
+        }
+        c.close();
+        c.tick_close();
     }
     #[test]
     fn uninstalled_041_preserves_current_explicit_choices_and_discard_baseline() {

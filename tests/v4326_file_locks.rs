@@ -126,6 +126,7 @@ fn install(target: &core::DeploymentTarget) -> Result<()> {
             profile: encore::PROFILE.into(),
             delta: false,
             delta_capable: false,
+            delta_six: false,
         }),
         None,
         Some("2.0.1"),

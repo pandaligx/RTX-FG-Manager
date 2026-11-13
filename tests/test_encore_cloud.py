@@ -85,7 +85,12 @@ class EncoreCloudTests(unittest.TestCase):
         fields_230 = [field for field in fields if field.get("since") == "2.3.0"]
         self.assertEqual({field["key"]: tuple(field["path"]) for field in fields_230}, paths_230)
         self.assertTrue(all(field.get("optional") is True for field in fields_230))
-        self.assertEqual(len(fields), 155 + len(new_paths) + len(paths_230))
+        paths_240 = {f"nrPass{n}Placement": ("neuralRendering", "core", f"nrPass{n}Placement")
+                     for n in range(1,5)}
+        fields_240 = [field for field in fields if field.get("since") == "2.4.0"]
+        self.assertEqual({field["key"]: tuple(field["path"]) for field in fields_240}, paths_240)
+        self.assertTrue(all(field.get("optional") and field["default"] == "inherit" for field in fields_240))
+        self.assertEqual(len(fields), 155 + len(new_paths) + len(paths_230) + len(paths_240))
         self.assertEqual(
             {field["key"] for field in fields if field.get("since") == "1.5.0"},
             {"xessTensorCores", "xefgTensorCores"},
@@ -102,7 +107,7 @@ class EncoreCloudTests(unittest.TestCase):
         self.assertEqual(native_paths - paths, {("configVersion",), ("frameGeneration", "multiplier"),
                                                ("frameGeneration", "flipMeteringLearned")})
         retired = {tuple(f["path"]) for f in fields if f["key"] == "nrEngine" or f["key"].startswith("nrOpen")}
-        self.assertEqual(paths - native_paths, retired | set(new_paths.values()) | set(paths_230.values()) | {
+        self.assertEqual(paths - native_paths, retired | set(new_paths.values()) | set(paths_230.values()) | set(paths_240.values()) | {
             ("menuState", "menuKey"), ("menuState", "menuLanguage"),
             ("smoothMotion", "smoothMotionForce"), ("smoothMotion", "smoothMotionTuringVariant"),
             ("nativeMenuFeatures", "vsyncOff"), ("providerPatchPolicy",),

@@ -19,15 +19,15 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.32"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.33"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
-[Download Linux x86_64 AppImage (experimental)](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.32/RTXManager-4.3.32-x86_64.AppImage)
+[Download Linux x86_64 AppImage (experimental)](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.33/RTXManager-4.3.33-x86_64.AppImage)
 
 </div>
 
 ---
 
-> **4.3.32 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
+> **4.3.33 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -45,52 +45,52 @@
 
 ## Download
 
-**Version 4.3.32** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
+**Version 4.3.33** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.32 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.32) | Default domestic source |
-| **GitHub** | [Open 4.3.32 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.32) | Primary project and fallback |
-| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.32/RTXManager-4.3.32-x86_64.AppImage) | Linux x86_64 domestic mirror |
-| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.32/RTXManager-4.3.32-x86_64.AppImage) | Linux x86_64 download |
+| **GitCode** | [Open 4.3.33 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.33) | Default domestic source |
+| **GitHub** | [Open 4.3.33 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.33) | Primary project and fallback |
+| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.33/RTXManager-4.3.33-x86_64.AppImage) | Linux x86_64 domestic mirror |
+| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.33/RTXManager-4.3.33-x86_64.AppImage) | Linux x86_64 download |
 | **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
 
 On Windows, download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 ### Linux (experimental)
 
-Download **`RTXManager-4.3.32-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
+Download **`RTXManager-4.3.33-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
 
 ```sh
-chmod +x RTXManager-4.3.32-x86_64.AppImage
-./RTXManager-4.3.32-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.33-x86_64.AppImage
+./RTXManager-4.3.33-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 Replace the prefix with the game's actual Wine directory; Steam Proton normally uses `steamapps/compatdata/<AppID>/pfx`. Add the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope. Releases include a separate `SHA256SUMS-linux.txt`; see the [Linux instructions](BUILDING.md#linux-appimage-experimental--实验性) for dependencies, running without FUSE and source builds.
 
 Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 
-## 4.3.32 highlights
+## 4.3.33 highlights
 
-- Adds the custom Dlssg_for_sm86 0.4.1 Delta Force / Vulkan option with improved resource reuse and memory-budget handling; custom 0.3.5 remains available.
-- Updates MFG Unlocker to 1.7.1, including NR settings and sharing. Standalone installation stays simple; plugin mode updates the paired host only in an existing complete OptiScaler 10 setup.
-- Adds independent Linux AppImage updates with integrity checks and startup rollback. Earlier Linux users need one manual download; Windows updates remain unchanged.
+- Updates Encore to 2.4.0, with per-pass NR placement, 33–100% custom DLSS scaling and matching shared presets.
+- Fixes runtime pairing in custom Delta Force 0.4.1, uses private Streamline 2.14.16 and adds DLSS 5X/6X. The default remains 4X; XeSS stays at up to 4X.
+- Preserves settings during supported upgrades and restores defaults after uninstall/reinstall. Standard 0.4.1, custom 0.3.5 and both platform update channels remain available.
 
 [Full changelog →](CHANGELOG.md)
 
-> **Dlssg_for_sm86 0.4.1** requires manager **4.3.14**; use **4.3.31 or later** for **Encore 2.3.0** settings and preset sharing. Upgrade games explicitly; manager updates do not automatically replace installed patches.
+> Use manager **4.3.33 or later** for **Encore 2.4.0** and the **custom Delta Force 0.4.1 6X revision**, including shared presets. Upgrade games explicitly; manager updates do not automatically replace installed patches.
 
 ## Choose a patch
 
 | Scheme | What to know | Settings / menu |
 | :--- | :--- | :--- |
 | **Dlssg_for_sm86 · 0.4.1** | Complete bundle with XeSS 2X–4X; fresh installs default to `Optimized=1`, preset A and SR off. | Manager / INI |
-| **Dlssg_for_sm86 · 0.4.1 · 额外支持三角洲专用 · DX12/Vulkan** | Updated custom bridge; old 0.3.5 remains available. Restart the game after changing resolution with Vulkan XeSS. | Manager / INI |
+| **Dlssg_for_sm86 · 0.4.1 · 额外支持三角洲专用 · DX12/Vulkan** | Private Streamline 2.14.16; DLSS up to 6X, default 4X; XeSS up to 4X. Restart after changing resolution with Vulkan XeSS. | Manager / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | Retained custom route with additional Delta Force support. Choose according to the actual game's requirements. | Manager / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | Retained dedicated Vulkan route; not interchangeable with the DX12 routes. | Manager / INI |
 | **MFG-Unlocker · 1.7.1** | Standalone DLL as before; plugin mode requires a complete existing OptiScaler 10 installation and backs up its host before updating the paired file. These modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
 | **MFG-Unlocker · 1.6.1** | Compatibility fallback; XeMFG requires the existing OptiScaler plugin route. | **Backspace** standalone; OptiScaler menu in plugin mode |
-| **RTX Encore · 2.3.0** | SR/RR/FG, DLSSNR, Smooth Motion, XeSS/XeFG and Frame Pacing, plus experimental features for games without native DLSS. | **Insert**, unless disabled or rebound |
+| **RTX Encore · 2.4.0** | SR/RR/FG, DLSSNR, Smooth Motion, XeSS/XeFG and Frame Pacing, plus experimental features for games without native DLSS. | **Insert**, unless disabled or rebound |
 
 > MFG-Unlocker 1.6.1 is available as a compatibility option. Uninstall the current patch before switching versions. Preset sharing for this option is supported from manager 4.3.15.
 
@@ -100,13 +100,14 @@ GPU detection provides information, not an installation gate. Each upstream patc
 
 | Scheme | RTX 20 · Turing | RTX 30 · Ampere | RTX 40 · Ada | RTX 50 · Blackwell |
 | :--- | :--- | :--- | :--- | :--- |
-| Dlssg_for_sm86 · 0.4.1 | Supported; new FG kernels lack real Turing validation | Primary supported/tested family | PTX path provided; no hardware validation | PTX path provided; no hardware validation |
-| 0.3.5 · Extra Delta Force support · DX12/Vulkan | Retained custom adaptation | Retained custom adaptation | Custom SM89 adaptation | Support unconfirmed |
-| Dlssg_for_sm86-MFG-version · Vulkan | Upstream target family | Upstream target family | No explicit upstream guarantee | No explicit upstream guarantee |
-| MFG-Unlocker · 1.7.1 / 1.6.1 | Experimental DLSS MFG | DLSS MFG supported | DLSS MFG supported | Native MFG with additional controls |
-| RTX Encore · 2.3.0 | Experimental FG / NR; driver-limited Smooth Motion | FG / NR; Fast SR and Smooth Motion routes | FG / NR; NVIDIA native Smooth Motion | Feature-dependent; Vulkan NR awaits hardware validation |
+| Dlssg_for_sm86 · 0.4.1 | Supported | Supported | Supported | Supported |
+| 0.4.1 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Supported |
+| 0.3.5 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Not supported |
+| Dlssg_for_sm86-MFG-version · Vulkan | Supported | Supported | Not supported | Not supported |
+| MFG-Unlocker · 1.7.1 / 1.6.1 | Supported | Supported | Supported | Supported |
+| RTX Encore · 2.4.0 | Supported | Supported | Supported | Supported |
 
-Sources: [Dlssg_for_sm86 requirements and limitations](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). The retained Delta Force package is this project's custom adaptation, not an upstream compatibility promise. This selection guide does not claim manager-side testing of every GPU or game.
+Sources: [Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). “Not supported” means outside the documented support scope of the distributed scheme. Experimental features and driver/runtime requirements still apply; this is not a guarantee for every game. Delta Force packages are custom adaptations.
 
 MFG's DLSS route requires an existing Streamline DLSS FG integration; Preset C needs 310.9.16, and RTX 20 requires specific 310.9 runtimes. **The experimental standalone XeMFG route in 1.7.0 can support eligible NVIDIA / AMD / Intel GPUs**, subject to Intel runtime, driver and DX12 / Vulkan requirements. This does not enable DLSS or DLSSNR on AMD / Intel. Version 1.6.1 lacks 1.7.0's standalone XeMFG route.
 
@@ -144,11 +145,11 @@ Close the game before configuration changes or removal. Upgrade a managed suppor
 </details>
 
 <details>
-<summary><b>Encore 2.3.0: components and existing settings</b></summary>
+<summary><b>Encore 2.4.0: components and existing settings</b></summary>
 
 Select components in **DLSS / XeSS runtimes** and enable features in **Preset parameters**. Encore can experimentally add features to games without native DLSS / FG; these are not enabled for you by default. Added DLSS-G / Streamline and Intel components follow the installation's requirements; owned originals are backed up and restored.
 
-The manager and preset-sharing service support 2.3.0 NR Final image, game motion vectors, exposure modes, FSR 1 and XeFG pacing controls. Upgrades retain JSONC comments, unknown fields and menu state; older shares retain their own protocol. See [2.3.0 settings](https://github.com/SilyNoMeta/rtx-encore/blob/v2.3.0/docs/SETTINGS.md) and [games without DLSS](https://github.com/SilyNoMeta/rtx-encore/blob/v2.3.0/docs/GAMES-WITHOUT-DLSS.md).
+The manager and preset-sharing service support 2.4.0 per-pass NR placement and 33–100% custom DLSS scaling. Explicit native Streamline SR/RR updates include the required common component and preserve restoration records. Upgrades retain JSONC comments, unknown fields and menu state. See [2.4.0 settings](https://github.com/SilyNoMeta/rtx-encore/blob/v2.4.0/docs/SETTINGS.md) and [games without DLSS](https://github.com/SilyNoMeta/rtx-encore/blob/v2.4.0/docs/GAMES-WITHOUT-DLSS.md).
 
 </details>
 

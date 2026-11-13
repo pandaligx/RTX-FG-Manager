@@ -374,7 +374,9 @@ impl EncoreEditor {
                 if matches!(event, InputEvent::Change) {
                     let value = input.read(cx).value().trim().to_owned();
                     let values = BTreeMap::from([(key.clone(), value.clone())]);
-                    if encore::validate_values(&values).is_ok() {
+                    if encore::validate_values(&values).is_ok()
+                        && encore::value_available(&key, &value, this.version.as_deref())
+                    {
                         this.set(&key, &value, cx);
                     } else {
                         this.errors.insert(key.clone());
@@ -558,7 +560,10 @@ impl EncoreEditor {
                     .child(self.t("Open引擎不支持RTX20；RTX30/40仍为高度实验功能。")),
             );
         }
-        if let (Some(min), Some(max)) = (field.min, field.max) {
+        if let (Some(min), Some(max)) = (
+            encore::minimum_for_version(field, self.version.as_deref()),
+            field.max,
+        ) {
             row = row.child(
                 div()
                     .text_xs()

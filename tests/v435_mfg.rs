@@ -23,6 +23,7 @@ fn context() -> presets::Context {
         profile: rtxmfg::PROFILE.into(),
         delta: false,
         delta_capable: false,
+        delta_six: false,
     }
 }
 fn fixture(custom: bool, version: &str) -> Result<(tempfile::TempDir, core::DeploymentTarget)> {

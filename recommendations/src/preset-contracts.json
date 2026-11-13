@@ -110,10 +110,14 @@
       },
       "dlssCustomScale": {
         "number": true,
-        "min": 50.0,
+        "min": 33.0,
         "max": 100.0,
         "integer": true,
         "inherit": false,
+        "minBefore": {
+          "version": "2.4.0",
+          "value": 50.0
+        },
         "label": "DLSS自定义比例",
         "labels": {}
       },
@@ -1235,6 +1239,82 @@
         "since": "1.4.0",
         "label": "NR 处理位置",
         "labels": {
+          "after-sr": "Post-SR（默认）",
+          "before-sr": "Pre-SR（实验）",
+          "present": "Final image（最终画面）"
+        }
+      },
+      "nrPass1Placement": {
+        "values": [
+          "inherit",
+          "after-sr",
+          "before-sr",
+          "present"
+        ],
+        "valueSince": {
+          "present": "2.3.0"
+        },
+        "since": "2.4.0",
+        "label": "NR 第 1 遍处理位置",
+        "labels": {
+          "inherit": "继承全局",
+          "after-sr": "Post-SR（默认）",
+          "before-sr": "Pre-SR（实验）",
+          "present": "Final image（最终画面）"
+        }
+      },
+      "nrPass2Placement": {
+        "values": [
+          "inherit",
+          "after-sr",
+          "before-sr",
+          "present"
+        ],
+        "valueSince": {
+          "present": "2.3.0"
+        },
+        "since": "2.4.0",
+        "label": "NR 第 2 遍处理位置",
+        "labels": {
+          "inherit": "继承全局",
+          "after-sr": "Post-SR（默认）",
+          "before-sr": "Pre-SR（实验）",
+          "present": "Final image（最终画面）"
+        }
+      },
+      "nrPass3Placement": {
+        "values": [
+          "inherit",
+          "after-sr",
+          "before-sr",
+          "present"
+        ],
+        "valueSince": {
+          "present": "2.3.0"
+        },
+        "since": "2.4.0",
+        "label": "NR 第 3 遍处理位置",
+        "labels": {
+          "inherit": "继承全局",
+          "after-sr": "Post-SR（默认）",
+          "before-sr": "Pre-SR（实验）",
+          "present": "Final image（最终画面）"
+        }
+      },
+      "nrPass4Placement": {
+        "values": [
+          "inherit",
+          "after-sr",
+          "before-sr",
+          "present"
+        ],
+        "valueSince": {
+          "present": "2.3.0"
+        },
+        "since": "2.4.0",
+        "label": "NR 第 4 遍处理位置",
+        "labels": {
+          "inherit": "继承全局",
           "after-sr": "Post-SR（默认）",
           "before-sr": "Pre-SR（实验）",
           "present": "Final image（最终画面）"

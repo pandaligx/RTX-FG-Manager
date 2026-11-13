@@ -37,6 +37,7 @@ fn context(profile: &str) -> presets::Context {
         profile: profile.into(),
         delta: false,
         delta_capable: false,
+        delta_six: false,
     }
 }
 

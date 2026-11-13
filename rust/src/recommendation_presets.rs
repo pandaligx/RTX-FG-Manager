@@ -189,6 +189,16 @@ pub fn execute_with_options(
         } else {
             let record = core::record(&target.directory)?.context("请先安装当前方案再应用参数")?;
             target.validate_record(&record)?;
+            if let Some(settings) = settings {
+                presets::Context::new(&recipe.scheme, policy, &target.game_exe)
+                    .validate_installed(
+                        record
+                            .upstream_version
+                            .as_deref()
+                            .or(record.payload_version.as_deref()),
+                        &settings.values,
+                    )?;
+            }
             ensure!(
                 record.scheme_id.as_deref() == Some(&recipe.scheme)
                     && core::backend_matches_profile(&record.backend, &policy.parameter_profile),
@@ -749,6 +759,9 @@ pub fn contracts() -> Value {
                 }
                 if let Some(until) = &f.until {
                     rule["until"] = json!(until);
+                }
+                if let Some(old) = &f.min_before {
+                    rule["minBefore"] = json!({"version":old.version,"value":old.value});
                 }
                 if p.key == "nrEngine" || p.key.starts_with("nrOpen") {
                     rule["until"] = json!("1.3.0");

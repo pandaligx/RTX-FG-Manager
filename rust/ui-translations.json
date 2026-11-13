@@ -1,4 +1,22 @@
 {
+  "三角洲专项：默认4X；DLSS最高6X，XeSS最高4X。": [
+    "Delta Force: 4X by default; DLSS up to 6X, XeSS up to 4X.",
+    "Delta Force：既定は4X。DLSSは最大6X、XeSSは最大4X。",
+    "델타 포스: 기본 4X, DLSS 최대 6X, XeSS 최대 4X.",
+    "Delta Force: по умолчанию 4X; DLSS до 6X, XeSS до 4X."
+  ],
+  "三角洲默认4X；DLSS可选跟随游戏、2X—6X，XeSS最高4X。高倍率会增加显存占用，实际帧数与延迟取决于游戏。": [
+    "Delta Force defaults to 4X. DLSS supports game-controlled or 2X–6X; XeSS supports up to 4X. Higher multipliers use more VRAM; actual FPS and latency depend on the game.",
+    "Delta Forceの既定は4X。DLSSはゲームに従うか2X–6X、XeSSは最大4Xです。高倍率ではVRAM使用量が増加し、実際のFPSと遅延はゲームによって異なります。",
+    "델타 포스 기본값은 4X입니다. DLSS는 게임 설정 또는 2X–6X, XeSS는 최대 4X를 지원합니다. 높은 배율은 VRAM을 더 사용하며 실제 FPS와 지연 시간은 게임에 따라 다릅니다.",
+    "В Delta Force по умолчанию 4X. DLSS: настройки игры или 2X–6X; XeSS: до 4X. Высокие множители требуют больше видеопамяти; FPS и задержка зависят от игры."
+  ],
+  "三角洲使用独立缓存中的 Streamline 2.14.16 与配套帧生成运行库，不覆盖游戏原文件。更改后需完全退出游戏并应用参数。": [
+    "Delta Force uses privately cached Streamline 2.14.16 and its matching frame-generation runtime without replacing game files. Fully exit the game before applying changes.",
+    "Delta Forceは個別キャッシュのStreamline 2.14.16と対応するフレーム生成ランタイムを使用し、ゲームの元ファイルを置き換えません。変更を適用する前にゲームを完全に終了してください。",
+    "델타 포스는 별도 캐시의 Streamline 2.14.16과 호환 프레임 생성 런타임을 사용하며 게임 원본 파일을 덮어쓰지 않습니다. 변경 사항을 적용하기 전에 게임을 완전히 종료하세요.",
+    "Delta Force использует Streamline 2.14.16 из отдельного кеша и совместимую библиотеку генерации кадров, не заменяя файлы игры. Полностью закройте игру перед применением изменений."
+  ],
   "更新下载完成，已校验文件": ["Update downloaded and file verified", "Обновление загружено, файл проверен", "更新のダウンロードと検証が完了しました", "업데이트 다운로드 및 파일 검증 완료"],
   "NR 外观模型": ["NR look model", "Модель облика NR", "NR 外観モデル", "NR 외관 모델"],
   "NR 网络预设": ["NR network preset", "Пресет сети NR", "NR ネットワークプリセット", "NR 네트워크 프리셋"],

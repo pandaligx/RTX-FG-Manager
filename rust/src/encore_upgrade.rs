@@ -551,6 +551,7 @@ mod tests {
             profile: profile.into(),
             delta: false,
             delta_capable: false,
+            delta_six: false,
         }
     }
     fn fixture() -> Result<(tempfile::TempDir, core::DeploymentTarget)> {

@@ -89,6 +89,8 @@ fn new_help_is_translated_in_all_supported_languages() -> Result<()> {
         for source in [
             "跟随游戏",
             "三角洲专项：默认4X；可选跟随游戏、2X、3X、4X。",
+            "三角洲专项：默认4X；DLSS最高6X，XeSS最高4X。",
+            "三角洲默认4X；DLSS可选跟随游戏、2X—6X，XeSS最高4X。高倍率会增加显存占用，实际帧数与延迟取决于游戏。",
             "补丁已移除，缓存待清理",
             "三角洲专项最高支持4X，原5X/6X已调整为4X",
         ] {

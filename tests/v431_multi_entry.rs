@@ -28,6 +28,7 @@ fn context(backend: &str) -> presets::Context {
         profile: profile.into(),
         delta: false,
         delta_capable: false,
+        delta_six: false,
     }
 }
 fn files(backend: &str, entries: &[String], secondary: u8) -> Result<BTreeMap<String, Vec<u8>>> {

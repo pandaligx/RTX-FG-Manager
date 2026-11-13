@@ -873,6 +873,13 @@ pub fn apply_parameters_at(
     crate::upstream040_upgrade::recover_locked(&target)?;
     let record = record(dir)?.context("请先安装当前方案再应用参数")?;
     target.validate_record(&record)?;
+    context.validate_installed(
+        record
+            .upstream_version
+            .as_deref()
+            .or(record.payload_version.as_deref()),
+        values,
+    )?;
     if record.backend == crate::upstream040::BACKEND {
         ensure!(
             context.profile
@@ -1319,7 +1326,7 @@ pub fn deploy_prepared_context_at_with_overrides(
             hashes: data.iter().map(|(n, b)| (n.clone(), hash(b))).collect(),
             cleanup_dirs: BTreeMap::new(),
             scheme_id: context.map(|c| c.scheme.clone()),
-            delta_cache_ids: Vec::new(),
+            delta_cache_ids: delta_cache_ids.clone(),
             delta_legacy_cache: false,
             cache_pending: false,
             cleanup_pending_reasons: Vec::new(),

@@ -387,6 +387,16 @@ impl Catalog {
                 "Delta capability requires a supported custom protocol"
             );
             ensure!(
+                !policy.capabilities.contains(crate::delta::SIX_X_CAPABILITY)
+                    || (p.scheme_id == DELTA_041_SCHEME
+                        && policy.parameter_profile == crate::upstream040::PROFILE_041
+                        && policy.capabilities.contains(crate::delta::CAPABILITY)
+                        && crate::delta::supports_six_x(
+                            p.upstream_version.as_deref().unwrap_or(&p.version)
+                        )),
+                "Delta 6X capability requires its matching custom entry revision"
+            );
+            ensure!(
                 match policy.parameter_profile.as_str() {
                     "initial" => policy.ini_policy == "initial",
                     crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 =>
@@ -1453,6 +1463,36 @@ mod tests {
         assert_eq!(files[0].id, p.download_file().id);
         Ok(())
     }
+    #[test]
+    fn custom_delta_revision_survives_a_stale_mirror() {
+        let baseline = bundled();
+        let mut stale = baseline.clone();
+        for p in &mut stale.packages {
+            if p.scheme_id == DELTA_041_SCHEME {
+                p.upstream_version = Some("0.4.1".into());
+            }
+        }
+        stale
+            .scheme_policies
+            .get_mut(DELTA_041_SCHEME)
+            .unwrap()
+            .capabilities
+            .remove(crate::delta::SIX_X_CAPABILITY);
+        retain_newer_baseline(&mut stale, &baseline);
+        assert!(
+            stale.scheme_policies[DELTA_041_SCHEME]
+                .capabilities
+                .contains(crate::delta::SIX_X_CAPABILITY)
+        );
+        assert!(
+            stale
+                .packages
+                .iter()
+                .filter(|p| p.scheme_id == DELTA_041_SCHEME)
+                .all(|p| p.upstream_version.as_deref() == Some(crate::delta::SIX_X_VERSION))
+        );
+    }
+
     #[test]
     fn stale_catalog_retains_reviewed_versions_without_reviving_removed_schemes() {
         let baseline = bundled();
