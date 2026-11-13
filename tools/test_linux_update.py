@@ -77,6 +77,10 @@ def run(image, version, success):
                 log.flush()
                 log.seek(0)
                 print(log.read(), file=sys.stderr)
+                print(f'helper exit: {helper.poll()}; target: {digest(target)}; old: {old}',
+                      file=sys.stderr)
+                for record in sorted(stage.glob('*.json')):
+                    print(f'{record.name}: {record.read_text()}', file=sys.stderr)
                 raise
             finally:
                 if parent.poll() is None:
