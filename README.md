@@ -78,7 +78,7 @@ Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login 
 
 [Full changelog →](CHANGELOG.md)
 
-> Use manager **4.3.33 or later** for **Encore 2.4.0** and the **custom Delta Force 0.4.1 6X revision**, including shared presets. Upgrade games explicitly; manager updates do not automatically replace installed patches.
+> Use manager **4.3.33 or later** for **Encore 2.4.1** and the **custom Delta Force 0.4.1 6X revision**, including shared presets. Encore 2.4.1 is a cloud-only hotfix for FG menus incorrectly capped at X2 during startup; no manager update is required. Upgrade games explicitly; manager updates do not automatically replace installed patches.
 
 ## Choose a patch
 
@@ -90,7 +90,7 @@ Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login 
 | **Dlssg_for_sm86-MFG-version · Vulkan** | Retained dedicated Vulkan route; not interchangeable with the DX12 routes. | Manager / INI |
 | **MFG-Unlocker · 1.7.1** | Standalone DLL as before; plugin mode requires a complete existing OptiScaler 10 installation and backs up its host before updating the paired file. These modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
 | **MFG-Unlocker · 1.6.1** | Compatibility fallback; XeMFG requires the existing OptiScaler plugin route. | **Backspace** standalone; OptiScaler menu in plugin mode |
-| **RTX Encore · 2.4.0** | SR/RR/FG, DLSSNR, Smooth Motion, XeSS/XeFG and Frame Pacing, plus experimental features for games without native DLSS. | **Insert**, unless disabled or rebound |
+| **RTX Encore · 2.4.1** | SR/RR/FG, DLSSNR, Smooth Motion, XeSS/XeFG and Frame Pacing, plus experimental features for games without native DLSS. | **Insert**, unless disabled or rebound |
 
 > MFG-Unlocker 1.6.1 is available as a compatibility option. Uninstall the current patch before switching versions. Preset sharing for this option is supported from manager 4.3.15.
 
@@ -105,7 +105,7 @@ GPU detection provides information, not an installation gate. Each upstream patc
 | 0.3.5 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Not supported |
 | Dlssg_for_sm86-MFG-version · Vulkan | Supported | Supported | Not supported | Not supported |
 | MFG-Unlocker · 1.7.1 / 1.6.1 | Supported | Supported | Supported | Supported |
-| RTX Encore · 2.4.0 | Supported | Supported | Supported | Supported |
+| RTX Encore · 2.4.1 | Supported | Supported | Supported | Supported |
 
 Sources: [Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). “Not supported” means outside the documented support scope of the distributed scheme. Experimental features and driver/runtime requirements still apply; this is not a guarantee for every game. Delta Force packages are custom adaptations.
 
@@ -145,7 +145,7 @@ Close the game before configuration changes or removal. Upgrade a managed suppor
 </details>
 
 <details>
-<summary><b>Encore 2.4.0: components and existing settings</b></summary>
+<summary><b>Encore 2.4.1: components and existing settings</b></summary>
 
 Select components in **DLSS / XeSS runtimes** and enable features in **Preset parameters**. Encore can experimentally add features to games without native DLSS / FG; these are not enabled for you by default. Added DLSS-G / Streamline and Intel components follow the installation's requirements; owned originals are backed up and restored.
 

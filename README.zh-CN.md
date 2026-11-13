@@ -78,7 +78,7 @@ Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
-> **Encore 2.4.0** 与 **三角洲专用 0.4.1 6X 修订版**的参数及分享，请使用管理器 **4.3.33 或更高版本**。按需升级游戏，管理器更新不会自动替换已安装补丁。
+> **Encore 2.4.1** 与 **三角洲专用 0.4.1 6X 修订版**的参数及分享，请使用管理器 **4.3.33 或更高版本**。Encore 2.4.1 仅更新云端补丁，修复启动时帧生成菜单被错误限制为 X2 的问题，无需更新管理器。按需升级游戏，管理器更新不会自动替换已安装补丁。
 
 ## 方案怎么选
 
@@ -90,7 +90,7 @@ Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
 | **MFG-Unlocker · 1.7.1** | 普通安装仍使用独立 DLL；已有完整 OptiScaler 10 时可选插件模式，备份并更新配套主文件。两种模式互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
-| **RTX Encore · 2.4.0** | SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG 与 Frame Pacing；可实验性地为无原生 DLSS 的游戏添加功能。 | **Insert**，禁用菜单或修改快捷键后除外 |
+| **RTX Encore · 2.4.1** | SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG 与 Frame Pacing；可实验性地为无原生 DLSS 的游戏添加功能。 | **Insert**，禁用菜单或修改快捷键后除外 |
 
 > MFG-Unlocker 1.6.1 已作为兼容备用方案保留；切换版本请先卸载现有补丁再安装。管理器 4.3.15 起支持该方案的玩家参数分享。
 
@@ -105,7 +105,7 @@ Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 支持 | 支持 | 支持 | 不支持 |
 | Dlssg_for_sm86-MFG-version · Vulkan | 支持 | 支持 | 不支持 | 不支持 |
 | MFG-Unlocker · 1.7.1 / 1.6.1 | 支持 | 支持 | 支持 | 支持 |
-| RTX Encore · 2.4.0 | 支持 | 支持 | 支持 | 支持 |
+| RTX Encore · 2.4.1 | 支持 | 支持 | 支持 | 支持 |
 
 依据：[Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。“不支持”表示未纳入当前分发方案的明确支持范围；实验性功能、驱动和运行库条件仍适用，不保证所有游戏兼容。三角洲方案为本项目自定义适配。
 
@@ -145,7 +145,7 @@ Dlssg_for_sm86 的 XeSS 引擎使用自身 CUDA 后端，不等于通用 Intel X
 </details>
 
 <details>
-<summary><b>Encore 2.4.0：组件选择与配置保留</b></summary>
+<summary><b>Encore 2.4.1：组件选择与配置保留</b></summary>
 
 在 **DLSS / XeSS 运行库** 中按需选择组件，在 **预设参数** 中启用功能。若游戏没有原生 DLSS / 帧生成，可选择 Encore 的对应实验功能；默认不替用户启用。额外 DLSS-G / Streamline 与 Intel 组件按安装条件部署，已有组件按归属备份和恢复。
 
