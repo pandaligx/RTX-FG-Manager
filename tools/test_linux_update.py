@@ -47,8 +47,8 @@ def run(image, version, success):
         Path(env['HOME']).mkdir()
         Path(env['XDG_RUNTIME_DIR']).mkdir(mode=0o700)
         if not success:
-            # An absent DISPLAY can fall back to :0. Force a nonexistent
-            # display so this case actually exercises failed GUI startup.
+            # GPUI can run headlessly when both variables are absent. Force a
+            # nonexistent display to actually exercise failed GUI startup.
             env['DISPLAY'] = ':65530'
             env['WAYLAND_DISPLAY'] = 'rtxfg-missing-display'
             env['XDG_SESSION_TYPE'] = 'x11'

@@ -47,7 +47,8 @@ jobs:
             build-essential pkg-config ca-certificates curl wget file \
             libfreetype-dev libfontconfig1-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libxcb1-dev libxcb-xkb-dev libwayland-dev \
-            squashfs-tools desktop-file-utils zsync xvfb xauth libvulkan1 mesa-vulkan-drivers
+            squashfs-tools desktop-file-utils zsync xvfb xauth libvulkan1 mesa-vulkan-drivers \
+            libegl1 libgl1-mesa-dri libglx-mesa0 vulkan-tools mesa-utils
 
       - name: Install pinned toolchain
         run: |
@@ -110,7 +111,13 @@ jobs:
           python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["rows"] == [] and r["directories"] == 1 and r["skipped"] == 0 and not r["cancelled"], r' "$RUNNER_TEMP/rtxfg-scan.json"
 
       - name: AppImage update restart and rollback
-        run: xvfb-run -a -s '-screen 0 1280x800x24' python3 tools/test_linux_update.py dist/*.AppImage
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+        run: |
+          xvfb-run -a vulkaninfo --summary
+          xvfb-run -a glxinfo -B
+          xvfb-run -a -s '-screen 0 1280x800x24' python3 tools/test_linux_update.py dist/*.AppImage
 
       - uses: actions/upload-artifact@v4
         with:
