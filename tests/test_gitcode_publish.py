@@ -304,6 +304,56 @@ class PublicationTests(unittest.TestCase):
                 {'cloud/help.json':('100644','blob','old')},
                 {'cloud/help.json':('100644','blob','new')})
 
+    def test_registration_only_recovery_keeps_all_immutable_inputs(self):
+        import copy
+        old = {'schema':3, 'revision':'bundles-'+'a'*20, 'schemes':[{'id':'old'}]}
+        added = {'id':'new', 'profile':'upstream041', 'archives':['new.zip'],
+                 'defaults':{}, 'capabilities':['delta_force_mfg_v1']}
+        current = {**old, 'schemes':old['schemes']+[added]}
+        index = {'packages':[{'scheme_id':'new', 'archive':'new.zip'}]}
+        embedded = {'scheme_policies':{'new':{'parameter_profile':'upstream041',
+                                            'capabilities':['delta_force_mfg_v1']}}}
+        pub.validate_bundle_registration(old, current, index, embedded)
+        invalid = []
+        for key, value in [('profile','wrong'), ('archives',['other.zip']),
+                           ('defaults',{'Optimized':'2'}), ('capabilities',[])]:
+            changed = copy.deepcopy(current)
+            changed['schemes'][1][key] = value
+            invalid.append(changed)
+        invalid.extend([{**current,'revision':'bundles-'+'b'*20},
+                        {**current,'schemes':[added]},
+                        {**current,'schemes':[{'id':'old','name':'changed'},added]},
+                        {**current,'schemes':current['schemes']+[added]}])
+        for changed in invalid:
+            with self.subTest(changed=changed), self.assertRaises(RuntimeError):
+                pub.validate_bundle_registration(old, changed, index, embedded)
+
+    def test_live_registration_reuses_only_prior_metadata_readback(self):
+        root = Path(__file__).resolve().parents[1]
+        current = (root/'cloud/bundles/catalog.json').read_bytes()
+        catalog = json.loads(current)
+        prior = {**catalog, 'schemes':[s for s in catalog['schemes']
+                                      if s['id'] != 'rtxfg-0.4.1-dx12-vulkan']}
+        prior_raw = json.dumps(prior).encode()
+        index = 'cloud/bundles/indexes/'+catalog['revision']+'.json'
+        contents = {'old':prior_raw, 'new':current, 'index':(root/index).read_bytes(),
+                    'embedded':(root/'rust/cloud-catalog.json').read_bytes()}
+        before = {'cloud/bundles/catalog.json':('100644','blob','old'),
+                  index:('100644','blob','index'),
+                  'rust/cloud-catalog.json':('100644','blob','embedded')}
+        after = {**before, 'cloud/bundles/catalog.json':('100644','blob','new')}
+        review = Mock()
+        review.git.side_effect = lambda root,*args,**kwargs:contents[args[-1]]
+        with patch.object(pub,'verify_metadata_artifact') as verify:
+            pub.verify_metadata_changes(root,review,before,after)
+            self.assertGreater(verify.call_count,1)
+            self.assertTrue(all(c.args[-1] == hashlib.sha256(prior_raw).hexdigest()
+                                for c in verify.call_args_list))
+        for name in [index,'rust/cloud-catalog.json']:
+            changed = {**after, name:('100644','blob','new')}
+            with self.assertRaisesRegex(RuntimeError,'immutable'):
+                pub.verify_metadata_changes(root,review,before,changed)
+
     def test_complete_bundle_verifies_once_and_rejects_conflicting_identity(self):
         revision='bundles-'+'e'*20
         url=pub.asset_url(pub.PAYLOAD_REPO,'payloads','scheme-complete-'+'a'*12+'.zip')

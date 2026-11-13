@@ -439,6 +439,33 @@ def sync_release_tag(root, tag):
         raise RuntimeError('GitCode source tag readback mismatch')
 
 
+def validate_bundle_registration(prior, current, index, embedded):
+    """Allow restoring an omitted declaration, never changing published bytes.
+
+    Both the immutable index and the already-reviewed embedded catalog must be
+    unchanged. Every previous declaration stays identical; additions must agree
+    with the embedded policy and the scheme's complete archive set.
+    """
+    unchanged = lambda c: {k: v for k, v in c.items() if k != 'schemes'}
+    if unchanged(prior) != unchanged(current):
+        raise RuntimeError('Bundle registration cannot change index or sources')
+    old = {s['id']: s for s in prior['schemes']}
+    new = {s['id']: s for s in current['schemes']}
+    if len(old) != len(prior['schemes']) or len(new) != len(current['schemes']):
+        raise RuntimeError('Duplicate bundle registration')
+    if not old.keys() < new.keys() or any(new[k] != v for k, v in old.items()):
+        raise RuntimeError('Bundle registration must only add omitted schemes')
+    for key in new.keys() - old.keys():
+        scheme = new[key]
+        policy = embedded.get('scheme_policies', {}).get(key)
+        archives = {p['archive'] for p in index['packages'] if p.get('scheme_id') == key}
+        if (not policy or not archives or set(scheme.get('archives', [])) != archives
+                or scheme.get('profile') != policy.get('parameter_profile')
+                or scheme.get('defaults', {}) != policy.get('defaults', {})
+                or scheme.get('capabilities', []) != policy.get('capabilities', [])):
+            raise RuntimeError('Bundle registration differs from published scheme')
+
+
 def verify_metadata_changes(root, review, before, after):
     if any(p.startswith('cloud/') and p.endswith('.json') and p not in after for p in before):
         raise RuntimeError('Published metadata cannot be deleted')
@@ -468,16 +495,26 @@ def verify_metadata_changes(root, review, before, after):
         if c.get('schema') != 3 or not re.fullmatch(r'bundles-[0-9a-f]{20}', c.get('revision', '')):
             raise RuntimeError('Invalid complete-bundle catalog')
         index_path = f'cloud/bundles/indexes/{c["revision"]}.json'
-        if index_path in before:
-            raise RuntimeError('A bundle catalog change requires a new immutable revision')
         raw = blob(index_path)
+        metadata_digest = hashlib.sha256(blob(bundle_path)).hexdigest()
+        if index_path in before:
+            embedded_path = 'rust/cloud-catalog.json'
+            if (before.get(index_path) != after.get(index_path)
+                    or embedded_path not in before
+                    or before[embedded_path] != after.get(embedded_path)
+                    or bundle_path not in before):
+                raise RuntimeError('A bundle catalog change requires a new immutable revision')
+            previous = review.git(root, 'cat-file', 'blob', before[bundle_path][2], binary=True)
+            validate_bundle_registration(json.loads(previous), c, json.loads(raw),
+                                         json.loads(blob(embedded_path)))
+            # Only identical index/archive bytes may reuse the previous readback.
+            metadata_digest = hashlib.sha256(previous).hexdigest()
         index = c['index']
         if len(raw) != index['bytes'] or hashlib.sha256(raw).hexdigest() != index['sha256']:
             raise RuntimeError('Bundle index does not match catalog')
         expected = asset_url(PAYLOAD_REPO, 'payloads', c['revision'] + '.json')
         if index['url'] != expected:
             raise RuntimeError('Bundle index must use Resources')
-        metadata_digest = hashlib.sha256(blob(bundle_path)).hexdigest()
         verify_metadata_artifact(expected, len(raw), index['sha256'], metadata_digest)
         seen = {}
         for p in json.loads(raw)['packages']:
