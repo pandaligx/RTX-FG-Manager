@@ -330,13 +330,14 @@ class PublicationTests(unittest.TestCase):
 
     def test_live_registration_reuses_only_prior_metadata_readback(self):
         root = Path(__file__).resolve().parents[1]
-        current = (root/'cloud/bundles/catalog.json').read_bytes()
+        # Git blobs keep LF even when the Windows checkout uses CRLF.
+        current = (root/'cloud/bundles/catalog.json').read_text('utf-8').encode()
         catalog = json.loads(current)
         prior = {**catalog, 'schemes':[s for s in catalog['schemes']
                                       if s['id'] != 'rtxfg-0.4.1-dx12-vulkan']}
         prior_raw = json.dumps(prior).encode()
         index = 'cloud/bundles/indexes/'+catalog['revision']+'.json'
-        contents = {'old':prior_raw, 'new':current, 'index':(root/index).read_bytes(),
+        contents = {'old':prior_raw, 'new':current, 'index':(root/index).read_text('utf-8').encode(),
                     'embedded':(root/'rust/cloud-catalog.json').read_bytes()}
         before = {'cloud/bundles/catalog.json':('100644','blob','old'),
                   index:('100644','blob','index'),
