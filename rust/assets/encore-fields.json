@@ -237,16 +237,20 @@
     "group": "image",
     "kind": "integer",
     "default": "67",
-    "min": 50,
+    "min": 33,
     "max": 100,
     "choices": [],
     "restart": false,
     "dependencies": [
       "dlssRenderScale=custom"
     ],
-    "help": "仅DLSS自定义比例使用，单位为百分比。",
+    "help": "自定义 DLSS 渲染比例；2.4.0 起支持 33–100%，旧版为 50–100%。",
     "optional": false,
-    "source_help": "Render scale in percent (50 to 100) when dlssRenderScale is custom."
+    "source_help": "Render scale in percent (33 to 100) when dlssRenderScale is custom.",
+    "min_before": {
+      "version": "2.4.0",
+      "value": 50
+    }
   },
   {
     "key": "srSharpening",
@@ -3809,6 +3813,170 @@
     "since": "1.4.0"
   },
   {
+    "key": "nrPass1Placement",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrPass1Placement"
+    ],
+    "label": "NR 第 1 遍处理位置",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "after-sr",
+        "label": "Post-SR（默认）"
+      },
+      {
+        "value": "before-sr",
+        "label": "Pre-SR（实验）"
+      },
+      {
+        "value": "present",
+        "label": "Final image（最终画面）",
+        "since": "2.3.0"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=1"
+    ],
+    "help": "继承全局或单独选择；按 Pre-SR、Post-SR、Final image 顺序处理。混合位置需兼容的游戏 DLSS；Vulkan 切到 Final image 后需重启。",
+    "optional": true,
+    "since": "2.4.0"
+  },
+  {
+    "key": "nrPass2Placement",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrPass2Placement"
+    ],
+    "label": "NR 第 2 遍处理位置",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "after-sr",
+        "label": "Post-SR（默认）"
+      },
+      {
+        "value": "before-sr",
+        "label": "Pre-SR（实验）"
+      },
+      {
+        "value": "present",
+        "label": "Final image（最终画面）",
+        "since": "2.3.0"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=2"
+    ],
+    "help": "继承全局或单独选择；按 Pre-SR、Post-SR、Final image 顺序处理。混合位置需兼容的游戏 DLSS；Vulkan 切到 Final image 后需重启。",
+    "optional": true,
+    "since": "2.4.0"
+  },
+  {
+    "key": "nrPass3Placement",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrPass3Placement"
+    ],
+    "label": "NR 第 3 遍处理位置",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "after-sr",
+        "label": "Post-SR（默认）"
+      },
+      {
+        "value": "before-sr",
+        "label": "Pre-SR（实验）"
+      },
+      {
+        "value": "present",
+        "label": "Final image（最终画面）",
+        "since": "2.3.0"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=3"
+    ],
+    "help": "继承全局或单独选择；按 Pre-SR、Post-SR、Final image 顺序处理。混合位置需兼容的游戏 DLSS；Vulkan 切到 Final image 后需重启。",
+    "optional": true,
+    "since": "2.4.0"
+  },
+  {
+    "key": "nrPass4Placement",
+    "path": [
+      "neuralRendering",
+      "core",
+      "nrPass4Placement"
+    ],
+    "label": "NR 第 4 遍处理位置",
+    "group": "image",
+    "kind": "choice",
+    "default": "inherit",
+    "min": null,
+    "max": null,
+    "choices": [
+      {
+        "value": "inherit",
+        "label": "继承全局"
+      },
+      {
+        "value": "after-sr",
+        "label": "Post-SR（默认）"
+      },
+      {
+        "value": "before-sr",
+        "label": "Pre-SR（实验）"
+      },
+      {
+        "value": "present",
+        "label": "Final image（最终画面）",
+        "since": "2.3.0"
+      }
+    ],
+    "restart": false,
+    "dependencies": [
+      "nrEnabled=1",
+      "nrPasses>=4"
+    ],
+    "help": "继承全局或单独选择；按 Pre-SR、Post-SR、Final image 顺序处理。混合位置需兼容的游戏 DLSS；Vulkan 切到 Final image 后需重启。",
+    "optional": true,
+    "since": "2.4.0"
+  },
+  {
     "key": "nrPass1Preset",
     "path": [
       "neuralRendering",
@@ -4382,7 +4550,7 @@
       "dlssWithoutGameDlss=1",
       "dlssWithoutGameDlssEngine=nis"
     ],
-    "help": "NIS / FSR 1：仅限 DirectX 11 SDR，包含游戏界面；无需额外运行库。",
+    "help": "NIS / FSR 1：2.4.0 支持兼容的 DirectX 11 / 12、Vulkan 及 SDR / HDR10 / scRGB；旧版仅 DirectX 11 SDR。会处理已绘制的游戏界面。",
     "optional": true,
     "since": "2.2.0"
   },

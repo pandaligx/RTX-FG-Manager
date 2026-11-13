@@ -33,8 +33,9 @@ export function presetSnapshot(input,scheme,version){
       need(!f.valueSince?.[value] || compare(version,f.valueSince[value])>=0,'unsupported_preset_version');
       const numeric=f.number && /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value);
       const n=Number(value);
+      const minimum=f.minBefore && compare(version,f.minBefore.version)<0?f.minBefore.value:f.min;
       need(f.values?.includes(value) || f.inherit && value==='inherit' || numeric && Number.isFinite(n)
-        && (!f.integer || /^\d+$/.test(value)) && (f.min==null || n>=f.min) && (f.max==null || n<=f.max),'invalid_preset_value');
+        && (!f.integer || /^\d+$/.test(value)) && (minimum==null || n>=minimum) && (f.max==null || n<=f.max),'invalid_preset_value');
     }
   }
   if(input.profile==='mfg_vulkan_sm86_7') for(const values of [input.values,input.defaults]){

@@ -750,6 +750,9 @@ pub fn contracts() -> Value {
                 if let Some(until) = &f.until {
                     rule["until"] = json!(until);
                 }
+                if let Some(old) = &f.min_before {
+                    rule["minBefore"] = json!({"version":old.version,"value":old.value});
+                }
                 if p.key == "nrEngine" || p.key.starts_with("nrOpen") {
                     rule["until"] = json!("1.3.0");
                 }

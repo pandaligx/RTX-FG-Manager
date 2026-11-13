@@ -77,6 +77,8 @@ fn native_streamline_paths_from(
             n.eq_ignore_ascii_case("sl.interposer.dll")
                 || n.eq_ignore_ascii_case("sl.common.dll")
                 || n.eq_ignore_ascii_case("sl.dlss_g.dll")
+                || n.eq_ignore_ascii_case("sl.dlss.dll")
+                || n.eq_ignore_ascii_case("sl.dlss_d.dll")
         }) {
             folders.insert(path.parent().context("Streamline 目录无效")?.to_path_buf());
         }
@@ -106,11 +108,13 @@ fn native_streamline_paths_from(
             );
         }
         let has_fg = folder.join("sl.dlss_g.dll").is_file();
+        let has_sr = folder.join("sl.dlss.dll").is_file() || folder.join("sl.dlss_d.dll").is_file();
         for name in STREAMLINE_PLUGINS {
             let path = core::no_links(&folder.join(name))?;
             if path.is_file()
                 || tracked.contains(&core::key(&path))
                 || has_fg && ["sl.common.dll", "sl.pcl.dll", "sl.reflex.dll"].contains(&name)
+                || has_sr && name == "sl.common.dll"
             {
                 if path.is_file() {
                     let v = version(&path)?;
@@ -711,6 +715,9 @@ fn streamline_status(
         }
         if names.contains("sl.dlss_g.dll") {
             names.extend(["sl.common.dll", "sl.pcl.dll", "sl.reflex.dll"].map(str::to_owned));
+        }
+        if names.contains("sl.dlss.dll") || names.contains("sl.dlss_d.dll") {
+            names.insert("sl.common.dll".into());
         }
         let mut file_version = |name: &str| -> Result<String> {
             let path = core::no_links(&directory.join(name))?;
@@ -1660,6 +1667,42 @@ mod tests {
         );
         Ok(())
     }
+    #[test]
+    fn sr_only_streamline_repairs_common_and_restores_without_adding_fg() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        let folder = t.directory.join("Plugins/SuperResolution");
+        fs::create_dir_all(&folder)?;
+        let plugin = folder.join("sl.dlss.dll");
+        fs::write(&plugin, b"original SR plugin")?;
+        let evidence = scanner::Evidence {
+            frame_integration_paths: vec![plugin.clone()],
+            ..Default::default()
+        };
+        let status = streamline_status(&t, &evidence, &[], |_| "2.14.16".into())?;
+        assert_eq!(status[0].plugins["sl.common.dll"], "缺失");
+        let paths = native_streamline_paths_from(&t, &evidence, |_| Ok("2.14.16".into()))?;
+        assert!(paths.contains(&folder.join("sl.common.dll")));
+        assert!(!paths.iter().any(|p| p.ends_with("sl.interposer.dll")
+            || p.ends_with("sl.dlss_g.dll")
+            || p.ends_with("nvngx_dlssg.dll")));
+        let source = tmp.path().join("sources");
+        fs::create_dir_all(&source)?;
+        let mut files = BTreeMap::new();
+        for name in ["sl.dlss.dll", "sl.common.dll", STREAMLINE_LICENSE] {
+            let p = source.join(name);
+            fs::write(&p, format!("new {name}"))?;
+            files.insert(name.into(), p);
+        }
+        install_locked(&t, "fg", &paths, &files)?;
+        assert!(folder.join("sl.common.dll").exists());
+        remove_locked(&t, "fg")?;
+        assert_eq!(fs::read(&plugin)?, b"original SR plugin");
+        assert!(!folder.join("sl.common.dll").exists());
+        assert!(!folder.join(STREAMLINE_LICENSE).exists());
+        Ok(())
+    }
+
     #[test]
     fn fg_only_update_retains_old_plugin_backups_until_restore() -> Result<()> {
         let tmp = tempfile::tempdir()?;
