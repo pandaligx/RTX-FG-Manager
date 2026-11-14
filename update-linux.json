@@ -1,11 +1,11 @@
 {
   "schema": 3,
-  "version": "4.3.33",
-  "file": "RTXManager-4.3.33-x86_64.AppImage",
-  "bytes": 22370808,
-  "sha256": "051a08d711628d919873d0ce3a1e382b6ac15866cda9dd0d4869074d2509fecc",
+  "version": "4.3.34",
+  "file": "RTXManager-4.3.34-x86_64.AppImage",
+  "bytes": 22387192,
+  "sha256": "ae60ef2fe05cda7484e5fd46ddff02e74f021f9557d186554872319bba2f0fb6",
   "notes": {
-    "zh-CN": "- 适配 RTX Encore 2.4.0：四遍神经渲染独立处理位置与33–100%自定义 DLSS 比例，参数分享同步支持。\n- 修复自定义三角洲 0.4.1 的旧 FG 运行库配对，私有 Streamline 升级2.14.16；DLSS增加5X/6X，默认保持4X，XeSS最高4X。\n- 同方案旧修订可原位升级并保留参数；改进新旧私有缓存归属清理，卸载后重新安装恢复默认值。\n- 保留原版0.4.1、旧三角洲0.3.5及其他方案；原有界面、更新通道和下载统计保持。",
-    "en": "- Adapt RTX Encore 2.4.0 per-pass neural rendering placement and 33–100% custom DLSS scaling, including shared presets.\n- Pair the custom Delta Force 0.4.1 entry with private Streamline 2.14.16 and the bundled FG runtime. Add DLSS 5X/6X; keep 4X as the default and the XeSS maximum.\n- Upgrade the previous custom revision in place while preserving settings. Track both private cache revisions per game; uninstalling and reinstalling restores defaults.\n- Keep standard 0.4.1, legacy custom 0.3.5, other schemes, the current interface, update channels and combined download statistics.\n\nValidation: targeted file-system and synthetic GPU tests; no claim of RTX 3060 Delta Force gameplay or a long-duration 6GB VRAM test."
+    "zh-CN": "- 升级原版 Dlssg_for_sm86 至 0.4.2，保留上游默认配置；已有安装升级时保留参数，卸载重装恢复新默认值。\n- 新增 ANR FG V.B15 完整方案，自动安装所需模型与组件。DX12 通常选择 dxgi.dll，Vulkan 选择 winmm.dll，每次只使用一个入口。\n- 支持 ANR 参数设置、玩家分享及卸载清理；遇到已有 OptiScaler 或其他同名文件时提示冲突，避免覆盖。ANR FG 不等于 NVIDIA DLSS 神经渲染。\n- 保留三角洲 0.4.1 6X、旧三角洲 0.3.5、MFG 和 Encore 方案。Windows 与 Linux 安装包同步提供，更新通道保持独立。",
+    "en": "- Update standard Dlssg_for_sm86 to 0.4.2 with upstream defaults. Supported upgrades preserve settings; uninstalling and reinstalling restores current defaults.\n- Add the ANR FG V.B15 full package with its models and components. Normally use dxgi.dll for DX12 or winmm.dll for Vulkan, with one entry at a time.\n- Add ANR settings, shared presets and owned-file cleanup. Existing OptiScaler installations or file conflicts are protected from replacement. ANR FG is separate from NVIDIA DLSS Neural Rendering.\n- Keep custom Delta Force 0.4.1 6X, legacy custom 0.3.5, MFG and Encore schemes. Windows and Linux packages remain on separate update channels."
   }
 }
