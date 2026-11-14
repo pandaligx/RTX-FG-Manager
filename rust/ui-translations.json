@@ -12,8 +12,7 @@
   "显卡支持范围请查看项目文档。": ["See project documentation for GPU support.", "Поддержка GPU указана в документации проекта.", "対応GPUはプロジェクトの説明を参照してください。", "GPU 지원 범위는 프로젝트 문서를 확인하세요."],
   "此方案主要支持 RTX 20 / 30，额外适配三角洲与 Vulkan。": ["Primarily supports RTX 20 / 30, with custom Delta Force and Vulkan support.", "Основная поддержка: RTX 20 / 30, с адаптацией для Delta Force и Vulkan.", "主にRTX 20 / 30に対応。Delta ForceとVulkan向けの独自対応を含みます。", "RTX 20 / 30을 주로 지원하며 델타 포스 및 Vulkan용 추가 호환 기능을 포함합니다."],
   "RTX 40 与 CMP 的兼容范围请查看项目文档。": ["See project documentation for RTX 40 and CMP compatibility.", "Совместимость RTX 40 и CMP указана в документации проекта.", "RTX 40とCMPの互換性はプロジェクトの説明を参照してください。", "RTX 40 및 CMP 호환 범위는 프로젝트 문서를 확인하세요."],
-  "XeMFG：符合 Intel 运行库要求的 NVIDIA / AMD / Intel 显卡。": ["XeMFG: NVIDIA / AMD / Intel GPUs meeting Intel runtime requirements.", "XeMFG: GPU NVIDIA / AMD / Intel, отвечающие требованиям среды Intel.", "XeMFG：Intelランタイムの要件を満たすNVIDIA / AMD / Intel GPU。", "XeMFG: Intel 런타임 요구 사항을 충족하는 NVIDIA / AMD / Intel GPU."],
-  "1.6.1 的 XeMFG 仅支持 OptiScaler 插件模式。": ["XeMFG in 1.6.1 requires OptiScaler plugin mode.", "XeMFG в 1.6.1 требует режима плагина OptiScaler.", "1.6.1のXeMFGはOptiScalerプラグインモード専用です。", "1.6.1의 XeMFG는 OptiScaler 플러그인 모드가 필요합니다."],
+  "DLSS 多帧生成：NVIDIA RTX 20 / 30 / 40 / 50": ["DLSS Multi Frame Generation: NVIDIA RTX 20 / 30 / 40 / 50", "DLSS Multi Frame Generation: NVIDIA RTX 20 / 30 / 40 / 50", "DLSSマルチフレーム生成：NVIDIA RTX 20 / 30 / 40 / 50", "DLSS 멀티 프레임 생성: NVIDIA RTX 20 / 30 / 40 / 50"],
   "ANR FG：Insert（Ins）打开菜单。游戏内开启帧生成；默认最高6X，实际倍率由游戏请求。修改参数后重启游戏。": [
     "ANR FG: press Insert (Ins) for the menu. Enable frame generation in-game; the default cap is 6X and the game requests the multiplier. Restart after changing settings.",
     "ANR FG: Insert (Ins) открывает меню. Включите генерацию кадров в игре; предел по умолчанию 6X, множитель запрашивает игра. После изменения настроек перезапустите игру.",

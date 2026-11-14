@@ -2744,7 +2744,10 @@ impl Manager {
                             let view = view_link.clone();
                             div()
                                 .h_flex()
-                                .w_full()
+                                // Leave the menu's checkmark lane outside this flex row.
+                                // A full-width child overflows that lane on long labels.
+                                .w_0()
+                                .flex_1()
                                 .gap_2()
                                 .min_w_0()
                                 .child(
@@ -2752,11 +2755,13 @@ impl Manager {
                                         .v_flex()
                                         .min_w_0()
                                         .flex_1()
+                                        .overflow_hidden()
                                         .py_1()
                                         .child(div().text_sm().truncate().child(name.clone()))
                                         .child(
                                             div()
                                                 .text_xs()
+                                                .whitespace_normal()
                                                 .text_color(cx.theme().muted_foreground)
                                                 .child(detail.clone()),
                                         ),
@@ -2765,6 +2770,7 @@ impl Manager {
                                     Button::new(("scheme-link", i))
                                         .focus_ring(crate::ui_focus::visible(cx))
                                         .w_6()
+                                        .h_6()
                                         .flex_shrink_0()
                                         .small()
                                         .ghost()
@@ -2781,6 +2787,7 @@ impl Manager {
                                     div()
                                         .id(("scheme-gpu", i))
                                         .w_6()
+                                        .h_6()
                                         .flex_shrink_0()
                                         .h_flex()
                                         .justify_center()

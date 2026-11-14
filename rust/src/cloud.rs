@@ -778,9 +778,7 @@ impl Catalog {
             crate::encore::PROFILE => {
                 "此项目支持 RTX 20 / 30 / 40 / 50。\n各功能的驱动及游戏要求请查看项目文档。"
             }
-            crate::rtxmfg::PROFILE => {
-                "DLSS：RTX 20 / 30 / 40 / 50\nXeMFG：符合 Intel 运行库要求的 NVIDIA / AMD / Intel 显卡。\n1.6.1 的 XeMFG 仅支持 OptiScaler 插件模式。"
-            }
+            crate::rtxmfg::PROFILE => "DLSS 多帧生成：NVIDIA RTX 20 / 30 / 40 / 50",
             _ if policy.capabilities.contains(crate::delta::CAPABILITY) => {
                 "此方案主要支持 RTX 20 / 30，额外适配三角洲与 Vulkan。\nRTX 40 与 CMP 的兼容范围请查看项目文档。"
             }
