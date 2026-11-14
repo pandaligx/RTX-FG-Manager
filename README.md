@@ -19,15 +19,15 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.33"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.34"><img src="docs/download-en.svg" alt="Download for Windows x64" width="300" height="58"></a>
 
-[Download Linux x86_64 AppImage (experimental)](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.33/RTXManager-4.3.33-x86_64.AppImage)
+[Download Linux x86_64 AppImage (experimental)](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.34/RTXManager-4.3.34-x86_64.AppImage)
 
 </div>
 
 ---
 
-> **4.3.33 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
+> **4.3.34 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager 4.3.6](docs/screenshot-home.png)
 
@@ -39,92 +39,78 @@
 
 | Manage | Customize | Recover |
 | :--- | :--- | :--- |
-| Scan or add games; individual and batch operations | A single configuration per game; supported DLL entry selection | Owned-file removal and transactional upgrade recovery |
+| Scan or add games; individual and batch operations | A single configuration per game; supported DLL entry selection | Restore original files when removing a patch; roll back failed installs |
 | One complete download per scheme, reused from cache | Collapsible navigation, resizable inspector, 12–18 font sizes | Preserve unknown files, original Bink components and unrelated plugins |
 | GitCode first, GitHub fallback | Light/dark themes, 38 color schemes, five interface languages | No automatic replacement of game patches when the manager updates |
 
 ## Download
 
-**Version 4.3.33** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
+**Version 4.3.34** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.33 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.33) | Default domestic source |
-| **GitHub** | [Open 4.3.33 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.33) | Primary project and fallback |
-| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.33/RTXManager-4.3.33-x86_64.AppImage) | Linux x86_64 domestic mirror |
-| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.33/RTXManager-4.3.33-x86_64.AppImage) | Linux x86_64 download |
-| **Gitee** | [Historical releases](https://gitee.com/pandaligx/RTX-FG-Manager/releases) | Old files retained; no new releases |
+| **GitCode** | [Open 4.3.34 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.34) | Default domestic source |
+| **GitHub** | [Open 4.3.34 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.34) | Primary project and fallback |
+| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.34/RTXManager-4.3.34-x86_64.AppImage) | Linux x86_64 domestic mirror |
+| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.34/RTXManager-4.3.34-x86_64.AppImage) | Linux x86_64 download |
 
 On Windows, download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 ### Linux (experimental)
 
-Download **`RTXManager-4.3.33-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
+Download **`RTXManager-4.3.34-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
 
 ```sh
-chmod +x RTXManager-4.3.33-x86_64.AppImage
-./RTXManager-4.3.33-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.34-x86_64.AppImage
+./RTXManager-4.3.34-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 Replace the prefix with the game's actual Wine directory; Steam Proton normally uses `steamapps/compatdata/<AppID>/pfx`. Add the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope. Releases include a separate `SHA256SUMS-linux.txt`; see the [Linux instructions](BUILDING.md#linux-appimage-experimental--实验性) for dependencies, running without FUSE and source builds.
 
-Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
+AppImage has its own automatic update channel. Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 
-## 4.3.33 highlights
+## 4.3.34 highlights
 
-- Updates Encore to 2.4.0, with per-pass NR placement, 33–100% custom DLSS scaling and matching shared presets.
-- Fixes runtime pairing in custom Delta Force 0.4.1, uses private Streamline 2.14.16 and adds DLSS 5X/6X. The default remains 4X; XeSS stays at up to 4X.
-- Preserves settings during supported upgrades and restores defaults after uninstall/reinstall. Standard 0.4.1, custom 0.3.5 and both platform update channels remain available.
+- Update standard Dlssg_for_sm86 to **0.4.2** with upstream defaults. Upgrades keep your settings; uninstalling and reinstalling restores defaults.
+- Add the **ANR FG V.B15 full package**, including its models and components, settings, shared presets and uninstall support.
+- Keep custom Delta Force 0.4.1 6X, legacy custom 0.3.5, MFG and Encore. Updating the manager does not automatically replace game patches.
 
 [Full changelog →](CHANGELOG.md)
-
-> Use manager **4.3.33 or later** for **Encore 2.4.1** and the **custom Delta Force 0.4.1 6X revision**, including shared presets. Encore 2.4.1 is a cloud-only hotfix for FG menus incorrectly capped at X2 during startup; no manager update is required. Upgrade games explicitly; manager updates do not automatically replace installed patches.
 
 ## Choose a patch
 
 | Scheme | What to know | Settings / menu |
 | :--- | :--- | :--- |
-| **Dlssg_for_sm86 · 0.4.1** | Complete bundle with XeSS 2X–4X; fresh installs default to `Optimized=1`, preset A and SR off. | Manager / INI |
+| **Dlssg_for_sm86 · 0.4.2** | Complete bundle with XeSS 2X–4X; fresh installs default to `Optimized=1`, preset A and SR off. | Manager / INI |
 | **Dlssg_for_sm86 · 0.4.1 · 额外支持三角洲专用 · DX12/Vulkan** | Private Streamline 2.14.16; DLSS up to 6X, default 4X; XeSS up to 4X. Restart after changing resolution with Vulkan XeSS. | Manager / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | Retained custom route with additional Delta Force support. Choose according to the actual game's requirements. | Manager / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | Retained dedicated Vulkan route; not interchangeable with the DX12 routes. | Manager / INI |
 | **MFG-Unlocker · 1.7.1** | Standalone DLL as before; plugin mode requires a complete existing OptiScaler 10 installation and backs up its host before updating the paired file. These modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
 | **MFG-Unlocker · 1.6.1** | Compatibility fallback; XeMFG requires the existing OptiScaler plugin route. | **Backspace** standalone; OptiScaler menu in plugin mode |
 | **RTX Encore · 2.4.1** | SR/RR/FG, DLSSNR, Smooth Motion, XeSS/XeFG and Frame Pacing, plus experimental features for games without native DLSS. | **Insert**, unless disabled or rebound |
+| **ANR FG · V.B15** | Full package includes OptiScaler, models and runtimes; one entry, default cap of 6X. For games without an existing OptiScaler installation. | Manager / OptiScaler menu |
 
-> MFG-Unlocker 1.6.1 is available as a compatibility option. Uninstall the current patch before switching versions. Preset sharing for this option is supported from manager 4.3.15.
-
-GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility. The initial scheme and 0.2.6 are retired from new installation choices; existing installations remain eligible for owned cleanup/recovery.
+GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility.
 
 ### GPU family support
 
 | Scheme | RTX 20 · Turing | RTX 30 · Ampere | RTX 40 · Ada | RTX 50 · Blackwell |
 | :--- | :--- | :--- | :--- | :--- |
-| Dlssg_for_sm86 · 0.4.1 | Supported | Supported | Supported | Supported |
+| Dlssg_for_sm86 · 0.4.2 | Supported | Supported | Supported | Supported |
 | 0.4.1 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Supported |
 | 0.3.5 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Not supported |
 | Dlssg_for_sm86-MFG-version · Vulkan | Supported | Supported | Not supported | Not supported |
 | MFG-Unlocker · 1.7.1 / 1.6.1 | Supported | Supported | Supported | Supported |
 | RTX Encore · 2.4.1 | Supported | Supported | Supported | Supported |
+| ANR FG · V.B15 | Supported | Supported | Supported | Supported |
 
 Sources: [Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). “Not supported” means outside the documented support scope of the distributed scheme. Experimental features and driver/runtime requirements still apply; this is not a guarantee for every game. Delta Force packages are custom adaptations.
 
-MFG's DLSS route requires an existing Streamline DLSS FG integration; Preset C needs 310.9.16, and RTX 20 requires specific 310.9 runtimes. **The experimental standalone XeMFG route in 1.7.0 can support eligible NVIDIA / AMD / Intel GPUs**, subject to Intel runtime, driver and DX12 / Vulkan requirements. This does not enable DLSS or DLSSNR on AMD / Intel. Version 1.6.1 lacks 1.7.0's standalone XeMFG route.
+MFG's DLSS route requires an existing Streamline DLSS FG integration; Preset C needs 310.9.16, and RTX 20 requires specific 310.9 runtimes. **The experimental standalone XeMFG route in 1.7.1 can support eligible NVIDIA / AMD / Intel GPUs**, subject to Intel runtime, driver and DX12 / Vulkan requirements. This does not enable DLSS or DLSSNR on AMD / Intel. Version 1.6.1 lacks 1.7.0's standalone XeMFG route.
 
-Dlssg_for_sm86's XeSS engine uses its own CUDA backend, not a general-purpose Intel XeSS DLL; it does not add AMD / Intel support. Official 0.4.1 targets DX12; the custom Delta Force and Vulkan packages are separate choices. Encore does not support GTX, AMD or Intel GPUs. Workstation, CMP and unlisted models have no explicit upstream guarantee; changing a GPU name cannot change its hardware capabilities.
+Dlssg_for_sm86's XeSS engine uses its own CUDA backend, not a general-purpose Intel XeSS DLL; it does not add AMD / Intel support. Standard 0.4.2 targets DX12; the custom Delta Force and Vulkan packages are separate choices. Encore does not support GTX, AMD or Intel GPUs. Workstation, CMP and unlisted models have no explicit upstream guarantee; changing a GPU name cannot change its hardware capabilities.
 
-### Encore feature support
-
-| Feature | DX11 | DX12 | Vulkan |
-| :--- | :--- | :--- | :--- |
-| X2–X6 FG with native DLSS FG integration | — | Yes | Yes; experimental on RTX 20/30 |
-| Added features for games without native DLSS / FG | Experimental | Experimental | Experimental |
-| UI assist / RTX 30 Fast SR | — | Yes | — |
-| RTX 30 Smooth Motion | Yes | Yes | Yes |
-| Neural Rendering | Experimental | Experimental | Experimental |
-| Menu / overlay | Yes | Yes | Yes |
-
-Summary of [upstream compatibility notes](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md), not universal game validation. RTX 20 FG/NR remain experimental; GTX, other GPU vendors, DX9 and OpenGL are unsupported. Smooth Motion needs qualified drivers; NR needs 310.8.0 or 310.9.16. See upstream for version requirements and game exceptions.
+[ANR upstream](https://github.com/apex-compute/ANR) also lists FG support for GTX 16, AMD RX 5000/6000/7000/9000, Steam Deck and Intel Arc A/B. ANR FG is separate from NVIDIA DLSSNR and does not enable NVIDIA DLSS on those GPUs. See [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md) for its feature and game requirements.
 
 ### Start in three steps
 
@@ -137,7 +123,7 @@ Close the game before configuration changes or removal. Upgrade a managed suppor
 <details>
 <summary><b>DLL names, ASI and OptiScaler</b></summary>
 
-- The manager permits multiple supported DLL entries. Loading multiple copies can conflict; this is a choice, not a compatibility guarantee. ASI/plugin mode remains exclusive with standalone DLL mode.
+- Some schemes permit multiple DLL entries; ANR permits only one. Loading multiple copies can conflict; this is a choice, not a compatibility guarantee. ASI/plugin mode remains exclusive with standalone DLL mode.
 - Encore's `version.dll`, `winmm.dll`, `dxgi.dll`, `dinput8.dll` and `rtx-encore.asi` use their corresponding upstream files. Other supported names use the main DLL. Renaming identical bytes preserves that file's signature; it does not sign separately built proxies or add graphics API support.
 - For Bink loading, preserve the original as `binkw64Hooked.dll` or `bink2w64Hooked.dll` beside the patch. The manager does not automatically rename or delete the game's originals.
 - MFG plugin mode requires an already installed OptiScaler 10 and its supported `OptiScaler/plugins` directory. The manager does not install OptiScaler or automatically discover custom plugin paths.
@@ -153,6 +139,17 @@ The manager and preset-sharing service support 2.4.0 per-pass NR placement and 3
 
 </details>
 
+<details>
+<summary><b>How do I use ANR FG?</b></summary>
+
+1. Close the game and remove the previous FG patch. For an existing OptiScaler installation, restore it first or follow upstream's addon instructions; the manager does not merge the two installations.
+2. Select **ANR FG V.B15**. Normally choose `dxgi.dll` for DX12 or `winmm.dll` for Vulkan. Select one entry and install.
+3. Enable **DLSS Frame Generation / NVIDIA Frame Generation** in the game; ANR handles that path. The default cap is 6X; the actual multiplier depends on the game.
+
+Windows requires Microsoft Visual C++ 2015–2022 x64. Linux / Proton also needs a per-game DLL override such as `dxgi=n,b` or `winmm=n,b`. Keep the full package's models; copying the DLL alone is not enough.
+
+</details>
+
 ## Update, remove and recover
 
 | Action | Effect |
@@ -163,9 +160,9 @@ The manager and preset-sharing service support 2.4.0 per-pass NR placement and 3
 | **Remove game** | Removes the library entry only. Does not uninstall the patch. |
 | **Clear cache** | Removes downloaded cache data only. Does not uninstall the patch. |
 
-Cleanup includes dlssg frame-time/NGX logs, MFG game-specific temporary logs, and Encore session, exception, performance logs and recognized generated crash dumps. Unknown files, manual captures and other games/plugins are retained. Locked files or incomplete recovery remain visible for retry. OptiScaler fields are restored only if the manager changed them and they have not since been edited.
+Cleanup includes dlssg frame-time/NGX logs, MFG game-specific temporary logs, and Encore session, exception, performance logs recognized generated crash dumps, and owned ANR settings and logs. Unknown files, manual captures and other games/plugins are retained. Locked files or incomplete recovery remain visible for retry. OptiScaler fields changed by MFG plugin mode are restored only if the manager changed them and they have not since been edited.
 
-Resources use one complete ZIP per scheme in [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads). The 0.4.1 package includes all required distributed components; only selected loaders are deployed. Resources are distributed through GitCode/GitHub, with optional runtimes managed separately.
+Resources use one complete ZIP per scheme in [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads). The 0.4.2 and ANR bundles include their required components; only the selected loaders and paired files are installed. Resources are distributed through GitCode/GitHub, with optional runtimes managed separately.
 
 ## Frequently asked questions
 
@@ -177,9 +174,9 @@ Use the relevant upstream game's compatibility notes and the game's actual API. 
 </details>
 
 <details>
-<summary><b>Why is 0.4.0's kernel mode 2?</b></summary>
+<summary><b>Will a fresh installation reuse my previous settings?</b></summary>
 
-0.4.0 defaults to `Optimized=2`; fresh 0.4.1 installs default to `Optimized=1`. Manager 4.3.15 fixes stale cached defaults: reinstall the patch if affected, without deleting manager data. Explicit settings in existing installations are preserved.
+Upgrading an installed patch preserves settings. A complete uninstall followed by a fresh installation uses current defaults. Standard 0.4.2 defaults to `Optimized=1`, DLSS 4X, preset A and SR off. You can also restore defaults in Preset parameters.
 
 </details>
 
@@ -193,7 +190,7 @@ Retry with GitHub as the source if GitCode is unavailable, or use the release li
 <details>
 <summary><b>Does signing or a passing manager test prove game compatibility?</b></summary>
 
-No. Signing identifies a publisher; file, configuration and UI tests do not establish GPU performance, game compatibility or anti-cheat acceptance. Follow the game's modding rules. The previously reported RTX 3060 6GB VRAM issue is not claimed fixed by this release.
+No. Signing identifies a publisher; file, configuration and UI tests do not establish GPU performance, game compatibility or anti-cheat acceptance. Follow the game's modding rules.
 
 </details>
 
@@ -205,7 +202,7 @@ Bug reports: [GitHub Issues](https://github.com/pandaligx/RTX-FG-Manager/issues)
 
 ## Credits
 
-Thanks to [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore), [GPUI](https://gpui.rs/), [GPUI Kit](https://github.com/longbridge/gpui-kit), [GPUI Fast](https://github.com/longbridge/gpui-fast) and [reqwest](https://github.com/seanmonstar/reqwest) / [Tokio](https://github.com/tokio-rs/tokio). See [Third-party notices](THIRD_PARTY_NOTICES.txt).
+Thanks to [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore), [apex-compute / ANR](https://github.com/apex-compute/ANR), [GPUI](https://gpui.rs/), [GPUI Kit](https://github.com/longbridge/gpui-kit), [GPUI Fast](https://github.com/longbridge/gpui-fast) and [reqwest](https://github.com/seanmonstar/reqwest) / [Tokio](https://github.com/tokio-rs/tokio). See [Third-party notices](THIRD_PARTY_NOTICES.txt).
 
 Special thanks to [大大大怪将军阁下](https://space.bilibili.com/608531525), [云外逸声](https://space.bilibili.com/256887068), [坏坏的帅帅啊](https://space.bilibili.com/296225145) and everyone contributing compatibility feedback. This project is not affiliated with NVIDIA, game publishers or the upstream projects.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.3.34 (awaiting signing)
+## 4.3.34 — 2026-11-14
 
 - Update standard Dlssg_for_sm86 to 0.4.2 with its complete loader and component bundle. Fresh installations use the upstream INI, including `Optimized=1`; upgrades preserve edits and uninstall/reinstall restores defaults.
 - Clarify that XeSS `UseHudless=Auto` in 0.4.2 no longer requires a HUD-less input and also interpolates the UI. Keep custom Delta Force 0.4.1 6X and legacy custom 0.3.5 unchanged.
