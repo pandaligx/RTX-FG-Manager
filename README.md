@@ -19,14 +19,14 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.34/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.34/RTXManager-4.3.34-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.35/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.35/RTXManager-4.3.35-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
 
 </div>
 
 ---
 
-> **4.3.34 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
+> **4.3.35 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager game library](docs/screenshot-home.png)
 
@@ -44,24 +44,24 @@
 
 ## Download
 
-**Version 4.3.34** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
+**Version 4.3.35** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.34 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.34) | Default domestic source |
-| **GitHub** | [Open 4.3.34 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.34) | Primary project and fallback |
-| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.34/RTXManager-4.3.34-x86_64.AppImage) | Linux x86_64 domestic mirror |
-| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.34/RTXManager-4.3.34-x86_64.AppImage) | Linux x86_64 download |
+| **GitCode** | [Open 4.3.35 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.35) | Default domestic source |
+| **GitHub** | [Open 4.3.35 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.35) | Primary project and fallback |
+| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.35/RTXManager-4.3.35-x86_64.AppImage) | Linux x86_64 domestic mirror |
+| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.35/RTXManager-4.3.35-x86_64.AppImage) | Linux x86_64 download |
 
 On Windows, download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 ### Linux (experimental)
 
-Download **`RTXManager-4.3.34-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
+Download **`RTXManager-4.3.35-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
 
 ```sh
-chmod +x RTXManager-4.3.34-x86_64.AppImage
-./RTXManager-4.3.34-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.35-x86_64.AppImage
+./RTXManager-4.3.35-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 Replace the prefix with the game's actual Wine directory; Steam Proton normally uses `steamapps/compatdata/<AppID>/pfx`. Add the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope. Releases include a separate `SHA256SUMS-linux.txt`; see the [Linux instructions](BUILDING.md#linux-appimage-experimental--实验性) for dependencies, running without FUSE and source builds.

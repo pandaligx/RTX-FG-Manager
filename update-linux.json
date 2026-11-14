@@ -1,11 +1,14 @@
 {
   "schema": 3,
-  "version": "4.3.34",
-  "file": "RTXManager-4.3.34-x86_64.AppImage",
-  "bytes": 22387192,
-  "sha256": "ae60ef2fe05cda7484e5fd46ddff02e74f021f9557d186554872319bba2f0fb6",
+  "version": "4.3.35",
+  "file": "RTXManager-4.3.35-x86_64.AppImage",
+  "bytes": 22440440,
+  "sha256": "ab39f8766329e45853bc321e0a7814f34f8547a5cb14dd936218aed595fde9de",
   "notes": {
-    "zh-CN": "- 升级原版 Dlssg_for_sm86 至 0.4.2，保留上游默认配置；已有安装升级时保留参数，卸载重装恢复新默认值。\n- 新增 ANR FG V.B15 完整方案，自动安装所需模型与组件。DX12 通常选择 dxgi.dll，Vulkan 选择 winmm.dll，每次只使用一个入口。\n- 支持 ANR 参数设置、玩家分享及卸载清理；遇到已有 OptiScaler 或其他同名文件时提示冲突，避免覆盖。ANR FG 不等于 NVIDIA DLSS 神经渲染。\n- 保留三角洲 0.4.1 6X、旧三角洲 0.3.5、MFG 和 Encore 方案。Windows 与 Linux 安装包同步提供，更新通道保持独立。",
-    "en": "- Update standard Dlssg_for_sm86 to 0.4.2 with upstream defaults. Supported upgrades preserve settings; uninstalling and reinstalling restores current defaults.\n- Add the ANR FG V.B15 full package with its models and components. Normally use dxgi.dll for DX12 or winmm.dll for Vulkan, with one entry at a time.\n- Add ANR settings, shared presets and owned-file cleanup. Existing OptiScaler installations or file conflicts are protected from replacement. ANR FG is separate from NVIDIA DLSS Neural Rendering.\n- Keep custom Delta Force 0.4.1 6X, legacy custom 0.3.5, MFG and Encore schemes. Windows and Linux packages remain on separate update channels."
+    "zh-CN": "## 本次更新\n- 三角洲 / Vulkan 方案升级至 Dlssg_for_sm86 0.4.2，保留 DLSS 最高6X、默认4X和私有 Streamline。\n- ANR FG 升级至 B16，支持保留配置直接升级，补充 Insert（Ins）菜单提示与 NVIDIA / AMD / Intel 显卡说明。\n- 方案列表新增显卡支持提示，项目链接改用 GitHub 图标，统一右侧说明。\n- 名称库显示更新时间及同步状态，自动同步失败后重试；推荐按钮灯光改为4秒一圈。\n- 简化 DLSS 检测信息，反作弊显示 Easy Anti-Cheat、BattlEye、ACE 等名称。\n- 更新中英文截图与 Windows/Linux 下载按钮。",
+    "en": "## What's new\n- Upgrade custom Delta Force / Vulkan to Dlssg_for_sm86 0.4.2, retaining DLSS up to 6X, the 4X default and private Streamline.\n- Upgrade ANR FG to B16 with settings-preserving upgrades; add its Insert (Ins) menu hint and NVIDIA / AMD / Intel GPU information.\n- Add GPU-support hints and GitHub icons to the scheme picker and simplify sidebar text.\n- Show name-catalog date and sync status, retry failed automatic checks, and use a four-second recommendation glow loop.\n- Simplify DLSS detection and name detected anti-cheat products, including Easy Anti-Cheat, BattlEye and ACE.\n- Refresh English/Chinese screenshots and Windows/Linux download buttons.",
+    "ru": "## Обновления\n- Схема Delta Force / Vulkan обновлена до Dlssg_for_sm86 0.4.2: DLSS до 6X, 4X по умолчанию и отдельный Streamline сохранены.\n- ANR FG обновлён до B16 с сохранением настроек. Добавлены подсказка Insert (Ins) и список GPU NVIDIA / AMD / Intel.\n- В списке схем появились подсказки о GPU и значки GitHub; текст боковой панели сокращён.\n- Показаны дата и статус синхронизации названий игр; добавлен повтор после ошибки. Цикл подсветки рекомендаций — 4 секунды.\n- Проверка DLSS стала короче; отображаются названия обнаруженных античитов.\n- Обновлены скриншоты и кнопки загрузки Windows/Linux.",
+    "ja": "## 今回の更新\n- Delta Force / VulkanをDlssg_for_sm86 0.4.2へ更新。DLSS最大6X、既定4X、専用Streamlineを維持。\n- ANR FGをB16へ更新し、設定を保持した更新に対応。Insert（Ins）案内とNVIDIA / AMD / Intel GPU情報を追加。\n- 方式一覧にGPU対応情報とGitHubアイコンを追加し、サイドバーの説明を簡潔化。\n- ゲーム名データの日付と同期状態を表示し、失敗時の再試行に対応。おすすめの光る枠は4秒周期に変更。\n- DLSS検出表示を簡潔にし、検出したアンチチートの名前を表示。\n- スクリーンショットとWindows/Linuxダウンロードボタンを更新。",
+    "ko": "## 업데이트 내용\n- 델타 포스 / Vulkan을 Dlssg_for_sm86 0.4.2로 업데이트합니다. DLSS 최대 6X, 기본 4X 및 전용 Streamline을 유지합니다.\n- ANR FG를 B16으로 업데이트하고 기존 설정을 유지합니다. Insert(Ins) 안내와 NVIDIA / AMD / Intel GPU 정보를 추가합니다.\n- 방식 목록에 GPU 지원 안내 및 GitHub 아이콘을 추가하고 사이드바 설명을 간소화합니다.\n- 게임 이름 데이터의 날짜와 동기화 상태를 표시하고 실패 시 재시도합니다. 추천 테두리 효과는 4초 주기로 변경합니다.\n- DLSS 감지 표시를 간소화하고 감지된 안티치트 이름을 표시합니다.\n- 스크린샷과 Windows/Linux 다운로드 버튼을 업데이트합니다."
   }
 }
