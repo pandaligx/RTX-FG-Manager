@@ -15,7 +15,8 @@ pub const DOMESTIC: &str = "https://api.gitcode.com/api/v5/repos/gcw_qWIjmve7/RT
 pub const GITHUB: &str =
     "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/bundles/catalog.json";
 pub const DELTA_SCHEME: &str = "rtxfg-0.3.5-dx12-vulkan";
-/// A separate identity keeps the tested 0.3.5 fallback and its parameters intact.
+/// Stable custom 0.4.x identity: upgrades preserve saved selections and shared
+/// presets while the independently retained 0.3.5 fallback remains untouched.
 pub const DELTA_041_SCHEME: &str = "rtxfg-0.4.1-dx12-vulkan";
 
 fn source_name(url: &str) -> &'static str {
@@ -764,6 +765,27 @@ impl Catalog {
             }
             _ => "https://github.com/sdli1995/dlssg_for_sm86",
         })
+    }
+    /// Descriptive upstream support, independent of installation eligibility.
+    pub fn scheme_gpu_hint(&self, id: &str) -> &'static str {
+        let Some(policy) = self.scheme_policies.get(id) else {
+            return "显卡支持范围请查看项目文档。";
+        };
+        match policy.parameter_profile.as_str() {
+            crate::anr::PROFILE => {
+                "此项目支持：\nNVIDIA RTX 20 / 30 / 40 / 50、GTX 16\nAMD RX 5000 / 6000 / 7000 / 9000、Steam Deck\nIntel Arc A / B"
+            }
+            crate::encore::PROFILE => {
+                "此项目支持 RTX 20 / 30 / 40 / 50。\n各功能的驱动及游戏要求请查看项目文档。"
+            }
+            crate::rtxmfg::PROFILE => {
+                "DLSS：RTX 20 / 30 / 40 / 50\nXeMFG：符合 Intel 运行库要求的 NVIDIA / AMD / Intel 显卡。\n1.6.1 的 XeMFG 仅支持 OptiScaler 插件模式。"
+            }
+            _ if policy.capabilities.contains(crate::delta::CAPABILITY) => {
+                "此方案主要支持 RTX 20 / 30，额外适配三角洲与 Vulkan。\nRTX 40 与 CMP 的兼容范围请查看项目文档。"
+            }
+            _ => "此项目主要支持 RTX 30 / 20。",
+        }
     }
     pub fn selected(&self, id: &str) -> &Package {
         self.packages

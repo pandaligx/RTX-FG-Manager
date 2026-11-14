@@ -1161,6 +1161,40 @@ fn component_probe_distinguishes_super_resolution_and_frame_generation() {
     fs::create_dir(dir.path().join("EasyAntiCheat")).unwrap();
     let p = scanner::inspect(&exe);
     assert!(p.super_resolution && p.frame_generation && p.anti_cheat);
+    assert_eq!(
+        p.anti_cheat_vendors
+            .iter()
+            .map(|v| v.name())
+            .collect::<Vec<_>>(),
+        ["Easy Anti-Cheat"]
+    );
+}
+
+#[test]
+fn component_probe_names_anticheat_without_matching_ordinary_ace_substrings() {
+    let dir = tempfile::tempdir().unwrap();
+    let exe = game(dir.path());
+    for name in ["interface.dll", "acecombat.exe", "surface.dll"] {
+        fs::write(dir.path().join(name), b"fixture").unwrap();
+    }
+    assert!(!scanner::inspect(&exe).anti_cheat);
+    for name in ["EasyAntiCheat_EOS", "BattlEye", "AntiCheatExpert"] {
+        fs::create_dir(dir.path().join(name)).unwrap();
+    }
+    fs::write(dir.path().join("ACE-Base.sys"), b"fixture").unwrap();
+    fs::write(dir.path().join("EasyAntiCheat_EOS.exe"), b"fixture").unwrap();
+    let result = scanner::inspect(&exe);
+    assert!(result.anti_cheat);
+    assert_eq!(
+        result
+            .anti_cheat_vendors
+            .iter()
+            .map(|v| v.name())
+            .collect::<Vec<_>>(),
+        ["Easy Anti-Cheat", "BattlEye", "ACE (Anti-Cheat Expert)"]
+    );
+    let other = tempfile::tempdir().unwrap();
+    assert!(!scanner::inspect(&game(other.path())).anti_cheat);
 }
 
 #[test]

@@ -2061,6 +2061,15 @@ Full license: rust/assets/nvidia-CC0.txt. NVIDIA and its logo are trademarks of 
 
 
 
+README Windows/Linux download buttons: Quiet.md, copyright (c) 2026 s1dashu, MIT.
+Source: https://github.com/s1dashu/quiet-md/tree/main/docs/images
+Files: docs/download-{en,zh}.svg and docs/download-linux-{en,zh}.svg.
+The English variants translate the button label. Full license: docs/download-buttons-LICENSE.txt.
+
+Lucide gpu SVG (rust/assets/gpu.svg)
+Source: https://github.com/lucide-icons/lucide/blob/main/icons/gpu.svg
+Covered by the Lucide ISC license below.
+
 Lucide venetian-mask SVG (rust/assets/gpu-disguise.svg)
 Source: https://github.com/lucide-icons/lucide/blob/main/icons/venetian-mask.svg
 

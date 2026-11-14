@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.35 — Unreleased
+
+- Upgrade the custom Delta Force / Vulkan scheme from Dlssg_for_sm86 0.4.1 to 0.4.2, retaining private Streamline 2.14.16, DLSS up to 6X and the 4X default. Keep legacy custom 0.3.5 and other schemes.
+- Preserve settings and shared presets during upgrades; uninstall/reinstall uses 0.4.2 defaults. XeSS `UseHudless=Auto` in 0.4.2 also interpolates the UI.
+- Add the ANR FG Insert (Ins) menu hint and clear NVIDIA / AMD / Intel support information.
+- Show GitHub and GPU-support icons in the scheme picker. Simplify detection text and identify detected Easy Anti-Cheat, BattlEye and ACE components.
+- Refresh English/Chinese screenshots and Windows/Linux download buttons. Keep existing update channels and combined download statistics.
+
 ## 4.3.34 — 2026-11-14
 
 - Update standard Dlssg_for_sm86 to 0.4.2 with its complete loader and component bundle. Fresh installations use the upstream INI, including `Optimized=1`; upgrades preserve edits and uninstall/reinstall restores defaults.

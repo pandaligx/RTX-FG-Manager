@@ -1,5 +1,13 @@
 # 更新日志
 
+## 4.3.35 — 待发布
+
+- 三角洲 / Vulkan 自定义方案升级至 Dlssg_for_sm86 0.4.2，替换 0.4.1；保留私有 Streamline 2.14.16、DLSS 最高 6X 与默认 4X。旧 0.3.5 及其他方案保持。
+- 原位升级保留参数与玩家分享；卸载后重装使用 0.4.2 默认配置。0.4.2 的 XeSS `UseHudless=Auto` 会同时处理界面。
+- ANR FG 补充 Insert（Ins）菜单提示和 NVIDIA / AMD / Intel 支持说明。
+- 方案列表使用 GitHub 图标，并增加显卡支持范围图标；检测信息更简洁，反作弊显示 Easy Anti-Cheat、BattlEye、ACE 等识别结果。
+- 更新中英文截图与 Windows/Linux 下载按钮。现有更新通道和合并下载统计保持。
+
 ## 4.3.34 — 2026-11-14
 
 - 标准 Dlssg_for_sm86 更新至 0.4.2，完整部署对应入口与内部组件；新安装沿用上游默认 INI，`Optimized=1`。原位升级保留用户参数，卸载重装恢复默认。
