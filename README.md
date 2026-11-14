@@ -160,7 +160,7 @@ Windows requires Microsoft Visual C++ 2015–2022 x64. Linux / Proton also needs
 | **Remove game** | Removes the library entry only. Does not uninstall the patch. |
 | **Clear cache** | Removes downloaded cache data only. Does not uninstall the patch. |
 
-Cleanup includes dlssg frame-time/NGX logs, MFG game-specific temporary logs, and Encore session, exception, performance logs recognized generated crash dumps, and owned ANR settings and logs. Unknown files, manual captures and other games/plugins are retained. Locked files or incomplete recovery remain visible for retry. OptiScaler fields changed by MFG plugin mode are restored only if the manager changed them and they have not since been edited.
+Cleanup includes dlssg frame-time/NGX logs, MFG game-specific temporary logs, Encore session/exception/performance logs, recognized crash dumps, and owned ANR settings and logs. Unknown files, manual captures and other games/plugins are retained. Files in use or unfinished restoration can be retried. In MFG plugin mode, OptiScaler settings are restored only if the manager changed them and they have not since been edited.
 
 Resources use one complete ZIP per scheme in [Resources (not a manager update)](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/payloads). The 0.4.2 and ANR bundles include their required components; only the selected loaders and paired files are installed. Resources are distributed through GitCode/GitHub, with optional runtimes managed separately.
 
