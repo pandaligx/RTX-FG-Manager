@@ -22,6 +22,86 @@ fn prepare(catalog: &cloud::Catalog, scheme: &str, proxy: &str) -> Result<cloud:
 }
 
 #[test]
+#[ignore = "requires the signed B15/B16 complete archives in an isolated cache"]
+fn signed_anr_b15_to_b16_keeps_settings_and_old_shares_then_restores_defaults() -> Result<()> {
+    let root = PathBuf::from(std::env::var("RTXFG_4334_INPUT")?);
+    anyhow::ensure!(std::env::var("LOCALAPPDATA")?.contains("development"));
+    let previous: cloud::Catalog =
+        serde_json::from_slice(&fs::read(std::env::var("RTXFG_ANR_B15_CATALOG")?)?)?;
+    let current = cloud::bundled();
+    for proxy in anr::PROXIES {
+        let old = prepare(&previous, anr::SCHEME, proxy)?;
+        let new = prepare(&current, anr::SCHEME, proxy)?;
+        assert_eq!(old.upstream_version.as_deref(), Some("0.0.15-B15"));
+        assert_eq!(new.upstream_version.as_deref(), Some("0.0.16-B16"));
+        let tmp = tempfile::tempdir_in(root.join("development/v4335-delta042"))?;
+        let exe = tmp.path().join("ANR-upgrade-test.exe");
+        fs::copy(std::env::current_exe()?, &exe)?;
+        let target = core::DeploymentTarget::for_game(&exe);
+        let context = presets::Context::new(anr::SCHEME, &new.policy, &exe);
+        let install = |payload: &cloud::Prepared| {
+            core::deploy_prepared_context_at_with_overrides(
+                &target,
+                &payload.backend,
+                &[proxy.into()],
+                None,
+                payload.files.clone(),
+                Some(&payload.version),
+                Some(&context),
+                Some(&Values::new()),
+                payload.upstream_version.as_deref(),
+            )
+        };
+        install(&old)?;
+        core::apply_parameters_at(
+            &target,
+            &context,
+            &Values::from([
+                ("max_generated".into(), "3".into()),
+                ("scene_cut".into(), "0".into()),
+            ]),
+        )?;
+        let before = fs::read(tmp.path().join(anr::CONFIG))?;
+        let host_path = tmp.path().join("OptiScaler.ini");
+        let mut host = fs::read(&host_path)?;
+        host.extend_from_slice(b"\n; user menu setting\n");
+        fs::write(&host_path, &host)?;
+        let share = recommendation_presets::capture(&target, &previous, anr::SCHEME, "0.0.15-B15")?;
+        let converted = share.for_version(anr::SCHEME, "0.0.15-B15", "0.0.16-B16")?;
+        assert_eq!(converted.values, share.values);
+        install(&new)?;
+        assert_eq!(fs::read(tmp.path().join(anr::CONFIG))?, before);
+        assert_eq!(fs::read(&host_path)?, host);
+        for (name, bytes) in &new.files {
+            if name != anr::CONFIG && name != "OptiScaler.ini" {
+                assert_eq!(fs::read(tmp.path().join(name))?, *bytes, "{proxy}: {name}");
+            }
+        }
+        let installed = core::record(&target.directory)?.unwrap();
+        assert_eq!(installed.upstream_version.as_deref(), Some("0.0.16-B16"));
+        recommendation_presets::capture(&target, &current, anr::SCHEME, "0.0.16-B16")?
+            .validate(anr::SCHEME, "0.0.16-B16")?;
+        fs::write(
+            tmp.path().join(anr::PROVIDER_DIR).join("nr_fg-session.log"),
+            b"log",
+        )?;
+        fs::write(tmp.path().join("OptiScaler.log"), b"host log")?;
+        assert!(cleanup::clean_outcome_at(&target)?.complete);
+        assert!(!tmp.path().join(core::OWN).exists());
+        assert!(!tmp.path().join("OptiScaler").exists());
+        assert!(!host_path.exists() && !tmp.path().join("OptiScaler.log").exists());
+        assert!(exe.exists());
+        install(&new)?;
+        assert_eq!(
+            fs::read(tmp.path().join(anr::CONFIG))?,
+            new.files[anr::CONFIG]
+        );
+        assert!(cleanup::clean_outcome_at(&target)?.complete);
+    }
+    Ok(())
+}
+
+#[test]
 #[ignore = "requires signed 0.4.2 and ANR packages in the isolated maintainer cache"]
 fn signed_anr_full_install_parameters_cleanup_and_defaults() -> Result<()> {
     let root = PathBuf::from(std::env::var("RTXFG_4334_INPUT")?);
@@ -67,9 +147,13 @@ fn signed_anr_full_install_parameters_cleanup_and_defaults() -> Result<()> {
             ("scene_cut".into(), "0".into()),
         ]);
         core::apply_parameters_at(&target, &context, &changes)?;
-        let snap = recommendation_presets::capture(&target, &catalog, anr::SCHEME, "0.0.15-B15")?;
+        let version = payload
+            .upstream_version
+            .as_deref()
+            .unwrap_or(&payload.version);
+        let snap = recommendation_presets::capture(&target, &catalog, anr::SCHEME, version)?;
         assert_eq!(snap.values["max_generated"], "2");
-        snap.validate(anr::SCHEME, "0.0.15-B15")?;
+        snap.validate(anr::SCHEME, version)?;
         // Menu changes in the bundled host config remain valid and survive reapply.
         let host = tmp.path().join("OptiScaler.ini");
         let mut bytes = fs::read(&host)?;

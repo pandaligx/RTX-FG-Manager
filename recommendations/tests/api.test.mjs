@@ -27,6 +27,11 @@ test('ANR parameter shares round trip without breaking legacy clients',async t=>
   old.content.notes='Old client edit';
   await f.call('PUT',path,{revision:1,content:old.content},u.token,'test-ip',16);
   assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',16,modern)).content.presets,c.presets);
+  // B16 changes model weights, not the parameter protocol. Keep prior votes/data.
+  const b16 = {...c, patchVersion:'0.0.16-B16'};
+  const updated = await f.call('PUT',path,{revision:2,content:b16},u.token,'test-ip',16,modern);
+  assert.equal(updated.content.patchVersion,'0.0.16-B16');
+  assert.deepEqual(updated.content.presets,c.presets);
   assert.throws(()=>recipe({...c,entries:['dxgi.dll','winmm.dll']}));
   const bad=structuredClone(c);bad.presets.values.path='C:/users/secret';
   assert.throws(()=>recipe(bad));

@@ -1,4 +1,21 @@
 {
+  "适配方案": ["Patch scheme", "Схема патча", "パッチ構成", "패치 구성"],
+  "显卡范围：见项目文档": ["GPUs: see project documentation", "Видеокарты: см. документацию", "GPU：プロジェクトの説明を参照", "GPU: 프로젝트 문서 참고"],
+  "主要支持：NVIDIA RTX 20 / 30": ["Primary support: NVIDIA RTX 20 / 30", "Основная поддержка: NVIDIA RTX 20 / 30", "主な対応：NVIDIA RTX 20 / 30", "주요 지원: NVIDIA RTX 20 / 30"],
+  "RTX 40 / CMP：按游戏适配": ["RTX 40 / CMP: game-dependent", "RTX 40 / CMP: зависит от игры", "RTX 40 / CMP：ゲームによる", "RTX 40 / CMP: 게임에 따라 다름"],
+  "Backspace 打开菜单。普通安装选一个 DLL；插件需已有 OptiScaler 10，1.7.1 会备份更新主文件并在卸载时还原。": ["Backspace opens the menu. Standalone: choose one DLL. Plugin: requires OptiScaler 10; 1.7.1 backs up and updates its main file, restoring it on uninstall.", "Backspace открывает меню. Отдельная установка: один DLL. Плагин требует OptiScaler 10; 1.7.1 сохраняет и обновляет основной файл, возвращая его при удалении.", "Backspaceでメニュー。単独導入はDLLを1つ選択。プラグインには既存のOptiScaler 10が必要です。1.7.1は本体をバックアップして更新し、削除時に復元します。", "Backspace로 메뉴를 엽니다. 단독 설치는 DLL 하나를 선택하세요. 플러그인은 기존 OptiScaler 10이 필요하며, 1.7.1은 주 파일을 백업·업데이트하고 제거 시 복원합니다."],
+  "Insert 打开菜单。建议单选 DLL；ASI 不能与 DLL 同装。多选可能冲突，Bink 原件须保留为 Hooked 文件。": ["Insert opens the menu. Use one DLL; ASI and DLL modes are exclusive. Multiple entries may conflict. Keep original Bink files under their Hooked names.", "Insert открывает меню. Лучше один DLL; ASI и DLL несовместимы. Несколько входов могут конфликтовать. Сохраните оригиналы Bink под именами Hooked.", "Insertでメニュー。DLLは1つを推奨し、ASIとの併用はできません。複数選択は競合の原因になります。元のBinkはHooked名で保持してください。", "Insert로 메뉴를 엽니다. DLL 하나를 권장하며 ASI와 함께 설치할 수 없습니다. 여러 항목은 충돌할 수 있습니다. 원본 Bink는 Hooked 이름으로 보관하세요."],
+  "仅用 version.dll，不要改名或混装其他 DLL。": ["Use version.dll only. Do not rename or mix other DLLs.", "Только version.dll. Не переименовывайте и не смешивайте DLL.", "version.dllのみ使用。名前変更や他のDLLとの混在は避けてください。", "version.dll만 사용하세요. 이름을 바꾸거나 다른 DLL을 혼용하지 마세요."],
+  "Insert（Ins）打开菜单。DX12 选 dxgi.dll，Vulkan 选 winmm.dll。需 VC++ 2015–2022 x64；已有 OptiScaler 请先还原。": ["Insert (Ins) opens the menu. DX12: dxgi.dll; Vulkan: winmm.dll. Requires VC++ 2015–2022 x64. Restore existing OptiScaler first.", "Insert (Ins) открывает меню. DX12: dxgi.dll; Vulkan: winmm.dll. Нужен VC++ 2015–2022 x64. Сначала восстановите прежний OptiScaler.", "Insert（Ins）でメニュー。DX12はdxgi.dll、Vulkanはwinmm.dll。VC++ 2015–2022 x64が必要です。既存のOptiScalerは先に復元してください。", "Insert(Ins)로 메뉴를 엽니다. DX12: dxgi.dll, Vulkan: winmm.dll. VC++ 2015–2022 x64가 필요합니다. 기존 OptiScaler를 먼저 복원하세요."],
+  "单选入口：优先 version.dll，也可选 dinput8 / dxgi / winmm。": ["Choose one entry: version.dll preferred, or dinput8 / dxgi / winmm.", "Один вход: лучше version.dll, либо dinput8 / dxgi / winmm.", "1つ選択：version.dllを推奨。dinput8 / dxgi / winmmも使用可能。", "하나만 선택: version.dll 권장, 또는 dinput8 / dxgi / winmm."],
+  "建议只选一个 DLL；多选可能冲突。": ["Use one DLL where possible; multiple entries may conflict.", "Рекомендуется один DLL; несколько могут конфликтовать.", "DLLは1つを推奨。複数選択は競合の原因になります。", "DLL 하나를 권장합니다. 여러 항목은 충돌할 수 있습니다."],
+  "优先 version / winmm / dinput8 / dbghelp；dxgi / d3d12 按需选择。": ["Prefer version / winmm / dinput8 / dbghelp; use dxgi / d3d12 as needed.", "Предпочтительны version / winmm / dinput8 / dbghelp; dxgi / d3d12 — по необходимости.", "version / winmm / dinput8 / dbghelpを推奨。dxgi / d3d12は必要に応じて選択。", "version / winmm / dinput8 / dbghelp 권장. dxgi / d3d12는 필요에 따라 선택하세요."],
+  "仅支持 DX12；Vulkan 请选三角洲或 Vulkan 版本。": ["DX12 only. For Vulkan, choose the Delta Force or Vulkan edition.", "Только DX12. Для Vulkan выберите версию Delta Force или Vulkan.", "DX12のみ。VulkanはDelta Force版またはVulkan版を選択。", "DX12 전용. Vulkan은 델타 포스 또는 Vulkan 버전을 선택하세요."],
+  "支持 Vulkan；RTX 20 待实测，不含三角洲适配。": ["Vulkan supported; RTX 20 untested. No Delta Force adaptation.", "Поддержка Vulkan; RTX 20 не проверены. Без адаптации Delta Force.", "Vulkan対応。RTX 20は未検証。Delta Force専用対応なし。", "Vulkan 지원. RTX 20 미검증, 델타 포스 전용 호환 기능 없음."],
+  "倍率由游戏决定，不会新增游戏内的倍率选项。": ["The game controls the multiplier; no extra in-game choices are added.", "Множитель задаёт игра; новых пунктов в её меню не появится.", "倍率はゲームが決定します。ゲーム内の倍率選択肢は増えません。", "배율은 게임에서 결정하며 게임 내 선택 항목은 추가되지 않습니다."],
+  "名称库：{0} 条 · {1}": ["Game names: {0} entries · {1}", "База названий: {0} записей · {1}", "名称データ：{0}件 · {1}", "게임 이름: {0}개 · {1}"],
+  "每天自动检查，可手动更新。": ["Checked daily. You can also update manually.", "Автопроверка раз в день. Доступно ручное обновление.", "毎日自動確認。手動でも更新できます。", "매일 자동 확인하며 수동으로도 업데이트할 수 있습니다."],
+  "名称库已更新": ["Name catalog updated", "База названий обновлена", "名称データを更新しました", "이름 데이터를 업데이트했습니다"],
   "反作弊：{0}": ["Anti-cheat: {0}", "Античит: {0}", "アンチチート：{0}", "안티치트: {0}"],
   "DLSS：{0}": ["DLSS: {0}", "DLSS: {0}", "DLSS：{0}", "DLSS: {0}"],
   "未检测到": ["Not detected", "Не обнаружено", "未検出", "감지되지 않음"],
@@ -5022,6 +5039,36 @@
     "落日无序的米莉安 (публикации и руководства в HeyBox)",
     "落日无序的米莉安（HeyBox での紹介・解説）",
     "落日无序的米莉安 (HeyBox 소개 및 사용 가이드)"
+  ],
+  "更新须保留原 DLL 入口；换入口前请先卸载": [
+    "Keep the current DLL entry when updating; uninstall before switching entries",
+    "При обновлении сохраните текущую DLL; перед сменой точки входа удалите мод",
+    "更新時は現在の DLL 入口を維持してください。変更前にアンインストールが必要です",
+    "업데이트 시 기존 DLL 진입점을 유지하세요. 변경하려면 먼저 제거하세요"
+  ],
+  "只允许升级到更高版本；已有文件未覆盖": [
+    "Only upgrades to newer versions are allowed; existing files were not overwritten",
+    "Разрешено обновление только до более новой версии; файлы не перезаписаны",
+    "新しいバージョンへの更新のみ可能です。既存ファイルは変更していません",
+    "상위 버전으로만 업데이트할 수 있습니다. 기존 파일은 변경하지 않았습니다"
+  ],
+  "补丁已升级；已保留原配置，重新启动游戏后生效": [
+    "Patch updated; settings preserved. Restart the game to apply",
+    "Патч обновлён, настройки сохранены. Перезапустите игру",
+    "パッチを更新し、設定を保持しました。ゲームを再起動してください",
+    "패치를 업데이트하고 설정을 유지했습니다. 게임을 다시 시작하세요"
+  ],
+  "补丁升级已提交并完成恢复；已保留原配置": [
+    "Patch update committed and recovered; settings preserved",
+    "Обновление патча завершено и восстановлено; настройки сохранены",
+    "パッチ更新と復旧が完了しました。設定は保持されています",
+    "패치 업데이트 및 복구 완료. 기존 설정은 유지되었습니다"
+  ],
+  "升级失败，已恢复原补丁文件和配置": [
+    "Update failed; original patch files and settings restored",
+    "Ошибка обновления; исходные файлы и настройки восстановлены",
+    "更新に失敗しました。元のパッチファイルと設定を復元しました",
+    "업데이트 실패. 원래 패치 파일과 설정을 복원했습니다"
   ],
   "XeFG 源帧稳定节奏": [
     "Steady game pacing for XeFG",

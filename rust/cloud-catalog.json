@@ -1400,12 +1400,12 @@
       "version": "1.6.1"
     },
     {
-      "archive": "anr-fg-b15-complete-3e7f4bd7a546.zip",
+      "archive": "anr-fg-b16-complete-5f9b2be9b744.zip",
       "archive_prefix": "",
       "backends": [
         "anr"
       ],
-      "bytes": 11164911,
+      "bytes": 11046429,
       "component": false,
       "files": [
         {
@@ -1414,9 +1414,9 @@
           "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
         },
         {
-          "bytes": 380,
+          "bytes": 429,
           "name": "ANR-THIRD-PARTY-NOTICES.txt",
-          "sha256": "b03cb634dc9dff1c37ce948cf82dc082927645ef1859db45f5913b14b1aec8c8"
+          "sha256": "b2bed5dbc899ada2084e9344cc42f08ec6a4afd7435c3eae13919658b11d0142"
         },
         {
           "bytes": 58976,
@@ -1429,14 +1429,14 @@
           "sha256": "136ce0356c78f05020afebe8dcaeda4c076c2dab72174f88d2b75fa61cf0bb9e"
         },
         {
-          "bytes": 449868,
+          "bytes": 425162,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/kernels-portable/pack.nrx",
-          "sha256": "f5642e9a2d3c0b3203a540506175200a6946e68c56f7c5b810f8564b1464dc2c"
+          "sha256": "22a0dadec6b4d3a61087bd84b2bf3676a3a126148ded7fb4907922a59242369f"
         },
         {
-          "bytes": 452790,
+          "bytes": 287574,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/kernels/pack.nrx",
-          "sha256": "a65583fb682cd4109e3b0dfe5d8d07b71c99186f031189e51abc1825e55bea2c"
+          "sha256": "8d8fd3236d3f78c73e0b1633cebddbdc72b6c00f7e95b75996af85c9d5873017"
         },
         {
           "bytes": 603,
@@ -1444,74 +1444,74 @@
           "sha256": "68bc047729ecd40558a328b7a56510569ff71d6259eb932f6f18f513226f93d3"
         },
         {
-          "bytes": 3755120,
+          "bytes": 3729376,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/nvngx_dlssg.dll",
-          "sha256": "a7a550c6e01b8abc89484af15a9bcaaa221e3bee8dced44f91425fe842c9629a"
+          "sha256": "c3f387823cbb345859921575d37ba20ec2fafcdc7bfde920c63a81427ba8a308"
         },
         {
-          "bytes": 8283,
+          "bytes": 8400,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/path_table.json",
-          "sha256": "6f6443928936103c311e48c0b2faa9627b71f19ac41c678bb3e495a91e48b4f4"
+          "sha256": "168c7ad0769e187695faa0986a501cc2aaaa0277cafbbff763133c703206cb7e"
         },
         {
-          "bytes": 84607,
+          "bytes": 93916,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-coopmat-pq10/pack.nrx",
-          "sha256": "96588c8922f23bdee9b43e19038e5f7b9056b3fc343c67f03e7caa06ebbf8b29"
+          "sha256": "b20184ff57540dc831b8c5754162ac6cc32d760d6aad0da6b51f2d84800621d3"
         },
         {
-          "bytes": 82299,
+          "bytes": 91658,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-coopmat-srgb8/pack.nrx",
-          "sha256": "7ff31cb45dc1d771c774399ce54411e65508005267ccdefc37f6cae2465832e4"
+          "sha256": "9e494c9286fdd06f87ae30878719dcff8e83c1bf5e0400540a47b52c9ff87b4a"
         },
         {
-          "bytes": 65883,
+          "bytes": 81438,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-dp4a-pq10/pack.nrx",
-          "sha256": "602173add33160bfb36d6c7e215c5104c7c5282baca7c62aa68f25336d51c38d"
+          "sha256": "5e67cf54e919424fffa8a4fcb86b0f3721a8802327e253219bb5824cd61b9dd7"
         },
         {
-          "bytes": 63441,
+          "bytes": 79014,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-dp4a-srgb8/pack.nrx",
-          "sha256": "2e8b5a996753a5bb2f0ced680d6f68e296ba725c7bd633be8bb0ce7f101d8629"
+          "sha256": "453b378c0be4a50a7b5ecc8563faa27871ffdc2e9d98620b245de6d1b6b4a8d9"
         },
         {
-          "bytes": 58120,
+          "bytes": 64578,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-packed-pq10/pack.nrx",
-          "sha256": "6d6983070aa0c4e78598dafe3453e9287a1992a05971ab6925998726722a646b"
+          "sha256": "c9b2ab21834255d754a6d756d8bd5d4b746019cd5953d061c778c8a7c5ad2565"
         },
         {
-          "bytes": 55932,
+          "bytes": 62359,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-packed-srgb8/pack.nrx",
-          "sha256": "36c3cad7d4f7dada76c818344d5f8a9cd6150ce76a112a0203004a5fce3fff83"
+          "sha256": "2950244ebdad6806b8a1bf7d207ad55149ab3c729ab88d8d5c29bd2dd6193972"
         },
         {
-          "bytes": 81298,
+          "bytes": 85300,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-linalg-pq10/pack.nrx",
-          "sha256": "42e8269e03e6476f541918e0176dfe28032d87f332c2b6bd3d6b231a3b3f8cf6"
+          "sha256": "e1ab86d550fd957fc40f485d68a9c4d25fdbd3d317d17f776b68fd4e9a618d38"
         },
         {
-          "bytes": 78861,
+          "bytes": 82821,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-linalg-srgb8/pack.nrx",
-          "sha256": "6562aa1c1bdebcdbb83e683e2266fdb35de6778d78418097209d8cd3a2665ab3"
+          "sha256": "53184f42b131df05d8aa747f7dfed90e2bb55cdf17017c4750ae7df8557cbbd8"
         },
         {
-          "bytes": 60727,
+          "bytes": 66667,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-pq10/pack.nrx",
-          "sha256": "36726f37da1da8d73f045855191d0275cb6c841517217bf590360ddc2759a01e"
+          "sha256": "42f6f7d121a7c7cbd319b12332c357872543c7399315992f26d8d92a52d4138a"
         },
         {
-          "bytes": 58543,
+          "bytes": 64493,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-srgb8/pack.nrx",
-          "sha256": "77939d7a2f9320bf31cd326a03c1d36f878a3dc7ae45c3eac616171f8d61cc73"
+          "sha256": "2cd458c0325b398cff0521fe9b90ff6d3abdcc330ff8889f21d583fbbcf32637"
         },
         {
-          "bytes": 81253,
+          "bytes": 90768,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-xmx-pq10/pack.nrx",
-          "sha256": "ecce6efb5c81bc30675d9ebb249c6e6b4b5c0118583ef18c337096c6b3efcf8a"
+          "sha256": "4670cfb77e99ffe32598d8c21b368c164e9a21754437c0e0bffcbe94d517ae3d"
         },
         {
-          "bytes": 78995,
+          "bytes": 88207,
           "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-xmx-srgb8/pack.nrx",
-          "sha256": "94fb8bf5715aeeacecad7eaf685b2115182c12dc7c7e69fd746aa48a5d1c2bdd"
+          "sha256": "d6e38a75b003507815d872c2d8242e97fbf13398a2aa60bc71005f16ae8c952c"
         },
         {
           "bytes": 958,
@@ -1521,27 +1521,27 @@
         {
           "bytes": 30289232,
           "name": "dxgi.dll",
-          "sha256": "13b631776aee15bf11c1ee2c4d282191a629c8504f6d4d278c0b711d8d371b3a"
+          "sha256": "f846db55f21a148841974cf799c86f65d972a373847f8358ee5b4be6d3019e42"
         }
       ],
-      "id": "anr-fg-b15-full",
-      "label": "ANR FG · V.B15",
+      "id": "anr-fg-b16-full",
+      "label": "ANR FG · V.B16",
       "labels": {
-        "en": "ANR FG · V.B15",
-        "ja": "ANR FG · V.B15",
-        "ko": "ANR FG · V.B15",
-        "ru": "ANR FG · V.B15",
-        "zh": "ANR FG · V.B15"
+        "en": "ANR FG · V.B16",
+        "ja": "ANR FG · V.B16",
+        "ko": "ANR FG · V.B16",
+        "ru": "ANR FG · V.B16",
+        "zh": "ANR FG · V.B16"
       },
       "proxy": "dxgi.dll",
       "scheme_id": "anr-fg",
-      "sha256": "3e7f4bd7a546a99537ce9115ca6f28f5a768ff8b52b8918b9478b6164c8c1cbd",
-      "upstream_version": "0.0.15-B15",
+      "sha256": "5f9b2be9b744e991a6e2b1672aa5562fced15f6a9df1bdc882e9c7429274bf52",
+      "upstream_version": "0.0.16-B16",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/anr-fg-b15-complete-3e7f4bd7a546.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/anr-fg-b15-complete-3e7f4bd7a546.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/anr-fg-b16-complete-5f9b2be9b744.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/anr-fg-b16-complete-5f9b2be9b744.zip"
       },
-      "version": "0.0.15"
+      "version": "0.0.16"
     },
     {
       "archive": "rtxfg-0.4.2-dx12-vulkan-r1-complete-390d62f8cc88.zip",
@@ -2021,7 +2021,7 @@
       "version": "0.4.2"
     }
   ],
-  "revision": "bundles-be01784fb9595860e178",
+  "revision": "bundles-fd7e2a6355153be0583d",
   "schema": 3,
   "scheme_policies": {
     "anr-fg": {

@@ -471,9 +471,9 @@ impl Manager {
                                     .min_w_0()
                                     .text_color(cx.theme().muted_foreground)
                                     .child(this.c.text(&format!(
-                                        "离线名称库：{0} 条 · {1}",
+                                        "名称库：{0} 条 · {1}",
                                         this.c.game_names.len(),
-                                        this.c.game_names.revision()
+                                        this.c.game_names.revision_label()
                                     ))),
                             )
                             .child(
@@ -486,9 +486,15 @@ impl Manager {
                                 .disabled(this.c.names_busy || this.c.read_only),
                             ),
                     )
-                    .when(!this.c.names_status.is_empty(), |d| {
-                        d.child(this.t(&this.c.names_status))
-                    })
+                    .child(div().text_color(cx.theme().muted_foreground).child(this.t(
+                        if this.c.names_busy {
+                            "正在更新名称库…"
+                        } else if this.c.names_status.is_empty() {
+                            "每天自动检查，可手动更新。"
+                        } else {
+                            &this.c.names_status
+                        },
+                    )))
                     .into_any_element()
             }),
         ]);

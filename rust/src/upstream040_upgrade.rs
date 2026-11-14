@@ -1,4 +1,4 @@
-//! Journaled same-entry version upgrade of one owned dlssg 0.4.x installation.
+//! Journaled same-entry version upgrade of owned dlssg 0.4.x and ANR installations.
 //! Call mutation helpers only with the deployment directory lock held. Recovery
 //! never loads a DLL and never obtains paths from a configuration document.
 use crate::{core, presets, upstream040, win};
@@ -15,8 +15,26 @@ fn matching_scheme(old: &core::Record, new: &core::Record) -> bool {
     old.scheme_id == new.scheme_id
         && matches!(
             old.scheme_id.as_deref(),
-            Some(SCHEME | crate::cloud::DELTA_041_SCHEME)
+            Some(SCHEME | crate::cloud::DELTA_041_SCHEME | crate::anr::SCHEME)
         )
+}
+
+fn matching_backend(old: &core::Record, new: &core::Record) -> bool {
+    matching_scheme(old, new)
+        && if new.scheme_id.as_deref() == Some(crate::anr::SCHEME) {
+            old.backend == crate::anr::BACKEND && new.backend == crate::anr::BACKEND
+        } else {
+            matches!(old.backend.as_str(), "upstream_sm86" | upstream040::BACKEND)
+                && new.backend == upstream040::BACKEND
+        }
+}
+
+fn mutable_config(record: &core::Record, name: &str) -> bool {
+    if record.backend == crate::anr::BACKEND {
+        matches!(name, crate::anr::CONFIG | "OptiScaler.ini")
+    } else {
+        name == core::INI
+    }
 }
 
 fn custom_revision_upgrade(old: &core::Record, new: &core::Record) -> bool {
@@ -77,17 +95,11 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
     target.validate_record(&j.old)?;
     target.validate_record(&j.new)?;
     ensure!(
-        matches!(
-            j.old.backend.as_str(),
-            "upstream_sm86" | upstream040::BACKEND
-        ) && j.new.backend == upstream040::BACKEND
-            && matching_scheme(&j.old, &j.new)
-            && !j.old.cache_pending
-            && !j.new.cache_pending,
+        matching_backend(&j.old, &j.new) && !j.old.cache_pending && !j.new.cache_pending,
         "升级恢复记录的方案不匹配"
     );
     ensure!(
-        if j.old.backend == upstream040::BACKEND {
+        if j.old.backend != "upstream_sm86" {
             j.new.selected() == j.old.selected()
         } else {
             j.new
@@ -95,7 +107,7 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
                 .iter()
                 .all(|n| j.old.selected().contains(n))
         },
-        "dlssg 0.4.x 更新须保留原 DLL 入口；换入口前请先卸载"
+        "更新须保留原 DLL 入口；换入口前请先卸载"
     );
     let old_version = j
         .old
@@ -110,14 +122,18 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
     ensure!(
         crate::updater::version(new_version)? > crate::updater::version(old_version)?
             || custom_revision_upgrade(&j.old, &j.new),
-        "dlssg 0.4.x 只允许升级到更高版本；已有文件未覆盖"
+        "只允许升级到更高版本；已有文件未覆盖"
     );
     ensure!(
-        j.new
-            .selected()
-            .iter()
-            .any(|n| j.old.hashes.get(n) != j.new.hashes.get(n)),
-        "dlssg 0.4.x DLL 内容未变化"
+        (j.new.backend == crate::anr::BACKEND
+            && j.new.hashes.iter().any(|(name, hash)| {
+                !mutable_config(&j.new, name) && j.old.hashes.get(name) != Some(hash)
+            }))
+            || j.new
+                .selected()
+                .iter()
+                .any(|n| j.old.hashes.get(n) != j.new.hashes.get(n)),
+        "补丁组件内容未变化"
     );
     let delta_owner = if j.new.scheme_id.as_deref() == Some(crate::cloud::DELTA_041_SCHEME) {
         let expected = if crate::delta::is_game(&target.game_exe) {
@@ -148,8 +164,8 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
     );
     for (name, hash) in &j.before {
         ensure!(
-            name == core::INI || j.old.hashes.get(name) == Some(hash),
-            "原 DLL 与升级归属记录不一致"
+            mutable_config(&j.old, name) || j.old.hashes.get(name) == Some(hash),
+            "原组件与升级归属记录不一致"
         );
     }
     Ok(())
@@ -292,7 +308,7 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
     Ok(true)
 }
 
-/// Upgrade only a valid, same-entry dlssg 0.4.x record. The package configuration
+/// Upgrade only a valid, same-entry record. The package configuration
 /// is for fresh installs; upgrades keep the latest disk bytes and apply only
 /// explicitly edited fields. The caller already holds the directory lock.
 pub fn upgrade_locked(
@@ -308,10 +324,8 @@ pub fn upgrade_locked(
     target.validate_record(old)?;
     target.validate_record(&new)?;
     ensure!(
-        matches!(old.backend.as_str(), "upstream_sm86" | upstream040::BACKEND)
-            && new.backend == upstream040::BACKEND
-            && matching_scheme(old, &new),
-        "只有本管理器记录的 dlssg 0.4.x 安装可以原位升级"
+        matching_backend(old, &new),
+        "只有本管理器记录的同方案安装可以原位升级"
     );
     let dir = &target.directory;
     let root = core::no_links(&dir.join(core::OWN))?;
@@ -325,29 +339,49 @@ pub fn upgrade_locked(
     for (name, hash) in &old.hashes {
         let bytes = checked_bytes(
             &dir.join(name),
-            if name == core::INI {
+            if mutable_config(old, name) {
                 1024 * 1024
             } else {
                 MAX_FILE
             },
         )?;
         ensure!(
-            name == core::INI || core::hash(&bytes) == *hash,
+            mutable_config(old, name) || core::hash(&bytes) == *hash,
             "旧补丁文件已变化：{name}。请先卸载；无法确认的文件可在清理详情确认删除，再安装新版。原安装尚未修改。"
         );
         originals.insert(name.clone(), bytes);
     }
-    let original_config = originals.get(core::INI).context("旧配置文件缺失")?;
-    let mut updated = upstream040::migrate_versions(
-        original_config,
-        old.upstream_version
-            .as_deref()
-            .or(old.payload_version.as_deref()),
-        new.upstream_version
-            .as_deref()
-            .or(new.payload_version.as_deref()),
-        explicit_overrides,
-    )?;
+    let config = if new.backend == crate::anr::BACKEND {
+        crate::anr::CONFIG
+    } else {
+        core::INI
+    };
+    let original_config = originals.get(config).context("旧配置文件缺失")?;
+    let mut updated = if new.backend == crate::anr::BACKEND {
+        // OptiScaler owns its own menu settings; only explicit ANR edits apply.
+        files.insert(
+            "OptiScaler.ini".into(),
+            originals
+                .get("OptiScaler.ini")
+                .context("旧宿主配置缺失")?
+                .clone(),
+        );
+        crate::anr::configure(
+            original_config,
+            explicit_overrides.unwrap_or(&presets::Values::new()),
+        )?
+    } else {
+        upstream040::migrate_versions(
+            original_config,
+            old.upstream_version
+                .as_deref()
+                .or(old.payload_version.as_deref()),
+            new.upstream_version
+                .as_deref()
+                .or(new.payload_version.as_deref()),
+            explicit_overrides,
+        )?
+    };
     if new.scheme_id.as_deref() == Some(crate::cloud::DELTA_041_SCHEME) {
         let context = presets::Context {
             scheme: crate::cloud::DELTA_041_SCHEME.into(),
@@ -370,11 +404,13 @@ pub fn upgrade_locked(
         }
     }
     ensure!(updated.len() <= 1024 * 1024, "更新后配置超过大小限制");
-    files.insert(core::INI.into(), updated);
+    files.insert(config.into(), updated);
     ensure!(
         files.iter().all(|(name, bytes)| !bytes.is_empty()
             && bytes.len() as u64
-                <= if name.ends_with(".dll") {
+                <= if name.ends_with(".dll")
+                    || (new.backend == crate::anr::BACKEND && name.ends_with(".nrx"))
+                {
                     MAX_FILE
                 } else {
                     1024 * 1024
@@ -508,14 +544,14 @@ pub fn upgrade_locked(
     if let Err(error) = operation {
         let committed = matches(&marker, &j.new_marker_hash).unwrap_or(false);
         return match recover_locked(target) {
-            Ok(_) if committed => Ok("dlssg 0.4.x 升级已提交并完成恢复；已保留原配置".into()),
-            Ok(_) => Err(error.context("升级失败，已恢复原 dlssg 0.4.x 文件和配置")),
+            Ok(_) if committed => Ok("补丁升级已提交并完成恢复；已保留原配置".into()),
+            Ok(_) => Err(error.context("升级失败，已恢复原补丁文件和配置")),
             Err(recovery) => {
                 bail!("升级未完成：{error}；自动恢复未完成，原件备份已保留：{recovery}")
             }
         };
     }
-    Ok("dlssg 0.4.x 已升级；已保留原配置，重新启动游戏后生效".into())
+    Ok("补丁已升级；已保留原配置，重新启动游戏后生效".into())
 }
 
 fn checkpoint(_name: &str) -> Result<()> {
@@ -627,6 +663,120 @@ mod tests {
     fn clear_fault() {
         FAULT.with(|f| *f.borrow_mut() = None);
     }
+
+    fn install_anr(target: &core::DeploymentTarget, beta: u8, edit: bool) -> Result<String> {
+        let mut files = BTreeMap::from([
+            ("dxgi.dll".into(), pe(true, 15)), // Model-only upgrades are valid.
+            (
+                crate::anr::CONFIG.into(),
+                b"max_generated = 5\nscene_cut = 1\n".to_vec(),
+            ),
+        ]);
+        for name in crate::anr::COMPONENTS {
+            files.insert(
+                name.into(),
+                if name.ends_with(".dll") {
+                    pe(true, 15)
+                } else if name.ends_with(".nrx") {
+                    vec![beta; 1024 * 1024 + 1]
+                } else {
+                    b"; host configuration or metadata\n".to_vec()
+                },
+            );
+        }
+        let context = presets::Context {
+            scheme: crate::anr::SCHEME.into(),
+            profile: crate::anr::PROFILE.into(),
+            delta: false,
+            delta_capable: false,
+            delta_six: false,
+        };
+        let values = if edit {
+            presets::Values::from([("max_generated".into(), "2".into())])
+        } else {
+            presets::Values::new()
+        };
+        core::deploy_prepared_context_at_with_overrides(
+            target,
+            crate::anr::BACKEND,
+            &["dxgi.dll".into()],
+            None,
+            files,
+            Some(&format!("0.0.{beta}")),
+            Some(&context),
+            Some(&values),
+            Some(&format!("0.0.{beta}-B{beta}")),
+        )
+    }
+
+    #[test]
+    fn anr_model_upgrade_recovers_failures_and_preserves_both_configurations() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let exe = temp.path().join("ANR-transaction-test.exe");
+        fs::write(&exe, pe(false, 0))?;
+        let target = core::DeploymentTarget::for_game(&exe);
+        install_anr(&target, 15, false)?;
+        let config = target.directory.join(crate::anr::CONFIG);
+        fs::write(
+            &config,
+            b"; keep comment\r\nmax_generated = 3\r\nscene_cut = 0\r\n",
+        )?;
+        let host = target.directory.join("OptiScaler.ini");
+        fs::write(&host, b"[User]\nKeep=1\n")?;
+        let before = snapshot(&target.directory)?;
+        let model = crate::anr::COMPONENTS[6];
+        let mut points = vec!["journal".into(), "marker-backup".into()];
+        for name in [crate::anr::CONFIG, model] {
+            for step in ["backup", "stage", "remove", "publish"] {
+                points.push(format!("{step}:{name}"));
+            }
+        }
+        for point in points {
+            for crash in [false, true] {
+                fault(&point, crash);
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    install_anr(&target, 16, true)
+                }));
+                clear_fault();
+                if crash {
+                    assert!(result.is_err(), "{point}");
+                    recover(&target)?;
+                } else {
+                    assert!(result.unwrap().is_err(), "{point}");
+                }
+                assert_eq!(snapshot(&target.directory)?, before, "{point}");
+            }
+        }
+        fault("committed", true);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            install_anr(&target, 16, true)
+        }));
+        clear_fault();
+        assert!(result.is_err());
+        assert!(recover(&target)?);
+        assert!(!has_pending(&target.directory)?);
+        assert_eq!(
+            core::record(&target.directory)?
+                .unwrap()
+                .payload_version
+                .as_deref(),
+            Some("0.0.16")
+        );
+        assert_eq!(fs::read(&host)?, b"[User]\nKeep=1\n");
+        let values = crate::anr::read(&fs::read(&config)?)?;
+        assert_eq!(values["max_generated"], "2");
+        assert_eq!(values["scene_cut"], "0");
+        assert!(fs::read_to_string(&config)?.contains("keep comment"));
+        let after = snapshot(&target.directory)?;
+        assert!(install_anr(&target, 15, false).is_err());
+        assert_eq!(snapshot(&target.directory)?, after);
+        fs::write(target.directory.join(model), b"foreign replacement")?;
+        let changed = snapshot(&target.directory)?;
+        assert!(install_anr(&target, 17, false).is_err());
+        assert_eq!(snapshot(&target.directory)?, changed);
+        Ok(())
+    }
+
     fn recover(target: &core::DeploymentTarget) -> Result<bool> {
         let _lock = win::game_lock(&target.directory)?;
         recover_locked(target)

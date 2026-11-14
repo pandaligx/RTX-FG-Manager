@@ -871,12 +871,10 @@ impl Recommendations {
             .cloned()
             .unwrap_or_else(|| recipe.scheme.clone());
         let base = name.split('·').next().unwrap_or(&name).trim();
-        let displayed_version = if recipe.scheme == rtx_fg_manager::anr::SCHEME
-            && recipe.patch_version == "0.0.15-B15"
-        {
-            "V.B15"
+        let displayed_version = if recipe.scheme == rtx_fg_manager::anr::SCHEME {
+            rtx_fg_manager::anr::display_version(&recipe.patch_version)
         } else {
-            &recipe.patch_version
+            recipe.patch_version.clone()
         };
         let alias = match recipe.gpu_alias.as_str() {
             "unchanged" => self.t("不需要修改显卡型号"),

@@ -68,11 +68,11 @@ chmod +x RTXManager-4.3.34-x86_64.AppImage
 
 AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
 
-## 4.3.34 更新亮点
+## 4.3.35 更新亮点
 
 - 原版 Dlssg_for_sm86 升级至 **0.4.2**，沿用上游默认配置；升级保留已修改参数，卸载后重装恢复默认。
-- 新增 **ANR FG V.B15 完整方案**，一并下载所需模型和组件，支持参数设置、玩家分享与卸载。
-- 保留三角洲 0.4.1 6X、旧三角洲 0.3.5、MFG 和 Encore 方案。管理器更新不会自动替换游戏补丁。
+- **ANR FG 更新至 V.B16**，使用新版模型，保留 B15 配置与玩家参数。
+- 三角洲方案升级至 0.4.2 6X，保留旧三角洲 0.3.5、MFG 和 Encore。管理器更新不会自动替换游戏补丁。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -87,7 +87,7 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | **MFG-Unlocker · 1.7.1** | 普通安装仍使用独立 DLL；已有完整 OptiScaler 10 时可选插件模式，备份并更新配套主文件。两种模式互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **RTX Encore · 2.4.1** | SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG 与 Frame Pacing；可实验性地为无原生 DLSS 的游戏添加功能。 | **Insert**，禁用菜单或修改快捷键后除外 |
-| **ANR FG · V.B15** | 完整包含 OptiScaler、模型和运行文件；单入口安装，默认最高 6X。适用于未安装 OptiScaler 的游戏。 | **Insert（Ins）** 打开菜单；也可在管理器中设置 |
+| **ANR FG · V.B16** | 完整包含 OptiScaler、模型和运行文件；单入口安装，默认最高 6X。适用于未安装 OptiScaler 的游戏。 | **Insert（Ins）** 打开菜单；也可在管理器中设置 |
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。
 
@@ -101,7 +101,7 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | Dlssg_for_sm86-MFG-version · Vulkan | 支持 | 支持 | 不支持 | 不支持 |
 | MFG-Unlocker · 1.7.1 / 1.6.1 | 支持 | 支持 | 支持 | 支持 |
 | RTX Encore · 2.4.1 | 支持 | 支持 | 支持 | 支持 |
-| ANR FG · V.B15 | 支持 | 支持 | 支持 | 支持 |
+| ANR FG · V.B16 | 支持 | 支持 | 支持 | 支持 |
 
 依据：[Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。“不支持”表示未纳入当前分发方案的明确支持范围；实验性功能、驱动和运行库条件仍适用，不保证所有游戏兼容。三角洲方案为本项目自定义适配。
 
@@ -150,7 +150,7 @@ Dlssg_for_sm86 的 XeSS 引擎使用自身 CUDA 后端，不等于通用 Intel X
 <summary><b>ANR FG 怎么用？</b></summary>
 
 1. 退出游戏，卸载此前安装的其他插帧补丁。已有 OptiScaler 的游戏请先恢复原安装，或按上游说明使用 addon；管理器不会自动合并它们。
-2. 选择 **ANR FG V.B15**。DX12 通常用 `dxgi.dll`，Vulkan 用 `winmm.dll`；只选一个入口，点击安装。
+2. 选择 **ANR FG V.B16**。DX12 通常用 `dxgi.dll`，Vulkan 用 `winmm.dll`；只选一个入口，点击安装。
 3. 游戏内开启 **DLSS 帧生成 / NVIDIA 帧生成**，由 ANR 替换处理。按 **Insert（Ins）** 打开菜单。默认倍率上限为 6X，实际倍率取决于游戏。
 
 Windows 需要 Microsoft Visual C++ 2015–2022 x64 运行库。Linux / Proton 还需为该游戏设置相应 DLL override，例如 `dxgi=n,b` 或 `winmm=n,b`。完整包必须保留模型文件，不要只复制 DLL。

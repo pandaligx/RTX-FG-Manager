@@ -68,11 +68,11 @@ Replace the prefix with the game's actual Wine directory; Steam Proton normally 
 
 AppImage has its own automatic update channel. Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 
-## 4.3.34 highlights
+## 4.3.35 highlights
 
 - Update standard Dlssg_for_sm86 to **0.4.2** with upstream defaults. Upgrades keep your settings; uninstalling and reinstalling restores defaults.
-- Add the **ANR FG V.B15 full package**, including its models and components, settings, shared presets and uninstall support.
-- Keep custom Delta Force 0.4.1 6X, legacy custom 0.3.5, MFG and Encore. Updating the manager does not automatically replace game patches.
+- Update **ANR FG to V.B16**, including the new models; retain settings and shared presets from B15.
+- Update custom Delta Force to 0.4.2 6X; keep legacy custom 0.3.5, MFG and Encore. Updating the manager does not automatically replace game patches.
 
 [Full changelog →](CHANGELOG.md)
 
@@ -87,7 +87,7 @@ AppImage has its own automatic update channel. Windows-only GPU scheduling, driv
 | **MFG-Unlocker · 1.7.1** | Standalone DLL as before; plugin mode requires a complete existing OptiScaler 10 installation and backs up its host before updating the paired file. These modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
 | **MFG-Unlocker · 1.6.1** | Compatibility fallback; XeMFG requires the existing OptiScaler plugin route. | **Backspace** standalone; OptiScaler menu in plugin mode |
 | **RTX Encore · 2.4.1** | SR/RR/FG, DLSSNR, Smooth Motion, XeSS/XeFG and Frame Pacing, plus experimental features for games without native DLSS. | **Insert**, unless disabled or rebound |
-| **ANR FG · V.B15** | Full package includes OptiScaler, models and runtimes; one entry, default cap of 6X. For games without an existing OptiScaler installation. | **Insert (Ins)** opens the menu; settings also available in the manager |
+| **ANR FG · V.B16** | Full package includes OptiScaler, models and runtimes; one entry, default cap of 6X. For games without an existing OptiScaler installation. | **Insert (Ins)** opens the menu; settings also available in the manager |
 
 GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility.
 
@@ -101,7 +101,7 @@ GPU detection provides information, not an installation gate. Each upstream patc
 | Dlssg_for_sm86-MFG-version · Vulkan | Supported | Supported | Not supported | Not supported |
 | MFG-Unlocker · 1.7.1 / 1.6.1 | Supported | Supported | Supported | Supported |
 | RTX Encore · 2.4.1 | Supported | Supported | Supported | Supported |
-| ANR FG · V.B15 | Supported | Supported | Supported | Supported |
+| ANR FG · V.B16 | Supported | Supported | Supported | Supported |
 
 Sources: [Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). “Not supported” means outside the documented support scope of the distributed scheme. Experimental features and driver/runtime requirements still apply; this is not a guarantee for every game. Delta Force packages are custom adaptations.
 
@@ -150,7 +150,7 @@ The manager and preset-sharing service support 2.4.0 per-pass NR placement and 3
 <summary><b>How do I use ANR FG?</b></summary>
 
 1. Close the game and remove the previous FG patch. For an existing OptiScaler installation, restore it first or follow upstream's addon instructions; the manager does not merge the two installations.
-2. Select **ANR FG V.B15**. Normally choose `dxgi.dll` for DX12 or `winmm.dll` for Vulkan. Select one entry and install.
+2. Select **ANR FG V.B16**. Normally choose `dxgi.dll` for DX12 or `winmm.dll` for Vulkan. Select one entry and install.
 3. Enable **DLSS Frame Generation / NVIDIA Frame Generation** in the game; ANR handles that path. Press **Insert (Ins)** to open its menu. The default cap is 6X; the actual multiplier depends on the game.
 
 Windows requires Microsoft Visual C++ 2015–2022 x64. Linux / Proton also needs a per-game DLL override such as `dxgi=n,b` or `winmm=n,b`. Keep the full package's models; copying the DLL alone is not enough.

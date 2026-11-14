@@ -1038,7 +1038,7 @@ impl Manager {
             entry
                 .with_animation(
                     "recommendation-entry-glow",
-                    Animation::new(Duration::from_secs(8)).repeat_synced(),
+                    Animation::new(Duration::from_secs(4)).repeat_synced(),
                     |entry, phase| entry.phase(phase),
                 )
                 .into_any_element()
@@ -2407,19 +2407,19 @@ impl Manager {
             );
         }
         let proxy_hint = if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
-            "普通安装选择一个 DLL，Backspace 打开菜单。已有 OptiScaler 10 才选择插件；1.7.1 会备份并更新配套主文件，卸载时恢复。"
+            "Backspace 打开菜单。普通安装选一个 DLL；插件需已有 OptiScaler 10，1.7.1 会备份更新主文件并在卸载时还原。"
         } else if self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE {
-            "Encore 菜单 Insert。DLL 可多选，ASI 与 DLL 模式互斥。上游建议单入口，多选可能重复加载或崩溃。Bink 需保留原始 Hooked 文件。"
+            "Insert 打开菜单。建议单选 DLL；ASI 不能与 DLL 同装。多选可能冲突，Bink 原件须保留为 Hooked 文件。"
         } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
-            "此上游版本仅提供version.dll，请勿改名或混装其他方案的DLL。"
+            "仅用 version.dll，不要改名或混装其他 DLL。"
         } else if self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE {
-            "ANR FG：Insert（Ins）打开菜单。DX12 优先 dxgi.dll，Vulkan 选 winmm.dll，只选一个入口。需要 VC++ 2015–2022 x64；已有 OptiScaler 请先还原。"
+            "Insert（Ins）打开菜单。DX12 选 dxgi.dll，Vulkan 选 winmm.dll。需 VC++ 2015–2022 x64；已有 OptiScaler 请先还原。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {
-            "Transfusion 每次只安装一个入口；优先 version.dll，冲突时可改选 dinput8、dxgi 或 winmm。保留其他 MOD，配置使用独立 JSON。"
+            "单选入口：优先 version.dll，也可选 dinput8 / dxgi / winmm。"
         } else if rtx_fg_manager::upstream040::is_profile(&self.c.parameter_profile()) {
-            "0.4.x 各代理使用对应文件，组件共用完整包。允许多选；上游建议只放一个入口，多选兼容性需自行测试。"
+            "建议只选一个 DLL；多选可能冲突。"
         } else if self.c.cloud_scheme().starts_with("upstream") {
-            "上游支持多选入口；游戏先加载的 DLL 生效，其余仅转发。优先 version/winmm/dinput8/dbghelp；dxgi/d3d12 按需使用。"
+            "优先 version / winmm / dinput8 / dbghelp；dxgi / d3d12 按需选择。"
         } else {
             "优先单选 version.dll；不兼容时卸载后换入口。多选可能冲突。"
         };
@@ -3248,7 +3248,7 @@ impl Manager {
                 div()
                     .v_flex()
                     .gap_2()
-                    .child(div().text_sm().child(self.t("此游戏的适配方案")))
+                    .child(div().text_sm().child(self.t("适配方案")))
                     .child(self.scheme_menu(scheme, series, cx)),
             );
         if let Some(d) = self
@@ -3304,14 +3304,19 @@ impl Manager {
             )
             .child(self.proxy_panel(window, cx));
         if self.c.cloud_scheme().starts_with("upstream") {
-            panel = panel
-                .child(Alert::info("upstream-scope", self.t("此上游方案使用 D3D12；Vulkan 可选择三角洲扩展或独立 Vulkan 方案，兼容性需按游戏实测。")).small());
+            panel = panel.child(
+                Alert::info(
+                    "upstream-scope",
+                    self.t("仅支持 DX12；Vulkan 请选三角洲或 Vulkan 版本。"),
+                )
+                .small(),
+            );
         }
         if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
             panel = panel.child(
                 Alert::info(
                     "mfg-vulkan-scope",
-                    self.t("新上游方案：作者已宣布Vulkan支持，RTX20尚待实测；不包含三角洲专项。"),
+                    self.t("支持 Vulkan；RTX 20 待实测，不含三角洲适配。"),
                 )
                 .small(),
             );
@@ -3322,7 +3327,7 @@ impl Manager {
             panel = panel.child(
                 Alert::info(
                     "experimental-limit",
-                    self.t("这是倍率上限，实际倍率由游戏请求；不会自动给游戏添加 5X/6X 菜单。"),
+                    self.t("倍率由游戏决定，不会新增游戏内的倍率选项。"),
                 )
                 .small(),
             );

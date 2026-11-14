@@ -769,20 +769,18 @@ impl Catalog {
     /// Descriptive upstream support, independent of installation eligibility.
     pub fn scheme_gpu_hint(&self, id: &str) -> &'static str {
         let Some(policy) = self.scheme_policies.get(id) else {
-            return "显卡支持范围请查看项目文档。";
+            return "显卡范围：见项目文档";
         };
         match policy.parameter_profile.as_str() {
             crate::anr::PROFILE => {
-                "此项目支持：\nNVIDIA RTX 20 / 30 / 40 / 50、GTX 16\nAMD RX 5000 / 6000 / 7000 / 9000、Steam Deck\nIntel Arc A / B"
+                "NVIDIA RTX 20 / 30 / 40 / 50、GTX 16\nAMD RX 5000 / 6000 / 7000 / 9000、Steam Deck\nIntel Arc A / B"
             }
-            crate::encore::PROFILE => {
-                "此项目支持 RTX 20 / 30 / 40 / 50。\n各功能的驱动及游戏要求请查看项目文档。"
-            }
+            crate::encore::PROFILE => "NVIDIA RTX 20 / 30 / 40 / 50",
             crate::rtxmfg::PROFILE => "DLSS 多帧生成：NVIDIA RTX 20 / 30 / 40 / 50",
             _ if policy.capabilities.contains(crate::delta::CAPABILITY) => {
-                "此方案主要支持 RTX 20 / 30，额外适配三角洲与 Vulkan。\nRTX 40 与 CMP 的兼容范围请查看项目文档。"
+                "主要支持：NVIDIA RTX 20 / 30\nRTX 40 / CMP：按游戏适配"
             }
-            _ => "此项目主要支持 RTX 30 / 20。",
+            _ => "主要支持：NVIDIA RTX 20 / 30",
         }
     }
     pub fn selected(&self, id: &str) -> &Package {
