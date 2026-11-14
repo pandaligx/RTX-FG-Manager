@@ -3174,5 +3174,59 @@
         }
       }
     }
+  },
+  "anr-fg": {
+    "profile": "anr_fg_b15",
+    "fields": {
+      "max_generated": {
+        "values": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "label": "倍率上限",
+        "labels": {
+          "1": "2X",
+          "2": "3X",
+          "3": "4X",
+          "4": "5X",
+          "5": "6X"
+        }
+      },
+      "scene_cut": {
+        "values": [
+          "1",
+          "0"
+        ],
+        "label": "场景切换保护",
+        "labels": {
+          "1": "开启",
+          "0": "关闭"
+        }
+      },
+      "path": {
+        "values": [
+          "auto",
+          "coopmat",
+          "packed",
+          "dp4a",
+          "portable",
+          "portable-linalg",
+          "portable-xmx"
+        ],
+        "label": "计算路径",
+        "labels": {
+          "auto": "自动",
+          "coopmat": "Cooperative Matrix",
+          "packed": "Packed",
+          "dp4a": "DP4A",
+          "portable": "Portable",
+          "portable-linalg": "Portable Linear Algebra",
+          "portable-xmx": "Portable XMX"
+        }
+      }
+    }
   }
 }

@@ -40,6 +40,7 @@ export const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0
 // Reviewed loader names only. Download addresses and local paths are absent.
 const universal = ['version.dll','dinput8.dll','winmm.dll','dxgi.dll','d3d9.dll','d3d10.dll','d3d11.dll','d3d12.dll','dsound.dll','wininet.dll','winhttp.dll','binkw64.dll','bink2w64.dll','xinput1_1.dll','xinput1_2.dll','xinput1_3.dll','xinput1_4.dll','xinput9_1_0.dll','xinputuap.dll'];
 export const schemes = {
+  'anr-fg': ['dxgi.dll','winmm.dll','version.dll'],
   'dlssg-transfusion-1.4.5.3': [...universal, 'rtx-encore.asi'],
   'rtx40mfg-1.3.3-hf2': [...universal, 'OptiScaler/plugins/MFGUnlocker.asi'],
   'mfg-unlocker-1.6.1-compat': [...universal, 'OptiScaler/plugins/MFGUnlocker.asi'],
@@ -66,6 +67,7 @@ export function recipe(input) {
     && new Set(input.entries).size === input.entries.length
     && input.entries.every(e => schemes[input.scheme].includes(e)), 'invalid_entries');
   need(!input.entries.some(e => e.endsWith('.asi')) || input.entries.length === 1, 'plugin_proxy_conflict');
+  need(input.scheme!=='anr-fg' || input.entries.length===1,'invalid_entries');
   need(typeof input.patchVersion === 'string' && /^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(input.patchVersion)
     && input.patchVersion.length <= 40, 'invalid_patch_version');
   need(['dx12','vulkan','dx11','unknown'].includes(input.renderer), 'invalid_renderer');

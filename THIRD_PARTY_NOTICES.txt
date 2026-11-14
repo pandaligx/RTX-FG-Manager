@@ -2051,6 +2051,11 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+ANR FG V.B15 (optional downloaded patch): https://github.com/apex-compute/ANR/releases/tag/FG-V.B15
+The full bundle includes the upstream Apex OptiScaler host (GPL-3.0), the ANR FG provider and model packs.
+OptiScaler's GPL text accompanies the downloaded bundle; its corresponding source archive is offered in the same upstream release.
+The manager does not rebuild or modify these signed binaries. The public ANR repository also contains capture/replay tools; this is not a claim that the released FG core is open source.
+
 NVIDIA brand icon: Simple Icons, CC0-1.0. Source: https://github.com/simple-icons/simple-icons/blob/develop/icons/nvidia.svg
 Full license: rust/assets/nvidia-CC0.txt. NVIDIA and its logo are trademarks of NVIDIA Corporation; used to identify device vendor.
 

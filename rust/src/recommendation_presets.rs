@@ -28,6 +28,7 @@ pub const PROFILES: &[(&str, &str)] = &[
     ("rtxfg-0.3.5-dx12-vulkan", "upstream035"),
     (cloud::DELTA_041_SCHEME, crate::upstream040::PROFILE_041),
     ("pipotoufik-mfg-vulkan-sm86-7", presets::MFG_VULKAN),
+    (crate::anr::SCHEME, crate::anr::PROFILE),
 ];
 
 pub const MFG_161_COMPAT: &str = "mfg-unlocker-1.6.1-compat";

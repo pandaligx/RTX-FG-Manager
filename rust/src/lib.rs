@@ -1,3 +1,4 @@
+pub mod anr;
 pub mod assets;
 pub mod cache;
 pub mod cleanup;

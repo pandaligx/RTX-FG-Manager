@@ -206,6 +206,7 @@ impl CompactCatalog {
                 "Duplicate/empty scheme"
             );
             let (ini_policy, max_selected_proxies) = match s.profile.as_str() {
+                crate::anr::PROFILE => ("anr_full", 1),
                 "initial" => ("initial", 1),
                 crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 => ("upstream040", 1),
                 crate::rtxmfg::PROFILE => ("rtxmfg_json", 1),
@@ -244,7 +245,7 @@ impl CompactCatalog {
                         vec!["SM89".into()]
                     } else if matches!(
                         s.profile.as_str(),
-                        crate::transfusion::PROFILE | crate::encore::PROFILE
+                        crate::transfusion::PROFILE | crate::encore::PROFILE | crate::anr::PROFILE
                     ) {
                         vec!["SM75".into(), "SM86".into(), "SM89".into()]
                     } else {
@@ -294,6 +295,7 @@ impl Catalog {
     /// this manager. Explicitly removed/unsupported schemes remain removed.
     pub fn retain_bundled_versions(&mut self) {
         let baseline = bundled();
+        retain_newly_introduced_anr(self, &baseline);
         for (scheme, policy) in &baseline.scheme_policies {
             let current = self.packages.iter().find(|p| &p.scheme_id == scheme);
             let fresh = baseline.packages.iter().find(|p| &p.scheme_id == scheme);
@@ -398,6 +400,11 @@ impl Catalog {
             );
             ensure!(
                 match policy.parameter_profile.as_str() {
+                    crate::anr::PROFILE =>
+                        policy.ini_policy == "anr_full"
+                            && policy.max_selected_proxies == 1
+                            && crate::anr::PROXIES.contains(&p.proxy.as_str())
+                            && p.backends == [crate::anr::BACKEND],
                     "initial" => policy.ini_policy == "initial",
                     crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 =>
                         policy.ini_policy == "upstream040"
@@ -498,6 +505,7 @@ impl Catalog {
             }
             ensure!(!p.component, "Components require a directory protocol");
             let encore = policy.parameter_profile == crate::encore::PROFILE;
+            let anr = policy.parameter_profile == crate::anr::PROFILE;
             let intel = encore && crate::encore::supports_120(p.upstream_version.as_deref());
             let mfg_notice = policy.parameter_profile == crate::rtxmfg::PROFILE
                 && crate::mfg_plugin::supported(p.upstream_version.as_deref());
@@ -510,7 +518,9 @@ impl Catalog {
             ensure!(
                 core::PROXIES.contains(&p.proxy.as_str())
                     && p.files.len()
-                        == if intel {
+                        == if anr {
+                            crate::anr::COMPONENTS.len() + 2
+                        } else if intel {
                             7
                         } else if mfg_host {
                             4
@@ -536,7 +546,9 @@ impl Catalog {
             );
             let mut expected_entries = BTreeSet::from([
                 p.proxy.as_str(),
-                if encore {
+                if anr {
+                    crate::anr::CONFIG
+                } else if encore {
                     crate::encore::CONFIG
                 } else if policy.parameter_profile == crate::rtxmfg::PROFILE {
                     crate::rtxmfg::CONFIG
@@ -548,6 +560,9 @@ impl Catalog {
             ]);
             if encore {
                 expected_entries.insert(crate::encore::NOTICES);
+            }
+            if anr {
+                expected_entries.extend(crate::anr::COMPONENTS);
             }
             if intel {
                 expected_entries.extend(crate::encore::INTEL_FILES);
@@ -584,6 +599,7 @@ impl Catalog {
                     && matches!(
                         policy.ini_policy.as_str(),
                         "native"
+                            | "anr_full"
                             | "initial"
                             | "upstream_proxy"
                             | "rtxmfg_json"
@@ -603,7 +619,9 @@ impl Catalog {
                     routes.insert((&p.scheme_id, b, &p.proxy)),
                     "Ambiguous package route"
                 );
-                let expected = if b == crate::rtxmfg::BACKEND {
+                let expected = if b == crate::anr::BACKEND {
+                    "anr_full"
+                } else if b == crate::rtxmfg::BACKEND {
                     "rtxmfg_json"
                 } else if b == crate::transfusion::BACKEND {
                     "transfusion_json"
@@ -628,6 +646,7 @@ impl Catalog {
                                 || matches!(
                                     policy.parameter_profile.as_str(),
                                     crate::rtxmfg::PROFILE
+                                        | crate::anr::PROFILE
                                         | crate::transfusion::PROFILE
                                         | crate::encore::PROFILE
                                 ))))
@@ -690,13 +709,15 @@ impl Catalog {
                     && seen.insert(&p.scheme_id)
             })
             .collect();
-        const ORDER: [&str; 6] = [
+        const ORDER: [&str; 8] = [
             "upstream-0.3.5-310-9",
             DELTA_041_SCHEME,
             "rtxfg-0.3.5-dx12-vulkan",
             "pipotoufik-mfg-vulkan-sm86-7",
             "rtx40mfg-1.3.3-hf2",
             "dlssg-transfusion-1.4.5.3",
+            "mfg-unlocker-1.6.1-compat",
+            crate::anr::SCHEME,
         ];
         schemes.sort_by_key(|p| {
             (
@@ -729,6 +750,7 @@ impl Catalog {
     pub fn scheme_source_url(&self, id: &str) -> Option<&'static str> {
         let policy = self.scheme_policies.get(id)?;
         Some(match policy.parameter_profile.as_str() {
+            crate::anr::PROFILE => crate::anr::SOURCE,
             crate::encore::PROFILE => crate::encore::SOURCE,
             crate::transfusion::PROFILE => crate::transfusion::SOURCE,
             crate::rtxmfg::PROFILE => "https://github.com/dashdogy/MFG-Unlocker",
@@ -777,6 +799,22 @@ impl Catalog {
         if self
             .scheme_policies
             .get(id)
+            .is_some_and(|p| p.parameter_profile == crate::anr::PROFILE)
+        {
+            return crate::anr::PROXIES
+                .iter()
+                .filter(|name| {
+                    self.packages.iter().any(|p| {
+                        p.scheme_id == id
+                            && package_supports_entry(p, &self.scheme_policies[id], name)
+                    })
+                })
+                .map(|s| (*s).into())
+                .collect();
+        }
+        if self
+            .scheme_policies
+            .get(id)
             .is_some_and(|p| p.parameter_profile == crate::encore::PROFILE)
         {
             let policy = &self.scheme_policies[id];
@@ -821,6 +859,9 @@ fn package_supports_entry(p: &Package, policy: &Policy, name: &str) -> bool {
     if p.component {
         return false;
     }
+    if policy.parameter_profile == crate::anr::PROFILE {
+        return p.proxy == "dxgi.dll" && crate::anr::PROXIES.contains(&name);
+    }
     if p.proxy == name {
         return true;
     }
@@ -853,6 +894,7 @@ pub fn bundled() -> Catalog {
 /// A stale mirror/cache must not downgrade a scheme below the build's reviewed
 /// baseline. A removed scheme stays removed; newer remote releases still win.
 fn retain_newer_baseline(catalog: &mut Catalog, baseline: &Catalog) {
+    retain_newly_introduced_anr(catalog, baseline);
     for (scheme, policy) in &baseline.scheme_policies {
         if !catalog.scheme_policies.contains_key(scheme) {
             continue;
@@ -885,6 +927,29 @@ fn retain_newer_baseline(catalog: &mut Catalog, baseline: &Catalog) {
                 .scheme_policies
                 .insert(scheme.clone(), policy.clone());
         }
+    }
+}
+/// The last reviewed pre-ANR catalog cannot know this newly bundled scheme.
+/// Only that exact predecessor gets this registration; a later remote removal
+/// or an explicit unsupported entry must remain authoritative.
+fn retain_newly_introduced_anr(catalog: &mut Catalog, baseline: &Catalog) {
+    if catalog.revision != "bundles-6ae5a179dcf09ec348b7"
+        || catalog.scheme_policies.contains_key(crate::anr::SCHEME)
+        || catalog.skipped_schemes.contains_key(crate::anr::SCHEME)
+    {
+        return;
+    }
+    if let Some(policy) = baseline.scheme_policies.get(crate::anr::SCHEME) {
+        catalog
+            .scheme_policies
+            .insert(crate::anr::SCHEME.into(), policy.clone());
+        catalog.packages.extend(
+            baseline
+                .packages
+                .iter()
+                .filter(|p| p.scheme_id == crate::anr::SCHEME)
+                .cloned(),
+        );
     }
 }
 pub fn cached() -> Catalog {
@@ -1084,8 +1149,16 @@ pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
                     && u16::from_le_bytes([h[22], h[23]]) & 0x2000 != 0,
                 "Not an x64 DLL"
             );
+        } else if f.name.ends_with(".nrx")
+            && p.backends == [crate::anr::BACKEND]
+            && crate::anr::COMPONENTS.contains(&f.name.as_str())
+        {
+            ensure!(!b.is_empty(), "Empty ANR model");
         } else {
             std::str::from_utf8(&b).context("INI is not UTF-8")?;
+            if f.name == crate::anr::CONFIG {
+                crate::anr::read(&b)?;
+            }
             if f.name == crate::encore::CONFIG {
                 crate::encore::validate_cloud_config(&b)?;
             }
@@ -1230,7 +1303,9 @@ fn selected_package<'a>(
                     if crate::upstream040::is_profile(&policy.parameter_profile) {
                         return b == crate::upstream040::BACKEND;
                     }
-                    if policy.parameter_profile == crate::rtxmfg::PROFILE {
+                    if policy.parameter_profile == crate::anr::PROFILE {
+                        b == crate::anr::BACKEND
+                    } else if policy.parameter_profile == crate::rtxmfg::PROFILE {
                         b == crate::rtxmfg::BACKEND
                     } else if policy.parameter_profile == crate::transfusion::PROFILE {
                         b == crate::transfusion::BACKEND
@@ -1332,7 +1407,9 @@ pub fn prepare_with_progress(
                 if crate::upstream040::is_profile(&policy.parameter_profile) {
                     return b.as_str() == crate::upstream040::BACKEND;
                 }
-                if policy.parameter_profile == crate::rtxmfg::PROFILE {
+                if policy.parameter_profile == crate::anr::PROFILE {
+                    b.as_str() == crate::anr::BACKEND
+                } else if policy.parameter_profile == crate::rtxmfg::PROFILE {
                     b.as_str() == crate::rtxmfg::BACKEND
                 } else if policy.parameter_profile == crate::transfusion::PROFILE {
                     b.as_str() == crate::transfusion::BACKEND
@@ -1365,7 +1442,7 @@ pub fn prepare_with_progress(
         for (name, bytes) in archive(c, p, cancel, &mut package_progress)? {
             let name = if matches!(
                 policy.parameter_profile.as_str(),
-                crate::rtxmfg::PROFILE | crate::encore::PROFILE
+                crate::rtxmfg::PROFILE | crate::encore::PROFILE | crate::anr::PROFILE
             ) && name == p.proxy
             {
                 proxy.clone()
@@ -1462,6 +1539,47 @@ mod tests {
         assert_eq!(files[0].bytes, p.bytes);
         assert_eq!(files[0].id, p.download_file().id);
         Ok(())
+    }
+    #[test]
+    fn anr_registration_only_supplements_the_reviewed_predecessor() {
+        let baseline = bundled();
+        let mut prior = baseline.clone();
+        prior.packages.retain(|p| p.scheme_id != crate::anr::SCHEME);
+        prior.scheme_policies.remove(crate::anr::SCHEME);
+        prior.revision = "bundles-6ae5a179dcf09ec348b7".into();
+        let mut later_removed = prior.clone();
+        later_removed.revision = "future-reviewed-catalog".into();
+        retain_newer_baseline(&mut later_removed, &baseline);
+        assert!(
+            !later_removed
+                .scheme_policies
+                .contains_key(crate::anr::SCHEME)
+        );
+        let mut skipped = prior.clone();
+        skipped
+            .skipped_schemes
+            .insert(crate::anr::SCHEME.into(), "unsupported".into());
+        retain_newer_baseline(&mut skipped, &baseline);
+        assert!(!skipped.scheme_policies.contains_key(crate::anr::SCHEME));
+        retain_newer_baseline(&mut prior, &baseline);
+        prior.validate().unwrap();
+        assert_eq!(
+            prior
+                .packages
+                .iter()
+                .filter(|p| p.scheme_id == crate::anr::SCHEME)
+                .count(),
+            1
+        );
+        prior.retain_bundled_versions();
+        assert_eq!(
+            prior
+                .packages
+                .iter()
+                .filter(|p| p.scheme_id == crate::anr::SCHEME)
+                .count(),
+            1
+        );
     }
     #[test]
     fn custom_delta_revision_survives_a_stale_mirror() {
@@ -1690,6 +1808,7 @@ mod tests {
             "rtx40mfg-1.3.3-hf2",
             "dlssg-transfusion-1.4.5.3",
             "mfg-unlocker-1.6.1-compat",
+            crate::anr::SCHEME,
         ];
         assert_eq!(
             c.schemes()

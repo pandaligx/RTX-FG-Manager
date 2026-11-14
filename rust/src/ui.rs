@@ -799,13 +799,18 @@ impl Manager {
                     let mut p = self.c.proxies();
                     if yes && !p.contains(&name) {
                         // Plugin mode and DLL mode are distinct loading methods.
-                        if name.ends_with(".asi") {
+                        if name.ends_with(".asi")
+                            || self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE
+                        {
                             p.clear();
                         } else {
                             p.retain(|n| !n.ends_with(".asi"));
                         }
                         p.push(name)
-                    } else if !yes {
+                    } else if !yes
+                        && !(self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE
+                            && p.len() == 1)
+                    {
                         p.retain(|p| *p != name)
                     }
                     if p.is_empty() {
@@ -2290,6 +2295,7 @@ impl Manager {
                 if matches!(
                     param.key,
                     "max_generated_frames"
+                        | "max_generated"
                         | "max_interpolated_frames"
                         | "force_multiplier"
                         | "rtx_mode"
@@ -2332,6 +2338,8 @@ impl Manager {
             .child(title)
             .when(self.c.boolean("preset_help_open", false), |d| d.child(Alert::info("preset-inline-help", self.t(if context.profile == rtx_fg_manager::rtxmfg::PROFILE {
                 "独立 MFG 按 Backspace；OptiScaler 插件使用其菜单。NR 与独立 XeSS 多帧生成需另装运行库。1.7.1 插件支持配套 OptiScaler 的 XeMFG 提供器；帧生成输出在 OptiScaler 中选择。"
+            } else if context.profile == rtx_fg_manager::anr::PROFILE {
+                "ANR FG 完整包已包含 OptiScaler 和模型。游戏内开启帧生成；默认上限6X，实际倍率由游戏请求。更改参数后重启游戏。"
             } else if context.profile == rtx_fg_manager::transfusion::PROFILE {
                 "默认跟随游戏；固定倍率可选2X—6X，5X/6X可能增加显存与延迟。Ctrl+Alt+2/3/4切换倍率，Ctrl+Alt+G跟随游戏，Ctrl+Alt+D切换动态。RTX20及旧显卡Vulkan仍需实机验证。"
             } else if context.delta && context.delta_six {
@@ -2404,6 +2412,8 @@ impl Manager {
             "Encore 菜单 Insert。DLL 可多选，ASI 与 DLL 模式互斥。上游建议单入口，多选可能重复加载或崩溃。Bink 需保留原始 Hooked 文件。"
         } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
             "此上游版本仅提供version.dll，请勿改名或混装其他方案的DLL。"
+        } else if self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE {
+            "ANR FG 完整安装：DX12 优先 dxgi.dll，Vulkan 选 winmm.dll，每次仅一个入口。需要 VC++ 2015–2022 x64 运行库；已有 OptiScaler 请先还原。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {
             "Transfusion 每次只安装一个入口；优先 version.dll，冲突时可改选 dinput8、dxgi 或 winmm。保留其他 MOD，配置使用独立 JSON。"
         } else if rtx_fg_manager::upstream040::is_profile(&self.c.parameter_profile()) {
@@ -2422,7 +2432,13 @@ impl Manager {
                 div()
                     .text_sm()
                     .font_weight(FontWeight::MEDIUM)
-                    .child(self.t("DLL 加载入口（可多选）")),
+                    .child(self.t(
+                        if self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE {
+                            "DLL 加载入口（单选）"
+                        } else {
+                            "DLL 加载入口（可多选）"
+                        },
+                    )),
             )
             .child(checks)
             .child(
@@ -3690,7 +3706,14 @@ impl Manager {
             (self.t("日志级别"),self.t("默认 1 只记录错误；2 用于诊断；3 记录详细过程。0.2.6 的 Vulkan 桥接日志暂不受此开关控制。")),
             (self.t("怎样生效"),self.t("仅保存当前游戏、当前方案的参数。完全退出游戏后点击安装补丁以应用；已部署相同 DLL 时只更新这些参数，保留其他 INI 内容。恢复默认只重置这里的选项。")),
         ];
-        if profile == rtx_fg_manager::transfusion::PROFILE {
+        if profile == rtx_fg_manager::anr::PROFILE {
+            sections = vec![
+                (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
+                (self.t("使用说明"), self.t("ANR FG 完整包已包含 OptiScaler 和模型。游戏内开启帧生成；默认上限6X，实际倍率由游戏请求。更改参数后重启游戏。")),
+                (self.t("兼容性"), self.t("支持情况取决于游戏的帧生成输入、显卡和驱动。这是 ANR 帧生成，不是 DLSS 神经渲染；上游 SR/RR 尚未发布。已有 OptiScaler 请使用上游 addon，完整包不会覆盖原安装。")),
+                (self.t("Linux"), self.t("Wine/Proton 需为所选入口设置 DLL override，例如 dxgi=n,b；Vulkan 改用 winmm。")),
+            ];
+        } else if profile == rtx_fg_manager::transfusion::PROFILE {
             sections = vec![
                 (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
                 (self.t("请求倍率"), self.t("Transfusion 使用独立 JSON，默认跟随游戏。固定支持2X—6X，5X/6X为实验；动态默认最高4X，目标0跟随显示器刷新率。")),

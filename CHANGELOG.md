@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.34 — 2026-11-14
+
+- Update standard Dlssg_for_sm86 to 0.4.2 with its complete loader and component bundle. Fresh installations use the upstream INI, including `Optimized=1`; upgrades preserve edits and uninstall/reinstall restores defaults.
+- Clarify that XeSS `UseHudless=Auto` in 0.4.2 no longer requires a HUD-less input and also interpolates the UI. Keep custom Delta Force 0.4.1 6X and legacy custom 0.3.5 unchanged.
+- Add the ANR FG V.B15 full package, including its paired OptiScaler host, models and runtime files, with one loader, frame multiplier cap, scene-cut protection, compute-path settings and preset sharing.
+- Protect existing OptiScaler installations. ANR uninstall cleans owned settings/logs while retaining other plugins and unknown files; also clean interrupted nested configuration writes.
+- Preserve the current UI and independent Windows/Linux update channels. The full ANR package is for games without OptiScaler; existing installations need the upstream addon route. Actual compatibility depends on the game, driver and hardware.
+
 ## 4.3.33
 
 - Adapt RTX Encore 2.4.0 per-pass neural rendering placement and 33–100% custom DLSS scaling, including shared presets.

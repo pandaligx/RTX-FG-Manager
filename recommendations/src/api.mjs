@@ -16,7 +16,7 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
-    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, notesLimit:NOTES_LIMIT };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, anr:1, notesLimit:NOTES_LIMIT };
     if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
@@ -63,6 +63,7 @@ export function createApi(db, options) {
       if(!supportsDelta6 && delta6(result.content)) delete result.content.presets;
       if(!mfg171 && newMfg(result.content.presets)) delete result.content.presets;
       if(!supportsEncore240 && encore240(result.content.presets)) delete result.content.presets;
+      if(headers['x-rtxfg-anr']!=='1' && result.content.scheme==='anr-fg') delete result.content.presets;
       if(crossStore && requested) {
         need(games.resolve(requested)===games.resolve(row.game),'game_mismatch');
         result.content.game={id:requested,name:games.describe(requested).name};
@@ -169,6 +170,7 @@ export function createApi(db, options) {
       if(!supportsDelta6 && delta6(original) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
       if(!mfg171 && newMfg(original.presets) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
       if(!supportsEncore240 && encore240(original.presets) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
+      if(headers['x-rtxfg-anr']!=='1' && original.scheme==='anr-fg' && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
       // Old clients only received a bounded excerpt. Never overwrite the full text
       // with that excerpt, or silently erase its unseen remainder during edits.
       if(!['8','9','10','11','12','13','14','15','16'].includes(feedback) && [...original.notes].length>500) {

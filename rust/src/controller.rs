@@ -313,6 +313,7 @@ fn uses_explicit_edits(profile: &str) -> bool {
     matches!(
         profile,
         rtx_fg_manager::encore::PROFILE
+            | rtx_fg_manager::anr::PROFILE
             | rtx_fg_manager::rtxmfg::PROFILE
             | rtx_fg_manager::upstream040::PROFILE
             | rtx_fg_manager::upstream040::PROFILE_041
@@ -324,6 +325,7 @@ fn read_json_preset_values(
     profile: &str,
 ) -> Result<rtx_fg_manager::presets::Values> {
     let config = match profile {
+        rtx_fg_manager::anr::PROFILE => rtx_fg_manager::anr::CONFIG,
         rtx_fg_manager::encore::PROFILE => rtx_fg_manager::encore::CONFIG,
         rtx_fg_manager::rtxmfg::PROFILE => rtx_fg_manager::rtxmfg::CONFIG,
         rtx_fg_manager::upstream040::PROFILE | rtx_fg_manager::upstream040::PROFILE_041 => {
@@ -334,7 +336,9 @@ fn read_json_preset_values(
     let path = core::no_links(&target.directory.join(config))?;
     anyhow::ensure!(path.metadata()?.len() <= 1024 * 1024, "配置文件过大");
     let bytes = std::fs::read(path)?;
-    if profile == rtx_fg_manager::encore::PROFILE {
+    if profile == rtx_fg_manager::anr::PROFILE {
+        rtx_fg_manager::anr::read(&bytes)
+    } else if profile == rtx_fg_manager::encore::PROFILE {
         let record = core::record(&target.directory)?;
         let version = record.as_ref().and_then(|r| {
             r.upstream_version
@@ -375,6 +379,8 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
             core::INI,
             rtx_fg_manager::rtxmfg::CONFIG,
             rtx_fg_manager::transfusion::CONFIG,
+            rtx_fg_manager::anr::CONFIG,
+            "OptiScaler.ini",
             rtx_fg_manager::encore::CONFIG,
             rtx_fg_manager::encore::NOTICES,
             ".rtx-fg-v3/encore-upgrade.json",
@@ -3315,7 +3321,7 @@ impl Controller {
                                     &available,
                                     version,
                                 )?
-                            } else if payload.backend == rtx_fg_manager::upstream040::BACKEND {
+                            } else if matches!(payload.backend.as_str(), rtx_fg_manager::upstream040::BACKEND | rtx_fg_manager::anr::BACKEND) {
                                 if core::record(&game.deployment_target(&p).directory)?.is_some() {
                                     // Existing installations preserve their disk values.
                                     files[name].clone()
