@@ -12,7 +12,7 @@ use std::{
 
 pub const CAPABILITY: &str = "delta_force_mfg_v1";
 pub const SIX_X_CAPABILITY: &str = "delta_force_mfg_6x_v1";
-pub const SIX_X_VERSION: &str = "0.4.1+rtxfg.2";
+pub const SIX_X_VERSION: &str = "0.4.2+rtxfg.1";
 pub const GAME: &str = "DeltaForceClient-Win64-Shipping.exe";
 pub const REVISION: &str = "Streamline-2.7.32-c39569d4a2a70434";
 pub const ID_KEY: &str = "DeltaForceRuntimeId";
@@ -28,7 +28,7 @@ struct Manifest {
     upstream041_images: Vec<String>,
 }
 pub fn supports_six_x(version: &str) -> bool {
-    version == SIX_X_VERSION
+    matches!(version, "0.4.1+rtxfg.2" | SIX_X_VERSION)
 }
 fn manifest() -> &'static Manifest {
     static VALUE: OnceLock<Manifest> = OnceLock::new();

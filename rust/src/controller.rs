@@ -712,12 +712,13 @@ impl Controller {
                 app.channel.job(move |c| {
                     let cached = game_names::cached(&data);
                     c.send(Event::GameNamesCached(cached.clone()));
-                    let result = if game_names::refresh_due(&data) {
+                    let checked = game_names::refresh_due(&data);
+                    let result = if checked {
                         game_names::refresh(&data, &cached, github, &cancel)
                     } else {
                         Ok(cached)
                     };
-                    c.send(Event::GameNames(result, false));
+                    c.send(Event::GameNames(result, checked));
                     Ok(())
                 });
             }
@@ -3915,21 +3916,27 @@ impl Controller {
                         self.save();
                     }
                 }
-                Event::GameNames(result, requested) => {
+                Event::GameNames(result, checked) => {
                     self.names_busy = false;
                     if self.closing {
                         continue;
                     }
                     match result {
                         Ok(catalog) => {
-                            if catalog.revision() > self.game_names.revision() {
+                            let updated = catalog.revision() > self.game_names.revision();
+                            if updated {
                                 self.game_names = Arc::new(catalog);
                                 self.library_revision += 1;
                                 self.identify_game_names();
                             }
-                            if requested {
-                                self.names_status = "名称库已是最新版本".into();
+                            self.names_status = if updated {
+                                "名称库已更新"
+                            } else if checked {
+                                "名称库已是最新版本"
+                            } else {
+                                "每天自动检查，可手动更新。"
                             }
+                            .into();
                         }
                         Err(e) => {
                             self.names_status = "名称库更新暂不可用，继续使用离线名称库。".into();
@@ -5529,6 +5536,24 @@ mod tests {
         );
         c.begin_work("运行库");
         assert!(c.scan_progress.is_none());
+    }
+    #[test]
+    fn game_names_feedback_distinguishes_cached_checked_and_retry() {
+        let (_dir, mut c) = controller();
+        c.names_busy = true;
+        c.channel
+            .send(Event::GameNames(Err(anyhow::anyhow!("offline")), true));
+        c.events();
+        assert!(!c.names_busy);
+        assert_eq!(c.names_status, "名称库更新暂不可用，继续使用离线名称库。");
+        c.channel
+            .send(Event::GameNames(Ok(game_names::bundled()), true));
+        c.events();
+        assert_eq!(c.names_status, "名称库已是最新版本");
+        c.channel
+            .send(Event::GameNames(Ok(game_names::bundled()), false));
+        c.events();
+        assert_eq!(c.names_status, "每天自动检查，可手动更新。");
     }
     #[test]
     fn game_names_preserve_manual_overrides_across_scan_cache_and_restart() {

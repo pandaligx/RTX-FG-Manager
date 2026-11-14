@@ -498,6 +498,45 @@ fn renderer_name(path: &Path, root: &Path) -> bool {
         || stem.contains("vulkan")
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum AntiCheat {
+    EasyAntiCheat,
+    BattlEye,
+    Ace,
+}
+impl AntiCheat {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::EasyAntiCheat => "Easy Anti-Cheat",
+            Self::BattlEye => "BattlEye",
+            Self::Ace => "ACE (Anti-Cheat Expert)",
+        }
+    }
+
+    /// Local installation markers only; not a query of running security software.
+    fn from_filename(name: &str) -> Option<Self> {
+        let name = name.to_ascii_lowercase();
+        if name.starts_with("easyanticheat") {
+            Some(Self::EasyAntiCheat)
+        } else if name == "battleye"
+            || name.starts_with("battleye.")
+            || matches!(
+                name.as_str(),
+                "beservice.exe" | "beservice_x64.exe" | "beclient.dll" | "beclient_x64.dll"
+            )
+        {
+            Some(Self::BattlEye)
+        } else if matches!(
+            name.as_str(),
+            "ace-base.sys" | "acesafe.sys" | "anticheatexpert"
+        ) {
+            Some(Self::Ace)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Evidence {
     pub frame_generation: bool,
@@ -509,6 +548,7 @@ pub struct Evidence {
     /// a game's existing integration. Patch-private folders remain excluded.
     pub frame_integration_paths: Vec<PathBuf>,
     pub anti_cheat: bool,
+    pub anti_cheat_vendors: std::collections::BTreeSet<AntiCheat>,
     pub limited: bool,
 }
 impl Evidence {
@@ -625,11 +665,10 @@ fn inspect_with_limits(
             if meta.file_attributes() & 0x400 != 0 {
                 continue;
             }
-            result.anti_cheat |= name.contains("easyanticheat")
-                || name.contains("battleye")
-                || name == "ace-base.sys"
-                || name == "acesafe.sys"
-                || name == "anticheatexpert";
+            if let Some(vendor) = AntiCheat::from_filename(&name) {
+                result.anti_cheat = true;
+                result.anti_cheat_vendors.insert(vendor);
+            }
             if meta.is_file() {
                 if [
                     "nvngx_dlssg.dll",
@@ -979,7 +1018,7 @@ fn scan_with_records(
             if names
                 .iter()
                 .chain(subnames.iter())
-                .any(|n| n.contains("easyanticheat") || n.contains("battleye"))
+                .any(|n| AntiCheat::from_filename(n).is_some())
             {
                 ancestors_into(&dir, &mut anti);
             }

@@ -148,6 +148,14 @@ impl Catalog {
     pub fn revision(&self) -> u64 {
         self.revision
     }
+    pub fn revision_label(&self) -> String {
+        let revision = self.revision.to_string();
+        if revision.len() == 12 {
+            format!("{}-{}-{}", &revision[..4], &revision[4..6], &revision[6..8])
+        } else {
+            revision
+        }
+    }
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -238,21 +246,33 @@ pub fn cached(data: &Path) -> Catalog {
         .filter(|c| c.revision >= bundled.revision)
         .unwrap_or(bundled)
 }
-pub fn refresh_due(data: &Path) -> bool {
-    let now = std::time::SystemTime::now()
+fn now() -> u64 {
+    std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs();
+        .as_secs()
+}
+fn refresh_due_at(data: &Path, now: u64) -> bool {
+    let check = core::read_json(&data.join("game-names-check.json"), 1024).unwrap_or_default();
+    let last = check["attempt"].as_u64().unwrap_or(0);
+    let success = check["success"].as_u64().unwrap_or(0);
+    // Retry offline checks after an hour, rather than suppressing them for a day.
+    // Legacy attempt-only records follow the same failure backoff.
+    let interval = if success > 0 && success >= last {
+        24 * 60 * 60
+    } else {
+        60 * 60
+    };
+    last == 0 || last > now || now - last >= interval
+}
+pub fn refresh_due(data: &Path) -> bool {
+    refresh_due_at(data, now())
+}
+fn record_check(data: &Path, at: u64, success: bool) {
     let path = data.join("game-names-check.json");
-    let last = core::read_json(&path, 1024)
-        .ok()
-        .and_then(|v| v["attempt"].as_u64())
-        .unwrap_or(0);
-    if last <= now && now - last < 24 * 60 * 60 {
-        return false;
-    }
-    // Attempt time also backs off offline failures; never retry on every launch.
-    core::atomic_json(&path, &serde_json::json!({"attempt":now})).is_ok()
+    let check = serde_json::json!({"attempt": at, "success": if success { at } else { 0 }});
+    // A status-file write failure must not prevent downloading a valid catalog.
+    let _ = core::atomic_json(&path, &check);
 }
 pub fn keys(game: &Game) -> Vec<String> {
     game.extra
@@ -403,6 +423,7 @@ pub fn refresh(
     prefer_github: bool,
     cancel: &AtomicBool,
 ) -> Result<Catalog> {
+    record_check(data, now(), false);
     let bytes = transfer::fetch_metadata(
         sources("game-names.json", prefer_github),
         transfer::UrlPolicy::Official,
@@ -412,6 +433,7 @@ pub fn refresh(
     let manifest: Manifest = serde_json::from_slice(&bytes)?;
     manifest.validate()?;
     if manifest.revision <= current.revision {
+        record_check(data, now(), true);
         return Ok(current.clone());
     }
     core::no_links(data)?;
@@ -427,7 +449,9 @@ pub fn refresh(
     };
     let path = transfer::download(&request, &temp.path().join("names.json"), cancel, |_| {})?;
     ensure!(!cancel.load(Ordering::Relaxed), "名称库更新已取消");
-    replace_cache(data, &fs::read(path)?, manifest.revision)
+    let next = replace_cache(data, &fs::read(path)?, manifest.revision)?;
+    record_check(data, now(), true);
+    Ok(next)
 }
 fn replace_cache(data: &Path, bytes: &[u8], revision: u64) -> Result<Catalog> {
     let next = Catalog::parse(bytes)?;
@@ -440,6 +464,37 @@ fn replace_cache(data: &Path, bytes: &[u8], revision: u64) -> Result<Catalog> {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn name_refresh_retries_failures_and_backs_off_successes() {
+        let dir = tempfile::tempdir().unwrap();
+        let at = 200_000;
+        assert!(refresh_due_at(dir.path(), at));
+        record_check(dir.path(), at, false);
+        assert!(!refresh_due_at(dir.path(), at + 3599));
+        assert!(refresh_due_at(dir.path(), at + 3600));
+        record_check(dir.path(), at, true);
+        assert!(!refresh_due_at(dir.path(), at + 86_399));
+        assert!(refresh_due_at(dir.path(), at + 86_400));
+        // A manual failure in the same second must not inherit a prior success.
+        record_check(dir.path(), at, false);
+        assert!(refresh_due_at(dir.path(), at + 3600));
+        assert!(refresh_due_at(dir.path(), at - 1));
+    }
+    #[test]
+    fn legacy_and_broken_name_check_records_do_not_block_refresh() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("game-names-check.json");
+        core::atomic_json(&path, &json!({"attempt": 200_000})).unwrap();
+        assert!(!refresh_due_at(dir.path(), 200_001));
+        assert!(refresh_due_at(dir.path(), 203_600));
+        fs::write(&path, "broken").unwrap();
+        assert!(refresh_due_at(dir.path(), 200_001));
+        // Failing to persist a check never suppresses a network attempt.
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+        record_check(dir.path(), 200_000, true);
+        assert!(refresh_due_at(dir.path(), 200_001));
+    }
     #[test]
     fn wuthering_waves_generic_client_needs_its_own_directory() {
         let catalog = bundled();
@@ -552,6 +607,7 @@ mod tests {
         assert!(replace_cache(t.path(), &bytes, 2).is_err());
         assert_eq!(fs::read(t.path().join(CACHE)).unwrap(), before);
         assert!(refresh_due(t.path()));
+        record_check(t.path(), now(), true);
         assert!(!refresh_due(t.path()));
     }
     fn catalog() -> Catalog {

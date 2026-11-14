@@ -1038,7 +1038,7 @@ impl Manager {
             entry
                 .with_animation(
                     "recommendation-entry-glow",
-                    Animation::new(Duration::from_secs(8)).repeat_synced(),
+                    Animation::new(Duration::from_secs(4)).repeat_synced(),
                     |entry, phase| entry.phase(phase),
                 )
                 .into_any_element()
@@ -2339,7 +2339,7 @@ impl Manager {
             .when(self.c.boolean("preset_help_open", false), |d| d.child(Alert::info("preset-inline-help", self.t(if context.profile == rtx_fg_manager::rtxmfg::PROFILE {
                 "独立 MFG 按 Backspace；OptiScaler 插件使用其菜单。NR 与独立 XeSS 多帧生成需另装运行库。1.7.1 插件支持配套 OptiScaler 的 XeMFG 提供器；帧生成输出在 OptiScaler 中选择。"
             } else if context.profile == rtx_fg_manager::anr::PROFILE {
-                "ANR FG 完整包已包含 OptiScaler 和模型。游戏内开启帧生成；默认上限6X，实际倍率由游戏请求。更改参数后重启游戏。"
+                "ANR FG：Insert（Ins）打开菜单。游戏内开启帧生成；默认最高6X，实际倍率由游戏请求。修改参数后重启游戏。"
             } else if context.profile == rtx_fg_manager::transfusion::PROFILE {
                 "默认跟随游戏；固定倍率可选2X—6X，5X/6X可能增加显存与延迟。Ctrl+Alt+2/3/4切换倍率，Ctrl+Alt+G跟随游戏，Ctrl+Alt+D切换动态。RTX20及旧显卡Vulkan仍需实机验证。"
             } else if context.delta && context.delta_six {
@@ -2407,19 +2407,19 @@ impl Manager {
             );
         }
         let proxy_hint = if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
-            "普通安装选择一个 DLL，Backspace 打开菜单。已有 OptiScaler 10 才选择插件；1.7.1 会备份并更新配套主文件，卸载时恢复。"
+            "Backspace 打开菜单。普通安装选一个 DLL；插件需已有 OptiScaler 10，1.7.1 会备份更新主文件并在卸载时还原。"
         } else if self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE {
-            "Encore 菜单 Insert。DLL 可多选，ASI 与 DLL 模式互斥。上游建议单入口，多选可能重复加载或崩溃。Bink 需保留原始 Hooked 文件。"
+            "Insert 打开菜单。建议单选 DLL；ASI 不能与 DLL 同装。多选可能冲突，Bink 原件须保留为 Hooked 文件。"
         } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
-            "此上游版本仅提供version.dll，请勿改名或混装其他方案的DLL。"
+            "仅用 version.dll，不要改名或混装其他 DLL。"
         } else if self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE {
-            "ANR FG 完整安装：DX12 优先 dxgi.dll，Vulkan 选 winmm.dll，每次仅一个入口。需要 VC++ 2015–2022 x64 运行库；已有 OptiScaler 请先还原。"
+            "Insert（Ins）打开菜单。DX12 选 dxgi.dll，Vulkan 选 winmm.dll。需 VC++ 2015–2022 x64；已有 OptiScaler 请先还原。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {
-            "Transfusion 每次只安装一个入口；优先 version.dll，冲突时可改选 dinput8、dxgi 或 winmm。保留其他 MOD，配置使用独立 JSON。"
+            "单选入口：优先 version.dll，也可选 dinput8 / dxgi / winmm。"
         } else if rtx_fg_manager::upstream040::is_profile(&self.c.parameter_profile()) {
-            "0.4.x 各代理使用对应文件，组件共用完整包。允许多选；上游建议只放一个入口，多选兼容性需自行测试。"
+            "建议只选一个 DLL；多选可能冲突。"
         } else if self.c.cloud_scheme().starts_with("upstream") {
-            "上游支持多选入口；游戏先加载的 DLL 生效，其余仅转发。优先 version/winmm/dinput8/dbghelp；dxgi/d3d12 按需使用。"
+            "优先 version / winmm / dinput8 / dbghelp；dxgi / d3d12 按需选择。"
         } else {
             "优先单选 version.dll；不兼容时卸载后换入口。多选可能冲突。"
         };
@@ -2692,6 +2692,7 @@ impl Manager {
                     i,
                     self.c.cloud_label(p),
                     self.c.catalog.supports_series(&p.scheme_id, series),
+                    self.t(self.c.catalog.scheme_gpu_hint(&p.scheme_id)),
                     self.c
                         .catalog
                         .scheme_source_url(&p.scheme_id)
@@ -2723,7 +2724,7 @@ impl Manager {
             .disabled(self.c.busy)
             .dropdown_menu(move |mut menu, _, _| {
                 menu = menu.min_w(px(menu_width)).max_w(px(menu_width));
-                for (i, label, supported, url) in &items {
+                for (i, label, supported, gpu_hint, url) in &items {
                     let (i, supported) = (*i, *supported);
                     let text = if supported {
                         label.clone()
@@ -2731,6 +2732,7 @@ impl Manager {
                         format!("{label} · {incompatible}")
                     };
                     let url = url.clone();
+                    let gpu_hint = gpu_hint.clone();
                     let mut parts = text.split(" · ");
                     let name = parts.next().unwrap_or_default().to_owned();
                     let detail = parts.collect::<Vec<_>>().join(" · ");
@@ -2742,20 +2744,24 @@ impl Manager {
                             let view = view_link.clone();
                             div()
                                 .h_flex()
-                                .w_full()
+                                // Leave the menu's checkmark lane outside this flex row.
+                                // A full-width child overflows that lane on long labels.
+                                .w_0()
+                                .flex_1()
                                 .gap_2()
                                 .min_w_0()
                                 .child(
                                     div()
                                         .v_flex()
                                         .min_w_0()
-                                        .w(px(menu_width - 88. * scale))
-                                        .flex_shrink_0()
+                                        .flex_1()
+                                        .overflow_hidden()
                                         .py_1()
                                         .child(div().text_sm().truncate().child(name.clone()))
                                         .child(
                                             div()
                                                 .text_xs()
+                                                .whitespace_normal()
                                                 .text_color(cx.theme().muted_foreground)
                                                 .child(detail.clone()),
                                         ),
@@ -2764,15 +2770,33 @@ impl Manager {
                                     Button::new(("scheme-link", i))
                                         .focus_ring(crate::ui_focus::visible(cx))
                                         .w_6()
+                                        .h_6()
                                         .flex_shrink_0()
                                         .small()
                                         .ghost()
-                                        .icon(IconName::ExternalLink)
+                                        .icon(IconName::Github)
+                                        .tooltip("GitHub")
                                         .on_click(move |_, window, cx| {
                                             cx.stop_propagation();
                                             let _ = view.update(cx, |this, cx| {
                                                 this.act(Command::Open(url.clone()), window, cx)
                                             });
+                                        }),
+                                )
+                                .child(
+                                    div()
+                                        .id(("scheme-gpu", i))
+                                        .w_6()
+                                        .h_6()
+                                        .flex_shrink_0()
+                                        .h_flex()
+                                        .justify_center()
+                                        .child(Icon::default().path("app/gpu.svg").small())
+                                        .tooltip({
+                                            let hint = gpu_hint.clone();
+                                            move |window, cx| {
+                                                Tooltip::new(hint.clone()).build(window, cx)
+                                            }
                                         }),
                                 )
                         })
@@ -3224,7 +3248,7 @@ impl Manager {
                 div()
                     .v_flex()
                     .gap_2()
-                    .child(div().text_sm().child(self.t("此游戏的适配方案")))
+                    .child(div().text_sm().child(self.t("适配方案")))
                     .child(self.scheme_menu(scheme, series, cx)),
             );
         if let Some(d) = self
@@ -3280,14 +3304,19 @@ impl Manager {
             )
             .child(self.proxy_panel(window, cx));
         if self.c.cloud_scheme().starts_with("upstream") {
-            panel = panel
-                .child(Alert::info("upstream-scope", self.t("此上游方案使用 D3D12；Vulkan 可选择三角洲扩展或独立 Vulkan 方案，兼容性需按游戏实测。")).small());
+            panel = panel.child(
+                Alert::info(
+                    "upstream-scope",
+                    self.t("仅支持 DX12；Vulkan 请选三角洲或 Vulkan 版本。"),
+                )
+                .small(),
+            );
         }
         if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
             panel = panel.child(
                 Alert::info(
                     "mfg-vulkan-scope",
-                    self.t("新上游方案：作者已宣布Vulkan支持，RTX20尚待实测；不包含三角洲专项。"),
+                    self.t("支持 Vulkan；RTX 20 待实测，不含三角洲适配。"),
                 )
                 .small(),
             );
@@ -3298,7 +3327,7 @@ impl Manager {
             panel = panel.child(
                 Alert::info(
                     "experimental-limit",
-                    self.t("这是倍率上限，实际倍率由游戏请求；不会自动给游戏添加 5X/6X 菜单。"),
+                    self.t("倍率由游戏决定，不会新增游戏内的倍率选项。"),
                 )
                 .small(),
             );
@@ -3316,19 +3345,38 @@ impl Manager {
                             g.reasons.iter().any(|s| s.contains("DLSS 帧生成组件"))
                         })
                     {
-                        "发现 DLSS 帧生成组件；是否可用由游戏决定。"
+                        if p.super_resolution {
+                            "DLSS：超分辨率 / 帧生成"
+                        } else {
+                            "DLSS：帧生成"
+                        }
                     } else if p.super_resolution {
-                        "发现 DLSS 超分组件，不代表支持帧生成。"
+                        "DLSS：超分辨率"
+                    } else if p.super_resolution_plugin {
+                        "DLSS：组件不完整"
+                    } else if p.limited {
+                        "DLSS：检测未完成"
                     } else {
-                        "有限检测未发现 DLSS 帧生成组件，不代表游戏不支持。"
+                        "DLSS：未检测到"
                     },
-                    if p.anti_cheat || game.is_some_and(|g| g.anti) {
-                        "发现反作弊线索，请先确认游戏是否允许此类补丁。"
+                    if !p.anti_cheat_vendors.is_empty() {
+                        format!(
+                            "反作弊：{}",
+                            p.anti_cheat_vendors
+                                .iter()
+                                .map(|v| v.name())
+                                .collect::<Vec<_>>()
+                                .join(" / ")
+                        )
+                    } else if p.anti_cheat || game.is_some_and(|g| g.anti) {
+                        "反作弊：已检测到".into()
+                    } else if p.limited {
+                        "反作弊：检测未完成".into()
                     } else {
-                        "未发现反作弊线索，不代表没有反作弊。"
+                        "反作弊：未检测到".into()
                     },
                 ),
-                None => ("正在检测…", "游戏本身须支持 DLSS 帧生成。"),
+                None => ("DLSS：正在检测…", "反作弊：正在检测…".into()),
             };
             panel = panel
                 .child(
@@ -3341,7 +3389,7 @@ impl Manager {
                     div()
                         .text_xs()
                         .text_color(cx.theme().muted_foreground)
-                        .child(self.t(anti)),
+                        .child(self.t(&anti)),
                 );
             if let Some(g) = game {
                 if g.targets.len() > 1 {
@@ -3351,6 +3399,11 @@ impl Manager {
                     }
                 }
                 for reason in &g.reasons {
+                    // The live component rows above already summarize these.
+                    // Keep scanner provenance in the model without repeating it here.
+                    if reason.contains("DLSS") || reason.contains("反作弊") {
+                        continue;
+                    }
                     panel = panel.child(div().text_xs().child(self.t(reason)));
                 }
             }
@@ -3709,7 +3762,7 @@ impl Manager {
         if profile == rtx_fg_manager::anr::PROFILE {
             sections = vec![
                 (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
-                (self.t("使用说明"), self.t("ANR FG 完整包已包含 OptiScaler 和模型。游戏内开启帧生成；默认上限6X，实际倍率由游戏请求。更改参数后重启游戏。")),
+                (self.t("使用说明"), self.t("ANR FG：Insert（Ins）打开菜单。游戏内开启帧生成；默认最高6X，实际倍率由游戏请求。修改参数后重启游戏。")),
                 (self.t("兼容性"), self.t("支持情况取决于游戏的帧生成输入、显卡和驱动。这是 ANR 帧生成，不是 DLSS 神经渲染；上游 SR/RR 尚未发布。已有 OptiScaler 请使用上游 addon，完整包不会覆盖原安装。")),
                 (self.t("Linux"), self.t("Wine/Proton 需为所选入口设置 DLL override，例如 dxgi=n,b；Vulkan 改用 winmm。")),
             ];

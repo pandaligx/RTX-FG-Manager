@@ -70,6 +70,7 @@ ALLOWED = {
     '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml',
     'docs/screenshot-home.png', 'docs/screenshot-home-themes.png',
     'docs/brand-banner.svg', 'docs/brand-banner.png', 'docs/download-en.svg', 'docs/download-zh.svg',
+    'docs/download-linux-en.svg', 'docs/download-linux-zh.svg', 'docs/download-buttons-LICENSE.txt',
     # Existing public history has this screenshot; retaining its history is safe.
     'docs/screenshot-home-zh.png',
     'docs/encore-1.1.0.md', 'docs/encore-1.1.0.zh-CN.md',

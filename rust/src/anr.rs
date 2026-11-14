@@ -12,12 +12,28 @@ use std::{
 };
 
 pub const BACKEND: &str = "anr";
+// Stable parameter protocol: B16 keeps the B15 keys, defaults and layout.
 pub const PROFILE: &str = "anr_fg_b15";
 pub const SCHEME: &str = "anr-fg";
 pub const SOURCE: &str = "https://github.com/apex-compute/ANR";
 pub const CONFIG: &str = "OptiScaler/custom/Apex Neural Rendering FG/dlssg/nr_fg.ini";
 pub const PROVIDER_DIR: &str = "OptiScaler/custom/Apex Neural Rendering FG/dlssg";
 pub const PROXIES: [&str; 3] = ["dxgi.dll", "winmm.dll", "version.dll"];
+
+/// Display the upstream beta label without leaking our sortable transport version.
+pub fn display_version(version: &str) -> String {
+    match semver::Version::parse(version) {
+        Ok(v)
+            if v.major == 0
+                && v.minor == 0
+                && v.pre.as_str() == format!("B{}", v.patch)
+                && v.build.is_empty() =>
+        {
+            format!("V.B{}", v.patch)
+        }
+        _ => version.to_owned(),
+    }
+}
 pub const COMPONENTS: [&str; 21] = [
     "OptiScaler.ini",
     "ANR-THIRD-PARTY-NOTICES.txt",
@@ -235,6 +251,13 @@ pub fn cleanup_directories(directory: &Path, dirs: &mut BTreeSet<PathBuf>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn beta_labels_match_their_transport_versions() {
+        assert_eq!(display_version("0.0.15-B15"), "V.B15");
+        assert_eq!(display_version("0.0.16-B16"), "V.B16");
+        assert_eq!(display_version("0.0.16-B15"), "0.0.16-B15");
+        assert_eq!(display_version("1.0.0"), "1.0.0");
+    }
     #[test]
     fn flat_config_preserves_unknown_comments_and_defaults() {
         let original=b"; ANR\r\npath = auto\r\nmax_generated = 5 ; limit\r\nscene_cut = 1\r\nnits_per_unit = 80\r\nmodel_size = large\r\n";

@@ -213,11 +213,36 @@ fn delta041_six_x_revision_keeps_four_x_default_and_xess_limit() -> Result<()> {
             .is_err()
     );
     context.validate_installed(Some(delta::SIX_X_VERSION), &shared.values)?;
-    for version in ["0.4.0", "0.4.1", delta::SIX_X_VERSION] {
+    for version in ["0.4.0", "0.4.1", "0.4.1+rtxfg.2", delta::SIX_X_VERSION] {
         let installed = presets::policy_for_version(&policy, Some(version));
         let context = presets::Context::new(cloud::DELTA_041_SCHEME, &installed, &exe);
-        assert_eq!(context.delta_six, version == delta::SIX_X_VERSION);
+        assert_eq!(context.delta_six, delta::supports_six_x(version));
     }
+    Ok(())
+}
+
+#[test]
+fn delta042_preserves_old_shared_six_x_settings() -> Result<()> {
+    let shared = recommendation_presets::Snapshot {
+        schema: 1,
+        profile: upstream040::PROFILE_041.into(),
+        values: presets::Values::from([
+            ("max_generated_frames".into(), "5".into()),
+            ("fg_engine".into(), "DLSS".into()),
+        ]),
+        defaults: presets::Values::from([
+            ("max_generated_frames".into(), "3".into()),
+            ("fg_engine".into(), "DLSS".into()),
+        ]),
+    };
+    let converted = shared.for_version(
+        cloud::DELTA_041_SCHEME,
+        "0.4.1+rtxfg.2",
+        delta::SIX_X_VERSION,
+    )?;
+    assert_eq!(converted.values, shared.values);
+    assert_eq!(converted.defaults, shared.defaults);
+    assert!(!delta::supports_six_x("0.4.2"));
     Ok(())
 }
 

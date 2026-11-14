@@ -8,7 +8,9 @@ use std::{collections::BTreeMap, fs, path::PathBuf, sync::atomic::AtomicBool};
 fn signed_delta041_all_entries_install_apply_cleanup_and_fresh_defaults() -> Result<()> {
     let local = std::env::var("LOCALAPPDATA")?;
     assert!(local.contains("isolated-appdata"));
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let root = std::env::var_os("RTXFG_DELTA_QA_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")));
     let modern = std::env::var_os("RTXFG_DELTA6_QA").is_some();
     let resources = std::env::var_os("RTXFG_DELTA6_QA")
         .map(PathBuf::from)
@@ -67,7 +69,11 @@ fn signed_delta041_all_entries_install_apply_cleanup_and_fresh_defaults() -> Res
         };
         if modern {
             let old: cloud::Catalog = serde_json::from_slice(&fs::read(
-                root.join("development/delta041-port/resources/rust/cloud-catalog.json"),
+                std::env::var_os("RTXFG_DELTA_PREVIOUS_CATALOG")
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| {
+                        root.join("development/delta041-port/resources/rust/cloud-catalog.json")
+                    }),
             )?)?;
             let previous = cloud::prepare_with_progress(
                 &old,

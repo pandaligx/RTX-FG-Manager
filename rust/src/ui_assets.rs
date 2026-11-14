@@ -31,6 +31,9 @@ impl AssetSource for Assets {
         if path == "app/nvidia.svg" {
             return Ok(Some(Cow::Borrowed(include_bytes!("../assets/nvidia.svg"))));
         }
+        if path == "app/gpu.svg" {
+            return Ok(Some(Cow::Borrowed(include_bytes!("../assets/gpu.svg"))));
+        }
         if path == "app/gpu-disguise.svg" {
             return Ok(Some(Cow::Borrowed(include_bytes!(
                 "../assets/gpu-disguise.svg"
@@ -48,6 +51,7 @@ impl AssetSource for Assets {
             "app/trash.svg",
             "app/bilibili.svg",
             "app/nvidia.svg",
+            "app/gpu.svg",
             "app/gpu-disguise.svg",
         ] {
             if name.starts_with(path) {

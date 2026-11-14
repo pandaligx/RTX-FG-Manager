@@ -19,9 +19,8 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.34"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="300" height="58"></a>
-
-[下载 Linux x86_64 AppImage（实验性）](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.34/RTXManager-4.3.34-x86_64.AppImage)
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.34/RTXManager.exe"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="232" height="64"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.34/RTXManager-4.3.34-x86_64.AppImage"><img src="docs/download-linux-zh.svg" alt="下载 Linux x86_64 AppImage（实验性）" width="232" height="64"></a>
 
 </div>
 
@@ -29,9 +28,9 @@
 
 > **4.3.34 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
 
-![RTX-FG-Manager 4.3.6](docs/screenshot-home-zh.png)
+![RTX-FG-Manager 游戏库](docs/screenshot-home-zh.png)
 
-<p align="center"><sub>4.3.6 用户提供截图 · 仅展示界面，不代表游戏兼容性或性能验证</sub></p>
+<p align="center"><sub>用户提供的中文界面截图</sub></p>
 
 ## 一个游戏库，多种补丁方案
 
@@ -69,11 +68,11 @@ chmod +x RTXManager-4.3.34-x86_64.AppImage
 
 AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
 
-## 4.3.34 更新亮点
+## 4.3.35 更新亮点
 
 - 原版 Dlssg_for_sm86 升级至 **0.4.2**，沿用上游默认配置；升级保留已修改参数，卸载后重装恢复默认。
-- 新增 **ANR FG V.B15 完整方案**，一并下载所需模型和组件，支持参数设置、玩家分享与卸载。
-- 保留三角洲 0.4.1 6X、旧三角洲 0.3.5、MFG 和 Encore 方案。管理器更新不会自动替换游戏补丁。
+- **ANR FG 更新至 V.B16**，使用新版模型，保留 B15 配置与玩家参数。
+- 三角洲方案升级至 0.4.2 6X，保留旧三角洲 0.3.5、MFG 和 Encore。管理器更新不会自动替换游戏补丁。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -82,13 +81,13 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | 方案 | 主要说明 | 参数 / 菜单 |
 | :--- | :--- | :--- |
 | **Dlssg_for_sm86 · 0.4.2** | 完整组件包，含 XeSS 2X–4X；新安装默认 `Optimized=1`、预设 A、SR 关闭。 | 管理器 / INI |
-| **Dlssg_for_sm86 · 0.4.1 · 额外支持三角洲专用 · DX12/Vulkan** | 私有 Streamline 2.14.16；DLSS 最高 6X、默认 4X，XeSS 最高 4X。Vulkan XeSS 改变分辨率需重启游戏。 | 管理器 / INI |
+| **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | 私有 Streamline 2.14.16；DLSS 最高 6X、默认 4X，XeSS 最高 4X。Vulkan XeSS 改变分辨率需重启游戏。 | 管理器 / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
 | **MFG-Unlocker · 1.7.1** | 普通安装仍使用独立 DLL；已有完整 OptiScaler 10 时可选插件模式，备份并更新配套主文件。两种模式互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **RTX Encore · 2.4.1** | SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG 与 Frame Pacing；可实验性地为无原生 DLSS 的游戏添加功能。 | **Insert**，禁用菜单或修改快捷键后除外 |
-| **ANR FG · V.B15** | 完整包含 OptiScaler、模型和运行文件；单入口安装，默认最高 6X。适用于未安装 OptiScaler 的游戏。 | 管理器 / OptiScaler 菜单 |
+| **ANR FG · V.B16** | 完整包含 OptiScaler、模型和运行文件；单入口安装，默认最高 6X。适用于未安装 OptiScaler 的游戏。 | **Insert（Ins）** 打开菜单；也可在管理器中设置 |
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。
 
@@ -97,12 +96,12 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | 方案 | RTX 20 · Turing | RTX 30 · Ampere | RTX 40 · Ada | RTX 50 · Blackwell |
 | :--- | :--- | :--- | :--- | :--- |
 | Dlssg_for_sm86 · 0.4.2 | 支持 | 支持 | 支持 | 支持 |
-| 0.4.1 · 三角洲专用 · DX12/Vulkan | 支持 | 支持 | 支持 | 支持 |
+| 0.4.2 · 三角洲专用 · DX12/Vulkan | 支持 | 支持 | 支持 | 支持 |
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 支持 | 支持 | 支持 | 不支持 |
 | Dlssg_for_sm86-MFG-version · Vulkan | 支持 | 支持 | 不支持 | 不支持 |
 | MFG-Unlocker · 1.7.1 / 1.6.1 | 支持 | 支持 | 支持 | 支持 |
 | RTX Encore · 2.4.1 | 支持 | 支持 | 支持 | 支持 |
-| ANR FG · V.B15 | 支持 | 支持 | 支持 | 支持 |
+| ANR FG · V.B16 | 支持 | 支持 | 支持 | 支持 |
 
 依据：[Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。“不支持”表示未纳入当前分发方案的明确支持范围；实验性功能、驱动和运行库条件仍适用，不保证所有游戏兼容。三角洲方案为本项目自定义适配。
 
@@ -110,7 +109,15 @@ MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 3
 
 Dlssg_for_sm86 的 XeSS 引擎使用自身 CUDA 后端，不等于通用 Intel XeSS DLL，也不因此支持 AMD / Intel。原版 0.4.2 面向 DX12；三角洲和 Vulkan 方案另行选择。Encore 不支持 GTX、AMD 或 Intel 显卡。专业卡、CMP 及未列出的型号未获上游明确保证；修改名称不会改变硬件能力。
 
-[ANR 上游](https://github.com/apex-compute/ANR)另列出 GTX 16、AMD RX 5000/6000/7000/9000、Steam Deck 及 Intel Arc A/B 的帧生成支持。ANR FG 与 NVIDIA DLSSNR 是不同功能，不会让这些显卡获得 NVIDIA DLSS 支持。Encore 的功能与游戏限制请查阅[上游兼容性说明](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。
+**ANR FG 同时支持 N 卡、A 卡和 I 卡：**
+
+| 厂商 | 上游列出的显卡 |
+| :--- | :--- |
+| NVIDIA | GeForce RTX 20 / 30 / 40 / 50、GTX 16 |
+| AMD | Radeon RX 5000 / 6000 / 7000 / 9000、Steam Deck |
+| Intel | Arc A / B |
+
+来源：[ANR 上游说明](https://github.com/apex-compute/ANR)。ANR FG 是帧生成功能，不等于 DLSS 神经渲染，也不会给 AMD / Intel 显卡添加 NVIDIA DLSS。具体游戏仍须满足上游要求。
 
 ### 三步开始
 
@@ -143,8 +150,8 @@ Dlssg_for_sm86 的 XeSS 引擎使用自身 CUDA 后端，不等于通用 Intel X
 <summary><b>ANR FG 怎么用？</b></summary>
 
 1. 退出游戏，卸载此前安装的其他插帧补丁。已有 OptiScaler 的游戏请先恢复原安装，或按上游说明使用 addon；管理器不会自动合并它们。
-2. 选择 **ANR FG V.B15**。DX12 通常用 `dxgi.dll`，Vulkan 用 `winmm.dll`；只选一个入口，点击安装。
-3. 游戏内开启 **DLSS 帧生成 / NVIDIA 帧生成**，由 ANR 替换处理。默认倍率上限为 6X，实际倍率取决于游戏。
+2. 选择 **ANR FG V.B16**。DX12 通常用 `dxgi.dll`，Vulkan 用 `winmm.dll`；只选一个入口，点击安装。
+3. 游戏内开启 **DLSS 帧生成 / NVIDIA 帧生成**，由 ANR 替换处理。按 **Insert（Ins）** 打开菜单。默认倍率上限为 6X，实际倍率取决于游戏。
 
 Windows 需要 Microsoft Visual C++ 2015–2022 x64 运行库。Linux / Proton 还需为该游戏设置相应 DLL override，例如 `dxgi=n,b` 或 `winmm=n,b`。完整包必须保留模型文件，不要只复制 DLL。
 

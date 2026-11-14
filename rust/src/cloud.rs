@@ -15,7 +15,8 @@ pub const DOMESTIC: &str = "https://api.gitcode.com/api/v5/repos/gcw_qWIjmve7/RT
 pub const GITHUB: &str =
     "https://raw.githubusercontent.com/pandaligx/RTX-FG-Manager/main/cloud/bundles/catalog.json";
 pub const DELTA_SCHEME: &str = "rtxfg-0.3.5-dx12-vulkan";
-/// A separate identity keeps the tested 0.3.5 fallback and its parameters intact.
+/// Stable custom 0.4.x identity: upgrades preserve saved selections and shared
+/// presets while the independently retained 0.3.5 fallback remains untouched.
 pub const DELTA_041_SCHEME: &str = "rtxfg-0.4.1-dx12-vulkan";
 
 fn source_name(url: &str) -> &'static str {
@@ -764,6 +765,23 @@ impl Catalog {
             }
             _ => "https://github.com/sdli1995/dlssg_for_sm86",
         })
+    }
+    /// Descriptive upstream support, independent of installation eligibility.
+    pub fn scheme_gpu_hint(&self, id: &str) -> &'static str {
+        let Some(policy) = self.scheme_policies.get(id) else {
+            return "显卡范围：见项目文档";
+        };
+        match policy.parameter_profile.as_str() {
+            crate::anr::PROFILE => {
+                "NVIDIA RTX 20 / 30 / 40 / 50、GTX 16\nAMD RX 5000 / 6000 / 7000 / 9000、Steam Deck\nIntel Arc A / B"
+            }
+            crate::encore::PROFILE => "NVIDIA RTX 20 / 30 / 40 / 50",
+            crate::rtxmfg::PROFILE => "DLSS 多帧生成：NVIDIA RTX 20 / 30 / 40 / 50",
+            _ if policy.capabilities.contains(crate::delta::CAPABILITY) => {
+                "主要支持：NVIDIA RTX 20 / 30\nRTX 40 / CMP：按游戏适配"
+            }
+            _ => "主要支持：NVIDIA RTX 20 / 30",
+        }
     }
     pub fn selected(&self, id: &str) -> &Package {
         self.packages

@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="58" viewBox="0 0 300 58" role="img" aria-label="下载 Windows x64 版"><rect x="1" y="1" width="298" height="56" rx="12" stroke="#a8c58c" fill="#e9f4df"/><path d="M29 18v16m-6-6 6 6 6-6m-13 9h14" fill="none" stroke="#142016" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><text x="53" y="34" fill="#142016" font-family="Segoe UI,Microsoft YaHei,Arial,sans-serif" font-size="16" font-weight="600">下载 Windows x64 版</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="232" height="64" viewBox="0 0 232 64" role="img" aria-label="免费下载 · x64 Windows">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a8cf0"/><stop offset="1" stop-color="#0067c0"/></linearGradient></defs>
+  <rect x="0.5" y="0.5" width="231" height="63" rx="14" fill="url(#g)" stroke="#0a5fb0"/>
+  <rect x="1.5" y="1.5" width="229" height="30" rx="13" fill="#fff" opacity="0.06"/>
+  <g transform="translate(22 18) scale(1.15)" fill="#fff"><path d="M0 0h11.2v11.2H0zM12.8 0H24v11.2H12.8zM0 12.8h11.2V24H0zM12.8 12.8H24V24H12.8z"/></g>
+  <text x="66" y="27" fill="#fff" fill-opacity="0.72" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif" font-size="12" font-weight="500">免费下载 · x64</text>
+  <text x="66" y="48" fill="#fff" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Helvetica,Arial,sans-serif" font-size="20" font-weight="600" letter-spacing="0.2">Windows</text>
+</svg>

@@ -1333,11 +1333,18 @@ pub fn deploy_prepared_context_at_with_overrides(
         return Ok(message);
     }
     if let Some(old) = existing.as_ref()
-        && backend == crate::upstream040::BACKEND
-        && (old.backend != backend
-            || selected
-                .iter()
-                .any(|n| old.hashes.get(n) != Some(&hash(&data[n]))))
+        && ((backend == crate::upstream040::BACKEND
+            && (old.backend != backend
+                || selected
+                    .iter()
+                    .any(|n| old.hashes.get(n) != Some(&hash(&data[n])))))
+            || (backend == crate::anr::BACKEND
+                && old.backend == backend
+                && data.iter().any(|(name, bytes)| {
+                    name != crate::anr::CONFIG
+                        && name != "OptiScaler.ini"
+                        && old.hashes.get(name) != Some(&hash(bytes))
+                })))
     {
         let new = Record {
             schema: 3,
