@@ -871,6 +871,13 @@ impl Recommendations {
             .cloned()
             .unwrap_or_else(|| recipe.scheme.clone());
         let base = name.split('·').next().unwrap_or(&name).trim();
+        let displayed_version = if recipe.scheme == rtx_fg_manager::anr::SCHEME
+            && recipe.patch_version == "0.0.15-B15"
+        {
+            "V.B15"
+        } else {
+            &recipe.patch_version
+        };
         let alias = match recipe.gpu_alias.as_str() {
             "unchanged" => self.t("不需要修改显卡型号"),
             "rtx4060" => format!("{} RTX 4060", self.t("修改显卡型号为")),
@@ -917,7 +924,7 @@ impl Recommendations {
             }
         );
         let fields = [
-            ("补丁方案", format!("{base} {}", recipe.patch_version)),
+            ("补丁方案", format!("{base} {displayed_version}")),
             ("DLL 入口", recipe.entries.join(" / ")),
             ("显卡改名", alias),
             ("图形 / NR", format!("{renderer} / {neural}")),

@@ -94,7 +94,9 @@ pub fn help(key: &str) -> Option<&'static str> {
         "sr_mode" => {
             "默认关闭。M/L 会覆盖全部画质档，质量、平衡和 DLAA 下可能更慢。旧版 On 和作用档位已取消。"
         }
-        "xess_hudless" => "严格模式下，游戏缺少无 HUD 输入可能直接退出；通常使用自动。",
+        "xess_hudless" => {
+            "0.4.2 的 Auto 等同关闭：连同 UI 插帧。严格模式需要游戏提供无 HUD 输入；0.4.1 保持原版本行为。"
+        }
         "max_generated_frames" => {
             "游戏仍可选择更低倍率；旧代仅 2X 的 DLSS-G 接口可能不受支持，换新 DLL 不等于更新游戏接口。"
         }

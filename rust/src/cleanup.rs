@@ -242,6 +242,7 @@ fn legacy_identity(journal: &Path) -> Result<Option<String>> {
 /// recognition, never a whitelist for installing a newly signed proxy.
 pub fn private_components(record: &Record) -> &'static [&'static str] {
     match record.backend.as_str() {
+        crate::anr::BACKEND => &crate::anr::COMPONENTS,
         crate::upstream040::BACKEND => &crate::upstream040::COMPONENTS,
         crate::encore::BACKEND => &crate::encore::INTEL_FILES,
         _ => &[],
@@ -751,6 +752,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     let config = core::config_name(&record.backend);
     let ini = core::no_links(&dir.join(config))?;
     let mut roots = if [
+        crate::anr::BACKEND,
         crate::rtxmfg::BACKEND,
         crate::transfusion::BACKEND,
         crate::encore::BACKEND,
@@ -793,7 +795,13 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
         kept.insert(q);
     }
     let mut component_pending = Vec::new();
+    if record.backend == crate::anr::BACKEND {
+        crate::anr::cleanup_directories(dir, &mut dirs);
+    }
     for &name in private_components(&record) {
+        if record.backend == crate::anr::BACKEND && name == "OptiScaler.ini" {
+            continue;
+        }
         if record.hashes.contains_key(name) {
             let path = core::no_links(&dir.join(name))?;
             if path.is_file()
@@ -833,7 +841,13 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
                 kept.insert(helper);
             }
         }
-        let logs: Vec<&str> = if record.backend == crate::encore::BACKEND {
+        if record.backend == crate::anr::BACKEND {
+            crate::anr::cleanup_targets(dir, &mut targets, &mut dirs)?;
+        }
+        let logs: Vec<&str> = if matches!(
+            record.backend.as_str(),
+            crate::encore::BACKEND | crate::anr::BACKEND
+        ) {
             Vec::new()
         } else if record.backend == crate::rtxmfg::BACKEND {
             crate::rtxmfg::SIDECARS.to_vec()
@@ -943,8 +957,9 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
             }
         }
     }
-    let config_stage = core::no_links(&root.join(format!("{config}.config-stage")))?;
-    allowed.insert(format!("{config}.config-stage"));
+    let config_stage_name = format!("{}.config-stage", config.replace('/', "__"));
+    let config_stage = core::no_links(&root.join(&config_stage_name))?;
+    allowed.insert(config_stage_name);
     if config_stage.is_file() && config_stage.metadata()?.len() <= 1024 * 1024 {
         // The marker and existing owned INI identify our interrupted config write.
         if ini.is_file() {

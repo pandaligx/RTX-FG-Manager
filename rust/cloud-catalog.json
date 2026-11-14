@@ -421,314 +421,314 @@
       "version": "0.2.6"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-entry-version-d45b4978bd96",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-entry-version-07a964d7e7fa",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": false,
       "files": [
         {
-          "bytes": 10092,
+          "bytes": 10480,
           "name": "dlssg_sm86.ini",
-          "sha256": "97713bfa9032121a6acfadf3fe1ec9aca467f27ee9d8f80095d3bf0f1267d298"
+          "sha256": "f87c375e80f8992d5988f4fd3434b39e7bd09f1650fffc3e64be90c43812c191"
         },
         {
           "bytes": 830176,
           "name": "version.dll",
-          "sha256": "ca7a24babe022f9592a2cb13ba70dd1edb82b4c6005d7c049630b6e84d96125f"
+          "sha256": "12c0c4368062049ef2c6182a98cfed13a6e7f3c06655b25b1fe02815dc077d12"
         }
       ],
-      "id": "dlssg-0.4.1-entry-version-d45b4978bd96",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-entry-version-07a964d7e7fa",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-entry-winmm-13b6a55c3495",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-entry-winmm-be23ea23600e",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": false,
       "files": [
         {
-          "bytes": 10092,
+          "bytes": 10480,
           "name": "dlssg_sm86.ini",
-          "sha256": "97713bfa9032121a6acfadf3fe1ec9aca467f27ee9d8f80095d3bf0f1267d298"
+          "sha256": "f87c375e80f8992d5988f4fd3434b39e7bd09f1650fffc3e64be90c43812c191"
         },
         {
           "bytes": 841032,
           "name": "winmm.dll",
-          "sha256": "7c07af2f9ef4a23766a18d78de8e3f4fd1324a006f658b18f620acdee1cd7cd5"
+          "sha256": "e2828163ed2164475284423766c1a584bf3960c2eedfafa57f89a0732407c28b"
         }
       ],
-      "id": "dlssg-0.4.1-entry-winmm-13b6a55c3495",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-entry-winmm-be23ea23600e",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "winmm.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-entry-dbghelp-afd9cc3699b6",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-entry-dbghelp-23b2244133ab",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": false,
       "files": [
         {
           "bytes": 847728,
           "name": "dbghelp.dll",
-          "sha256": "0151630034f9dca497a271b07ada88941daeb593191cd369f02be41d68ec1c1f"
+          "sha256": "efc5dcf842fb431ee0dc815ca0f9b28ec1d15ce4d58a9fb5662f2793a70f799b"
         },
         {
-          "bytes": 10092,
+          "bytes": 10480,
           "name": "dlssg_sm86.ini",
-          "sha256": "97713bfa9032121a6acfadf3fe1ec9aca467f27ee9d8f80095d3bf0f1267d298"
+          "sha256": "f87c375e80f8992d5988f4fd3434b39e7bd09f1650fffc3e64be90c43812c191"
         }
       ],
-      "id": "dlssg-0.4.1-entry-dbghelp-afd9cc3699b6",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-entry-dbghelp-23b2244133ab",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "dbghelp.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-entry-dinput8-b914eb325024",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-entry-dinput8-3d79ee835d1a",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": false,
       "files": [
         {
           "bytes": 829112,
           "name": "dinput8.dll",
-          "sha256": "cca8e32855996d9730b894aabada07452a7d9e1b31a3e7c4d8e0236b874cc6db"
+          "sha256": "88fd4144029b00470572d5c8957e234f9755024e1e36a2ef0a524b18443c8e0d"
         },
         {
-          "bytes": 10092,
+          "bytes": 10480,
           "name": "dlssg_sm86.ini",
-          "sha256": "97713bfa9032121a6acfadf3fe1ec9aca467f27ee9d8f80095d3bf0f1267d298"
+          "sha256": "f87c375e80f8992d5988f4fd3434b39e7bd09f1650fffc3e64be90c43812c191"
         }
       ],
-      "id": "dlssg-0.4.1-entry-dinput8-b914eb325024",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-entry-dinput8-3d79ee835d1a",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "dinput8.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-entry-dxgi-e53c4a4fdff9",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-entry-dxgi-b4e39daa4e27",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": false,
       "files": [
         {
-          "bytes": 10092,
+          "bytes": 10480,
           "name": "dlssg_sm86.ini",
-          "sha256": "97713bfa9032121a6acfadf3fe1ec9aca467f27ee9d8f80095d3bf0f1267d298"
+          "sha256": "f87c375e80f8992d5988f4fd3434b39e7bd09f1650fffc3e64be90c43812c191"
         },
         {
           "bytes": 830688,
           "name": "dxgi.dll",
-          "sha256": "3daed223e18e8ef83e9850f514398d3443ed10c8fde6ecc5729470025e8cb19d"
+          "sha256": "ed35e3bb33e759025c3cf640ef490f20dc67a8c9219a22bce741ba98f80f9b3c"
         }
       ],
-      "id": "dlssg-0.4.1-entry-dxgi-e53c4a4fdff9",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-entry-dxgi-b4e39daa4e27",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "dxgi.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-entry-d3d12-61ab0c3ce486",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-entry-d3d12-0be323c4aa41",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": false,
       "files": [
         {
           "bytes": 830688,
           "name": "d3d12.dll",
-          "sha256": "a28826af4398f93b312ea14a1089d7c7257d265b08dfa75fd99677a4571800de"
+          "sha256": "4eb60600d85befe1b468d98891ae95b87bd265afcd9cf2a2017c93f6efb49fad"
         },
         {
-          "bytes": 10092,
+          "bytes": 10480,
           "name": "dlssg_sm86.ini",
-          "sha256": "97713bfa9032121a6acfadf3fe1ec9aca467f27ee9d8f80095d3bf0f1267d298"
+          "sha256": "f87c375e80f8992d5988f4fd3434b39e7bd09f1650fffc3e64be90c43812c191"
         }
       ],
-      "id": "dlssg-0.4.1-entry-d3d12-61ab0c3ce486",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-entry-d3d12-0be323c4aa41",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "d3d12.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-component-backend-sm86_backend-7d197846fdc1",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-component-backend-sm86_backend-4e445fb822e8",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": true,
       "files": [
         {
-          "bytes": 2340952,
+          "bytes": 2356416,
           "name": "dlssg_sm86/backend/sm86_backend.dll",
-          "sha256": "01eacb7dee04672353905bf4bb1c87fdc5e034e6b999afd389f834eafeb126b5"
+          "sha256": "4e445fb822e8af37212933fb9b1ace01eb82db0f64896359a7711b3fe5db7349"
         }
       ],
-      "id": "dlssg-0.4.1-component-backend-sm86_backend-7d197846fdc1",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-component-backend-sm86_backend-4e445fb822e8",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-component-kernels-fg_kernels-17a73896d03e",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-component-kernels-fg_kernels-1ebd50b74ac8",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": true,
       "files": [
         {
           "bytes": 11987504,
           "name": "dlssg_sm86/kernels/fg_kernels.dll",
-          "sha256": "33d0b12efa6d073a5f9523a48ba3eef816c2bceef89dbc15f860eb61185ac9ba"
+          "sha256": "1ebd50b74ac8583299fd902208487e7f71b6bfb8d44ccee224cd2372a22c35a7"
         }
       ],
-      "id": "dlssg-0.4.1-component-kernels-fg_kernels-17a73896d03e",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-component-kernels-fg_kernels-1ebd50b74ac8",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-component-runtime-nvngx_dlssg-18c596ffc0da",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-component-runtime-nvngx_dlssg-cadee1aa6db3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": true,
       "files": [
         {
@@ -737,66 +737,66 @@
           "sha256": "cadee1aa6db3907babdc3285da2aebc4553d92b89c38ba3eae8abd8bba1bea72"
         }
       ],
-      "id": "dlssg-0.4.1-component-runtime-nvngx_dlssg-18c596ffc0da",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-component-runtime-nvngx_dlssg-cadee1aa6db3",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-component-xefg-xefg_kernels-55ce3841ceda",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-component-xefg-xefg_kernels-605f2bc5e7f3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": true,
       "files": [
         {
-          "bytes": 16503272,
+          "bytes": 17447416,
           "name": "dlssg_sm86/xefg/xefg_kernels.dll",
-          "sha256": "f87988f07785dfc4929bc6357bd288ea5d5734e5ae56840c4fd97bdfa992b8bd"
+          "sha256": "605f2bc5e7f3affe3136fd8b71555cfc1c189240ab3a35913bd7c5b5fecc162d"
         }
       ],
-      "id": "dlssg-0.4.1-component-xefg-xefg_kernels-55ce3841ceda",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-component-xefg-xefg_kernels-605f2bc5e7f3",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-component-sr-nvngx_dlss-79af3944d8b4",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-component-sr-nvngx_dlss-858ccff96360",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": true,
       "files": [
         {
@@ -805,66 +805,66 @@
           "sha256": "858ccff96360c3098db9264cd6f13d04a027e09b6ce7ad5bbc297570e824b4f2"
         }
       ],
-      "id": "dlssg-0.4.1-component-sr-nvngx_dlss-79af3944d8b4",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-component-sr-nvngx_dlss-858ccff96360",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-component-sr-sr_kernels-48ad972f0c93",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-component-sr-sr_kernels-b0b82c6e55b1",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": true,
       "files": [
         {
           "bytes": 107514704,
           "name": "dlssg_sm86/sr/sr_kernels.dll",
-          "sha256": "599f2d9b5da2e0fc1fab589aabf29f4081167671af4e8a51c632db673f72dcf7"
+          "sha256": "b0b82c6e55b12cee49ff44257ee7121c45dedd6b2f78f6bacdcec6f724a8886c"
         }
       ],
-      "id": "dlssg-0.4.1-component-sr-sr_kernels-48ad972f0c93",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-component-sr-sr_kernels-b0b82c6e55b1",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
-      "archive": "dlssg-0.4.1-complete-9f397efeb502.zip",
-      "archive_prefix": "dlssg-0.4.1-notices-1057b99a4210",
+      "archive": "dlssg-0.4.2-complete-190c404e6796.zip",
+      "archive_prefix": "dlssg-0.4.2-notices-c94738231fdd",
       "backends": [
         "upstream040"
       ],
-      "bytes": 89859799,
+      "bytes": 90795780,
       "component": true,
       "files": [
         {
@@ -873,29 +873,29 @@
           "sha256": "7537220f50c6430d953eda8bff01f0817014e604cb3607f3b62c786d070d8570"
         },
         {
-          "bytes": 10713,
+          "bytes": 10517,
           "name": "dlssg_sm86/THIRD_PARTY_NOTICES.txt",
-          "sha256": "7b713d4449f50ff6dac8a26ff9af1d88600814dc5c35bfcf61416b9ec089614b"
+          "sha256": "6729e527a07ae224904e824bfdcdda52b6e1e80a0c5d23246d69b3804f241184"
         }
       ],
-      "id": "dlssg-0.4.1-notices-1057b99a4210",
-      "label": "Dlssg_for_sm86 · 0.4.1",
+      "id": "dlssg-0.4.2-notices-c94738231fdd",
+      "label": "Dlssg_for_sm86 · 0.4.2",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.1",
-        "ja": "Dlssg_for_sm86 · 0.4.1",
-        "ko": "Dlssg_for_sm86 · 0.4.1",
-        "ru": "Dlssg_for_sm86 · 0.4.1",
-        "zh": "Dlssg_for_sm86 · 0.4.1"
+        "en": "Dlssg_for_sm86 · 0.4.2",
+        "ja": "Dlssg_for_sm86 · 0.4.2",
+        "ko": "Dlssg_for_sm86 · 0.4.2",
+        "ru": "Dlssg_for_sm86 · 0.4.2",
+        "zh": "Dlssg_for_sm86 · 0.4.2"
       },
       "proxy": "version.dll",
       "scheme_id": "upstream-0.3.5-310-9",
-      "sha256": "9f397efeb502fb1393e964f40d86003725e1ade3cf052739493eb9157524e0e3",
-      "upstream_version": "0.4.1",
+      "sha256": "190c404e679629bb40ca52e296fe52d21c5705e065ab01c37b584bfd2ecee7ab",
+      "upstream_version": "0.4.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.1-complete-9f397efeb502.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/dlssg-0.4.2-complete-190c404e6796.zip"
       },
-      "version": "0.4.1"
+      "version": "0.4.2"
     },
     {
       "archive": "mfg-unlocker-1.7.1-complete-fdeecb534906.zip",
@@ -1875,11 +1875,167 @@
         "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.1-dx12-vulkan-r2-complete-6c339ad97364.zip"
       },
       "version": "0.4.1"
+    },
+    {
+      "archive": "anr-fg-b15-complete-3e7f4bd7a546.zip",
+      "archive_prefix": "",
+      "backends": [
+        "anr"
+      ],
+      "bytes": 11164911,
+      "component": false,
+      "files": [
+        {
+          "bytes": 35149,
+          "name": "ANR-OptiScaler-GPL-3.0.txt",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        {
+          "bytes": 380,
+          "name": "ANR-THIRD-PARTY-NOTICES.txt",
+          "sha256": "b03cb634dc9dff1c37ce948cf82dc082927645ef1859db45f5913b14b1aec8c8"
+        },
+        {
+          "bytes": 58976,
+          "name": "OptiScaler.ini",
+          "sha256": "dd6540a7d06ca4a7b0de88c227b37e555ccf16ab34fe9349364d3600e96f77a0"
+        },
+        {
+          "bytes": 35316,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/adapters/pack.nrx",
+          "sha256": "136ce0356c78f05020afebe8dcaeda4c076c2dab72174f88d2b75fa61cf0bb9e"
+        },
+        {
+          "bytes": 449868,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/kernels-portable/pack.nrx",
+          "sha256": "f5642e9a2d3c0b3203a540506175200a6946e68c56f7c5b810f8564b1464dc2c"
+        },
+        {
+          "bytes": 452790,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/kernels/pack.nrx",
+          "sha256": "a65583fb682cd4109e3b0dfe5d8d07b71c99186f031189e51abc1825e55bea2c"
+        },
+        {
+          "bytes": 603,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/nr_fg.ini",
+          "sha256": "68bc047729ecd40558a328b7a56510569ff71d6259eb932f6f18f513226f93d3"
+        },
+        {
+          "bytes": 3755120,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/nvngx_dlssg.dll",
+          "sha256": "a7a550c6e01b8abc89484af15a9bcaaa221e3bee8dced44f91425fe842c9629a"
+        },
+        {
+          "bytes": 8283,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/path_table.json",
+          "sha256": "6f6443928936103c311e48c0b2faa9627b71f19ac41c678bb3e495a91e48b4f4"
+        },
+        {
+          "bytes": 84607,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-coopmat-pq10/pack.nrx",
+          "sha256": "96588c8922f23bdee9b43e19038e5f7b9056b3fc343c67f03e7caa06ebbf8b29"
+        },
+        {
+          "bytes": 82299,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-coopmat-srgb8/pack.nrx",
+          "sha256": "7ff31cb45dc1d771c774399ce54411e65508005267ccdefc37f6cae2465832e4"
+        },
+        {
+          "bytes": 65883,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-dp4a-pq10/pack.nrx",
+          "sha256": "602173add33160bfb36d6c7e215c5104c7c5282baca7c62aa68f25336d51c38d"
+        },
+        {
+          "bytes": 63441,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-dp4a-srgb8/pack.nrx",
+          "sha256": "2e8b5a996753a5bb2f0ced680d6f68e296ba725c7bd633be8bb0ce7f101d8629"
+        },
+        {
+          "bytes": 58120,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-packed-pq10/pack.nrx",
+          "sha256": "6d6983070aa0c4e78598dafe3453e9287a1992a05971ab6925998726722a646b"
+        },
+        {
+          "bytes": 55932,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-packed-srgb8/pack.nrx",
+          "sha256": "36c3cad7d4f7dada76c818344d5f8a9cd6150ce76a112a0203004a5fce3fff83"
+        },
+        {
+          "bytes": 81298,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-linalg-pq10/pack.nrx",
+          "sha256": "42e8269e03e6476f541918e0176dfe28032d87f332c2b6bd3d6b231a3b3f8cf6"
+        },
+        {
+          "bytes": 78861,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-linalg-srgb8/pack.nrx",
+          "sha256": "6562aa1c1bdebcdbb83e683e2266fdb35de6778d78418097209d8cd3a2665ab3"
+        },
+        {
+          "bytes": 60727,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-pq10/pack.nrx",
+          "sha256": "36726f37da1da8d73f045855191d0275cb6c841517217bf590360ddc2759a01e"
+        },
+        {
+          "bytes": 58543,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-srgb8/pack.nrx",
+          "sha256": "77939d7a2f9320bf31cd326a03c1d36f878a3dc7ae45c3eac616171f8d61cc73"
+        },
+        {
+          "bytes": 81253,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-xmx-pq10/pack.nrx",
+          "sha256": "ecce6efb5c81bc30675d9ebb249c6e6b4b5c0118583ef18c337096c6b3efcf8a"
+        },
+        {
+          "bytes": 78995,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-xmx-srgb8/pack.nrx",
+          "sha256": "94fb8bf5715aeeacecad7eaf685b2115182c12dc7c7e69fd746aa48a5d1c2bdd"
+        },
+        {
+          "bytes": 958,
+          "name": "OptiScaler/custom/Apex Neural Rendering FG/dlssg/size_table.json",
+          "sha256": "7c602f6709e14bbf972250d47b8b3dc55ce4dafd803723561120097e644e5478"
+        },
+        {
+          "bytes": 30289232,
+          "name": "dxgi.dll",
+          "sha256": "13b631776aee15bf11c1ee2c4d282191a629c8504f6d4d278c0b711d8d371b3a"
+        }
+      ],
+      "id": "anr-fg-b15-full",
+      "label": "ANR FG · V.B15",
+      "labels": {
+        "en": "ANR FG · V.B15",
+        "ja": "ANR FG · V.B15",
+        "ko": "ANR FG · V.B15",
+        "ru": "ANR FG · V.B15",
+        "zh": "ANR FG · V.B15"
+      },
+      "proxy": "dxgi.dll",
+      "scheme_id": "anr-fg",
+      "sha256": "3e7f4bd7a546a99537ce9115ca6f28f5a768ff8b52b8918b9478b6164c8c1cbd",
+      "upstream_version": "0.0.15-B15",
+      "urls": {
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/anr-fg-b15-complete-3e7f4bd7a546.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/anr-fg-b15-complete-3e7f4bd7a546.zip"
+      },
+      "version": "0.0.15"
     }
   ],
-  "revision": "bundles-6ae5a179dcf09ec348b7",
+  "revision": "bundles-0876c38d79f4f9eb2782",
   "schema": 3,
   "scheme_policies": {
+    "anr-fg": {
+      "capabilities": [],
+      "defaults": {},
+      "gpu_paths": [
+        "SM75",
+        "SM86",
+        "SM89"
+      ],
+      "ini_policy": "anr_full",
+      "max_selected_proxies": 1,
+      "parameter_profile": "anr_fg_b15"
+    },
     "dlssg-transfusion-1.4.5.3": {
       "capabilities": [
         "encore_dedicated_entries"

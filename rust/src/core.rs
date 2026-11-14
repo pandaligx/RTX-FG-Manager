@@ -35,7 +35,8 @@ pub const PROXIES: [&str; 22] = [
     crate::mfg_plugin::ENTRY,
     "rtx-encore.asi",
 ];
-pub const BACKENDS: [&str; 11] = [
+pub const BACKENDS: [&str; 12] = [
+    crate::anr::BACKEND,
     "native20",
     "native30",
     "native_x6_20",
@@ -425,7 +426,9 @@ pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
         .collect())
 }
 pub fn config_name(backend: &str) -> &'static str {
-    if backend == crate::encore::BACKEND {
+    if backend == crate::anr::BACKEND {
+        crate::anr::CONFIG
+    } else if backend == crate::encore::BACKEND {
         crate::encore::CONFIG
     } else if backend == crate::rtxmfg::BACKEND {
         crate::rtxmfg::CONFIG
@@ -439,6 +442,7 @@ pub fn config_name(backend: &str) -> &'static str {
 /// that protocol to a previously installed backend merely because its ID matches.
 pub fn backend_matches_profile(backend: &str, profile: &str) -> bool {
     match profile {
+        crate::anr::PROFILE => backend == crate::anr::BACKEND,
         crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 => {
             backend == crate::upstream040::BACKEND
         }
@@ -467,6 +471,15 @@ pub fn folder(backend: &str) -> Result<&str> {
 pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>> {
     folder(backend)?;
     let mut names = normalize_proxies(proxies)?;
+    if backend == crate::anr::BACKEND {
+        ensure!(
+            names.len() == 1 && crate::anr::PROXIES.contains(&names[0].as_str()),
+            "ANR 完整方案每次仅安装一个入口"
+        );
+        names.push(crate::anr::CONFIG.into());
+        names.extend(crate::anr::COMPONENTS.iter().map(|s| (*s).to_owned()));
+        return Ok(names);
+    }
     ensure!(
         !names.iter().any(|n| n.ends_with(".asi")) || names.len() == 1,
         "ASI 插件与 DLL 加载入口不能同时安装"
@@ -555,6 +568,9 @@ pub fn package(backend: &str, proxies: &[String]) -> Result<BTreeMap<String, Vec
     Ok(out)
 }
 pub fn configure_package(backend: &str, out: &mut BTreeMap<String, Vec<u8>>) -> Result<()> {
+    if backend == crate::anr::BACKEND {
+        return Ok(());
+    }
     // Bundled upstream runtimes default to the user cache. Moving their extracted
     // components next to a game changes DLL loading behavior (reported by ZZZ).
     if backend == "upstream_sm86"
@@ -977,7 +993,9 @@ pub fn status_at(target: &DeploymentTarget) -> String {
                     return Ok("未完成 / 可清理恢复".into());
                 }
                 if digest(&q)? != *h {
-                    if n == config_name(&r.backend) {
+                    if n == config_name(&r.backend)
+                        || (r.backend == crate::anr::BACKEND && n == "OptiScaler.ini")
+                    {
                         edited = true
                     } else {
                         return Ok("DLL 已调整 / 卸载会识别本项目文件并保留其他 MOD".into());
@@ -1185,6 +1203,12 @@ pub fn deploy_prepared_context_at_with_overrides(
         )?;
     }
     let mut existing = record(dir)?;
+    if backend == crate::anr::BACKEND {
+        crate::anr::preflight(
+            &target,
+            existing.as_ref().is_some_and(|r| r.backend == backend),
+        )?;
+    }
     if let Some(record) = &existing {
         target.validate_record(record)?;
     }
@@ -1343,6 +1367,7 @@ pub fn deploy_prepared_context_at_with_overrides(
     // while allowing an already-tested manual package to retain custom INI text.
     if existing.is_none()
         && backend != crate::encore::BACKEND
+        && backend != crate::anr::BACKEND
         && !mfg_plugin
         && context.is_some()
         && dir.join(config).is_file()
@@ -1404,7 +1429,8 @@ pub fn deploy_prepared_context_at_with_overrides(
         {
             ensure!(
                 data.iter()
-                    .filter(|(name, _)| name.as_str() != config)
+                    .filter(|(name, _)| name.as_str() != config
+                        && !(backend == crate::anr::BACKEND && name.as_str() == "OptiScaler.ini"))
                     .all(|(name, bytes)| r.hashes.get(name) == Some(&hash(bytes))),
                 "当前安装与内置文件版本不同，请先卸载补丁，再安装新版；已有文件未覆盖"
             );
@@ -1420,6 +1446,8 @@ pub fn deploy_prepared_context_at_with_overrides(
                             .as_deref()
                             .or(r.payload_version.as_deref()),
                     )?
+                } else if backend == crate::anr::BACKEND {
+                    crate::anr::configure(&current, explicit_overrides.unwrap_or(&no_overrides))?
                 } else if backend == crate::rtxmfg::BACKEND {
                     if let Some(values) = explicit_overrides.filter(|v| !v.is_empty()) {
                         crate::rtxmfg::configure(&current, values)?
@@ -1461,7 +1489,9 @@ pub fn deploy_prepared_context_at_with_overrides(
                     return Ok("参数已应用；下次启动游戏生效。".into());
                 }
                 if current != updated {
-                    let stage = no_links(&root.join(format!("{config}.config-stage")))?;
+                    let stage = no_links(
+                        &root.join(format!("{}.config-stage", config.replace('/', "__"))),
+                    )?;
                     ensure!(!stage.exists(), "存在未完成的配置更新，请先卸载补丁");
                     write_new(&stage, &updated)?;
                     ensure!(fs::read(&ini)? == current, "配置已变化，请刷新后重试");
@@ -1477,7 +1507,8 @@ pub fn deploy_prepared_context_at_with_overrides(
         }
         bail!("已有部署或未完成操作，请先清理再重新部署")
     }
-    if backend == "upstream_sm86"
+    if backend == crate::anr::BACKEND
+        || backend == "upstream_sm86"
         || backend == crate::upstream040::BACKEND
         || backend == crate::rtxmfg::BACKEND
         || backend == crate::transfusion::BACKEND
@@ -1494,7 +1525,8 @@ pub fn deploy_prepared_context_at_with_overrides(
             );
         }
     }
-    let conflicts = if backend.starts_with("native")
+    let conflicts = if backend == crate::anr::BACKEND
+        || backend.starts_with("native")
         || backend == "upstream_sm86"
         || backend == crate::upstream040::BACKEND
         || backend == crate::rtxmfg::BACKEND

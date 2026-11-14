@@ -246,6 +246,9 @@ pub struct Parameter {
     pub choices: Vec<(&'static str, &'static str)>,
 }
 pub fn parameters(profile: &str) -> Vec<Parameter> {
+    if profile == crate::anr::PROFILE {
+        return crate::anr::parameters();
+    }
     if profile == crate::upstream040::PROFILE_041 {
         return crate::upstream040::parameters_041();
     }
@@ -375,6 +378,7 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
         matches!(
             profile,
             "upstream035"
+                | crate::anr::PROFILE
                 | crate::upstream040::PROFILE
                 | crate::upstream040::PROFILE_041
                 | "upstream031"
@@ -452,6 +456,9 @@ pub fn defaults(profile: &str, overrides: &Values) -> Values {
     values
 }
 pub fn configure(bytes: &[u8], profile: &str, values: &Values) -> Result<Vec<u8>> {
+    if profile == crate::anr::PROFILE {
+        return crate::anr::configure(bytes, values);
+    }
     if profile == crate::upstream040::PROFILE_041 {
         return crate::upstream040::configure_041(bytes, values);
     }
@@ -526,6 +533,9 @@ pub fn merge_context(
     backend: &str,
     context: Option<&Context>,
 ) -> Result<Vec<u8>> {
+    if backend == crate::anr::BACKEND {
+        return crate::anr::configure(current, &crate::anr::read(desired)?);
+    }
     if backend == crate::encore::BACKEND {
         return crate::encore::configure(current, &crate::encore::read(desired)?);
     }
@@ -652,6 +662,9 @@ fn mfg_parameters() -> Vec<Parameter> {
 }
 
 pub fn read_values(bytes: &[u8], profile: &str) -> Result<Values> {
+    if profile == crate::anr::PROFILE {
+        return crate::anr::read(bytes);
+    }
     if profile == crate::upstream040::PROFILE_041 {
         return crate::upstream040::read_041(bytes);
     }
@@ -748,6 +761,8 @@ pub fn inspect_at(
                 .is_some_and(|r| r.backend == crate::transfusion::BACKEND)
             {
                 crate::transfusion::CONFIG
+            } else if policy.parameter_profile == crate::anr::PROFILE {
+                crate::anr::CONFIG
             } else if policy.parameter_profile == crate::encore::PROFILE {
                 crate::encore::CONFIG
             } else if policy.parameter_profile == crate::rtxmfg::PROFILE {

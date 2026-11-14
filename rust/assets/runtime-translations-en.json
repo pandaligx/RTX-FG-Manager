@@ -1,4 +1,11 @@
 {
+  "场景切换保护": "Scene-cut protection",
+  "计算路径": "Compute path",
+  "0.4.2 的 Auto 等同关闭：连同 UI 插帧。严格模式需要游戏提供无 HUD 输入；0.4.1 保持原版本行为。": "In 0.4.2, Auto means off: interpolate the whole image including UI. Strict mode requires HUD-less game input. Version 0.4.1 retains its original behavior.",
+  "ANR FG 完整包已包含 OptiScaler 和模型。游戏内开启帧生成；默认上限6X，实际倍率由游戏请求。更改参数后重启游戏。": "The ANR FG full package includes OptiScaler and its models. Enable frame generation in game. The default limit is 6X; the game requests the actual multiplier. Restart the game after changing settings.",
+  "ANR FG 完整安装：DX12 优先 dxgi.dll，Vulkan 选 winmm.dll，每次仅一个入口。需要 VC++ 2015–2022 x64 运行库；已有 OptiScaler 请先还原。": "ANR FG full install: prefer dxgi.dll for DX12 or winmm.dll for Vulkan, one loader at a time. Requires VC++ 2015–2022 x64. Restore an existing OptiScaler installation first.",
+  "支持情况取决于游戏的帧生成输入、显卡和驱动。这是 ANR 帧生成，不是 DLSS 神经渲染；上游 SR/RR 尚未发布。已有 OptiScaler 请使用上游 addon，完整包不会覆盖原安装。": "Support depends on the game's frame-generation input, GPU and driver. This is ANR frame generation, not DLSS Neural Rendering; upstream SR/RR is not released. For existing OptiScaler, use the upstream addon; the full installer will not overwrite it.",
+  "Wine/Proton 需为所选入口设置 DLL override，例如 dxgi=n,b；Vulkan 改用 winmm。": "Wine/Proton requires a DLL override for the selected loader, such as dxgi=n,b; use winmm for Vulkan.",
   "DLSS / XeSS 运行库": "DLSS / XeSS runtimes",
   "DLSS / XeSS 运行库…": "DLSS / XeSS runtimes…",
   "DLSS 超分辨率": "DLSS Super Resolution",
@@ -98,5 +105,6 @@
   "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起支持无 DLSS 游戏的 DX11/Vulkan，以及 DX11 原生 DLSS 替换；Vulkan 原生 DLSS 替换仍使用标准 XeSS。旧版仅支持 DX12；准备成功不代表实际启用。": "Experimental, off by default. Requires RTX 30/40/50 and a supported driver. Since 2.1.0: added SR in DX11/Vulkan and native DLSS replacement in DX11. Native Vulkan DLSS replacement keeps standard XeSS. Earlier versions require DX12. Successful preparation does not prove activation.",
   "实验性，默认关闭。需要 RTX 30/40/50 和受支持驱动。2.1.0 起扩展到 DX11/Vulkan 无原生帧生成游戏；旧版仅支持 DX12。以游戏菜单中的实际激活状态为准。": "Experimental, off by default. Requires RTX 30/40/50 and a supported driver. Since 2.1.0: added FG in DX11/Vulkan; earlier versions require DX12. Check actual activation in the in-game menu.",
   "检测到原生帧生成或文件冲突，新增 DLSS-G 暂不可用；保留原文件，可选择其他引擎。": "Native frame generation or a file conflict was detected. Added DLSS-G is unavailable; existing files are preserved. Choose another engine.",
-  "游戏已有原生帧生成；使用上方 DLSS 帧生成更新，无需添加第二套帧生成。": "The game already has native frame generation. Update DLSS frame generation above; do not add a second integration."
+  "游戏已有原生帧生成；使用上方 DLSS 帧生成更新，无需添加第二套帧生成。": "The game already has native frame generation. Update DLSS frame generation above; do not add a second integration.",
+  "DLL 加载入口（单选）": "DLL loader (choose one)"
 }

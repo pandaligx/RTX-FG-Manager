@@ -14,6 +14,25 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('ANR parameter shares round trip without breaking legacy clients',async t=>{
+  const f=fixture(t),u=await f.login(),modern={'x-rtxfg-anr':'1'};
+  const c={...content(),scheme:'anr-fg',patchVersion:'0.0.15-B15',entries:['dxgi.dll'],
+    presets:{schema:1,profile:'anr_fg_b15',values:{max_generated:'3',scene_cut:'0',path:'auto'},
+      defaults:{max_generated:'5',scene_cut:'1',path:'auto'}}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',16,modern);
+  assert.deepEqual(posted.content.presets,c.presets);
+  const path='/v1/recipes/'+posted.id;
+  const old=await f.call('GET',path,null,u.token,'test-ip',16);
+  assert.equal(old.content.presets,undefined);
+  old.content.notes='Old client edit';
+  await f.call('PUT',path,{revision:1,content:old.content},u.token,'test-ip',16);
+  assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',16,modern)).content.presets,c.presets);
+  assert.throws(()=>recipe({...c,entries:['dxgi.dll','winmm.dll']}));
+  const bad=structuredClone(c);bad.presets.values.path='C:/users/secret';
+  assert.throws(()=>recipe(bad));
+  assert.equal((await f.call('GET','/v1/capabilities')).anr,1);
+});
+
 test('Encore 2.4 placements and scale stay private to capable clients and survive old edits',async t=>{
   const f=fixture(t),u=await f.login(),modern={'x-rtxfg-encore240':'1'};
   const c={...shared(),patchVersion:'2.4.0',presets:{schema:1,profile:'rtx_encore_json_v4',
