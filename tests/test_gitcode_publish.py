@@ -373,6 +373,18 @@ class PublicationTests(unittest.TestCase):
         with patch.object(pub,'verify') as verify:
             pub.verify_metadata_changes(Path('.'),review,{},after)
             self.assertEqual(verify.call_count,2) # one index, one complete archive
+        anr = {**package, 'scheme_id':'anr-fg', 'archive_prefix':'',
+               'files':[{'name':'OptiScaler.ini','bytes':1,'sha256':'b'*64}]}
+        review,after=metadata([anr])
+        with patch.object(pub,'verify') as verify:
+            pub.verify_metadata_changes(Path('.'),review,{},after)
+            self.assertEqual(verify.call_count,2)
+        for invalid in [{k:v for k,v in anr.items() if k!='archive_prefix'},
+                        {**anr,'archive_prefix':None}, {**anr,'files':[]},
+                        {**anr,'scheme_id':'other'}]:
+            review,after=metadata([invalid])
+            with patch.object(pub,'verify'),self.assertRaisesRegex(RuntimeError,'explicit package prefix'):
+                pub.verify_metadata_changes(Path('.'),review,{},after)
         review,after=metadata([package,{**package,'bytes':31}])
         with patch.object(pub,'verify'),self.assertRaisesRegex(RuntimeError,'Conflicting'):
             pub.verify_metadata_changes(Path('.'),review,{},after)
