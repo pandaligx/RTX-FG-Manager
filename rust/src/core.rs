@@ -286,8 +286,9 @@ fn location_checked(exe: &Path, must_exist: bool, require_parent: bool) -> Resul
 pub struct DeploymentTarget {
     pub game_exe: PathBuf,
     pub directory: PathBuf,
-    /// Other rendering/cleanup EXEs in the same library group. These guard
-    /// mutations only; they never change deployment or cleanup ownership.
+    /// Other rendering/cleanup EXEs in the same library group. They guard
+    /// mutations and identify sibling runtime journals during restoration;
+    /// they never become implicit patch deployment or cleanup targets.
     pub guard_exes: Vec<PathBuf>,
 }
 impl DeploymentTarget {

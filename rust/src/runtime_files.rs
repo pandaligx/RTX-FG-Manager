@@ -1052,7 +1052,7 @@ fn root(target: &core::DeploymentTarget, kind: &str) -> Result<PathBuf> {
     filename(kind)?;
     core::no_links(&target.directory.join(OWN).join(kind))
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Record {
     schema: u8,
@@ -1063,7 +1063,7 @@ struct Record {
     kind: String,
     entries: Vec<Entry>,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Entry {
     path: String,
@@ -1481,7 +1481,10 @@ fn install_locked_with(
         Ok(())
     })();
     if let Err(error) = result {
-        remove_locked(target, kind)
+        // The batch already holds sibling directory locks (non-reentrant on
+        // Linux). Roll back this install's own intent, without transferring
+        // ownership to peers or trying to acquire their locks again.
+        remove_locked_impl(target, kind, false)
             .context(format!("安装失败：{error:#}；恢复未完成，请保留备份"))?;
         return Err(error.context("运行库安装失败，已恢复原件"));
     }
@@ -1572,15 +1575,40 @@ fn install_many_with(
     Ok(())
 }
 pub fn remove_locked(target: &core::DeploymentTarget, kind: &str) -> Result<()> {
+    remove_locked_impl(target, kind, true)
+}
+fn remove_locked_impl(target: &core::DeploymentTarget, kind: &str, share: bool) -> Result<()> {
     let Some(r) = read(target, kind)? else {
         return Ok(());
     };
     core::assert_target_stopped(target)?;
     let folder = root(target, kind)?;
+    let shared = if share {
+        SharedRemoval::prepare(target, kind, &r)?
+    } else {
+        SharedRemoval {
+            entries: BTreeMap::new(),
+            peers: vec![],
+            _locks: vec![],
+        }
+    };
+    // A legacy second owner sometimes only copied N over the identical N.
+    // After the first owner restored O its record may already be gone. Retire
+    // this no-op journal without touching O (or any later external update).
+    let noops: BTreeSet<_> = r
+        .entries
+        .iter()
+        .filter(|e| {
+            r.complete && e.original.as_ref() == Some(&e.installed) && e.previous == e.original
+        })
+        .map(|e| core::key(Path::new(&e.path)))
+        .collect();
     for e in &r.entries {
         let p = destination(target, kind, e)?;
         ensure!(
-            accepted(&p, e)?,
+            shared.entries.contains_key(&core::key(&p))
+                || noops.contains(&core::key(&p))
+                || accepted(&p, e)?,
             "运行库已被其他程序修改，保留文件及备份：{}",
             p.display()
         );
@@ -1591,9 +1619,15 @@ pub fn remove_locked(target: &core::DeploymentTarget, kind: &str) -> Result<()> 
             );
         }
     }
+    // Transfer the earliest verified original before deleting any owner's
+    // journal. Other renderers keep their runtime until the last owner leaves.
+    shared.persist(kind)?;
     for e in &r.entries {
         core::assert_target_stopped(target)?;
         let p = destination(target, kind, e)?;
+        if shared.entries.contains_key(&core::key(&p)) || noops.contains(&core::key(&p)) {
+            continue;
+        }
         ensure!(accepted(&p, e)?, "运行库在恢复期间已变化");
         if let Some(h) = &e.original {
             replace(&folder.join(format!("{h}.bak")), &p)?;
@@ -1616,6 +1650,181 @@ pub fn remove_locked(target: &core::DeploymentTarget, kind: &str) -> Result<()> 
         let _ = fs::remove_dir(core::no_links(&target.directory.join("RTXMFG-XeSS"))?);
     }
     Ok(())
+}
+
+struct SharedOriginal {
+    original: Option<String>,
+    backup: Option<PathBuf>,
+    current: Option<String>,
+}
+struct SharedRemoval {
+    entries: BTreeMap<String, SharedOriginal>,
+    peers: Vec<(core::DeploymentTarget, Record)>,
+    // Held through journal transfer and removal. Locks fail fast on contention.
+    _locks: Vec<win::GameLock>,
+}
+impl SharedRemoval {
+    fn prepare(target: &core::DeploymentTarget, kind: &str, record: &Record) -> Result<Self> {
+        let mut plan = Self {
+            entries: BTreeMap::new(),
+            peers: vec![],
+            _locks: vec![],
+        };
+        if !matches!(kind, "sr" | "rr" | "fg") {
+            return Ok(plan);
+        }
+        let installation = core::key(&scanner::installation_root(&target.game_exe));
+        let mut seen = BTreeSet::from([core::key(&target.directory)]);
+        for exe in &target.guard_exes {
+            // Only explicit library siblings with the same installation root
+            // may share ownership. Never discover/adopt unrelated game files.
+            let peer = core::DeploymentTarget::for_game(exe);
+            if core::key(&scanner::installation_root(exe)) != installation
+                || !seen.insert(core::key(&peer.directory))
+                || !root(&peer, kind)?.join("ownership.json").exists()
+            {
+                continue;
+            }
+            let peer = peer.validate(false)?;
+            plan._locks.push(win::game_lock(&peer.directory)?);
+            core::assert_target_stopped(&peer)?;
+            if let Some(r) = read(&peer, kind)? {
+                plan.peers.push((peer, r));
+            }
+        }
+        for e in &record.entries {
+            let path = destination(target, kind, e)?;
+            let key = core::key(&path);
+            let mut owners = vec![(target, e)];
+            for (peer, r) in &plan.peers {
+                for other in &r.entries {
+                    if core::key(&destination(peer, kind, other)?) == key {
+                        owners.push((peer, other));
+                    }
+                }
+            }
+            if owners.len() == 1 {
+                continue;
+            }
+            let mut accepted_current = false;
+            for (owner, entry) in &owners {
+                accepted_current |= accepted(&path, entry)?;
+                if let Some(hash) = &entry.original {
+                    ensure!(
+                        matches(&root(owner, kind)?.join(format!("{hash}.bak")), hash)?,
+                        "共享运行库原件备份损坏，已保留记录：{}",
+                        path.display()
+                    );
+                }
+            }
+            ensure!(
+                accepted_current,
+                "运行库已被其他程序修改，保留文件及备份：{}",
+                path.display()
+            );
+            // Legacy per-directory installs form O -> N1 -> N2 (including
+            // N1 -> N1 no-ops). Resolve one connected, unambiguous original.
+            let mut originals: BTreeSet<_> =
+                owners.iter().map(|(_, e)| e.original.clone()).collect();
+            for (_, entry) in &owners {
+                for hash in std::iter::once(&entry.installed).chain(entry.previous.as_ref()) {
+                    if entry.original.as_ref() != Some(hash) {
+                        originals.remove(&Some(hash.clone()));
+                    }
+                }
+            }
+            ensure!(
+                originals.len() == 1,
+                "共享运行库备份关系不明确，已保留文件及记录：{}",
+                path.display()
+            );
+            let original = originals.into_iter().next().unwrap();
+            let mut connected = BTreeSet::from([original.clone()]);
+            loop {
+                let before = connected.len();
+                for (_, entry) in &owners {
+                    if connected.contains(&entry.original) {
+                        connected.insert(Some(entry.installed.clone()));
+                        if let Some(hash) = &entry.previous {
+                            connected.insert(Some(hash.clone()));
+                        }
+                    }
+                }
+                if connected.len() == before {
+                    break;
+                }
+            }
+            ensure!(
+                owners.iter().all(|(_, e)| connected.contains(&e.original)),
+                "共享运行库备份链不完整，已保留文件及记录：{}",
+                path.display()
+            );
+            let backup = original
+                .as_ref()
+                .map(|hash| {
+                    let (owner, _) = owners.iter().find(|(_, e)| e.original == original).unwrap();
+                    Ok::<_, anyhow::Error>(root(owner, kind)?.join(format!("{hash}.bak")))
+                })
+                .transpose()?;
+            let current = if path.exists() {
+                Some(core::digest(&path)?)
+            } else {
+                None
+            };
+            plan.entries.insert(
+                key,
+                SharedOriginal {
+                    original,
+                    backup,
+                    current,
+                },
+            );
+        }
+        Ok(plan)
+    }
+    fn persist(&self, kind: &str) -> Result<()> {
+        for (peer, record) in &self.peers {
+            let mut updated = record.clone();
+            let mut old_backups = BTreeSet::new();
+            let mut changed = false;
+            let folder = root(peer, kind)?;
+            for entry in &mut updated.entries {
+                let Some(shared) = self.entries.get(&core::key(Path::new(&entry.path))) else {
+                    continue;
+                };
+                if let Some(hash) = &entry.original {
+                    old_backups.insert(hash.clone());
+                }
+                if let (Some(hash), Some(source)) = (&shared.original, &shared.backup) {
+                    let backup = core::no_links(&folder.join(format!("{hash}.bak")))?;
+                    if !backup.exists() {
+                        replace(source, &backup)?;
+                    }
+                    ensure!(matches(&backup, hash)?, "共享运行库备份校验失败");
+                }
+                entry.original = shared.original.clone();
+                entry.previous = shared.current.clone();
+                changed = true;
+            }
+            if changed {
+                core::assert_target_stopped(peer)?;
+                core::atomic_json(&folder.join("ownership.json"), &updated)?;
+                for hash in old_backups {
+                    if !updated
+                        .entries
+                        .iter()
+                        .any(|e| e.original.as_ref() == Some(&hash))
+                    {
+                        let backup = core::no_links(&folder.join(format!("{hash}.bak")))?;
+                        if matches(&backup, &hash)? {
+                            fs::remove_file(backup)?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 }
 pub fn remove_many(targets: &[core::DeploymentTarget], kind: &str) -> Result<()> {
     let mut errors = Vec::new();
@@ -2409,6 +2618,199 @@ mod tests {
         remove_locked(&t, "sr")?;
         assert_eq!(fs::read(&p)?, b"original\0\xff");
         assert!(!root(&t, "sr")?.exists());
+        Ok(())
+    }
+    #[test]
+    fn shared_runtime_legacy_uninstall_preserves_original_in_either_order() -> Result<()> {
+        for reverse in [false, true] {
+            for kind in ["sr", "rr", "fg"] {
+                let tmp = tempfile::tempdir()?;
+                let game = tmp.path().join("steamapps/common/SharedGame");
+                let mut a = target(&game.join("platform/steam"))?;
+                let mut b = target(&game.join("steam"))?;
+                a.guard_exes.push(b.game_exe.clone());
+                b.guard_exes.push(a.game_exe.clone());
+                let p = game.join("Engine/Plugins/NVIDIA").join(filename(kind)?);
+                fs::create_dir_all(p.parent().unwrap())?;
+                fs::write(&p, b"original game runtime\0\xff")?;
+                let s = sources(&tmp.path().join("source"), kind)?;
+                // The pre-fix client completes runtimes one EXE at a time.
+                install_locked(&a, kind, std::slice::from_ref(&p), &s)?;
+                install_locked(&b, kind, std::slice::from_ref(&p), &s)?;
+                let updated = fs::read(&p)?;
+                let (first, last) = if reverse { (&b, &a) } else { (&a, &b) };
+                assert!(crate::cleanup::clean_outcome_at(first)?.complete);
+                assert_eq!(
+                    fs::read(&p)?,
+                    updated,
+                    "other directory still uses the update"
+                );
+                assert!(crate::cleanup::clean_outcome_at(last)?.complete);
+                assert_eq!(fs::read(&p)?, b"original game runtime\0\xff");
+                assert!(!a.directory.join(OWN).exists());
+                assert!(!b.directory.join(OWN).exists());
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn shared_runtime_three_owners_and_different_versions_restore_once() -> Result<()> {
+        for order in [[0, 1, 2], [2, 1, 0], [1, 0, 2]] {
+            let tmp = tempfile::tempdir()?;
+            let game = tmp.path().join("steamapps/common/MultiRenderer");
+            let mut targets = [
+                target(&game.join("one"))?,
+                target(&game.join("two"))?,
+                target(&game.join("three"))?,
+            ];
+            let exes: Vec<_> = targets.iter().map(|t| t.game_exe.clone()).collect();
+            for t in &mut targets {
+                t.guard_exes = exes.iter().filter(|p| *p != &t.game_exe).cloned().collect();
+            }
+            let path = game.join("nvngx_dlss.dll");
+            fs::write(&path, b"game original")?;
+            let src = sources(&tmp.path().join("source"), "sr")?;
+            for (i, target) in targets.iter().enumerate() {
+                fs::write(&src["nvngx_dlss.dll"], format!("version {i}"))?;
+                install_locked(target, "sr", std::slice::from_ref(&path), &src)?;
+            }
+            for (index, t) in order.into_iter().enumerate() {
+                remove_locked(&targets[t], "sr")?;
+                remove_locked(&targets[t], "sr")?; // completed retry is harmless
+                assert_eq!(
+                    fs::read(&path)?,
+                    if index == 2 {
+                        b"game original".as_slice()
+                    } else {
+                        b"version 2".as_slice()
+                    }
+                );
+            }
+            assert!(targets.iter().all(|t| !t.directory.join(OWN).exists()));
+        }
+        Ok(())
+    }
+    #[test]
+    fn shared_runtime_external_changes_and_bad_backups_still_block_cleanup() -> Result<()> {
+        for corrupt_backup in [false, true] {
+            let tmp = tempfile::tempdir()?;
+            let game = tmp.path().join("steamapps/common/SharedGame");
+            let mut a = target(&game.join("bin/x64"))?;
+            let mut b = target(&game.join("bin/x64_dx12"))?;
+            a.guard_exes.push(b.game_exe.clone());
+            b.guard_exes.push(a.game_exe.clone());
+            let path = game.join("nvngx_dlssd.dll");
+            fs::write(&path, b"original")?;
+            let src = sources(&tmp.path().join("source"), "rr")?;
+            install_locked(&a, "rr", std::slice::from_ref(&path), &src)?;
+            install_locked(&b, "rr", std::slice::from_ref(&path), &src)?;
+            let journals: Vec<_> = [&a, &b]
+                .iter()
+                .map(|t| fs::read(root(t, "rr").unwrap().join("ownership.json")).unwrap())
+                .collect();
+            if corrupt_backup {
+                fs::write(
+                    root(&a, "rr")?.join(format!("{}.bak", core::hash(b"original"))),
+                    b"bad",
+                )?;
+            } else {
+                fs::write(&path, b"user or game update")?;
+            }
+            let before = fs::read(&path)?;
+            assert!(remove_locked(&b, "rr").is_err());
+            assert_eq!(fs::read(&path)?, before);
+            for (target, journal) in [&a, &b].iter().zip(journals) {
+                assert_eq!(
+                    fs::read(root(target, "rr")?.join("ownership.json"))?,
+                    journal
+                );
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn shared_runtime_added_plugin_is_deleted_only_with_last_owner() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let game = tmp.path().join("steamapps/common/SharedGame");
+        let mut a = target(&game.join("dx11"))?;
+        let mut b = target(&game.join("dx12"))?;
+        a.guard_exes.push(b.game_exe.clone());
+        b.guard_exes.push(a.game_exe.clone());
+        let path = game.join("sl.reflex.dll");
+        let source = tmp.path().join("sl.reflex.dll");
+        fs::write(&source, b"added plugin")?;
+        let src = BTreeMap::from([("sl.reflex.dll".into(), source)]);
+        install_locked(&a, "fg", std::slice::from_ref(&path), &src)?;
+        install_locked(&b, "fg", std::slice::from_ref(&path), &src)?;
+        remove_locked(&a, "fg")?;
+        assert!(path.exists());
+        remove_locked(&b, "fg")?;
+        assert!(!path.exists());
+        Ok(())
+    }
+    #[test]
+    fn shared_runtime_batched_install_records_a_single_original() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let game = tmp.path().join("steamapps/common/SharedGame");
+        let a = target(&game.join("bin/x64"))?;
+        let b = target(&game.join("bin/x64_dx12"))?;
+        let path = game.join("nvngx_dlss.dll");
+        fs::write(&path, b"original")?;
+        let src = sources(&tmp.path().join("source"), "sr")?;
+        install_many_with(
+            &[a.clone(), b.clone()],
+            "sr",
+            &AtomicBool::new(false),
+            || Ok(src),
+        )?;
+        assert_eq!(
+            [&a, &b]
+                .iter()
+                .filter(|t| read(t, "sr").unwrap().is_some())
+                .count(),
+            1
+        );
+        remove_many(&[a, b], "sr")?;
+        assert_eq!(fs::read(&path)?, b"original");
+        Ok(())
+    }
+    #[test]
+    fn shared_runtime_retry_after_old_client_already_restored_first_directory() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let game = tmp.path().join("steamapps/common/SharedGame");
+        let a = target(&game.join("platform/steam"))?;
+        let mut b = target(&game.join("steam"))?;
+        let path = game.join("nvngx_dlss.dll");
+        fs::write(&path, b"original")?;
+        let src = sources(&tmp.path().join("source"), "sr")?;
+        install_locked(&a, "sr", std::slice::from_ref(&path), &src)?;
+        install_locked(&b, "sr", std::slice::from_ref(&path), &src)?;
+        // Simulate 4.3.35 restoring A without consulting the second owner.
+        remove_locked(&a, "sr")?;
+        assert_eq!(fs::read(&path)?, b"original");
+        b.guard_exes.push(a.game_exe.clone());
+        assert!(crate::cleanup::clean_outcome_at(&b)?.complete);
+        assert_eq!(fs::read(&path)?, b"original");
+        assert!(!b.directory.join(OWN).exists());
+        Ok(())
+    }
+    #[test]
+    fn shared_runtime_interrupted_transfer_can_resume_without_losing_backup() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let game = tmp.path().join("steamapps/common/SharedGame");
+        let mut a = target(&game.join("one"))?;
+        let mut b = target(&game.join("two"))?;
+        a.guard_exes.push(b.game_exe.clone());
+        b.guard_exes.push(a.game_exe.clone());
+        let path = game.join("nvngx_dlss.dll");
+        fs::write(&path, b"original")?;
+        let src = sources(&tmp.path().join("source"), "sr")?;
+        install_locked(&a, "sr", std::slice::from_ref(&path), &src)?;
+        install_locked(&b, "sr", std::slice::from_ref(&path), &src)?;
+        SharedRemoval::prepare(&a, "sr", &read(&a, "sr")?.unwrap())?.persist("sr")?;
+        remove_locked(&a, "sr")?;
+        remove_locked(&b, "sr")?;
+        assert_eq!(fs::read(&path)?, b"original");
         Ok(())
     }
     #[test]

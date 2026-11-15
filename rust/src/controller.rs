@@ -2040,7 +2040,9 @@ impl Controller {
                     }
                     // An old launcher deployment remains reachable for uninstall, but
                     // is not silently reinstalled into that unverified location.
-                    if (dir.join(core::OWN).exists() || dir.join(core::INI).exists())
+                    if (dir.join(core::OWN).exists()
+                        || dir.join(core::INI).exists()
+                        || dir.join(".rtx-fg-runtimes").is_dir())
                         && !fresh
                             .cleanup_only
                             .iter()
@@ -3396,10 +3398,18 @@ impl Controller {
                     if prepared.as_ref().is_some_and(|payload| payload.backend == rtx_fg_manager::encore::BACKEND
                         && rtx_fg_manager::encore::supports_200(payload.upstream_version.as_deref().or(Some(&payload.version)))) {
                         let previous_errors=errors.len();
+                        let mut batches: Vec<(rtx_fg_manager::encore_components::Components, Vec<core::DeploymentTarget>)> = Vec::new();
                         for target in game.deployment_targets() {
-                        let choice = components.get(&target.game_exe.display().to_string()).copied().unwrap_or_default();
+                            let choice = components.get(&target.game_exe.display().to_string()).copied().unwrap_or_default();
+                            if let Some((_, group)) = batches.iter_mut().find(|(selection, _)| *selection == choice) {
+                                group.push(target);
+                            } else { batches.push((choice, vec![target])); }
+                        }
+                        // One batch deduplicates shared Engine DLL paths before
+                        // taking the original backup, rather than once per EXE.
+                        for (choice, group) in batches {
                         if let Err(error) = rtx_fg_manager::runtime_files::complete_encore_selected(
-                            std::slice::from_ref(&target), choice, catalog.prefer_github, &cancel,
+                            &group, choice, catalog.prefer_github, &cancel,
                             &mut |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
                                 transfer, proxy: "Encore".into(), package_index: 1, package_count: 1,
                             })),

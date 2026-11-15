@@ -68,7 +68,7 @@ pub struct Game {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 impl Game {
-    /// Repair the known compiler false positive in saved libraries without a
+    /// Repair known bootstrap/compiler false positives in saved libraries without a
     /// disk-wide rescan. Old owned paths remain available only for cleanup.
     pub fn repair_renderer(&mut self) {
         if !self.deployment_dir.is_empty() {
@@ -76,21 +76,37 @@ impl Game {
         }
         let root = installation_root(Path::new(&self.exe));
         let dx12 = root.join("bin/x64_dx12/witcher3.exe");
-        if is_name(&root, &["The Witcher 3"]) && dx12.is_file() && core::pe64(&dx12, false).is_ok()
+        let pbz = root.join("platform/steam/PBZ.exe");
+        let preferred = if is_name(&root, &["The Witcher 3"]) {
+            Some(dx12)
+        } else if is_name(&root, &["PBZ"])
+            && is_name(Path::new(&self.exe), &["PBZ.exe"])
+            && root.join("Engine").is_dir()
+        {
+            Some(pbz)
+        } else {
+            None
+        };
+        if let Some(preferred) = preferred
+            .filter(|p| p.is_file() && core::pe64(p, false).is_ok())
+            .and_then(|p| core::no_links(&p).ok())
         {
             let old = std::iter::once(self.exe.clone())
                 .chain(self.targets.clone())
                 .collect::<Vec<_>>();
             for p in old {
                 if let Some(dir) = Path::new(&p).parent()
-                    && core::key(dir) != core::key(dx12.parent().unwrap())
-                    && dir.join(core::OWN).is_dir()
-                    && !self.cleanup_only.contains(&p)
+                    && core::key(dir) != core::key(preferred.parent().unwrap())
+                    && (dir.join(core::OWN).is_dir() || dir.join(".rtx-fg-runtimes").is_dir())
+                    && !self
+                        .cleanup_only
+                        .iter()
+                        .any(|old| core::key(Path::new(old)) == core::key(Path::new(&p)))
                 {
                     self.cleanup_only.push(p);
                 }
             }
-            self.exe = dx12.to_string_lossy().into();
+            self.exe = preferred.to_string_lossy().into();
             self.targets = vec![self.exe.clone()];
             self.root = root.to_string_lossy().into();
         }
@@ -342,6 +358,62 @@ mod engine_scan_tests {
         assert_eq!(report.rows.len(), 1);
         assert_eq!(report.rows[0].targets.len(), 1);
         assert_eq!(core::key(Path::new(&report.rows[0].exe)), core::key(&game));
+    }
+    #[test]
+    fn pbz_prefers_platform_renderer_and_keeps_old_runtime_cleanup() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("steamapps/common/PBZ");
+        let renderer = root.join("platform/steam/PBZ.exe");
+        let bootstrap = root.join("steam/PBZ.exe");
+        exe(&renderer);
+        exe(&bootstrap);
+        fs::create_dir_all(root.join("Engine")).unwrap();
+        fs::write(root.join("nvngx_dlssg.dll"), b"FG evidence").unwrap();
+        fs::create_dir_all(bootstrap.parent().unwrap().join(".rtx-fg-runtimes")).unwrap();
+        let report = scan_with_records(
+            std::slice::from_ref(&root),
+            &AtomicBool::new(false),
+            |_, _, _| {},
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(report.rows.len(), 1);
+        let mut game = report.rows[0].clone();
+        assert_eq!(game.targets.len(), 1);
+        assert_eq!(core::key(Path::new(&game.targets[0])), core::key(&renderer));
+        assert_eq!(game.cleanup_only.len(), 1);
+        assert_eq!(
+            core::key(Path::new(&game.cleanup_only[0])),
+            core::key(&bootstrap)
+        );
+        // Repair libraries saved by older managers on startup, without a rescan.
+        game.exe = bootstrap.display().to_string();
+        game.targets = vec![game.exe.clone(), renderer.display().to_string()];
+        game.repair_renderer();
+        assert_eq!(core::key(Path::new(&game.exe)), core::key(&renderer));
+        assert_eq!(game.targets.len(), 1);
+        assert_eq!(game.cleanup_only.len(), 1);
+    }
+    #[test]
+    fn pbz_repair_requires_valid_renderer_and_preserves_custom_targets() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("steamapps/common/PBZ");
+        let bootstrap = root.join("steam/PBZ.exe");
+        let renderer = root.join("platform/steam/PBZ.exe");
+        exe(&bootstrap);
+        fs::create_dir_all(root.join("Engine")).unwrap();
+        let mut game: Game =
+            serde_json::from_value(json!({"exe":bootstrap,"title":"PBZ"})).unwrap();
+        game.repair_renderer();
+        assert_eq!(core::key(Path::new(&game.exe)), core::key(&bootstrap));
+        fs::create_dir_all(renderer.parent().unwrap()).unwrap();
+        fs::write(&renderer, b"not an executable").unwrap();
+        game.repair_renderer();
+        assert_eq!(core::key(Path::new(&game.exe)), core::key(&bootstrap));
+        exe(&renderer);
+        game.deployment_dir = root.join("plugins").display().to_string();
+        game.repair_renderer();
+        assert_eq!(core::key(Path::new(&game.exe)), core::key(&bootstrap));
     }
     #[test]
     fn platform_directory_only_admits_matching_game_not_unrelated_programs() {

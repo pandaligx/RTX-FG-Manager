@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.36 — 2026-11-15
+
+- Fix uninstalling games with multiple deployment directories that share DLSS/Streamline files. Keep shared files until the last managed directory is removed, then restore the verified original; recover legacy duplicate backups without overwriting external changes.
+- Complete matching Encore component selections as one batch to avoid repeatedly backing up the same shared runtime.
+- Select Phantom Blade Zero's `platform/steam/PBZ.exe` renderer. Repair saved library entries and keep older launcher deployments reachable for cleanup only.
+- 修复多目录游戏共用 DLSS/Streamline 时卸载误报文件被修改的问题；兼容旧版重复备份，最后一处卸载后还原原件。
+- 影之刃零使用 `platform/steam/PBZ.exe`，自动修正旧游戏库记录，旧错误目录仅保留清理入口。其他补丁、界面和更新通道不变。
+
 ## 4.3.35 — 2026-11-14
 
 - Update ANR FG to V.B16 with new frame-generation model weights. Preserve B15 settings and shared presets, and show upstream beta labels in recommendation cards.
