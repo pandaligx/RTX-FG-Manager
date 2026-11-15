@@ -1,14 +1,14 @@
 {
   "schema": 2,
-  "version": "4.3.35",
+  "version": "4.3.36",
   "file": "RTXManager.exe",
-  "sha256": "8694a6c8ab1d63405c3c4c9fa196746395809c29db4b862cf7937625b6547784",
-  "bytes": 47645640,
+  "sha256": "976826567e514a301b30716654b60f3f9315367d3b4e2beb945b38b30ba436fd",
+  "bytes": 47716944,
   "notes": {
-    "zh-CN": "## 本次更新\n- 三角洲 / Vulkan 方案升级至 Dlssg_for_sm86 0.4.2，保留 DLSS 最高6X、默认4X和私有 Streamline。\n- ANR FG 升级至 B16，支持保留配置直接升级，补充 Insert（Ins）菜单提示与 NVIDIA / AMD / Intel 显卡说明。\n- 方案列表新增显卡支持提示，项目链接改用 GitHub 图标，统一右侧说明。\n- 名称库显示更新时间及同步状态，自动同步失败后重试；推荐按钮灯光改为4秒一圈。\n- 简化 DLSS 检测信息，反作弊显示 Easy Anti-Cheat、BattlEye、ACE 等名称。\n- 更新中英文截图与 Windows/Linux 下载按钮。",
-    "en": "## What's new\n- Upgrade custom Delta Force / Vulkan to Dlssg_for_sm86 0.4.2, retaining DLSS up to 6X, the 4X default and private Streamline.\n- Upgrade ANR FG to B16 with settings-preserving upgrades; add its Insert (Ins) menu hint and NVIDIA / AMD / Intel GPU information.\n- Add GPU-support hints and GitHub icons to the scheme picker and simplify sidebar text.\n- Show name-catalog date and sync status, retry failed automatic checks, and use a four-second recommendation glow loop.\n- Simplify DLSS detection and name detected anti-cheat products, including Easy Anti-Cheat, BattlEye and ACE.\n- Refresh English/Chinese screenshots and Windows/Linux download buttons.",
-    "ru": "## Обновления\n- Схема Delta Force / Vulkan обновлена до Dlssg_for_sm86 0.4.2: DLSS до 6X, 4X по умолчанию и отдельный Streamline сохранены.\n- ANR FG обновлён до B16 с сохранением настроек. Добавлены подсказка Insert (Ins) и список GPU NVIDIA / AMD / Intel.\n- В списке схем появились подсказки о GPU и значки GitHub; текст боковой панели сокращён.\n- Показаны дата и статус синхронизации названий игр; добавлен повтор после ошибки. Цикл подсветки рекомендаций — 4 секунды.\n- Проверка DLSS стала короче; отображаются названия обнаруженных античитов.\n- Обновлены скриншоты и кнопки загрузки Windows/Linux.",
-    "ja": "## 今回の更新\n- Delta Force / VulkanをDlssg_for_sm86 0.4.2へ更新。DLSS最大6X、既定4X、専用Streamlineを維持。\n- ANR FGをB16へ更新し、設定を保持した更新に対応。Insert（Ins）案内とNVIDIA / AMD / Intel GPU情報を追加。\n- 方式一覧にGPU対応情報とGitHubアイコンを追加し、サイドバーの説明を簡潔化。\n- ゲーム名データの日付と同期状態を表示し、失敗時の再試行に対応。おすすめの光る枠は4秒周期に変更。\n- DLSS検出表示を簡潔にし、検出したアンチチートの名前を表示。\n- スクリーンショットとWindows/Linuxダウンロードボタンを更新。",
-    "ko": "## 업데이트 내용\n- 델타 포스 / Vulkan을 Dlssg_for_sm86 0.4.2로 업데이트합니다. DLSS 최대 6X, 기본 4X 및 전용 Streamline을 유지합니다.\n- ANR FG를 B16으로 업데이트하고 기존 설정을 유지합니다. Insert(Ins) 안내와 NVIDIA / AMD / Intel GPU 정보를 추가합니다.\n- 방식 목록에 GPU 지원 안내 및 GitHub 아이콘을 추가하고 사이드바 설명을 간소화합니다.\n- 게임 이름 데이터의 날짜와 동기화 상태를 표시하고 실패 시 재시도합니다. 추천 테두리 효과는 4초 주기로 변경합니다.\n- DLSS 감지 표시를 간소화하고 감지된 안티치트 이름을 표시합니다.\n- 스크린샷과 Windows/Linux 다운로드 버튼을 업데이트합니다."
+    "zh-CN": "## 本次更新\n- 修复多目录游戏卸载时，共用运行库被误判为其他程序修改的问题。\n- 共用的 DLSS/Streamline 文件在最后一处卸载后还原，兼容旧版重复备份。\n- 影之刃零使用正确的 platform/steam 目录，旧错误目录仍可通过卸载清理。\n- 保持其他补丁、界面及自动更新不变。",
+    "en": "## What's new\n- Fix false runtime-conflict errors when uninstalling games with multiple deployment directories.\n- Restore shared DLSS/Streamline files after the last managed directory is removed, including legacy duplicate backups.\n- Use Phantom Blade Zero's platform/steam renderer; retain cleanup access to previously managed launcher files.\n- Keep other patches, the interface and automatic updates unchanged.",
+    "ru": "## Обновления\n- Исправлена ошибка восстановления общих библиотек в играх с несколькими каталогами установки.\n- Общие файлы DLSS/Streamline восстанавливаются после удаления последней установки; поддерживаются старые дублирующиеся резервные копии.\n- Для Phantom Blade Zero используется platform/steam. Старый каталог остаётся доступным для очистки.\n- Другие патчи, интерфейс и обновления не изменены.",
+    "ja": "## 更新内容\n- 複数の配置先で共有するランタイムを削除する際の誤った競合エラーを修正。\n- DLSS/Streamlineは最後の配置先を削除した後に復元。旧版の重複バックアップにも対応。\n- Phantom Blade Zeroはplatform/steamを使用。以前の配置先もアンインストールで清掃可能。\n- その他のパッチ、画面、自動更新は変更なし。",
+    "ko": "## 업데이트 내용\n- 여러 설치 폴더가 런타임을 공유할 때 발생하던 잘못된 충돌 오류를 수정합니다.\n- 마지막 설치를 제거한 뒤 DLSS/Streamline 원본을 복원하며 이전 버전의 중복 백업도 처리합니다.\n- Phantom Blade Zero는 platform/steam을 사용합니다. 이전 설치 위치도 제거 시 정리합니다.\n- 다른 패치, 화면 및 자동 업데이트는 유지합니다."
   }
 }
