@@ -19,14 +19,14 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.35/RTXManager.exe"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="232" height="64"></a>
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.35/RTXManager-4.3.35-x86_64.AppImage"><img src="docs/download-linux-zh.svg" alt="下载 Linux x86_64 AppImage（实验性）" width="232" height="64"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.36/RTXManager.exe"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="232" height="64"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.36/RTXManager-4.3.36-x86_64.AppImage"><img src="docs/download-linux-zh.svg" alt="下载 Linux x86_64 AppImage（实验性）" width="232" height="64"></a>
 
 </div>
 
 ---
 
-> **4.3.35 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
+> **4.3.36 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 游戏库](docs/screenshot-home-zh.png)
 
@@ -44,35 +44,35 @@
 
 ## 下载
 
-**版本 4.3.35** · Windows 10 / 11 x64 · Linux x86_64（实验性）
+**版本 4.3.36** · Windows 10 / 11 x64 · Linux x86_64（实验性）
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.35 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.35) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.35 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.35) | 主项目与备用源 |
-| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.35/RTXManager-4.3.35-x86_64.AppImage) | Linux x86_64 国内下载 |
-| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.35/RTXManager-4.3.35-x86_64.AppImage) | Linux x86_64 备用下载 |
+| **GitCode** | [打开 4.3.36 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.36) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.36 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.36) | 主项目与备用源 |
+| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.36/RTXManager-4.3.36-x86_64.AppImage) | Linux x86_64 国内下载 |
+| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.36/RTXManager-4.3.36-x86_64.AppImage) | Linux x86_64 备用下载 |
 
 Windows 用户下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
 ### Linux（实验性）
 
-下载上方 **`RTXManager-4.3.35-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
+下载上方 **`RTXManager-4.3.36-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
 
 ```sh
-chmod +x RTXManager-4.3.35-x86_64.AppImage
-./RTXManager-4.3.35-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.36-x86_64.AppImage
+./RTXManager-4.3.36-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 将前缀路径替换为游戏实际使用的 Wine 目录；Steam Proton 通常选择 `steamapps/compatdata/<AppID>/pfx`。再添加游戏的 Windows EXE，不用于原生 Linux ELF 游戏，也不自动配置 Proton 启动参数。发行页提供独立的 `SHA256SUMS-linux.txt`；依赖、免 FUSE 启动和源码构建见[Linux 说明](BUILDING.md#linux-appimage-experimental--实验性)。
 
 AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
 
-## 4.3.35 更新亮点
+## 4.3.36 更新亮点
 
-- 原版 Dlssg_for_sm86 升级至 **0.4.2**，沿用上游默认配置；升级保留已修改参数，卸载后重装恢复默认。
-- **ANR FG 更新至 V.B16**，使用新版模型，保留 B15 配置与玩家参数。
-- 三角洲方案升级至 0.4.2 6X，保留旧三角洲 0.3.5、MFG 和 Encore。管理器更新不会自动替换游戏补丁。
+- 修复多目录游戏卸载补丁报错，正确恢复共用的运行库。
+- 兼容旧版重复部署记录，继续保护其他插件及用户修改过的文件。
+- 影之刃零使用 `platform/steam/PBZ.exe`，旧的重复目录只用于清理，不再重复安装。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 

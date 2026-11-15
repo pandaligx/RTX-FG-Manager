@@ -8,6 +8,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      package_only:
+        description: Build the Linux release package without the full CI suite
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,6 +41,7 @@ jobs:
           key: linux-pr-${{ github.ref_name }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
             linux-pr-${{ github.ref_name }}-${{ hashFiles('Cargo.lock') }}-
+            linux-pr-main-
 
       - name: Install build dependencies
         run: |
@@ -58,15 +64,19 @@ jobs:
           rustup target add x86_64-unknown-linux-gnu
 
       - name: Check formatting
+        if: ${{ !inputs.package_only }}
         run: cargo fmt --all -- --check
 
       - name: Linux release channel contracts
+        if: ${{ !inputs.package_only }}
         run: python3 -B -m unittest discover -s tests -p test_linux_release.py -v
 
       - name: Check Linux library and desktop application
+        if: ${{ !inputs.package_only }}
         run: cargo check --locked --target x86_64-unknown-linux-gnu --lib --bin RTXManager
 
       - name: Portable configuration and Linux regression tests
+        if: ${{ !inputs.package_only }}
         # --target is mandatory here too: .cargo/config.toml pins the Windows
         # triple, so without it this would try to build for Windows and fail.
         run: |
@@ -74,6 +84,7 @@ jobs:
           timeout 15m cargo test --locked --target x86_64-unknown-linux-gnu --test v429_encore_config --test v4328_encore220 --test gpu_alias_linux_e2e --test v4332_mfg171 -- --nocapture --test-threads=2
 
       - name: Clippy
+        if: ${{ !inputs.package_only }}
         run: cargo clippy --locked --lib --bin RTXManager --target x86_64-unknown-linux-gnu -- -D warnings
 
       - name: Build release
