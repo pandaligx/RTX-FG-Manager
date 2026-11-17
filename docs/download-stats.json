@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-16T12:59:16+00:00",
-  "total": 6175673,
+  "updated_at": "2026-11-17T00:53:51+00:00",
+  "total": 6289487,
   "sources": [
     {
       "platform": "GitHub",
       "repository": "pandaligx/RTX-FG-Manager",
-      "downloads": 98448,
+      "downloads": 98782,
       "scope": "published_release_assets"
     },
     {
       "platform": "GitCode",
       "repository": "gcw_qWIjmve7/RTX-FG-Manager",
-      "downloads": 3143464,
+      "downloads": 3206499,
       "scope": "platform_reported_repository_history"
     },
     {
       "platform": "GitCode",
       "repository": "gcw_qWIjmve7/RTX-FG-Manager-payloads",
-      "downloads": 2933761,
+      "downloads": 2984206,
       "scope": "platform_reported_repository_history"
     }
   ],
