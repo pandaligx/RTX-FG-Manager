@@ -1,14 +1,14 @@
 {
   "schema": 3,
-  "version": "4.3.38",
-  "file": "RTXManager-4.3.38-x86_64.AppImage",
-  "bytes": 22780408,
-  "sha256": "fa4e6dc223f795989d575cc319996614e86f83fd503654b6a7cc54f132bdf744",
+  "version": "4.3.39",
+  "file": "RTXManager-4.3.39-x86_64.AppImage",
+  "bytes": 22821368,
+  "sha256": "1f6fc9a133faeafaaa9d0195380faeceb8abbc4bcacd3060c0b0eb908537a6ee",
   "notes": {
-    "zh-CN": "## 本次更新\n- 修复卸载 ANR FG 后遗留 Vulkan 加载器，导致再次安装时报“已有 OptiScaler”的问题。\n- 游戏库现在会标出旧版 ANR 残留。退出游戏后可直接重装 ANR，或点击“清理残留”。游戏自带的 Vulkan 文件和独立安装的 OptiScaler 插件会保留。",
-    "en": "## What's new\n- Fixed an ANR FG uninstall issue that left its Vulkan loader behind and blocked reinstallation with an “OptiScaler already installed” message.\n- The game library now identifies leftovers from earlier ANR installations. Close the game, then reinstall ANR or select “Clean residuals”. The game's own Vulkan files and independent OptiScaler plugins are preserved.",
-    "ru": "## Обновления\n- Исправлено удаление ANR FG: оставшийся загрузчик Vulkan мешал повторной установке ANR.\n- Библиотека игр теперь показывает остатки прежней установки. Закройте игру и установите ANR снова или выберите очистку остатков. Собственные файлы Vulkan игры и сторонние плагины OptiScaler сохраняются.",
-    "ja": "## 更新内容\n- ANR FG のアンインストール後に Vulkan ローダーが残り、OptiScaler が既に存在するというメッセージで再インストールできない問題を修正しました。\n- 以前の ANR の残留ファイルをゲームライブラリに表示します。ゲームを終了して ANR を再インストールするか、残留ファイルを削除できます。ゲーム付属の Vulkan ファイルと個別に導入した OptiScaler プラグインは保持されます。",
-    "ko": "## 업데이트 내용\n- ANR FG 제거 후 Vulkan 로더가 남아 OptiScaler가 이미 설치되었다는 메시지와 함께 재설치가 차단되던 문제를 수정했습니다.\n- 게임 라이브러리에 이전 ANR 설치의 잔여 파일이 표시됩니다. 게임을 종료한 뒤 ANR을 다시 설치하거나 잔여 파일을 정리할 수 있습니다. 게임 자체의 Vulkan 파일과 별도로 설치한 OptiScaler 플러그인은 보존됩니다."
+    "zh-CN": "## 本次更新\n- 玩家推荐会合并同一游戏在已核实平台条目下的方案。《明日方舟：终末地》打开后即可查看完整列表。\n- Windows 游戏库支持识别网易官服安装记录，分享时也可选择“网易游戏”。\n- 推荐卡片分层显示名称、日期和评价，完整方案和邮箱登录界面更紧凑。\n- DLSS / XeSS 运行库并排显示当前与目标版本，支持展开多个文件位置，修正 Streamline 目录跳转。",
+    "en": "## What's new\n- Player recommendations now include setups from verified storefront entries for the same game. Arknights: Endfield opens with its full list.\n- The Windows library recognizes NetEase official-client installation records. NetEase Games is also available when sharing.\n- Recommendation cards separate titles and dates from voting. Setup details and email sign-in use less space.\n- The DLSS / XeSS window shows installed and target versions together. Expand multiple file locations and open the exact Streamline plugin folder.",
+    "ru": "## Обновления\n- Рекомендации объединяют подборки одной игры из подтверждённых каталогов. Для Arknights: Endfield сразу открывается полный список.\n- В Windows добавлено распознавание официальных установок NetEase. При публикации можно выбрать NetEase Games.\n- В карточках разделены название, дата и оценки. Окна сведений и входа по почте стали компактнее.\n- В окне DLSS / XeSS рядом показаны установленная и целевая версии. Список путей разворачивается, а кнопка папки открывает каталог плагинов Streamline.",
+    "ja": "## 更新内容\n- 同じゲームのストア登録が確認できた場合、各ストアの共有設定をまとめて表示します。『アークナイツ：エンドフィールド』でも最初から一覧を確認できます。\n- Windows で NetEase 公式クライアントのインストール情報を認識します。共有時にも NetEase Games を選べます。\n- カードの名前と日付を評価ボタンから分け、詳細画面とメールログインをコンパクトにしました。\n- DLSS / XeSS は現在のバージョンと変更先を並べて表示します。複数の保存場所を展開でき、フォルダーボタンから Streamline プラグインの場所を直接開けます。",
+    "ko": "## 업데이트 내용\n- 같은 게임으로 확인된 스토어의 추천 설정을 함께 표시합니다. 명일방주: 엔드필드는 처음부터 전체 목록을 볼 수 있습니다.\n- Windows에서 NetEase 공식 클라이언트 설치 기록을 인식하며, 설정 공유 시 NetEase Games를 선택할 수 있습니다.\n- 추천 카드의 이름과 날짜를 평가 버튼과 구분하고, 상세 정보 및 이메일 로그인 화면을 간결하게 정리했습니다.\n- DLSS / XeSS 창에 현재 버전과 대상 버전을 함께 표시합니다. 여러 파일 경로를 펼치고 Streamline 플러그인 폴더를 바로 열 수 있습니다."
   }
 }
