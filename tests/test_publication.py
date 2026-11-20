@@ -50,6 +50,11 @@ class SourceAllowlistTests(unittest.TestCase):
     def test_live_catalog_keeps_every_bundled_scheme_and_archive(self):
         bundled = json.loads((ROOT / 'rust/cloud-catalog.json').read_text('utf-8-sig'))
         compact = json.loads((ROOT / 'cloud/bundles/catalog.json').read_text('utf-8-sig'))
+        index = json.loads((ROOT / 'cloud/bundles/indexes' / (compact['revision'] + '.json')).read_bytes())
+        version = re.search(r'^version = "([\d.]+)"', (ROOT / 'Cargo.toml').read_text('utf-8'), re.M).group(1)
+        def version_tuple(value):
+            return tuple(map(int, value.split('.')))
+
         schemes = {scheme['id']: scheme for scheme in compact['schemes']}
         self.assertEqual(set(schemes), set(bundled['scheme_policies']),
                          'A cloud refresh must not hide a scheme shipped in this client')
@@ -58,7 +63,21 @@ class SourceAllowlistTests(unittest.TestCase):
                 self.assertEqual(schemes[scheme_id]['profile'], policy['parameter_profile'])
                 archives = {package['archive'] for package in bundled['packages']
                             if package['scheme_id'] == scheme_id}
-                self.assertEqual(set(schemes[scheme_id]['archives']), archives)
+                scheme = schemes[scheme_id]
+                base = set(scheme['archives'])
+                current = base
+                declared = base.copy()
+                if release := scheme.get('release'):
+                    newer = set(release['archives'])
+                    self.assertTrue(base and newer)
+                    self.assertGreater(version_tuple(release['min_manager_version']),
+                                       version_tuple(scheme['min_manager_version']))
+                    declared.update(newer)
+                    if version_tuple(version) >= version_tuple(release['min_manager_version']):
+                        current = newer
+                self.assertEqual(current, archives)
+                indexed = {p['archive'] for p in index['packages'] if p['scheme_id'] == scheme_id}
+                self.assertEqual(declared, indexed, 'Both current and fallback archives must be downloadable')
 
     def test_current_reviewed_export_is_accepted_by_the_source_mirror(self):
         files = current_source_export_files()
