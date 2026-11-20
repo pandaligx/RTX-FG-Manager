@@ -8,6 +8,8 @@ pub const PROFILE: &str = "upstream040";
 pub const PROFILE_041: &str = "upstream041";
 pub const BACKEND: &str = "upstream040";
 pub const SCHEME: &str = "upstream-0.3.5-310-9";
+pub const PIPO_SCHEME: &str = "pipo-sm86-10";
+pub const PIPO_VULKAN_SCHEME: &str = "pipotoufik-mfg-vulkan-sm86-7";
 pub const PROXIES: [&str; 6] = [
     "version.dll",
     "winmm.dll",

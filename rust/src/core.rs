@@ -470,6 +470,14 @@ pub fn folder(backend: &str) -> Result<&str> {
     })
 }
 pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>> {
+    deployment_names_for_version(backend, proxies, None)
+}
+
+fn deployment_names_for_version(
+    backend: &str,
+    proxies: &[String],
+    version: Option<&str>,
+) -> Result<Vec<String>> {
     folder(backend)?;
     let mut names = normalize_proxies(proxies)?;
     if backend == crate::anr::BACKEND {
@@ -478,7 +486,11 @@ pub fn deployment_names(backend: &str, proxies: &[String]) -> Result<Vec<String>
             "ANR 完整方案每次仅安装一个入口"
         );
         names.push(crate::anr::CONFIG.into());
-        names.extend(crate::anr::COMPONENTS.iter().map(|s| (*s).to_owned()));
+        names.extend(
+            crate::anr::components(version)
+                .iter()
+                .map(|s| (*s).to_owned()),
+        );
         return Ok(names);
     }
     ensure!(
@@ -745,7 +757,13 @@ impl Record {
         );
         let p = normalize_proxies(&self.selected())?;
         ensure!(self.proxy == p[0], "部署记录的 DLL 入口不一致");
-        let mut names = deployment_names(&self.backend, &p)?;
+        let mut names = deployment_names_for_version(
+            &self.backend,
+            &p,
+            self.upstream_version
+                .as_deref()
+                .or(self.payload_version.as_deref()),
+        )?;
         if self.backend == crate::encore::BACKEND
             && crate::encore::INTEL_FILES
                 .iter()
@@ -1135,7 +1153,11 @@ pub fn deploy_prepared_context_at_with_overrides(
     upstream_version: Option<&str>,
 ) -> Result<String> {
     let config = config_name(backend);
-    let mut expected = deployment_names(backend, proxies)?;
+    let mut expected =
+        deployment_names_for_version(backend, proxies, upstream_version.or(payload_version))?;
+    if context.is_some_and(|c| c.scheme == crate::upstream040::PIPO_SCHEME) {
+        ensure!(proxies.len() == 1, "Pipo 0.4.2 每次仅安装一个 DLL 入口");
+    }
     if backend == crate::encore::BACKEND
         && crate::encore::INTEL_FILES
             .iter()
@@ -1212,6 +1234,13 @@ pub fn deploy_prepared_context_at_with_overrides(
     }
     if let Some(record) = &existing {
         target.validate_record(record)?;
+        let next_scheme = context.map(|c| c.scheme.as_str());
+        let old_scheme = record.scheme_id.as_deref();
+        ensure!(
+            old_scheme == next_scheme
+                || ![old_scheme, next_scheme].contains(&Some(crate::upstream040::PIPO_SCHEME)),
+            "请先卸载当前方案，再安装所选方案"
+        );
     }
     let delta_cache_ids = if context.is_some_and(|c| c.delta) {
         ensure!(crate::delta::is_game(p), "三角洲专项目标不匹配");

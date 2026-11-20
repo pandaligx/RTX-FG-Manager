@@ -28,6 +28,10 @@ pub const PROFILES: &[(&str, &str)] = &[
     ("rtxfg-0.3.5-dx12-vulkan", "upstream035"),
     (cloud::DELTA_041_SCHEME, crate::upstream040::PROFILE_041),
     ("pipotoufik-mfg-vulkan-sm86-7", presets::MFG_VULKAN),
+    (
+        crate::upstream040::PIPO_SCHEME,
+        crate::upstream040::PROFILE_041,
+    ),
     (crate::anr::SCHEME, crate::anr::PROFILE),
 ];
 
@@ -132,9 +136,7 @@ pub fn execute_with_options(
     let version = recipe.available_version(catalog)?;
     // Encore's manual-install dependencies are part of the patch installation.
     // The optional runtimes selection only controls the player's version overrides.
-    let complete_encore = recipe.scheme == encore::SCHEME
-        && encore::supports_200(Some(&version))
-        && (action.installs() || action.runtimes());
+    let complete_encore = recipe.completes_encore(&version, action);
     let converted;
     let settings = if action.parameters() {
         let settings = recipe
@@ -732,7 +734,7 @@ pub fn contracts() -> Value {
     let mut result = serde_json::Map::new();
     for &(scheme, profile) in PROFILES {
         let mut fields = serde_json::Map::new();
-        for p in presets::parameters(profile)
+        for p in presets::parameters_for_scheme(scheme, profile)
             .into_iter()
             .filter(|p| shareable(profile, p.key))
         {

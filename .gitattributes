@@ -5,6 +5,8 @@
 /cloud/catalog.json -text
 /cloud/v3/indexes/*.json -text
 /cloud/v3/catalog.json -text
+/cloud/bundles/indexes/*.json -text
+/cloud/bundles/catalog.json -text
 /cloud/help.json -text
 /update.json -text
 /cloud/names/*.json -text

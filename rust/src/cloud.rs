@@ -152,7 +152,19 @@ pub struct CompactScheme {
     pub defaults: crate::presets::Values,
     pub archives: Vec<String>,
     #[serde(default)]
+    pub release: Option<CompactRelease>,
+    #[serde(default)]
     pub capabilities: BTreeSet<String>,
+}
+/// Pre-4.3.37 clients read the base archive list. A newer file layout is
+/// advertised separately so those clients can still install their known version.
+#[derive(Deserialize)]
+pub struct CompactRelease {
+    pub min_manager_version: String,
+    pub archives: Vec<String>,
+    pub name: String,
+    #[serde(default)]
+    pub names: BTreeMap<String, String>,
 }
 impl CompactCatalog {
     pub fn expand(self, index: &[u8]) -> Result<Catalog> {
@@ -186,7 +198,7 @@ impl CompactCatalog {
         let mut policies = BTreeMap::new();
         let mut skipped_schemes = BTreeMap::new();
         let mut scheme_ids = BTreeSet::new();
-        for s in self.schemes {
+        for mut s in self.schemes {
             ensure!(
                 !s.id.is_empty() && s.id.len() <= 150 && scheme_ids.insert(s.id.clone()),
                 "Duplicate/invalid scheme"
@@ -200,6 +212,13 @@ impl CompactCatalog {
             if newer || crate::presets::validate(&s.profile, &BTreeMap::new()).is_err() {
                 skipped_schemes.insert(s.id, "此方案需要更新管理器".into());
                 continue;
+            }
+            if let Some(release) = s.release.take()
+                && manager_version >= crate::updater::version(&release.min_manager_version)?
+            {
+                s.archives = release.archives;
+                s.name = release.name;
+                s.names = release.names;
             }
             crate::presets::validate(&s.profile, &s.defaults)?;
             ensure!(
@@ -296,7 +315,7 @@ impl Catalog {
     /// this manager. Explicitly removed/unsupported schemes remain removed.
     pub fn retain_bundled_versions(&mut self) {
         let baseline = bundled();
-        retain_newly_introduced_anr(self, &baseline);
+        retain_newly_introduced(self, &baseline);
         for (scheme, policy) in &baseline.scheme_policies {
             let current = self.packages.iter().find(|p| &p.scheme_id == scheme);
             let fresh = baseline.packages.iter().find(|p| &p.scheme_id == scheme);
@@ -520,7 +539,11 @@ impl Catalog {
                 core::PROXIES.contains(&p.proxy.as_str())
                     && p.files.len()
                         == if anr {
-                            crate::anr::COMPONENTS.len() + 2
+                            crate::anr::components(
+                                p.upstream_version.as_deref().or(Some(&p.version)),
+                            )
+                            .len()
+                                + 2
                         } else if intel {
                             7
                         } else if mfg_host {
@@ -563,7 +586,11 @@ impl Catalog {
                 expected_entries.insert(crate::encore::NOTICES);
             }
             if anr {
-                expected_entries.extend(crate::anr::COMPONENTS);
+                expected_entries.extend(
+                    crate::anr::components(p.upstream_version.as_deref().or(Some(&p.version)))
+                        .iter()
+                        .copied(),
+                );
             }
             if intel {
                 expected_entries.extend(crate::encore::INTEL_FILES);
@@ -700,21 +727,25 @@ impl Catalog {
         }
         Ok(())
     }
+    /// Historical packages remain addressable by their original IDs for recovery.
+    pub fn is_installable(&self, id: &str) -> bool {
+        !matches!(
+            id,
+            "initial" | "native-0.2.6-stable" | crate::upstream040::PIPO_VULKAN_SCHEME
+        ) && self.scheme_policies.contains_key(id)
+    }
     pub fn schemes(&self) -> Vec<&Package> {
         let mut seen = BTreeSet::new();
         let mut schemes: Vec<_> = self
             .packages
             .iter()
-            .filter(|p| {
-                !matches!(p.scheme_id.as_str(), "initial" | "native-0.2.6-stable")
-                    && seen.insert(&p.scheme_id)
-            })
+            .filter(|p| self.is_installable(&p.scheme_id) && seen.insert(&p.scheme_id))
             .collect();
         const ORDER: [&str; 8] = [
             "upstream-0.3.5-310-9",
             DELTA_041_SCHEME,
             "rtxfg-0.3.5-dx12-vulkan",
-            "pipotoufik-mfg-vulkan-sm86-7",
+            crate::upstream040::PIPO_SCHEME,
             "rtx40mfg-1.3.3-hf2",
             "dlssg-transfusion-1.4.5.3",
             "mfg-unlocker-1.6.1-compat",
@@ -732,11 +763,7 @@ impl Catalog {
         schemes
     }
     pub fn supports_series(&self, id: &str, series: usize) -> bool {
-        // Retain historical metadata for recognition and owned restoration,
-        // but do not offer the retired first-release scheme for installation.
-        series <= 2
-            && !matches!(id, "initial" | "native-0.2.6-stable")
-            && self.scheme_policies.contains_key(id)
+        series <= 2 && self.is_installable(id)
     }
     /// Older cloud clients derived this legacy pair from `upstream035`.
     /// Only the identified Delta MFG implementation also has an automatic SM89 path.
@@ -755,7 +782,9 @@ impl Catalog {
             crate::encore::PROFILE => crate::encore::SOURCE,
             crate::transfusion::PROFILE => crate::transfusion::SOURCE,
             crate::rtxmfg::PROFILE => "https://github.com/dashdogy/MFG-Unlocker",
-            crate::presets::MFG_VULKAN => {
+            _ if id == crate::upstream040::PIPO_SCHEME
+                || policy.parameter_profile == crate::presets::MFG_VULKAN =>
+            {
                 "https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version"
             }
             _ if policy.capabilities.contains(crate::delta::CAPABILITY)
@@ -772,6 +801,7 @@ impl Catalog {
             return "显卡范围：见项目文档";
         };
         match policy.parameter_profile.as_str() {
+            _ if id == crate::upstream040::PIPO_SCHEME => "NVIDIA RTX 3070 已测试；RTX 20 待验证",
             crate::anr::PROFILE => {
                 "NVIDIA RTX 20 / 30 / 40 / 50、GTX 16\nAMD RX 5000 / 6000 / 7000 / 9000、Steam Deck\nIntel Arc A / B"
             }
@@ -800,6 +830,9 @@ impl Catalog {
         let Some(policy) = self.scheme_policies.get(id) else {
             return 0;
         };
+        if id == crate::upstream040::PIPO_SCHEME {
+            return 1;
+        }
         if matches!(
             policy.parameter_profile.as_str(),
             crate::upstream040::PROFILE
@@ -912,7 +945,7 @@ pub fn bundled() -> Catalog {
 /// A stale mirror/cache must not downgrade a scheme below the build's reviewed
 /// baseline. A removed scheme stays removed; newer remote releases still win.
 fn retain_newer_baseline(catalog: &mut Catalog, baseline: &Catalog) {
-    retain_newly_introduced_anr(catalog, baseline);
+    retain_newly_introduced(catalog, baseline);
     for (scheme, policy) in &baseline.scheme_policies {
         if !catalog.scheme_policies.contains_key(scheme) {
             continue;
@@ -947,25 +980,32 @@ fn retain_newer_baseline(catalog: &mut Catalog, baseline: &Catalog) {
         }
     }
 }
-/// The last reviewed pre-ANR catalog cannot know this newly bundled scheme.
-/// Only that exact predecessor gets this registration; a later remote removal
-/// or an explicit unsupported entry must remain authoritative.
-fn retain_newly_introduced_anr(catalog: &mut Catalog, baseline: &Catalog) {
-    if catalog.revision != "bundles-6ae5a179dcf09ec348b7"
-        || catalog.scheme_policies.contains_key(crate::anr::SCHEME)
-        || catalog.skipped_schemes.contains_key(crate::anr::SCHEME)
-    {
-        return;
+/// A known predecessor cannot advertise the new schemes. Later removals and
+/// explicit minimum-client exclusions are authoritative.
+fn retain_newly_introduced(catalog: &mut Catalog, baseline: &Catalog) {
+    let added: &[&str] = match catalog.revision.as_str() {
+        "bundles-6ae5a179dcf09ec348b7" => &[crate::anr::SCHEME, crate::upstream040::PIPO_SCHEME],
+        "bundles-fd7e2a6355153be0583d" => &[crate::upstream040::PIPO_SCHEME],
+        _ => &[],
+    };
+    for &scheme in added {
+        if !catalog.skipped_schemes.contains_key(scheme) {
+            add_missing_bundled_scheme(catalog, baseline, scheme);
+        }
     }
-    if let Some(policy) = baseline.scheme_policies.get(crate::anr::SCHEME) {
+}
+fn add_missing_bundled_scheme(catalog: &mut Catalog, baseline: &Catalog, scheme: &str) {
+    if !catalog.scheme_policies.contains_key(scheme)
+        && let Some(policy) = baseline.scheme_policies.get(scheme)
+    {
         catalog
             .scheme_policies
-            .insert(crate::anr::SCHEME.into(), policy.clone());
+            .insert(scheme.into(), policy.clone());
         catalog.packages.extend(
             baseline
                 .packages
                 .iter()
-                .filter(|p| p.scheme_id == crate::anr::SCHEME)
+                .filter(|p| p.scheme_id == scheme)
                 .cloned(),
         );
     }
@@ -982,8 +1022,18 @@ fn cached_at(root: &Path) -> Catalog {
         .ok()
         .and_then(|v| serde_json::from_value::<Catalog>(v).ok())
         .map(|mut c| {
+            let baseline = bundled();
+            let pipo = crate::upstream040::PIPO_SCHEME;
+            // The preceding client persisted its filtered view of this same index.
+            // A genuinely newer index still controls its own compatibility rules.
+            if c.revision == baseline.revision
+                && baseline.is_installable(pipo)
+                && c.skipped_schemes.remove(pipo).is_some()
+            {
+                add_missing_bundled_scheme(&mut c, &baseline, pipo);
+            }
             c.enable_legacy_delta_sm89();
-            retain_newer_baseline(&mut c, &bundled());
+            retain_newer_baseline(&mut c, &baseline);
             c
         })
         .filter(|c| c.validate().is_ok())
@@ -1347,6 +1397,7 @@ pub fn download_files(
     series: usize,
     proxies: &[String],
 ) -> Result<Vec<crate::transfer::DownloadFile>> {
+    ensure!(c.is_installable(scheme), "Scheme retired or unavailable");
     let mut files = Vec::new();
     for proxy in core::normalize_proxies(proxies)? {
         files.push(selected_package(c, scheme, series, &proxy)?.download_file());
@@ -1371,6 +1422,10 @@ pub fn prepare_with_progress(
     mut report: impl FnMut(CloudProgress),
 ) -> Result<Prepared> {
     c.validate()?;
+    ensure!(
+        c.is_installable(scheme),
+        "Scheme retired or unavailable; uninstall and restore remain available"
+    );
     let _cache_lock = crate::cache::wait_for_operation(cancel, || {
         report(CloudProgress {
             transfer: crate::transfer::Progress {
@@ -1383,10 +1438,6 @@ pub fn prepare_with_progress(
         });
     })?;
     ensure!(series <= 2, "Invalid GPU selection");
-    ensure!(
-        !matches!(scheme, "initial" | "native-0.2.6-stable"),
-        "Scheme retired; uninstall and restore remain available"
-    );
     let policy = c
         .scheme_policies
         .get(scheme)
@@ -1556,6 +1607,52 @@ mod tests {
         let p = selected_package(&c, DELTA_SCHEME, 2, "version.dll")?;
         assert_eq!(files[0].bytes, p.bytes);
         assert_eq!(files[0].id, p.download_file().id);
+        Ok(())
+    }
+    #[test]
+    fn old_managers_can_install_their_last_compatible_anr_and_encore() -> anyhow::Result<()> {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cloud/bundles");
+        let raw = fs::read(dir.join("catalog.json"))?;
+        let parse = || serde_json::from_slice::<CompactCatalog>(&raw);
+        let index = fs::read(
+            dir.join("indexes")
+                .join(format!("{}.json", parse()?.revision)),
+        )?;
+        let old = parse()?.expand_for_manager_version(&index, "4.3.36")?;
+        let current = parse()?.expand(&index)?;
+        assert_eq!(
+            old.selected(crate::anr::SCHEME).upstream_version.as_deref(),
+            Some("0.0.16-B16")
+        );
+        assert_eq!(old.selected(crate::encore::SCHEME).version, "2.4.1");
+        assert!(
+            old.skipped_schemes
+                .contains_key(crate::upstream040::PIPO_SCHEME)
+        );
+        let cache = tempfile::tempdir()?;
+        core::atomic_json(&cache.path().join("cloud-catalog-bundles.json"), &old)?;
+        let offline = cached_at(cache.path());
+        assert!(offline.is_installable(crate::upstream040::PIPO_SCHEME));
+        assert!(!offline.is_installable(crate::upstream040::PIPO_VULKAN_SCHEME));
+        assert_eq!(
+            offline
+                .schemes()
+                .iter()
+                .map(|p| &p.scheme_id)
+                .collect::<Vec<_>>(),
+            current
+                .schemes()
+                .iter()
+                .map(|p| &p.scheme_id)
+                .collect::<Vec<_>>()
+        );
+        for id in [
+            crate::anr::SCHEME,
+            crate::encore::SCHEME,
+            crate::upstream040::PIPO_SCHEME,
+        ] {
+            assert_eq!(current.selected(id).id, bundled().selected(id).id);
+        }
         Ok(())
     }
     #[test]
@@ -1815,14 +1912,14 @@ mod tests {
         assert!(!c.scheme_policies.contains_key("initial"));
     }
     #[test]
-    fn retired_026_is_hidden_and_scheme_order_is_stable() {
+    fn retired_schemes_are_hidden_and_scheme_order_is_stable() {
         let mut c = bundled();
         assert!((0..3).all(|series| !c.supports_series("native-0.2.6-stable", series)));
         let expected = vec![
             "upstream-0.3.5-310-9",
             DELTA_041_SCHEME,
             "rtxfg-0.3.5-dx12-vulkan",
-            "pipotoufik-mfg-vulkan-sm86-7",
+            crate::upstream040::PIPO_SCHEME,
             "rtx40mfg-1.3.3-hf2",
             "dlssg-transfusion-1.4.5.3",
             "mfg-unlocker-1.6.1-compat",
@@ -1845,6 +1942,22 @@ mod tests {
         );
         // Retired package metadata remains readable for owned cleanup/restoration.
         assert!(c.scheme_policies.contains_key("native-0.2.6-stable"));
+        let retired = crate::upstream040::PIPO_VULKAN_SCHEME;
+        assert_eq!(c.selected(retired).scheme_id, retired);
+        assert!((0..3).all(|series| !c.supports_series(retired, series)));
+        let entries = ["version.dll".into()];
+        assert!(download_files(&c, retired, 1, &entries).is_err());
+        assert!(
+            prepare_with_progress(
+                &c,
+                retired,
+                1,
+                &entries,
+                &AtomicBool::new(false),
+                |_| panic!("retired package started a transfer")
+            )
+            .is_err()
+        );
     }
     #[test]
     fn legacy_delta_policy_migration_is_idempotent_and_narrow() {

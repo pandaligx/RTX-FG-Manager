@@ -12,7 +12,7 @@ use std::{
 };
 
 pub const BACKEND: &str = "anr";
-// Stable parameter protocol: B16 keeps the B15 keys, defaults and layout.
+// B15 through B20 use the same editable settings, even as model files change.
 pub const PROFILE: &str = "anr_fg_b15";
 pub const SCHEME: &str = "anr-fg";
 pub const SOURCE: &str = "https://github.com/apex-compute/ANR";
@@ -34,7 +34,7 @@ pub fn display_version(version: &str) -> String {
         _ => version.to_owned(),
     }
 }
-pub const COMPONENTS: [&str; 21] = [
+pub const COMPONENTS: [&str; 32] = [
     "OptiScaler.ini",
     "ANR-THIRD-PARTY-NOTICES.txt",
     "ANR-OptiScaler-GPL-3.0.txt",
@@ -56,7 +56,30 @@ pub const COMPONENTS: [&str; 21] = [
     "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-srgb8/pack.nrx",
     "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-xmx-pq10/pack.nrx",
     "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-xmx-srgb8/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-3840x2160-coopmat-nvidia-blackwell-pq10/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-3840x2160-coopmat-nvidia-blackwell-scrgb16/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-3840x2160-coopmat-nvidia-blackwell-srgb8/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-coopmat-nvidia-blackwell-pq10/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-coopmat-nvidia-blackwell-scrgb16/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-coopmat-nvidia-blackwell-srgb8/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-coopmat-scrgb16/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-dp4a-scrgb16/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-packed-scrgb16/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-linalg-scrgb16/pack.nrx",
+    "OptiScaler/custom/Apex Neural Rendering FG/dlssg/programs/fg-lite-any-portable-scrgb16/pack.nrx",
 ];
+
+/// Use the inventory of the recorded release when validating an old installation.
+pub fn components(version: Option<&str>) -> &'static [&'static str] {
+    if version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v.major == 0 && v.minor == 0 && v.patch >= 20)
+    {
+        &COMPONENTS
+    } else {
+        &COMPONENTS[..21]
+    }
+}
 
 pub fn parameters() -> Vec<Parameter> {
     vec![
@@ -221,8 +244,16 @@ pub fn cleanup_targets(
         }
     }
     let provider = core::no_links(&directory.join(PROVIDER_DIR))?;
-    if provider.is_dir() {
-        for entry in fs::read_dir(&provider)? {
+    // The full package documents the provider directory, while the B20
+    // release also names its parent as a log location.
+    for log_dir in [
+        provider.as_path(),
+        provider.parent().expect("fixed provider path"),
+    ] {
+        if !log_dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(log_dir)? {
             let entry = entry?;
             let name = entry.file_name();
             let name = name.to_string_lossy();

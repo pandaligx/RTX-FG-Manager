@@ -15,7 +15,12 @@ fn matching_scheme(old: &core::Record, new: &core::Record) -> bool {
     old.scheme_id == new.scheme_id
         && matches!(
             old.scheme_id.as_deref(),
-            Some(SCHEME | crate::cloud::DELTA_041_SCHEME | crate::anr::SCHEME)
+            Some(
+                SCHEME
+                    | upstream040::PIPO_SCHEME
+                    | crate::cloud::DELTA_041_SCHEME
+                    | crate::anr::SCHEME
+            )
         )
 }
 
@@ -672,7 +677,7 @@ mod tests {
                 b"max_generated = 5\nscene_cut = 1\n".to_vec(),
             ),
         ]);
-        for name in crate::anr::COMPONENTS {
+        for &name in crate::anr::components(Some(&format!("0.0.{beta}-B{beta}"))) {
             files.insert(
                 name.into(),
                 if name.ends_with(".dll") {

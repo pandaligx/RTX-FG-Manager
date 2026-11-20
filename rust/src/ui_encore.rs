@@ -9,6 +9,41 @@ struct TextBinding {
     _subscription: Subscription,
 }
 
+fn recorded_chord(stroke: &Keystroke) -> Option<String> {
+    if stroke.key.is_empty() || stroke.modifiers.function {
+        return None;
+    }
+    let key = match stroke.key.as_str() {
+        "=" | "+" => "Plus",
+        "," => "Comma",
+        "." => "Period",
+        "-" => "Minus",
+        "pageup" => "PageUp",
+        "pagedown" => "PageDown",
+        "return" => "Enter",
+        key => key,
+    };
+    let mut parts = Vec::new();
+    for (pressed, name) in [
+        (stroke.modifiers.control, "Ctrl"),
+        (stroke.modifiers.alt, "Alt"),
+        (stroke.modifiers.shift, "Shift"),
+        (stroke.modifiers.platform, "Win"),
+    ] {
+        if pressed {
+            parts.push(name);
+        }
+    }
+    let key = if key.len() == 1 || key.starts_with('f') {
+        key.to_ascii_uppercase()
+    } else {
+        key.to_owned()
+    };
+    parts.push(&key);
+    let combo = parts.join("+");
+    encore::valid_hotkey(&combo).then_some(combo)
+}
+
 #[derive(Clone, Copy)]
 enum AddedFeature {
     Sr,
@@ -35,28 +70,10 @@ impl AddedFeature {
             return "off";
         }
         match self {
-            Self::Sr
-                if values
-                    .get("dlssWithoutGameDlssEngine")
-                    .is_some_and(|v| v == "xess") =>
-            {
-                "xess"
-            }
-            Self::Sr
-                if values
-                    .get("dlssWithoutGameDlssEngine")
-                    .is_some_and(|v| v == "nis") =>
-            {
-                "nis"
-            }
-            Self::Sr
-                if values
-                    .get("dlssWithoutGameDlssEngine")
-                    .is_some_and(|v| v == "fsr1") =>
-            {
-                "fsr1"
-            }
-            Self::Sr => "dlss",
+            Self::Sr => values
+                .get("dlssWithoutGameDlssEngine")
+                .map(String::as_str)
+                .unwrap_or("dlss"),
             Self::Fg
                 if values
                     .get("frameGenerationEngine")
@@ -99,6 +116,8 @@ pub(super) struct EncoreEditor {
     search: Entity<InputState>,
     query: String,
     inputs: HashMap<String, TextBinding>,
+    shortcut_focus: FocusHandle,
+    recording: Option<String>,
     errors: BTreeSet<String>,
     invalid: Rc<Cell<bool>>,
     tr: i18n::Translator,
@@ -124,6 +143,12 @@ impl EncoreEditor {
             }
         });
         let mut subscriptions = vec![subscription];
+        let shortcut_focus = cx.focus_handle();
+        subscriptions.push(cx.on_blur(&shortcut_focus, window, |this, _, cx| {
+            if this.recording.take().is_some() {
+                cx.notify();
+            }
+        }));
         if let Some(parent) = owner.upgrade() {
             subscriptions.push(cx.observe(&parent, |_, _, cx| cx.notify()));
         }
@@ -134,6 +159,8 @@ impl EncoreEditor {
             search,
             query: String::new(),
             inputs: HashMap::new(),
+            shortcut_focus,
+            recording: None,
             errors: BTreeSet::new(),
             invalid,
             tr: i18n::Translator::new("zh-CN"),
@@ -223,6 +250,13 @@ impl EncoreEditor {
         ] {
             if matches!(feature, AddedFeature::Sr) && encore::supports_220(self.version.as_deref())
             {
+                if encore::value_available(
+                    "dlssWithoutGameDlssEngine",
+                    "mwsr",
+                    self.version.as_deref(),
+                ) {
+                    choices.push(("mwsr", "MWSR"));
+                }
                 choices.push(("nis", "NIS"));
             }
             if matches!(feature, AddedFeature::Sr) && encore::supports_230(self.version.as_deref())
@@ -263,7 +297,7 @@ impl EncoreEditor {
                 ""
             } else if installed.is_none_or(|s| s.installed == 0) {
                 "请先安装 Encore"
-            } else if matches!(selected.as_str(), "nis" | "fsr1") {
+            } else if matches!(selected.as_str(), "nis" | "fsr1" | "mwsr") {
                 "无需额外运行库"
             } else if matches!(selected.as_str(), "xess" | "xefg") {
                 "随 Encore 提供"
@@ -511,6 +545,65 @@ impl EncoreEditor {
         } else {
             self.text_input(field, value, disabled, window, cx)
         };
+        let control = if field.kind == encore::FieldKind::Hotkey
+            && encore::supports_250(self.version.as_deref())
+        {
+            let recording = self.recording.as_deref() == Some(&field.key);
+            let key = field.key.clone();
+            let previous = value.clone();
+            let count = value.split(',').filter(|s| !s.trim().is_empty()).count();
+            let capture = div().when(recording, |view| {
+                view.track_focus(&self.shortcut_focus)
+                    .capture_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                        cx.stop_propagation();
+                        window.prevent_default();
+                        if event.is_held {
+                            return;
+                        }
+                        if event.keystroke.key == "escape"
+                            && event.keystroke.modifiers == Modifiers::default()
+                        {
+                            this.recording = None;
+                        } else if let Some(combo) = recorded_chord(&event.keystroke) {
+                            if !previous
+                                .split(',')
+                                .any(|old| old.trim().eq_ignore_ascii_case(&combo))
+                            {
+                                let updated = if previous.is_empty() {
+                                    combo
+                                } else {
+                                    format!("{previous}, {combo}")
+                                };
+                                this.set(&key, &updated, cx);
+                            }
+                            this.recording = None;
+                        }
+                        cx.notify();
+                    }))
+            });
+            let id = field.key.clone();
+            let button = Button::new(SharedString::from(format!("record-{id}")))
+                .small()
+                .label(self.t(if recording {
+                    "按组合键，Esc 取消"
+                } else {
+                    "录入按键"
+                }))
+                .disabled(disabled || count >= 3)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.recording = Some(id.clone());
+                    window.focus(&this.shortcut_focus, cx);
+                    cx.notify();
+                }));
+            div()
+                .h_flex()
+                .gap_2()
+                .child(div().flex_1().min_w_0().child(control))
+                .child(capture.child(button))
+                .into_any_element()
+        } else {
+            control
+        };
         let mut row = div()
             .v_flex()
             .gap_2()
@@ -580,12 +673,15 @@ impl EncoreEditor {
             );
         }
         if self.errors.contains(&field.key) {
-            row = row.child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().danger)
-                    .child(self.t("输入无效，请按范围和说明填写。此项尚未保存。")),
-            );
+            row = row.child(div().text_xs().text_color(cx.theme().danger).child(self.t(
+                if field.kind == encore::FieldKind::Hotkey
+                    && encore::supports_250(self.version.as_deref())
+                {
+                    "每项最多 3 组快捷键，用逗号分隔。"
+                } else {
+                    "输入无效，请按范围和说明填写。此项尚未保存。"
+                },
+            )));
         }
         row.into_any_element()
     }
@@ -750,6 +846,25 @@ impl EncoreEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[::core::prelude::v1::test]
+    fn keyboard_capture_uses_the_encore_key_names() {
+        let key = |name: &str| Keystroke {
+            modifiers: Modifiers {
+                control: true,
+                alt: true,
+                ..Default::default()
+            },
+            key: name.into(),
+            key_char: None,
+        };
+        assert_eq!(recorded_chord(&key("f9")).as_deref(), Some("Ctrl+Alt+F9"));
+        assert_eq!(
+            recorded_chord(&key("pageup")).as_deref(),
+            Some("Ctrl+Alt+PageUp")
+        );
+        assert_eq!(recorded_chord(&key("=")).as_deref(), Some("Ctrl+Alt+Plus"));
+        assert!(recorded_chord(&key("unidentified")).is_none());
+    }
     #[::core::prelude::v1::test]
     fn added_controls_map_only_their_fields_and_keep_native_choices() {
         let mut values = encore::defaults_for_version(Some("2.0.1"));

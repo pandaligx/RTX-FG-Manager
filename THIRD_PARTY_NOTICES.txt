@@ -15,10 +15,10 @@ not an official platform translation database or a compatibility guarantee.
 Manager source and distribution notes (2026-10-26; 4.3.13 candidate, not released)
 The manager is a Rust native application using GPUI Kit with the GPUI Fast backend.
 It does not bundle a Python interpreter, Tcl/Tk or a PyInstaller bootloader.
-GPUI Kit 0.9.1, including Base, Component and Kit assets:
+GPUI Kit 0.10.0, including Base, Component and Kit assets:
 https://github.com/longbridge/gpui-kit
-Pinned source: 39ab849a93b5f15507b969164d49891db8d5b470 (Apache-2.0).
-GPUI Fast 0.1.14: https://github.com/longbridge/gpui-fast (Apache-2.0).
+Pinned source: f697c3133d55c64fa8a5b67926147fb3dadd276d (Apache-2.0).
+GPUI Fast 0.1.16: https://github.com/longbridge/gpui-fast (Apache-2.0).
 Copyright 2022 - 2025 Zed Industries, Inc.; Copyright 2026 Longbridge.
 The exact released Fast license is retained in rust/assets/licenses/GPUI-FAST-LICENSE.
 GPUI Pre support crates 0.3.12: https://github.com/zed-industries/zed (Apache-2.0).
@@ -1239,9 +1239,12 @@ SOFTWARE.
 
 
 
-DLSSG MFG sm86-7 / Dlssg-MFG-Vulkan (optional cloud payload)
+DLSSG MFG sm86-7 / Dlssg-MFG-Vulkan (historical cloud payload)
 Source: https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version
 Release: https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-7
+The separate DX12 sm86-10 package uses its own signed binaries and INI.
+Source: https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-10
+Its complete package includes the original license and third-party notices.
 Tag commit shown by upstream: c1c165b. Upstream version.dll code and INI are unchanged; user Authenticode signature retained. This is separate from Smooth Motion. NVIDIA components and upstream code remain subject to their respective terms; this manager's license does not relicense them. Vulkan/RTX20 compatibility is not guaranteed by packaging or signing.
 
 RTX40MFG-Unlock v1.3.3-hotfix.2 (previous) / v1.4.1-hotfix.1 (4.2.6 candidate): https://github.com/dashdogy/RTX40MFG-Unlock
@@ -2051,7 +2054,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-ANR FG V.B15 (optional downloaded patch): https://github.com/apex-compute/ANR/releases/tag/FG-V.B15
+ANR FG V.B20 (optional downloaded patch): https://github.com/apex-compute/ANR/releases/tag/FG-V.B20
 The full bundle includes the upstream Apex OptiScaler host (GPL-3.0), the ANR FG provider and model packs.
 OptiScaler's GPL text accompanies the downloaded bundle; its corresponding source archive is offered in the same upstream release.
 The manager does not rebuild or modify these signed binaries. The public ANR repository also contains capture/replay tools; this is not a claim that the released FG core is open source.

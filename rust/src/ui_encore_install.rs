@@ -35,7 +35,8 @@ impl Manager {
                 } else {row=row.child(div().text_xs().child(tr.t("保留游戏原生帧生成")));}
                 if choice.needs_reconstruction {
                     let mut buttons=div().h_flex().flex_wrap().gap_1();
-                    for (n,sr,label) in [(0,Reconstruction::None,"不启用"),(1,Reconstruction::Dlss,"DLSS"),(2,Reconstruction::Xess,"XeSS"),(3,Reconstruction::Nis,"NIS"),(4,Reconstruction::Fsr1,"FSR 1")] {
+                    for (n,sr,label) in [(0,Reconstruction::None,"不启用"),(1,Reconstruction::Dlss,"DLSS"),(2,Reconstruction::Xess,"XeSS"),(5,Reconstruction::Mwsr,"MWSR"),(3,Reconstruction::Nis,"NIS"),(4,Reconstruction::Fsr1,"FSR 1")] {
+                        if sr == Reconstruction::Mwsr && !choice.mwsr_available { continue; }
                         if sr == Reconstruction::Fsr1 && !choice.fsr1_available { continue; }
                         if sr == Reconstruction::Nis && !choice.nis_available { continue; }
                         let selections=choices.clone();

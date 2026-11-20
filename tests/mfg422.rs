@@ -50,7 +50,13 @@ fn new_catalog_retains_ids_and_default_and_limits_new_proxy() -> Result<()> {
         serde_json::from_slice(&fs::read(folder.join("catalog.json"))?)?;
     let c = compact.expand(&fs::read(folder.join("index.json"))?)?;
     assert_eq!(c.packages.len(), 20);
-    assert_eq!(c.schemes().len(), 3);
+    assert_eq!(
+        c.schemes()
+            .iter()
+            .map(|p| p.scheme_id.as_str())
+            .collect::<Vec<_>>(),
+        ["upstream-0.3.5-310-9", "rtxfg-0.3.5-dx12-vulkan"]
+    );
     assert_eq!(c.scheme_policies.len(), 5); // Retired initial scheme stays readable for recovery.
     assert!(c.schemes().iter().all(|p| p.scheme_id != "initial"));
     assert_eq!(c.default_scheme, "upstream-0.3.5-310-9");

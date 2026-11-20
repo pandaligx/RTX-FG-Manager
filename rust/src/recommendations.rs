@@ -104,6 +104,10 @@ pub fn identify(game: &Game, catalog: &game_names::Catalog) -> Option<GameIdenti
     {
         return Some(id);
     }
+    automatic_identity(game, catalog)
+}
+
+fn automatic_identity(game: &Game, catalog: &game_names::Catalog) -> Option<GameIdentity> {
     let keys = game_names::keys(game);
     if let Some(entry) = game_names::identified(game, catalog) {
         let stable = entry
@@ -117,6 +121,119 @@ pub fn identify(game: &Game, catalog: &game_names::Catalog) -> Option<GameIdenti
     // Without a reviewed cross-store mapping, do not guess that separate IDs are the same game.
     let key = (keys.len() == 1).then(|| &keys[0])?;
     GameIdentity::new(key.clone(), game_names::original(game)).ok()
+}
+
+/// A local, explicitly confirmed pair. The service keeps each share, vote and
+/// author in its original game group. New shares use the platform identity.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GameLink {
+    pub platform: GameIdentity,
+    pub historical: GameIdentity,
+}
+impl GameLink {
+    fn valid(&self) -> bool {
+        !self.platform.id.starts_with("custom:")
+            && self.historical.id.starts_with("custom:")
+            && self.platform.validate().is_ok()
+            && self.historical.validate().is_ok()
+    }
+    pub fn saved(game: &Game, active: &GameIdentity) -> Option<Self> {
+        let pair: Self =
+            serde_json::from_value(game.extra.get("recommendation_link")?.clone()).ok()?;
+        (pair.platform.id == active.id && pair.valid()).then_some(pair)
+    }
+    pub fn accepts(game: &Game, catalog: &game_names::Catalog, id: &str) -> bool {
+        identify(game, catalog).is_some_and(|primary| {
+            primary.id == id
+                || Self::saved(game, &primary).is_some_and(|link| link.historical.id == id)
+        })
+    }
+}
+
+fn title_key(name: &str) -> String {
+    name.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn exe_stem(name: &str) -> Option<&str> {
+    let (stem, extension) = name.rsplit_once('.')?;
+    (extension.eq_ignore_ascii_case("exe")
+        && !stem.contains(['/', '\\', ':'])
+        && title_key(stem).chars().count() >= 4
+        && !matches!(
+            title_key(stem).as_str(),
+            "launcher"
+                | "client"
+                | "game"
+                | "shipping"
+                | "clientwin64shipping"
+                | "gamelaunchhelper"
+        ))
+    .then_some(stem)
+}
+
+pub fn search_title(name: &str) -> &str {
+    let name = name.trim();
+    exe_stem(name).unwrap_or(name)
+}
+
+/// A filename can suggest a choice, but never binds the game on its own.
+pub fn local_link_suggestion(game: &Game, catalog: &game_names::Catalog) -> Option<GameLink> {
+    let old = identify(game, catalog)?;
+    if !old.id.starts_with("custom:") {
+        return None;
+    }
+    let platform = automatic_identity(game, catalog).or_else(|| {
+        let stem = exe_stem(&old.name)?;
+        let key = title_key(stem);
+        let mut matches = catalog.search(stem).into_iter().filter(|e| {
+            [e.original(), e.chinese()]
+                .iter()
+                .any(|s| title_key(s) == key)
+        });
+        let hit = matches.next()?;
+        matches.next().is_none().then_some(())?;
+        GameCandidate::from_entry(&hit).map(|c| c.identity)
+    })?;
+    Some(GameLink {
+        platform,
+        historical: old,
+    })
+}
+
+/// Only send an executable stem that also matches a reviewed public game title.
+pub fn historical_search_term(
+    game: &Game,
+    catalog: &game_names::Catalog,
+    active: &GameIdentity,
+) -> Option<String> {
+    if !identify(game, catalog).is_some_and(|current| current.id == active.id)
+        || automatic_identity(game, catalog).is_some_and(|detected| detected.id != active.id)
+    {
+        return None;
+    }
+    let entry = if let Some(id) = active.id.strip_prefix("catalog:") {
+        catalog.entry(&id.to_ascii_uppercase())?
+    } else {
+        catalog.matched(std::slice::from_ref(&active.id))?
+    };
+    let stem = exe_stem(game.exe.rsplit(['/', '\\']).next()?)?;
+    [entry.original(), entry.chinese()]
+        .iter()
+        .any(|s| title_key(s) == title_key(stem))
+        .then(|| stem.to_owned())
+}
+
+pub fn historical_match(term: &str, hits: &[GameCandidate]) -> Option<GameIdentity> {
+    let mut exact = hits.iter().filter(|h| {
+        h.shared_count > 0
+            && h.identity.id.starts_with("custom:")
+            && exe_stem(&h.identity.name).is_some_and(|stem| stem.eq_ignore_ascii_case(term))
+    });
+    let hit = exact.next()?;
+    exact.next().is_none().then(|| hit.identity.clone())
 }
 pub fn platform(game: &Game) -> &'static str {
     let keys = game_names::keys(game);
@@ -170,6 +287,7 @@ pub struct GameCandidate {
     pub identity: GameIdentity,
     pub original: String,
     pub platforms: Vec<String>,
+    pub shared_count: u64,
 }
 impl GameCandidate {
     pub fn from_entry(entry: &game_names::Entry) -> Option<Self> {
@@ -183,6 +301,7 @@ impl GameCandidate {
             identity: GameIdentity::new(id, entry.chinese().into()).ok()?,
             original: entry.original().into(),
             platforms: candidate_platforms(entry.platform_keys()),
+            shared_count: 0,
         })
     }
 }
@@ -236,10 +355,67 @@ pub struct Recipe {
     pub edition: String,
 }
 impl Recipe {
+    pub fn check_runtime_selection(&self) -> Result<()> {
+        if let Some(snapshot) = &self.runtimes {
+            snapshot.compatible_with(&self.scheme, &self.entries)?;
+        }
+        if self.neural_runtime == "310.9.16" {
+            crate::recommendation_runtimes::ensure_nr_scheme(&self.scheme)?;
+        }
+        Ok(())
+    }
+    pub fn completes_encore(
+        &self,
+        available: &str,
+        action: crate::recommendation_presets::Action,
+    ) -> bool {
+        self.scheme == crate::encore::SCHEME
+            && crate::encore::supports_200(Some(available))
+            && (action.installs() || action.runtimes())
+    }
+    /// Use the author's recorded revision, including historical patch variants.
+    pub fn suggested_title(&self) -> String {
+        let project = match self.scheme.as_str() {
+            crate::upstream040::SCHEME => "Dlssg",
+            cloud::DELTA_SCHEME | cloud::DELTA_041_SCHEME => "Dlssg Delta",
+            crate::upstream040::PIPO_SCHEME | "pipotoufik-mfg-vulkan-sm86-7" => "Dlssg Pipo",
+            crate::encore::SCHEME => "RTX Encore",
+            "rtx40mfg-1.3.3-hf2" | crate::recommendation_presets::MFG_161_COMPAT => "MFG Unlocker",
+            crate::anr::SCHEME => "ANR FG",
+            other => other,
+        };
+        let version = if self.scheme == crate::anr::SCHEME {
+            crate::anr::display_version(&self.patch_version)
+        } else {
+            self.patch_version.clone()
+        };
+        let suffix = format!("{project} {version}");
+        let gpu = self.gpu_model.trim();
+        let gpu = gpu
+            .strip_prefix("NVIDIA GeForce ")
+            .or_else(|| gpu.strip_prefix("NVIDIA "))
+            .unwrap_or(gpu);
+        if gpu.is_empty() || gpu.eq_ignore_ascii_case("unknown") || gpu == "未知" {
+            return suffix.chars().take(80).collect();
+        }
+        let available = 80_usize.saturating_sub(suffix.chars().count() + 3);
+        if available == 0 {
+            return suffix.chars().take(80).collect();
+        }
+        let gpu = gpu.chars().take(available).collect::<String>();
+        format!("{} · {suffix}", gpu.trim_end())
+    }
+
+    pub fn display_title(&self) -> String {
+        match self.title.as_str() {
+            "我的可用方案" | "My working setup" => self.suggested_title(),
+            _ => self.title.clone(),
+        }
+    }
     pub fn validate(&self, catalog: &cloud::Catalog) -> Result<()> {
         self.validate_public()?;
         ensure!(
-            catalog.schemes().iter().any(|p| p.scheme_id == self.scheme),
+            catalog.is_installable(&self.scheme),
             "此方案已下架，不能自动替换为其他项目"
         );
         let allowed = catalog.proxies(&self.scheme);
@@ -382,7 +558,7 @@ pub fn installed_recipe(
             platform: platform(game).into(),
             edition: String::new(),
             game: identity.clone(),
-            title: "我的可用方案".into(),
+            title: String::new(),
             notes: String::new(),
             scheme: record
                 .scheme_id
@@ -409,6 +585,7 @@ pub fn installed_recipe(
             runtimes: Some(crate::recommendation_runtimes::capture(&target)?),
         };
         let mut current = current;
+        current.title = current.suggested_title();
         if current.scheme == crate::recommendation_presets::MFG_161_COMPAT {
             // Unrelated runtime files can remain after switching patches. They
             // must not become an installation requirement for this older MFG.
@@ -877,6 +1054,8 @@ impl Client {
             .header("X-RTXFG-Delta6", "1")
             .header("X-RTXFG-MFG171", "1")
             .header("X-RTXFG-Encore240", "1")
+            .header("X-RTXFG-Encore250", "1")
+            .header("X-RTXFG-Pipo042", "1")
             .header("X-RTXFG-ANR", "1")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
@@ -1169,12 +1348,18 @@ impl Client {
             original: String,
             #[serde(default)]
             keys: Vec<String>,
+            #[serde(default)]
+            recipes: u64,
         }
         #[derive(Deserialize)]
         struct Hits {
             items: Vec<Hit>,
         }
-        let url = reqwest::Url::parse_with_params(&format!("{ORIGIN}/v1/games"), &[("q", name)])?;
+        public_text(name, 120, false)?;
+        let url = reqwest::Url::parse_with_params(
+            &format!("{ORIGIN}/v1/games"),
+            &[("q", search_title(name))],
+        )?;
         let hits: Hits = self.request(
             Method::GET,
             &format!("/v1/games?{}", url.query().unwrap_or_default()),
@@ -1191,6 +1376,7 @@ impl Client {
                     identity: GameIdentity::new(h.id, h.name)?,
                     original: h.original,
                     platforms: candidate_platforms(&h.keys),
+                    shared_count: h.recipes,
                 })
             })
             .collect()
@@ -2041,6 +2227,115 @@ mod tests {
             game_names::Catalog::parse(include_bytes!("../assets/game-names.json")).unwrap();
         assert!(identify(&game, &catalog).is_none());
     }
+
+    #[test]
+    fn an_executable_group_links_only_after_confirmation_and_keeps_both_routes() -> Result<()> {
+        let catalog = game_names::bundled();
+        let old = GameIdentity::custom("Borderlands4.exe")?;
+        let mut game = Game {
+            exe: "D:/Games/Borderlands4.exe".into(),
+            ..Default::default()
+        };
+        game.extra.insert("recommendation_game".into(), json!(old));
+        let suggested = local_link_suggestion(&game, &catalog).unwrap();
+        assert_eq!(suggested.platform.id, "steam:1285190");
+        assert_eq!(identify(&game, &catalog), Some(old.clone()));
+        assert!(!GameLink::accepts(&game, &catalog, &suggested.platform.id));
+        game.extra
+            .insert("name_identity".into(), json!({"keys":["steam:1285190"]}));
+        assert_eq!(
+            local_link_suggestion(&game, &catalog),
+            Some(suggested.clone())
+        );
+        game.extra
+            .insert("recommendation_game".into(), json!(suggested.platform));
+        assert!(!GameLink::accepts(&game, &catalog, &old.id));
+        game.extra
+            .insert("recommendation_link".into(), json!(suggested));
+        assert_eq!(identify(&game, &catalog), Some(suggested.platform.clone()));
+        assert!(GameLink::accepts(&game, &catalog, &old.id));
+        assert!(GameLink::accepts(&game, &catalog, "steam:1285190"));
+        assert!(!GameLink::accepts(&game, &catalog, "steam:49520"));
+        assert_eq!(
+            historical_search_term(&game, &catalog, &suggested.platform).as_deref(),
+            Some("Borderlands4")
+        );
+        game.extra.remove("name_identity");
+        assert_eq!(
+            historical_search_term(&game, &catalog, &suggested.platform).as_deref(),
+            Some("Borderlands4")
+        );
+        game.extra
+            .insert("name_identity".into(), json!({"keys":["steam:49520"]}));
+        assert!(historical_search_term(&game, &catalog, &suggested.platform).is_none());
+        let mut historical = card("", "", 0);
+        historical.content.game = old.clone();
+        assert!(recipe_route(&historical, "vote")?.contains(&old.id.replace(':', "%3A")));
+        game.extra.remove("recommendation_link");
+        assert!(!GameLink::accepts(&game, &catalog, &old.id));
+        Ok(())
+    }
+
+    #[test]
+    fn filename_hints_require_distinctive_names_visible_shares_and_the_exact_edition() -> Result<()>
+    {
+        let candidate = |name: &str, count| -> Result<GameCandidate> {
+            Ok(GameCandidate {
+                identity: GameIdentity::custom(name)?,
+                original: String::new(),
+                platforms: vec![],
+                shared_count: count,
+            })
+        };
+        let hits = [
+            candidate("Borderlands3.exe", 4)?,
+            candidate("Borderlands4.exe", 1)?,
+        ];
+        assert_eq!(
+            historical_match("Borderlands4", &hits),
+            Some(hits[1].identity.clone())
+        );
+        assert!(historical_match("Borderlands", &hits).is_none());
+        assert!(historical_match("Borderlands4", &[candidate("Borderlands4.exe", 0)?]).is_none());
+        assert!(exe_stem("Client-Win64-Shipping.exe").is_none());
+        assert!(exe_stem("C:/Games/Borderlands4.exe").is_none());
+        assert_eq!(search_title("Borderlands4.EXE"), "Borderlands4");
+        let names = game_names::bundled();
+        let mut game = Game {
+            exe: "D:/Games/AnotherGame.exe".into(),
+            ..Default::default()
+        };
+        game.extra
+            .insert("name_identity".into(), json!({"keys":["steam:1285190"]}));
+        assert!(historical_search_term(&game, &names, &identify(&game, &names).unwrap()).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn historical_default_titles_use_the_recorded_variant_and_leave_custom_titles_alone() {
+        let mut r = card("NVIDIA GeForce RTX 2060 SUPER", "", 0).content;
+        r.title = "我的可用方案".into();
+        r.patch_version = "0.4.2".into();
+        for (id, label) in [
+            (crate::upstream040::SCHEME, "Dlssg"),
+            (cloud::DELTA_041_SCHEME, "Dlssg Delta"),
+            (crate::upstream040::PIPO_SCHEME, "Dlssg Pipo"),
+        ] {
+            r.scheme = id.into();
+            assert_eq!(r.display_title(), format!("RTX 2060 SUPER · {label} 0.4.2"));
+        }
+        r.scheme = crate::anr::SCHEME.into();
+        r.patch_version = "0.0.16-B16".into();
+        r.gpu_model.clear();
+        r.title = "My working setup".into();
+        assert_eq!(r.display_title(), "ANR FG V.B16");
+        assert_eq!(r.title, "My working setup");
+        r.title = "我的可用方案 2K".into();
+        assert_eq!(r.display_title(), r.title);
+        r.gpu_model = "显".repeat(80);
+        assert_eq!(r.suggested_title().chars().count(), 80);
+        assert!(r.suggested_title().ends_with("ANR FG V.B16"));
+    }
     #[test]
     fn sharing_reuses_reviewed_rules_but_never_stale_or_conflicting_matches() {
         let names = game_names::bundled();
@@ -2138,6 +2433,11 @@ mod tests {
         old.content.patch_version = "99.0.0".into();
         assert!(old.content.available_version(&catalog).is_err());
         old.content.scheme = "retired-project".into();
+        old.validate("steam:292030", &catalog).unwrap();
+        assert!(old.content.available_version(&catalog).is_err());
+        old.content.scheme = crate::upstream040::PIPO_VULKAN_SCHEME.into();
+        old.content.patch_version = catalog.selected(&old.content.scheme).version.clone();
+        old.content.entries = vec!["version.dll".into()];
         old.validate("steam:292030", &catalog).unwrap();
         assert!(old.content.available_version(&catalog).is_err());
         old.content.scheme = crate::encore::SCHEME.into();

@@ -14,6 +14,27 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('MWSR and Pipo settings survive legacy reads and edits without mixing forks',async t=>{
+  const f=fixture(t),u=await f.login();
+  const modern={'x-rtxfg-encore250':'1','x-rtxfg-pipo042':'1'};
+  const mwsr={...content(),patchVersion:'2.5.0',presets:{schema:1,profile:'rtx_encore_json_v4',
+    values:{dlssWithoutGameDlssEngine:'mwsr'},defaults:{dlssWithoutGameDlssEngine:'dlss'}}};
+  const pipo={...content(),scheme:'pipo-sm86-10',patchVersion:'0.4.2-pipo',entries:['version.dll'],
+    presets:{schema:1,profile:'upstream041',values:{optimized:'1',preset:'A'},defaults:{optimized:'2',preset:'C'}}};
+  for(const c of [mwsr,pipo]){
+    const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:c},u.token,'test-ip',16,modern);
+    const path='/v1/recipes/'+posted.id;
+    assert.deepEqual(posted.content.presets,c.presets);
+    const legacy=await f.call('GET',path,null,u.token,'test-ip',16);
+    assert.equal(legacy.content.presets,undefined);
+    await f.call('PUT',path,{revision:1,content:{...legacy.content,notes:'Updated note'}},u.token,'test-ip',16);
+    assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',16,modern)).content.presets,c.presets);
+  }
+  assert.throws(()=>recipe({...mwsr,patchVersion:'2.4.2'}));
+  assert.throws(()=>recipe({...pipo,entries:['version.dll','dxgi.dll']}));
+  assert.throws(()=>recipe({...pipo,scheme:'pipotoufik-mfg-vulkan-sm86-7'}));
+});
+
 test('ANR parameter shares round trip without breaking legacy clients',async t=>{
   const f=fixture(t),u=await f.login(),modern={'x-rtxfg-anr':'1'};
   const c={...content(),scheme:'anr-fg',patchVersion:'0.0.15-B15',entries:['dxgi.dll'],

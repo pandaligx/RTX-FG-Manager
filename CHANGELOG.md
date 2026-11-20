@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.37 — 2026-11-20
+
+- Replace the Pipo Vulkan entry with sm86-10 for DX12. The new build defaults to preset C and kernel mode 2. Existing Vulkan installations can still be uninstalled and restored.
+- Add Encore 2.5.0 MWSR spatial upscaling, its sharpening and AA controls, and Korean menu selection. Update ANR FG to B20 with scRGB HDR and Blackwell model packs.
+- Update GPUI Kit to 0.10.0 and GPUI Fast to 0.1.16. Partial library selections show a mixed checkbox. Animation settings use the platform preference when requested.
+- Link a platform game to shares saved under an older executable name after confirmation. New shares use the platform entry. Default titles show the GPU and tested patch version. Fixed a crash when confirming a game link.
+- Compare the game's runtime versions with the patch's bundled versions before installation. The preview follows the selected components and shows what will happen in each managed directory.
+
 ## 4.3.36 — 2026-11-15
 
 - Fix uninstalling games with multiple deployment directories that share DLSS/Streamline files. Keep shared files until the last managed directory is removed, then restore the verified original; recover legacy duplicate backups without overwriting external changes.

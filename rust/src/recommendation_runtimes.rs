@@ -18,25 +18,66 @@ pub struct Component {
     pub package_version: Option<String>,
 }
 impl Component {
+    fn matches_native(&self, current: &runtime_files::Status) -> bool {
+        current.available
+            && current.present
+            && current.warning.is_none()
+            && current
+                .versions
+                .iter()
+                .map(|v| normalized(v))
+                .collect::<BTreeSet<_>>()
+                == self.versions.iter().map(|v| normalized(v)).collect()
+    }
+
     fn needs_install(&self, targets: &[core::DeploymentTarget]) -> bool {
         if self.source == "patch" || self.preserves_game_files() {
             return false;
         }
         !(self.source == "game"
             && self.kind != "nr"
-            && targets.iter().all(|target| {
-                let current = runtime_files::inspect(target, &self.kind);
-                current.available
-                    && current.present
-                    && current.warning.is_none()
-                    && current
-                        .versions
-                        .iter()
-                        .map(|v| normalized(v))
-                        .collect::<BTreeSet<_>>()
-                        == self.versions.iter().map(|v| normalized(v)).collect()
-            }))
+            && targets
+                .iter()
+                .all(|target| self.matches_native(&runtime_files::inspect(target, &self.kind))))
     }
+    fn preflight_target(
+        &self,
+        target: &core::DeploymentTarget,
+        recipe: &crate::recommendations::Recipe,
+    ) -> Result<Option<runtime_files::Status>> {
+        let added = recipe.scheme == crate::encore::SCHEME
+            && crate::encore::supports_200(Some(&recipe.patch_version));
+        if self.kind == "encorefg" {
+            ensure!(added, "新增帧生成组件需要 Encore 2.0+");
+            runtime_files::preflight_added_fg(target, None)?;
+        } else if self.source == "game" {
+            if self.kind == "nr" {
+                ensure!(
+                    added || crate::scanner::inspect(&target.game_exe).neural_input(),
+                    "未发现游戏的 DLSS 超分或光线重建组件；不会添加 NR 运行库"
+                );
+            } else {
+                if added && matches!(self.kind.as_str(), "sr" | "rr") {
+                    let evidence = crate::scanner::inspect_for_installation(&target.game_exe);
+                    if !evidence.limited
+                        && (self.kind == "rr"
+                            || (!evidence.neural_input() && !evidence.super_resolution_plugin))
+                    {
+                        // Encore completion can supply a missing RR or eligible SR.
+                        return Ok(None);
+                    }
+                }
+                let status = runtime_files::inspect(target, &self.kind);
+                ensure!(
+                    status.available && status.present,
+                    "游戏缺少分享所用的运行库文件；可仅安装方案，不会向未知位置写入"
+                );
+                return Ok(Some(status));
+            }
+        }
+        Ok(None)
+    }
+
     /// An old inventory can list several native versions without identifying
     /// their locations. It is reference information, not a safe replacement map.
     pub fn preserves_game_files(&self) -> bool {
@@ -53,6 +94,150 @@ impl Component {
 pub struct Snapshot {
     pub schema: u32,
     pub components: Vec<Component>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RuntimeStep {
+    Keep,
+    Install,
+    Replace,
+    Mixed,
+    Verify,
+    Unavailable,
+}
+impl RuntimeStep {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Keep => "保留本机",
+            Self::Install => "需安装",
+            Self::Replace => "将替换",
+            Self::Mixed => "各目录操作不同",
+            Self::Verify => "安装时核对",
+            Self::Unavailable => "当前无法安装",
+        }
+    }
+}
+
+pub fn preview_action(
+    source: &str,
+    patch: bool,
+    runtimes: bool,
+    compatible: bool,
+    local: Option<RuntimeStep>,
+) -> &'static str {
+    if runtimes && !compatible {
+        return "当前无法安装";
+    }
+    if source == "patch" && patch {
+        return "随补丁安装";
+    }
+    if !runtimes {
+        return "未选择";
+    }
+    if source == "patch" {
+        return "核对已安装补丁";
+    }
+    local.map_or("正在检查本机…", RuntimeStep::label)
+}
+
+/// One line per runtime kind; each version still belongs to its original source.
+pub fn grouped(components: &[Component]) -> Vec<(&str, Vec<&Component>)> {
+    [
+        "sr", "rr", "fg", "nr", "xess", "xess_fg", "xell", "encorefg",
+    ]
+    .into_iter()
+    .filter_map(|kind| {
+        let group: Vec<_> = components.iter().filter(|c| c.kind == kind).collect();
+        (!group.is_empty()).then_some((kind, group))
+    })
+    .collect()
+}
+
+/// Older recipes can request NR in the original top-level field only.
+pub fn displayed_components(recipe: &crate::recommendations::Recipe) -> Vec<Component> {
+    let mut components = recipe
+        .runtimes
+        .as_ref()
+        .map(|s| s.components.clone())
+        .unwrap_or_default();
+    if recipe.neural_runtime == "310.9.16" && !components.iter().any(|c| c.kind == "nr") {
+        components.push(Component {
+            kind: "nr".into(),
+            versions: vec![recipe.neural_runtime.clone()],
+            source: "game".into(),
+            package_version: None,
+        });
+    }
+    components
+}
+
+/// The worker inspects only the selected game's destinations. The installer
+/// still repeats its preflight at the time the user actually chooses to apply.
+pub fn preview(
+    recipe: &crate::recommendations::Recipe,
+    targets: &[core::DeploymentTarget],
+) -> BTreeMap<(String, String), RuntimeStep> {
+    let mut result = BTreeMap::new();
+    let targets = targets
+        .iter()
+        .map(|t| t.validate(true))
+        .collect::<Result<Vec<_>>>();
+    for c in displayed_components(recipe) {
+        if c.source == "patch" {
+            continue;
+        }
+        let key = (c.kind.clone(), c.source.clone());
+        let Ok(targets) = &targets else {
+            result.insert(key, RuntimeStep::Unavailable);
+            continue;
+        };
+        let mut combined = None;
+        for target in targets {
+            let recorded = recipe
+                .runtimes
+                .as_ref()
+                .is_some_and(|s| s.components.contains(&c));
+            let checked = if recorded {
+                c.preflight_target(target, recipe)
+            } else {
+                Ok(None)
+            };
+            let Ok(checked) = checked else {
+                combined = Some(RuntimeStep::Unavailable);
+                break;
+            };
+            let step = if c.kind == "nr" {
+                let status = neural_runtime::inspect(target);
+                if status.present || status.warning.is_some() {
+                    RuntimeStep::Verify
+                } else {
+                    RuntimeStep::Install
+                }
+            } else if c.source == "managed" {
+                // The SDK installer verifies the complete package and file ownership.
+                RuntimeStep::Verify
+            } else {
+                let status = checked.unwrap_or_else(|| runtime_files::inspect(target, &c.kind));
+                if c.preserves_game_files() && !status.present {
+                    RuntimeStep::Verify
+                } else if c.preserves_game_files() || c.matches_native(&status) {
+                    RuntimeStep::Keep
+                } else if status.warning.is_some() && status.present {
+                    RuntimeStep::Verify
+                } else if status.present {
+                    RuntimeStep::Replace
+                } else {
+                    RuntimeStep::Install
+                }
+            };
+            combined = Some(match combined {
+                Some(previous) if previous != step => RuntimeStep::Mixed,
+                _ => step,
+            });
+        }
+        result.insert(key, combined.unwrap_or(RuntimeStep::Unavailable));
+    }
+    result
 }
 pub fn label(kind: &str) -> &'static str {
     match kind {
@@ -273,45 +458,9 @@ impl Snapshot {
         recipe: &crate::recommendations::Recipe,
     ) -> Result<()> {
         self.compatible_with(&recipe.scheme, &recipe.entries)?;
-        let added = recipe.scheme == crate::encore::SCHEME
-            && crate::encore::supports_200(Some(&recipe.patch_version));
         for c in &self.components {
-            if c.kind == "encorefg" {
-                ensure!(added, "新增帧生成组件需要 Encore 2.0+");
-                for target in targets {
-                    runtime_files::preflight_added_fg(target, None)?;
-                }
-                continue;
-            }
-            if c.kind == "nr" && c.source == "game" {
-                for target in targets {
-                    ensure!(
-                        added || crate::scanner::inspect(&target.game_exe).neural_input(),
-                        "未发现游戏的 DLSS 超分或光线重建组件；不会添加 NR 运行库"
-                    );
-                }
-            }
-            if c.source != "game" || c.kind == "nr" {
-                continue;
-            }
             for target in targets {
-                if added && matches!(c.kind.as_str(), "sr" | "rr") {
-                    let evidence = crate::scanner::inspect_for_installation(&target.game_exe);
-                    if !evidence.limited
-                        && (c.kind == "rr"
-                            || (!evidence.neural_input() && !evidence.super_resolution_plugin))
-                    {
-                        // Encore's completion stage supplies a missing RR (and
-                        // eligible SR) beside its DLL. It need not pre-exist in
-                        // a clean game after the previous managed copy was removed.
-                        continue;
-                    }
-                }
-                let status = runtime_files::inspect(target, &c.kind);
-                ensure!(
-                    status.available && status.present,
-                    "游戏缺少分享所用的运行库文件；可仅安装方案，不会向未知位置写入"
-                );
+                c.preflight_target(target, recipe)?;
             }
         }
         Ok(())
@@ -527,6 +676,85 @@ mod tests {
                 package_version: None,
             }],
         }
+    }
+    #[test]
+    fn grouped_inventory_preserves_game_and_patch_versions_and_selection() {
+        let mut s = snapshot("310.5.2");
+        for (kind, source, version) in [
+            ("fg", "patch", "310.9.16"),
+            ("sr", "patch", "310.9.16"),
+            ("fg", "game", "310.5.2"),
+        ] {
+            s.components.push(Component {
+                kind: kind.into(),
+                source: source.into(),
+                versions: vec![version.into()],
+                package_version: None,
+            });
+        }
+        let rows = grouped(&s.components);
+        assert_eq!(
+            rows.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
+            ["sr", "fg"]
+        );
+        for (_, group) in rows {
+            assert_eq!(group.len(), 2);
+            assert!(
+                group
+                    .iter()
+                    .any(|c| c.source == "game" && c.versions == ["310.5.2"])
+            );
+            assert!(
+                group
+                    .iter()
+                    .any(|c| c.source == "patch" && c.versions == ["310.9.16"])
+            );
+        }
+        assert_eq!(
+            preview_action("patch", true, false, true, None),
+            "随补丁安装"
+        );
+        assert_eq!(
+            preview_action("patch", false, true, true, None),
+            "核对已安装补丁"
+        );
+        assert_eq!(
+            preview_action("game", true, false, true, Some(RuntimeStep::Replace)),
+            "未选择"
+        );
+        assert_eq!(
+            preview_action("game", true, true, true, Some(RuntimeStep::Replace)),
+            "将替换"
+        );
+        assert_eq!(
+            preview_action("game", true, true, true, Some(RuntimeStep::Keep)),
+            "保留本机"
+        );
+        assert_eq!(
+            preview_action("patch", true, true, false, None),
+            "当前无法安装"
+        );
+        assert_eq!(
+            preview_action("game", true, true, true, None),
+            "正在检查本机…"
+        );
+    }
+
+    #[test]
+    fn runtime_preview_uses_the_same_native_version_check_as_the_installer() {
+        let c = snapshot("310.9.16").components.remove(0);
+        let mut status = runtime_files::Status {
+            available: true,
+            present: true,
+            versions: BTreeSet::from(["310.9.16.0".into()]),
+            ..Default::default()
+        };
+        assert!(c.matches_native(&status));
+        status.versions.insert("310.5.2".into());
+        assert!(!c.matches_native(&status));
+        status.versions.remove("310.5.2");
+        status.present = false;
+        assert!(!c.matches_native(&status));
     }
     #[test]
     fn version_inventory_is_bounded_and_never_accepts_paths() {

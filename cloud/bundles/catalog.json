@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 84151,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-fd7e2a6355153be0583d.json",
-    "sha256": "6c8d91053b38c8a9ef724654cd79a6ddf1485e88cf187c8dcd132f8b051ae620",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-fd7e2a6355153be0583d.json"
+    "bytes": 128601,
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-ca24fdfb2fac3099f61e.json",
+    "sha256": "92e7927b2c6364668d41708ad95b50eab5ae5b076d70b67111b1cddfce1895fe",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-ca24fdfb2fac3099f61e.json"
   },
-  "revision": "bundles-fd7e2a6355153be0583d",
+  "revision": "bundles-ca24fdfb2fac3099f61e",
   "schema": 3,
   "schemes": [
     {
@@ -268,6 +268,20 @@
         "zh": "RTX Encore · 2.4.1"
       },
       "profile": "rtx_encore_json_v4",
+      "release": {
+        "archives": [
+          "rtx-encore-2.5.0-complete-91bd6b9244b9.zip"
+        ],
+        "min_manager_version": "4.3.37",
+        "name": "RTX Encore · 2.5.0",
+        "names": {
+          "en": "RTX Encore · 2.5.0",
+          "ja": "RTX Encore · 2.5.0",
+          "ko": "RTX Encore · 2.5.0",
+          "ru": "RTX Encore · 2.5.0",
+          "zh": "RTX Encore · 2.5.0"
+        }
+      },
       "source_url": "https://github.com/SilyNoMeta/rtx-encore"
     },
     {
@@ -306,7 +320,42 @@
         "ru": "ANR FG · V.B16",
         "zh": "ANR FG · V.B16"
       },
-      "profile": "anr_fg_b15"
+      "profile": "anr_fg_b15",
+      "release": {
+        "archives": [
+          "anr-fg-b20-complete-3be3b27020b7.zip"
+        ],
+        "min_manager_version": "4.3.37",
+        "name": "ANR FG · V.B20",
+        "names": {
+          "en": "ANR FG · V.B20",
+          "ja": "ANR FG · V.B20",
+          "ko": "ANR FG · V.B20",
+          "ru": "ANR FG · V.B20",
+          "zh": "ANR FG · V.B20"
+        }
+      }
+    },
+    {
+      "archives": [
+        "pipo-sm86-10-complete-0a4a32462a6f.zip"
+      ],
+      "capabilities": [],
+      "defaults": {
+        "optimized": "2",
+        "preset": "C"
+      },
+      "id": "pipo-sm86-10",
+      "min_manager_version": "4.3.37",
+      "name": "Dlssg_for_sm86 · 0.4.2 Pipo · DX12",
+      "names": {
+        "en": "Dlssg_for_sm86 · 0.4.2 Pipo · DX12",
+        "ja": "Dlssg_for_sm86 · 0.4.2 Pipo · DX12",
+        "ko": "Dlssg_for_sm86 · 0.4.2 Pipo · DX12",
+        "ru": "Dlssg_for_sm86 · 0.4.2 Pipo · DX12",
+        "zh": "Dlssg_for_sm86 · 0.4.2 Pipo · DX12"
+      },
+      "profile": "upstream041"
     }
   ],
   "sources": {

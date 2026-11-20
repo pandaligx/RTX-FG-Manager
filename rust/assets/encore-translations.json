@@ -1,4 +1,30 @@
 {
+  "한국어": ["한국어", "한국어", "한국어", "한국어"],
+  "MWSR": ["MWSR", "MWSR", "MWSR", "MWSR"],
+  "空间超分无需额外运行库。请使用相同比例的较低窗口分辨率，每轴放大不超过 2 倍。": [
+    "Spatial upscaling needs no additional runtime. Use a lower window resolution with the same aspect ratio, up to 2× per axis.",
+    "Для пространственного масштабирования дополнительные библиотеки не нужны. Уменьшите разрешение окна с теми же пропорциями, до 2× по каждой оси.",
+    "空間アップスケールに追加ランタイムは不要です。同じ縦横比で低いウィンドウ解像度を選んでください。各軸最大2倍です。",
+    "공간 업스케일링에는 추가 런타임이 필요 없습니다. 같은 화면 비율의 낮은 창 해상도를 선택하세요. 각 축 최대 2배입니다."
+  ],
+  "空间超分锐化强度为 0–100%。MWSR 在 30% 时使用算法原有的锐化强度。": [
+    "Spatial sharpness ranges from 0–100%. At 30%, MWSR uses its original sharpening strength.",
+    "Резкость пространственного масштабирования: 0–100%. При 30% MWSR использует исходную резкость.",
+    "空間シャープネスは0～100%です。MWSRは30%で本来の強度を使います。",
+    "공간 선명도는 0~100%입니다. MWSR은 30%에서 기본 선명도를 사용합니다."
+  ],
+  "空间抗锯齿也会处理已绘制的游戏界面。2.4 起支持兼容的 DX11、DX12、Vulkan 和 SDR、HDR10、scRGB。": [
+    "Spatial AA also affects the rendered HUD. From 2.4, compatible DX11, DX12 and Vulkan paths support SDR, HDR10 and scRGB.",
+    "Пространственное сглаживание затрагивает интерфейс игры. С версии 2.4 поддерживаются совместимые режимы DX11, DX12, Vulkan и SDR, HDR10, scRGB.",
+    "空間AAは描画済みHUDにも適用されます。2.4以降は対応するDX11、DX12、VulkanでSDR、HDR10、scRGBを扱えます。",
+    "공간 AA는 이미 그려진 HUD에도 적용됩니다. 2.4부터 호환되는 DX11, DX12, Vulkan에서 SDR, HDR10, scRGB를 지원합니다."
+  ],
+  "在放大前按输入分辨率处理，或在放大后按输出分辨率处理。": [
+    "Apply at input resolution before upscaling, or at output resolution afterwards.",
+    "Применять до масштабирования во входном разрешении или после него в выходном.",
+    "拡大前の入力解像度または拡大後の出力解像度で処理します。",
+    "확대 전 입력 해상도 또는 확대 후 출력 해상도에서 처리합니다."
+  ],
   "自动": [
     "Automatic",
     "Автоматически",
@@ -3275,11 +3301,11 @@
     "NIS / FSR 1 need no extra runtime. Use a lower windowed game resolution with the same aspect ratio; both axes must upscale by no more than 2x.",
     "NIS / FSR 1 need no extra runtime. Use a lower windowed game resolution with the same aspect ratio; both axes must upscale by no more than 2x."
   ],
-  "用于新增帧生成与 Final image NR。2.3.0 默认优先游戏运动矢量，不可用时回退 RTX Encore 估计；保留已有选择。": [
-    "Used by added FG and Final image NR. 2.3 prefers game motion vectors and falls back to RTX Encore estimates. Existing explicit choices are preserved.",
-    "Used by added FG and Final image NR. 2.3 prefers game motion vectors and falls back to RTX Encore estimates. Existing explicit choices are preserved.",
-    "Used by added FG and Final image NR. 2.3 prefers game motion vectors and falls back to RTX Encore estimates. Existing explicit choices are preserved.",
-    "Used by added FG and Final image NR. 2.3 prefers game motion vectors and falls back to RTX Encore estimates. Existing explicit choices are preserved."
+  "从 2.3 起默认优先使用游戏运动矢量，可用性由游戏决定。2.5 起，在没有原生 DLSS 的游戏中使用神经渲染时，也可在游戏菜单调整运动估计方式。": [
+    "From 2.3, Encore prefers game motion vectors when available. In 2.5, you can also change motion estimation in the in-game NR menu in games without native DLSS.",
+    "С версии 2.3 Encore предпочитает векторы движения игры, если они доступны. С версии 2.5 в играх без DLSS способ оценки движения можно выбрать и в игровом меню NR.",
+    "2.3 以降は、利用できる場合にゲームのモーションベクトルを優先します。2.5 以降は、DLSS 非対応ゲームの NR メニューからも動き推定方式を変更できます。",
+    "2.3부터 게임의 모션 벡터를 사용할 수 있으면 우선합니다. 2.5부터는 DLSS를 기본 지원하지 않는 게임에서도 게임 내 NR 메뉴에서 모션 추정 방식을 바꿀 수 있습니다."
   ],
   "NIS / FSR 1 锐化强度，0–100%，即时生效。": [
     "NIS / FSR 1 sharpness, 0–100%. Applied live.",

@@ -305,7 +305,7 @@ impl Manager {
         crate::ui_focus::observe(cx);
         cx.observe_window_activation(window, |_, _, cx| cx.notify())
             .detach();
-        cx.set_reduce_motion(preferred_reduce_motion(&state, win::reduced_motion()));
+        gpui::base::set_reduce_motion_preference(motion_preference(&state), cx);
         let mut c = Controller::new(data, state, error, smoke);
         if !c.boolean("sidebar_compact_default_v3", false) {
             c.state["sidebar_collapsed"] = json!(true);
@@ -838,10 +838,7 @@ impl Manager {
             Command::Themes => self.open_themes(window, cx),
             Command::Motion(mode) => {
                 self.c.state["ui_motion"] = json!(mode);
-                cx.set_reduce_motion(preferred_reduce_motion(
-                    &self.c.state,
-                    win::reduced_motion(),
-                ));
+                gpui::base::set_reduce_motion_preference(motion_preference(&self.c.state), cx);
                 self.c.save();
             }
             Command::ApplyPreset => self.c.apply_focused_parameters(),
@@ -1676,6 +1673,10 @@ impl Manager {
                         Checkbox::new("all")
                             .focus_ring(crate::ui_focus::visible(cx))
                             .label(self.t("全选"))
+                            .indeterminate(
+                                !self.c.selected.is_empty()
+                                    && self.c.selected.len() < self.c.games.len(),
+                            )
                             .checked(
                                 !self.c.games.is_empty()
                                     && self.c.selected.len() == self.c.games.len(),
@@ -2416,6 +2417,8 @@ impl Manager {
             "Insert（Ins）打开菜单。DX12 选 dxgi.dll，Vulkan 选 winmm.dll。需 VC++ 2015–2022 x64；已有 OptiScaler 请先还原。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {
             "单选入口：优先 version.dll，也可选 dinput8 / dxgi / winmm。"
+        } else if self.c.cloud_scheme() == rtx_fg_manager::upstream040::PIPO_SCHEME {
+            "选择一个入口，建议使用 version.dll。"
         } else if rtx_fg_manager::upstream040::is_profile(&self.c.parameter_profile()) {
             "建议只选一个 DLL；多选可能冲突。"
         } else if self.c.cloud_scheme().starts_with("upstream") {
@@ -2433,7 +2436,7 @@ impl Manager {
                     .text_sm()
                     .font_weight(FontWeight::MEDIUM)
                     .child(self.t(
-                        if self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE {
+                        if self.c.catalog.selection_limit(&self.c.cloud_scheme()) == 1 {
                             "DLL 加载入口（单选）"
                         } else {
                             "DLL 加载入口（可多选）"
@@ -4404,10 +4407,10 @@ impl Manager {
         }
         if self.system_poll.elapsed() > Duration::from_secs(2) {
             self.system_poll = Instant::now();
-            cx.set_reduce_motion(preferred_reduce_motion(
-                &self.c.state,
-                win::reduced_motion(),
-            ));
+            #[cfg(windows)]
+            if motion_preference(&self.c.state) == gpui::base::ReduceMotionPreference::System {
+                gpui::base::apply_system_reduce_motion(cx);
+            }
             self.c.poll_hags();
             let choice = self.c.choice("theme", "跟随系统");
             if choice != self.theme_choice || choice == "跟随系统" {
@@ -4841,11 +4844,12 @@ fn deployment_label(status: &str) -> (String, TagVariant) {
         )
     }
 }
-fn preferred_reduce_motion(state: &Value, system: bool) -> bool {
+fn motion_preference(state: &Value) -> gpui::base::ReduceMotionPreference {
+    use gpui::base::ReduceMotionPreference;
     match state["ui_motion"].as_str() {
-        Some("system") => system,
-        Some("off") => true,
-        _ => false,
+        Some("system") => ReduceMotionPreference::System,
+        Some("off") => ReduceMotionPreference::Reduce,
+        _ => ReduceMotionPreference::Allow,
     }
 }
 fn preferred_font_size(state: &Value) -> f32 {
@@ -4937,25 +4941,18 @@ mod layout_tests {
     }
     #[test]
     fn motion_defaults_on_and_preserves_explicit_choices() {
-        for system in [false, true] {
-            for value in [
-                serde_json::Value::Null,
-                serde_json::json!("on"),
-                serde_json::json!("invalid"),
-            ] {
-                assert!(!super::preferred_reduce_motion(
-                    &serde_json::json!({"ui_motion":value}),
-                    system
-                ));
-            }
+        use gpui::base::ReduceMotionPreference::{Allow, Reduce, System};
+        for (value, expected) in [
+            (None, Allow),
+            (Some("on"), Allow),
+            (Some("unknown"), Allow),
+            (Some("system"), System),
+            (Some("off"), Reduce),
+        ] {
             assert_eq!(
-                super::preferred_reduce_motion(&serde_json::json!({"ui_motion":"system"}), system),
-                system
+                super::motion_preference(&serde_json::json!({"ui_motion":value})),
+                expected
             );
-            assert!(super::preferred_reduce_motion(
-                &serde_json::json!({"ui_motion":"off"}),
-                system
-            ));
         }
     }
     #[test]

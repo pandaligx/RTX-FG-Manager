@@ -42,6 +42,49 @@ fn fixture() -> Result<(tempfile::TempDir, Game, cloud::Catalog, Recipe)> {
     Ok((temp, game, catalog, recipe))
 }
 #[test]
+fn preview_checks_each_game_directory_without_touching_its_files() -> Result<()> {
+    use rtx_fg_manager::recommendation_runtimes::{self as runtime, RuntimeStep};
+    let (_temp, _, _, mut recipe) = fixture()?;
+    let first = tempfile::tempdir()?;
+    let second = tempfile::tempdir()?;
+    let targets = [first.path(), second.path()]
+        .map(|d| core::DeploymentTarget::for_game(&d.join("Example.exe")));
+    for target in &targets {
+        fs::write(&target.game_exe, pe(false))?;
+    }
+    let sr = first.path().join("nvngx_dlss.dll");
+    fs::write(&sr, pe(true))?;
+    recipe.runtimes = Some(serde_json::from_value(
+        serde_json::json!({"schema":1,"components":[
+        {"kind":"sr","source":"game","versions":["310.9.16"]},
+        {"kind":"sr","source":"patch","versions":["310.5.2"]}]}),
+    )?);
+    let key = ("sr".to_owned(), "game".to_owned());
+    assert_eq!(
+        runtime::preview(&recipe, &targets[..1])[&key],
+        RuntimeStep::Replace
+    );
+    assert_eq!(
+        runtime::preview(&recipe, &targets)[&key],
+        RuntimeStep::Unavailable
+    );
+    assert_eq!(
+        runtime::preview(&recipe, &[])[&key],
+        RuntimeStep::Unavailable
+    );
+    assert_eq!(fs::read(&sr)?, pe(true));
+    assert!(!second.path().join("nvngx_dlss.dll").exists());
+    recipe.runtimes = None;
+    recipe.neural_runtime = "310.9.16".into();
+    assert_eq!(runtime::displayed_components(&recipe)[0].kind, "nr");
+    assert_eq!(
+        runtime::preview(&recipe, &targets)[&("nr".into(), "game".into())],
+        RuntimeStep::Install
+    );
+    assert!(!second.path().join("nvngx_dlssnr.dll").exists());
+    Ok(())
+}
+#[test]
 fn shared_parameters_apply_to_all_directories_and_preserve_private_content() -> Result<()> {
     let (_temp, game, catalog, recipe) = fixture()?;
     shared::execute(

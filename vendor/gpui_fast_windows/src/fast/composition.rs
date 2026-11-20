@@ -31,15 +31,13 @@ use gpui::{
 };
 use gpui_util::ResultExt;
 use windows::{
-    Win32::{
-        Graphics::{
-            Direct3D11::{ID3D11RenderTargetView, ID3D11Texture2D},
-            DirectComposition::{
-                IDCompositionDevice, IDCompositionRectangleClip, IDCompositionVisual,
-                IDCompositionVisual3,
-            },
-            Dxgi::{DXGI_PRESENT, DXGI_SWAP_CHAIN_FLAG, IDXGISwapChain1},
+    Win32::Graphics::{
+        Direct3D11::{ID3D11RenderTargetView, ID3D11Texture2D},
+        DirectComposition::{
+            IDCompositionDevice, IDCompositionRectangleClip, IDCompositionVisual,
+            IDCompositionVisual3,
         },
+        Dxgi::{DXGI_PRESENT, DXGI_SWAP_CHAIN_FLAG, IDXGISwapChain1},
     },
     core::{IUnknown, Interface},
 };

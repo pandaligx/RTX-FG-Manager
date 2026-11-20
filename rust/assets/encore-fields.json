@@ -4204,6 +4204,11 @@
         "value": "ja",
         "label": "日本語",
         "since": "2.0.0"
+      },
+      {
+        "value": "ko",
+        "label": "한국어",
+        "since": "2.4.2"
       }
     ],
     "restart": false,
@@ -4357,13 +4362,18 @@
         "value": "fsr1",
         "label": "FSR 1",
         "since": "2.3.0"
+      },
+      {
+        "value": "mwsr",
+        "label": "MWSR",
+        "since": "2.5.0"
       }
     ],
     "restart": true,
     "dependencies": [
       "dlssWithoutGameDlss=1"
     ],
-    "help": "NIS / FSR 1 无需额外运行库；游戏需使用较低的窗口分辨率、相同宽高比，每轴严格放大且不超过 2 倍。",
+    "help": "空间超分无需额外运行库。请使用相同比例的较低窗口分辨率，每轴放大不超过 2 倍。",
     "optional": true,
     "since": "2.0.0"
   },
@@ -4434,7 +4444,7 @@
     ],
     "restart": false,
     "dependencies": [],
-    "help": "用于新增帧生成与 Final image NR。2.3.0 默认优先游戏运动矢量，不可用时回退 RTX Encore 估计；保留已有选择。",
+    "help": "从 2.3 起默认优先使用游戏运动矢量，可用性由游戏决定。2.5 起，在没有原生 DLSS 的游戏中使用神经渲染时，也可在游戏菜单调整运动估计方式。",
     "optional": true,
     "since": "2.0.0"
   },
@@ -4515,7 +4525,7 @@
       "dlssWithoutGameDlss=1",
       "dlssWithoutGameDlssEngine=nis"
     ],
-    "help": "NIS / FSR 1 锐化强度，0–100%，即时生效。",
+    "help": "空间超分锐化强度为 0–100%。MWSR 在 30% 时使用算法原有的锐化强度。",
     "optional": true,
     "since": "2.2.0"
   },
@@ -4550,7 +4560,7 @@
       "dlssWithoutGameDlss=1",
       "dlssWithoutGameDlssEngine=nis"
     ],
-    "help": "NIS / FSR 1：2.4.0 支持兼容的 DirectX 11 / 12、Vulkan 及 SDR / HDR10 / scRGB；旧版仅 DirectX 11 SDR。会处理已绘制的游戏界面。",
+    "help": "空间抗锯齿也会处理已绘制的游戏界面。2.4 起支持兼容的 DX11、DX12、Vulkan 和 SDR、HDR10、scRGB。",
     "optional": true,
     "since": "2.2.0"
   },
@@ -4581,7 +4591,7 @@
       "dlssWithoutGameDlss=1",
       "dlssWithoutGameDlssEngine=nis"
     ],
-    "help": "在 NIS / FSR 1 之前按输入分辨率处理，或之后按输出分辨率处理。",
+    "help": "在放大前按输入分辨率处理，或在放大后按输出分辨率处理。",
     "optional": true,
     "since": "2.2.0"
   },

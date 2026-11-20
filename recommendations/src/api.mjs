@@ -16,7 +16,7 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
-    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, anr:1, notesLimit:NOTES_LIMIT };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, anr:1, notesLimit:NOTES_LIMIT };
     if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
@@ -33,6 +33,11 @@ export function createApi(db, options) {
       && ['values','defaults'].some(part=>Number(content.presets[part]?.max_generated_frames)>3);
     const mfg171=headers['x-rtxfg-mfg171']==='1';
     const supportsEncore240=headers['x-rtxfg-encore240']==='1';
+    const unsupportedPreset = content => content.presets && (
+      content.scheme==='pipo-sm86-10' && headers['x-rtxfg-pipo042']!=='1'
+      || content.presets.profile==='rtx_encore_json_v4' && headers['x-rtxfg-encore250']!=='1'
+        && ['values','defaults'].some(part=>content.presets[part]?.dlssWithoutGameDlssEngine==='mwsr')
+    );
     const encore240=p=>p?.profile==='rtx_encore_json_v4' && ['values','defaults'].some(part=>
       [1,2,3,4].some(n=>Object.hasOwn(p[part],`nrPass${n}Placement`))
       || Object.hasOwn(p[part],'dlssCustomScale') && Number(p[part].dlssCustomScale)<50);
@@ -63,6 +68,7 @@ export function createApi(db, options) {
       if(!supportsDelta6 && delta6(result.content)) delete result.content.presets;
       if(!mfg171 && newMfg(result.content.presets)) delete result.content.presets;
       if(!supportsEncore240 && encore240(result.content.presets)) delete result.content.presets;
+      if(unsupportedPreset(result.content)) delete result.content.presets;
       if(headers['x-rtxfg-anr']!=='1' && result.content.scheme==='anr-fg') delete result.content.presets;
       if(crossStore && requested) {
         need(games.resolve(requested)===games.resolve(row.game),'game_mismatch');
@@ -166,6 +172,7 @@ export function createApi(db, options) {
       need(row.revision===body.revision,'revision_changed',409);
       const content=recipe(body.content); need(games.resolve(content.game.id)===games.resolve(row.game),'game_cannot_change');
       const original=JSON.parse(row.content);content.game=original.game;
+      if(unsupportedPreset(original) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
       if(!delta041 && original.scheme==='rtxfg-0.4.1-dx12-vulkan' && original.scheme===content.scheme && original.patchVersion===content.patchVersion && original.presets) content.presets=original.presets;
       if(!supportsDelta6 && delta6(original) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;
       if(!mfg171 && newMfg(original.presets) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) content.presets=original.presets;

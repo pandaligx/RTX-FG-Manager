@@ -1,14 +1,14 @@
 # Modified by Longbridge for gpui-fast publication.
 [package]
 name = "gpui-fast-windows"
-version = "0.1.14"
+version = "0.1.16"
 edition = "2024"
 publish = ["crates-io"]
 license = "Apache-2.0"
 repository = "https://github.com/longbridge/gpui-fast"
 homepage = "https://github.com/longbridge/gpui-fast"
 readme = "README.md"
-documentation = "https://docs.rs/gpui-fast-windows/0.1.14/gpui_windows/"
+documentation = "https://docs.rs/gpui-fast-windows/0.1.16/gpui_windows/"
 description = "gpui_windows: GPUI with gpui-fast rendering and layout optimizations"
 autoexamples = false
 autobenches = false
@@ -29,7 +29,7 @@ screen-capture = ["gpui/screen-capture", "scap"]
 [dependencies.gpui]
 default-features = false
 package = "gpui-fast"
-version = "^0.1.14"
+version = "^0.1.16"
 path = "../gpui"
 
 [target."cfg(target_os = \"windows\")".dependencies]

@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use rtx_fg_manager::{
     cleanup, cloud, core, game_names, gpu_alias, hags, i18n, preferences,
     scanner::{self, Game},
-    updater, win,
+    updater, upstream040, win,
 };
 use serde_json::{Value, json};
 use std::{
@@ -828,7 +828,7 @@ impl Controller {
             "rtxfg-0.3.5-dx12-vulkan" => {
                 Some("Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan")
             }
-            "pipotoufik-mfg-vulkan-sm86-7" => Some("Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan"),
+            upstream040::PIPO_VULKAN_SCHEME => Some("Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan"),
             "rtx40mfg-1.3.3-hf2" => {
                 return format!(
                     "MFG-Unlocker · {}",
@@ -866,14 +866,11 @@ impl Controller {
                     .map(|d| d.0.clone())
             })
             .unwrap_or_else(|| self.choice("cloud_scheme", &self.catalog.default_scheme));
-        let requested = if requested.starts_with("initial-") {
-            "initial".into()
-        } else if requested.contains("experimental") {
-            "native-0.2.6-stable".into()
-        } else {
-            requested
-        };
-        let id = self.catalog.selected(&requested).scheme_id.clone();
+        let id = self
+            .catalog
+            .selected(Self::saved_scheme_id(&requested))
+            .scheme_id
+            .clone();
         let series = self.series_for(exe);
         if self.catalog.supports_series(&id, series) {
             id
@@ -913,6 +910,16 @@ impl Controller {
             1
         }
     }
+    // Only translate a remembered selection. Deployment records and shared presets
+    // keep the original ID so a Vulkan configuration cannot be applied to DX12.
+    fn saved_scheme_id(id: &str) -> &str {
+        match id {
+            upstream040::PIPO_VULKAN_SCHEME => upstream040::PIPO_SCHEME,
+            id if id.starts_with("initial-") => "initial",
+            id if id.contains("experimental") => "native-0.2.6-stable",
+            id => id,
+        }
+    }
     fn compatible_scheme(&self, exe: Option<&str>, series: usize) -> String {
         let remembered = exe
             .and_then(|e| self.games.iter().find(|g| g.exe == e))
@@ -921,6 +928,7 @@ impl Controller {
             .and_then(|v| v.get(series.to_string()))
             .and_then(Value::as_str);
         remembered
+            .map(Self::saved_scheme_id)
             .filter(|id| self.catalog.supports_series(id, series))
             .map(str::to_owned)
             .or_else(|| {
@@ -1179,7 +1187,12 @@ impl Controller {
         let mut updates = Vec::new();
         let mut clamped = Vec::new();
         for game in &self.games {
-            for scheme in self.catalog.scheme_policies.keys() {
+            for scheme in self
+                .catalog
+                .scheme_policies
+                .keys()
+                .filter(|scheme| self.catalog.is_installable(scheme))
+            {
                 let policy = self.parameter_policy(&game.exe, scheme);
                 let policy = &policy;
                 let context = rtx_fg_manager::presets::Context::new(
@@ -1561,7 +1574,7 @@ impl Controller {
                 .and_then(Value::as_object)?
                 .iter()
                 .find(|(scheme, v)| {
-                    v.as_bool() == Some(true) && self.catalog.scheme_policies.contains_key(*scheme)
+                    v.as_bool() == Some(true) && self.catalog.is_installable(scheme)
                 })
                 .map(|(scheme, _)| (game.exe.clone(), scheme.clone()))
         })
@@ -2366,6 +2379,14 @@ impl Controller {
                     p.upstream_version.as_deref().or(Some(&p.version)),
                 )
         });
+        let mwsr_available = self.catalog.packages.iter().any(|p| {
+            p.scheme_id == rtx_fg_manager::encore::SCHEME
+                && rtx_fg_manager::encore::value_available(
+                    "dlssWithoutGameDlssEngine",
+                    "mwsr",
+                    p.upstream_version.as_deref().or(Some(&p.version)),
+                )
+        });
         let fsr1_available = self.catalog.packages.iter().any(|p| {
             p.scheme_id == rtx_fg_manager::encore::SCHEME
                 && rtx_fg_manager::encore::supports_230(
@@ -2411,6 +2432,7 @@ impl Controller {
                         choice.installed = installed;
                         choice.nis_available = nis_available;
                         choice.fsr1_available = fsr1_available;
+                        choice.mwsr_available = mwsr_available;
                         if rtx_fg_manager::runtime_files::inspect(&target, "encorefg").managed {
                             choice.native_streamline = false;
                             choice.native_fg = false;
@@ -2474,6 +2496,7 @@ impl Controller {
                     && selected.needs_frames == original.needs_frames
                     && selected.needs_reconstruction == original.needs_reconstruction
                     && selected.fsr1_available == original.fsr1_available
+                    && selected.mwsr_available == original.mwsr_available
                     && selected.nis_available == original.nis_available
                     && selected.dlss_fg_available == original.dlss_fg_available
                     && selected.installed == original.installed
@@ -2719,8 +2742,11 @@ impl Controller {
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("请选择游戏"))?;
         anyhow::ensure!(
-            rtx_fg_manager::recommendations::identify(&game, &self.game_names)
-                .is_some_and(|id| id.id == recipe.game.id),
+            rtx_fg_manager::recommendations::GameLink::accepts(
+                &game,
+                &self.game_names,
+                &recipe.game.id
+            ),
             "推荐不属于当前游戏"
         );
         let version = recipe.available_version(&self.catalog)?;
@@ -5455,6 +5481,39 @@ mod tests {
         (dir, c)
     }
 
+    #[test]
+    fn remembered_vulkan_selection_uses_pipo_dx12_without_importing_its_draft() {
+        let (_dir, mut c) = controller();
+        let old = upstream040::PIPO_VULKAN_SCHEME;
+        let current = upstream040::PIPO_SCHEME;
+        let exe = "A.exe";
+        c.state["cloud_scheme"] = json!(old);
+        assert_eq!(c.cloud_scheme(), current);
+        let mut game = Game {
+            exe: exe.into(),
+            ..Default::default()
+        };
+        game.extra
+            .insert("deployment_choice".into(), json!({"scheme":old}));
+        game.extra.insert("series_schemes".into(), json!({"1":old}));
+        game.extra
+            .insert("preset_dirty".into(), json!({(old):true}));
+        game.extra.insert(
+            "preset_options_v2".into(),
+            json!({(old):{"force_multiplier":"5"}}),
+        );
+        c.games.push(game);
+        c.focus = Some(exe.into());
+        assert_eq!(c.cloud_scheme(), current);
+        assert_eq!(c.compatible_scheme(Some(exe), 1), current);
+        assert!(c.first_pending_preset().is_none());
+        let values = c.preset_values(exe);
+        assert_eq!(values["preset"], "C");
+        assert_eq!(values["optimized"], "2");
+        let saved = c.games[0].extra.clone();
+        c.set_selection(old.into(), 1, vec!["version.dll".into()]);
+        assert_eq!(c.games[0].extra, saved);
+    }
     #[test]
     fn first_scan_waits_for_update_then_prompts_once() {
         let (dir, mut c) = controller();

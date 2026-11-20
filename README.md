@@ -68,11 +68,10 @@ Replace the prefix with the game's actual Wine directory; Steam Proton normally 
 
 AppImage has its own automatic update channel. Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 
-## 4.3.36 highlights
+## 4.3.37 highlights
 
-- Fix uninstalling patches from games with multiple deployment directories, including shared runtime restoration.
-- Recover duplicate records left by older versions without removing unrelated or externally changed files.
-- Correct Phantom Blade Zero detection to use `platform/steam/PBZ.exe`; retain the old duplicate location for cleanup only.
+- Find older shares under the same platform game. Cards show the GPU and tested patch version, and the install preview compares game and bundled runtimes.
+- Choose Pipo sm86-10 for DX12, MWSR spatial upscaling in RTX Encore 2.5.0, or scRGB HDR in ANR FG B20.
 
 [Full changelog →](CHANGELOG.md)
 
@@ -83,11 +82,11 @@ AppImage has its own automatic update channel. Windows-only GPU scheduling, driv
 | **Dlssg_for_sm86 · 0.4.2** | Complete bundle with XeSS 2X–4X; fresh installs default to `Optimized=1`, preset A and SR off. | Manager / INI |
 | **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | Private Streamline 2.14.16; DLSS up to 6X, default 4X; XeSS up to 4X. Restart after changing resolution with Vulkan XeSS. | Manager / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | Retained custom route with additional Delta Force support. Choose according to the actual game's requirements. | Manager / INI |
-| **Dlssg_for_sm86-MFG-version · Vulkan** | Retained dedicated Vulkan route; not interchangeable with the DX12 routes. | Manager / INI |
+| **Dlssg_for_sm86 · 0.4.2 Pipo · DX12** | sm86-10 replaces this fork’s older Vulkan entry. Defaults to preset C, kernel mode 2 and 4X. Choose one of six entry DLLs. | Manager / INI |
 | **MFG-Unlocker · 1.7.1** | Standalone DLL as before; plugin mode requires a complete existing OptiScaler 10 installation and backs up its host before updating the paired file. These modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
 | **MFG-Unlocker · 1.6.1** | Compatibility fallback; XeMFG requires the existing OptiScaler plugin route. | **Backspace** standalone; OptiScaler menu in plugin mode |
-| **RTX Encore · 2.4.1** | SR/RR/FG, DLSSNR, Smooth Motion, XeSS/XeFG and Frame Pacing, plus experimental features for games without native DLSS. | **Insert**, unless disabled or rebound |
-| **ANR FG · V.B16** | Full package includes OptiScaler, models and runtimes; one entry, default cap of 6X. For games without an existing OptiScaler installation. | **Insert (Ins)** opens the menu; settings also available in the manager |
+| **RTX Encore · 2.5.0** | SR/RR/FG, DLSSNR, Smooth Motion and XeSS/XeFG. Games without native DLSS can also use MWSR spatial upscaling. | **Insert** by default |
+| **ANR FG · V.B20** | Includes OptiScaler and 23 model programs for different GPUs and output formats, including Blackwell and scRGB HDR. Choose one entry. Default cap is 6X. | **Insert (Ins)** or manager settings |
 
 GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility.
 
@@ -98,12 +97,13 @@ GPU detection provides information, not an installation gate. Each upstream patc
 | Dlssg_for_sm86 · 0.4.2 | Supported | Supported | Supported | Supported |
 | 0.4.2 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Supported |
 | 0.3.5 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Not supported |
-| Dlssg_for_sm86-MFG-version · Vulkan | Supported | Supported | Not supported | Not supported |
 | MFG-Unlocker · 1.7.1 / 1.6.1 | Supported | Supported | Supported | Supported |
-| RTX Encore · 2.4.1 | Supported | Supported | Supported | Supported |
-| ANR FG · V.B16 | Supported | Supported | Supported | Supported |
+| RTX Encore · 2.5.0 | Supported | Supported | Supported | Supported |
+| ANR FG · V.B20 | Supported | Supported | Supported | Supported |
 
-Sources: [Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [Vulkan fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). “Not supported” means outside the documented support scope of the distributed scheme. Experimental features and driver/runtime requirements still apply; this is not a guarantee for every game. Delta Force packages are custom adaptations.
+The Pipo author tested the DX12 build on an RTX 3070. RTX 20 support is unconfirmed. If a game has the older Pipo Vulkan build, use **Uninstall and restore** before switching it to DX12. [sm86-10 release](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-10)
+
+Sources: [Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [Pipo fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). “Not supported” means outside the documented support scope of the distributed scheme. Experimental features and driver/runtime requirements still apply; this is not a guarantee for every game. Delta Force packages are custom adaptations.
 
 MFG's DLSS route requires an existing Streamline DLSS FG integration; Preset C needs 310.9.16, and RTX 20 requires specific 310.9 runtimes. **The experimental standalone XeMFG route in 1.7.1 can support eligible NVIDIA / AMD / Intel GPUs**, subject to Intel runtime, driver and DX12 / Vulkan requirements. This does not enable DLSS or DLSSNR on AMD / Intel. Version 1.6.1 lacks 1.7.0's standalone XeMFG route.
 
@@ -138,11 +138,11 @@ Close the game before configuration changes or removal. Upgrade a managed suppor
 </details>
 
 <details>
-<summary><b>Encore 2.4.1: components and existing settings</b></summary>
+<summary><b>Encore 2.5.0 components and existing settings</b></summary>
 
 Select components in **DLSS / XeSS runtimes** and enable features in **Preset parameters**. Encore can experimentally add features to games without native DLSS / FG; these are not enabled for you by default. Added DLSS-G / Streamline and Intel components follow the installation's requirements; owned originals are backed up and restored.
 
-The manager and preset-sharing service support 2.4.0 per-pass NR placement and 33–100% custom DLSS scaling. Explicit native Streamline SR/RR updates include the required common component and preserve restoration records. Upgrades retain JSONC comments, unknown fields and menu state. See [2.4.0 settings](https://github.com/SilyNoMeta/rtx-encore/blob/v2.4.0/docs/SETTINGS.md) and [games without DLSS](https://github.com/SilyNoMeta/rtx-encore/blob/v2.4.0/docs/GAMES-WITHOUT-DLSS.md).
+MWSR needs no additional runtime. Use a lower game window resolution with the same aspect ratio as the display. Existing engine choices, JSONC comments and menu settings survive upgrades. [Encore settings](https://github.com/SilyNoMeta/rtx-encore/blob/v2.5.0/docs/SETTINGS.md) · [Games without DLSS](https://github.com/SilyNoMeta/rtx-encore/blob/v2.5.0/docs/GAMES-WITHOUT-DLSS.md)
 
 </details>
 
@@ -150,7 +150,7 @@ The manager and preset-sharing service support 2.4.0 per-pass NR placement and 3
 <summary><b>How do I use ANR FG?</b></summary>
 
 1. Close the game and remove the previous FG patch. For an existing OptiScaler installation, restore it first or follow upstream's addon instructions; the manager does not merge the two installations.
-2. Select **ANR FG V.B16**. Normally choose `dxgi.dll` for DX12 or `winmm.dll` for Vulkan. Select one entry and install.
+2. Select **ANR FG V.B20**. Normally choose `dxgi.dll` for DX12 or `winmm.dll` for Vulkan. Select one entry and install.
 3. Enable **DLSS Frame Generation / NVIDIA Frame Generation** in the game; ANR handles that path. Press **Insert (Ins)** to open its menu. The default cap is 6X; the actual multiplier depends on the game.
 
 Windows requires Microsoft Visual C++ 2015–2022 x64. Linux / Proton also needs a per-game DLL override such as `dxgi=n,b` or `winmm=n,b`. Keep the full package's models; copying the DLL alone is not enough.

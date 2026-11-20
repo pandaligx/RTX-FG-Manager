@@ -164,6 +164,11 @@ pub fn supports_230(version: Option<&str>) -> bool {
         .and_then(|v| semver::Version::parse(v).ok())
         .is_some_and(|v| v >= semver::Version::new(2, 3, 0))
 }
+pub fn supports_250(version: Option<&str>) -> bool {
+    version
+        .and_then(|v| semver::Version::parse(v).ok())
+        .is_some_and(|v| v >= semver::Version::new(2, 5, 0))
+}
 /// Apply the manager's resolved locale only to a fresh default, before explicit
 /// per-game values are merged. Other locales retain the upstream default.
 pub fn localize_defaults(values: &mut Values, language: &str) {
@@ -221,6 +226,9 @@ pub fn choice_available(choice: &Choice, version: Option<&str>) -> bool {
 pub fn value_available(key: &str, value: &str, version: Option<&str>) -> bool {
     field(key).is_some_and(|f| {
         field_available(f, version)
+            && (f.kind != FieldKind::Hotkey
+                || value.split(',').count() <= 3
+                || !supports_250(version))
             && (f.min_before.is_none()
                 || value.parse::<f64>().is_ok_and(|n| {
                     minimum_for_version(f, version).is_none_or(|minimum| n >= minimum)
@@ -373,7 +381,9 @@ pub fn field_enabled(key: &str, values: &Values, _gpu: Option<i32>) -> bool {
                 return effective == Some(v);
             }
             get(k) == Some(v)
-                || k == "dlssWithoutGameDlssEngine" && v == "nis" && get(k) == Some("fsr1")
+                || k == "dlssWithoutGameDlssEngine"
+                    && v == "nis"
+                    && matches!(get(k), Some("fsr1" | "mwsr"))
                 || k == "nrEnabled" && v == "1" && get("nrWithoutGameDlss") == Some("1")
                 || key == "xessTensorCores"
                     && k == "reconstructionEngine"

@@ -14,6 +14,7 @@ pub enum Reconstruction {
     Xess,
     Nis,
     Fsr1,
+    Mwsr,
 }
 #[derive(Clone, Debug)]
 pub struct Choice {
@@ -24,6 +25,7 @@ pub struct Choice {
     pub dlss_fg_available: bool,
     pub nis_available: bool,
     pub fsr1_available: bool,
+    pub mwsr_available: bool,
     pub frames: Option<Frames>,
     pub reconstruction: Option<Reconstruction>,
     pub screen: bool,
@@ -42,6 +44,7 @@ impl Choice {
             dlss_fg_available,
             nis_available: false,
             fsr1_available: false,
+            mwsr_available: false,
             frames: None,
             reconstruction: None,
             screen: false,
@@ -98,6 +101,7 @@ impl Choice {
             let r = self.reconstruction?;
             if r == Reconstruction::Nis && !self.nis_available
                 || r == Reconstruction::Fsr1 && !self.fsr1_available
+                || r == Reconstruction::Mwsr && !self.mwsr_available
             {
                 return None;
             }
@@ -112,14 +116,12 @@ impl Choice {
             );
             v.insert(
                 "dlssWithoutGameDlssEngine".into(),
-                if r == Reconstruction::Fsr1 {
-                    "fsr1"
-                } else if r == Reconstruction::Nis {
-                    "nis"
-                } else if r == Reconstruction::Xess {
-                    "xess"
-                } else {
-                    "dlss"
+                match r {
+                    Reconstruction::Mwsr => "mwsr",
+                    Reconstruction::Fsr1 => "fsr1",
+                    Reconstruction::Nis => "nis",
+                    Reconstruction::Xess => "xess",
+                    Reconstruction::Dlss | Reconstruction::None => "dlss",
                 }
                 .into(),
             );

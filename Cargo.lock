@@ -2008,8 +2008,8 @@ dependencies = [
 
 [[package]]
 name = "gpui-base"
-version = "0.9.1"
-source = "git+https://github.com/longbridge/gpui-kit?rev=39ab849a93b5f15507b969164d49891db8d5b470#39ab849a93b5f15507b969164d49891db8d5b470"
+version = "0.10.0"
+source = "git+https://github.com/longbridge/gpui-kit?rev=4e015e9e26e137e020ebc0c4fecf9ce5e0889668#f697c3133d55c64fa8a5b67926147fb3dadd276d"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2040,6 +2040,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "smol",
+ "sys-locale",
  "tracing",
  "unicode-linebreak",
  "unicode-segmentation",
@@ -2049,8 +2050,8 @@ dependencies = [
 
 [[package]]
 name = "gpui-component"
-version = "0.9.1"
-source = "git+https://github.com/longbridge/gpui-kit?rev=39ab849a93b5f15507b969164d49891db8d5b470#39ab849a93b5f15507b969164d49891db8d5b470"
+version = "0.10.0"
+source = "git+https://github.com/longbridge/gpui-kit?rev=4e015e9e26e137e020ebc0c4fecf9ce5e0889668#f697c3133d55c64fa8a5b67926147fb3dadd276d"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2096,8 +2097,8 @@ dependencies = [
 
 [[package]]
 name = "gpui-component-macros"
-version = "0.9.1"
-source = "git+https://github.com/longbridge/gpui-kit?rev=39ab849a93b5f15507b969164d49891db8d5b470#39ab849a93b5f15507b969164d49891db8d5b470"
+version = "0.10.0"
+source = "git+https://github.com/longbridge/gpui-kit?rev=4e015e9e26e137e020ebc0c4fecf9ce5e0889668#f697c3133d55c64fa8a5b67926147fb3dadd276d"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2107,9 +2108,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast"
-version = "0.1.14"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8c3a7e25e5a4789656da980b0316857acbdb72347b5d890d7d0c549bb9fee72"
+checksum = "7f156153ed82b67b45c6b5ed5d833da14b27eb68ae7828741f64b52691e254d0"
 dependencies = [
  "accesskit",
  "anyhow",
@@ -2173,9 +2174,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast-apple"
-version = "0.1.14"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d1934376409ef93257473cfd1cba16bbc825a3a3afc437410de73208cfd8364"
+checksum = "52c8337a6ca2fcbaf574e3e78495b29ff92a06932523c1e7e005f0fb37c6ce48"
 dependencies = [
  "anyhow",
  "async-task",
@@ -2213,9 +2214,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast-linux"
-version = "0.1.14"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0409042721bd50ed8c538e13cb13f6d92f5adeade2e2a284a41d32c704c2eef1"
+checksum = "442fb7af8c998c77749ed68d64fccc019ebc9938f42d55e6ebc86ac7f9ef6bec"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -2258,9 +2259,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast-macos"
-version = "0.1.14"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "192b5731d190f840ad7868d1bb8c1c1fe70007a747cc8d2f60700699ca4318e0"
+checksum = "bcc07eff9d26477dad2c75809c083bda8ab0fa61a8fee60b46cc28c48b5a7a1d"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2292,6 +2293,7 @@ dependencies = [
  "parking_lot",
  "raw-window-handle",
  "semver",
+ "serde_json",
  "smallvec",
  "strum",
  "uuid",
@@ -2299,9 +2301,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast-macros"
-version = "0.1.14"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "269fc24ab55f85d5fb90ce812b3e6adcf5ad0bdccc79a08aa9ddd88a3a477494"
+checksum = "a6cb3d6ba41781dad8ea9f4b73e0eb122916e31dc9137c5af80eb06a5e750691"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -2311,9 +2313,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast-platform"
-version = "0.1.14"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df86a665111fb86fe149c6d72660777d17bcf2af9133079459faf7bda0b3f756"
+checksum = "f635166b148a1d4097d75d41620b5bc477be2e17ca122b56b1ff8a82330f993a"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -2327,9 +2329,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast-web"
-version = "0.1.14"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f01164798296dafad1d7608e2385f28145d36ae180cfef4d5d5ac737d323815a"
+checksum = "a0a5719c2ca90add59e8639886fadbcdebad658e750e8e99ec87b22eaf0ad24c"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -2357,9 +2359,9 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast-wgpu"
-version = "0.1.14"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cfa13d90b546bec059b6e1c08969b45236d64beb89a96cc6bc54d0df19466ce"
+checksum = "846b898f14d55f6e107521fde8ec045a971af6225d6a51410c5514bc2f8bf334"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2384,7 +2386,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-fast-windows"
-version = "0.1.14"
+version = "0.1.16"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -2412,8 +2414,8 @@ dependencies = [
 
 [[package]]
 name = "gpui-kit"
-version = "0.9.1"
-source = "git+https://github.com/longbridge/gpui-kit?rev=39ab849a93b5f15507b969164d49891db8d5b470#39ab849a93b5f15507b969164d49891db8d5b470"
+version = "0.10.0"
+source = "git+https://github.com/longbridge/gpui-kit?rev=4e015e9e26e137e020ebc0c4fecf9ce5e0889668#f697c3133d55c64fa8a5b67926147fb3dadd276d"
 dependencies = [
  "gpui-base",
  "gpui-component",
@@ -2429,8 +2431,8 @@ dependencies = [
 
 [[package]]
 name = "gpui-kit-assets"
-version = "0.9.1"
-source = "git+https://github.com/longbridge/gpui-kit?rev=39ab849a93b5f15507b969164d49891db8d5b470#39ab849a93b5f15507b969164d49891db8d5b470"
+version = "0.10.0"
+source = "git+https://github.com/longbridge/gpui-kit?rev=4e015e9e26e137e020ebc0c4fecf9ce5e0889668#f697c3133d55c64fa8a5b67926147fb3dadd276d"
 dependencies = [
  "anyhow",
  "gpui-fast",
@@ -5738,7 +5740,7 @@ dependencies = [
 
 [[package]]
 name = "rtx-fg-manager"
-version = "4.3.36"
+version = "4.3.37"
 dependencies = [
  "anyhow",
  "base64",

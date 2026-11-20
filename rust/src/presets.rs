@@ -27,7 +27,7 @@ impl Context {
         }
     }
     pub fn parameters(&self) -> Vec<Parameter> {
-        let mut fields = parameters(&self.profile);
+        let mut fields = parameters_for_scheme(&self.scheme, &self.profile);
         if self.delta {
             let count = fields
                 .iter_mut()
@@ -244,6 +244,25 @@ pub struct Parameter {
     pub label: &'static str,
     pub default: &'static str,
     pub choices: Vec<(&'static str, &'static str)>,
+}
+pub fn parameters_for_scheme(scheme: &str, profile: &str) -> Vec<Parameter> {
+    let mut fields = parameters(profile);
+    if scheme == crate::upstream040::PIPO_SCHEME {
+        for field in &mut fields {
+            match field.key {
+                "optimized" => {
+                    field.default = "2";
+                    if let Some(choice) = field.choices.iter_mut().find(|(value, _)| *value == "1")
+                    {
+                        choice.1 = "1 · 逐位一致";
+                    }
+                }
+                "preset" => field.default = "C",
+                _ => {}
+            }
+        }
+    }
+    fields
 }
 pub fn parameters(profile: &str) -> Vec<Parameter> {
     if profile == crate::anr::PROFILE {

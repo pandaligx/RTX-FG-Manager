@@ -242,7 +242,12 @@ fn legacy_identity(journal: &Path) -> Result<Option<String>> {
 /// recognition, never a whitelist for installing a newly signed proxy.
 pub fn private_components(record: &Record) -> &'static [&'static str] {
     match record.backend.as_str() {
-        crate::anr::BACKEND => &crate::anr::COMPONENTS,
+        crate::anr::BACKEND => crate::anr::components(
+            record
+                .upstream_version
+                .as_deref()
+                .or(record.payload_version.as_deref()),
+        ),
         crate::upstream040::BACKEND => &crate::upstream040::COMPONENTS,
         crate::encore::BACKEND => &crate::encore::INTEL_FILES,
         _ => &[],

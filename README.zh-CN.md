@@ -68,11 +68,10 @@ chmod +x RTXManager-4.3.36-x86_64.AppImage
 
 AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
 
-## 4.3.36 更新亮点
+## 4.3.37 更新亮点
 
-- 修复多目录游戏卸载补丁报错，正确恢复共用的运行库。
-- 兼容旧版重复部署记录，继续保护其他插件及用户修改过的文件。
-- 影之刃零使用 `platform/steam/PBZ.exe`，旧的重复目录只用于清理，不再重复安装。
+- 同一款游戏可关联旧名称下的玩家分享。卡片显示显卡和实测补丁版本，安装前可对照游戏自带和补丁内置的运行库。
+- Pipo sm86-10 接替旧版，适用于 DX12。RTX Encore 2.5.0 新增 MWSR 空间超分，ANR FG B20 支持 scRGB HDR。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -83,11 +82,11 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | **Dlssg_for_sm86 · 0.4.2** | 完整组件包，含 XeSS 2X–4X；新安装默认 `Optimized=1`、预设 A、SR 关闭。 | 管理器 / INI |
 | **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | 私有 Streamline 2.14.16；DLSS 最高 6X、默认 4X，XeSS 最高 4X。Vulkan XeSS 改变分辨率需重启游戏。 | 管理器 / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
-| **Dlssg_for_sm86-MFG-version · Vulkan** | 保留专用 Vulkan 方案，与 DX12 路线不可混为一谈。 | 管理器 / INI |
+| **Dlssg_for_sm86 · 0.4.2 Pipo · DX12** | sm86-10 接替该分支的旧 Vulkan 入口。默认预设 C、内核模式 2、4X。六个 DLL 入口选一个。 | 管理器 / INI |
 | **MFG-Unlocker · 1.7.1** | 普通安装仍使用独立 DLL；已有完整 OptiScaler 10 时可选插件模式，备份并更新配套主文件。两种模式互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
-| **RTX Encore · 2.4.1** | SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG 与 Frame Pacing；可实验性地为无原生 DLSS 的游戏添加功能。 | **Insert**，禁用菜单或修改快捷键后除外 |
-| **ANR FG · V.B16** | 完整包含 OptiScaler、模型和运行文件；单入口安装，默认最高 6X。适用于未安装 OptiScaler 的游戏。 | **Insert（Ins）** 打开菜单；也可在管理器中设置 |
+| **RTX Encore · 2.5.0** | 提供 SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG。无原生 DLSS 的游戏也可选 MWSR 空间超分。 | 默认 **Insert** |
+| **ANR FG · V.B20** | 包含 OptiScaler 和 23 个模型程序，支持 scRGB HDR 和 Blackwell 显卡。选一个入口，默认最高 6X。 | **Insert（Ins）** 或管理器预设 |
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。
 
@@ -98,12 +97,13 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | Dlssg_for_sm86 · 0.4.2 | 支持 | 支持 | 支持 | 支持 |
 | 0.4.2 · 三角洲专用 · DX12/Vulkan | 支持 | 支持 | 支持 | 支持 |
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 支持 | 支持 | 支持 | 不支持 |
-| Dlssg_for_sm86-MFG-version · Vulkan | 支持 | 支持 | 不支持 | 不支持 |
 | MFG-Unlocker · 1.7.1 / 1.6.1 | 支持 | 支持 | 支持 | 支持 |
-| RTX Encore · 2.4.1 | 支持 | 支持 | 支持 | 支持 |
-| ANR FG · V.B16 | 支持 | 支持 | 支持 | 支持 |
+| RTX Encore · 2.5.0 | 支持 | 支持 | 支持 | 支持 |
+| ANR FG · V.B20 | 支持 | 支持 | 支持 | 支持 |
 
-依据：[Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[Vulkan 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。“不支持”表示未纳入当前分发方案的明确支持范围；实验性功能、驱动和运行库条件仍适用，不保证所有游戏兼容。三角洲方案为本项目自定义适配。
+Pipo 作者使用 RTX 3070 测试 DX12 版，RTX 20 的兼容性仍待确认。游戏已装旧版 Pipo Vulkan 时，先点「卸载并恢复」，再切换到 DX12。[sm86-10 发布说明](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-10)
+
+依据：[Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[Pipo 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。“不支持”表示未纳入当前分发方案的明确支持范围；实验性功能、驱动和运行库条件仍适用，不保证所有游戏兼容。三角洲方案为本项目自定义适配。
 
 MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 310.9.16，RTX 20 限特定 310.9 运行库。**1.7.1 的 XeMFG 是独立实验路线，可用于符合条件的 NVIDIA / AMD / Intel 显卡**，需匹配 Intel 运行库、驱动及 DX12 / Vulkan 游戏；这不代表 AMD / Intel 获得 DLSS 或 DLSSNR 支持。1.6.1 没有 1.7.0 的独立 XeMFG 路线。
 
@@ -138,11 +138,11 @@ Dlssg_for_sm86 的 XeSS 引擎使用自身 CUDA 后端，不等于通用 Intel X
 </details>
 
 <details>
-<summary><b>Encore 2.4.1：组件选择与配置保留</b></summary>
+<summary><b>Encore 2.5.0 的组件选择与配置保留</b></summary>
 
 在 **DLSS / XeSS 运行库** 中按需选择组件，在 **预设参数** 中启用功能。若游戏没有原生 DLSS / 帧生成，可选择 Encore 的对应实验功能；默认不替用户启用。额外 DLSS-G / Streamline 与 Intel 组件按安装条件部署，已有组件按归属备份和恢复。
 
-2.4.0 的逐遍 NR 处理位置及 33–100% 自定义 DLSS 比例已接入管理器和玩家分享。显式更新原生 Streamline SR/RR 时补齐配套公共组件，并保留恢复记录。升级保留已有 JSONC 注释、未知字段和菜单状态。详见 [2.4.0 参数文档](https://github.com/SilyNoMeta/rtx-encore/blob/v2.4.0/docs/SETTINGS.md)与[无原生 DLSS 游戏说明](https://github.com/SilyNoMeta/rtx-encore/blob/v2.4.0/docs/GAMES-WITHOUT-DLSS.md)。
+MWSR 无需额外运行库。请在游戏中选择较低的窗口分辨率，宽高比与屏幕一致。升级会保留已选引擎、JSONC 注释及菜单设置。[Encore 参数文档](https://github.com/SilyNoMeta/rtx-encore/blob/v2.5.0/docs/SETTINGS.zh-CN.md) · [无原生 DLSS 游戏说明](https://github.com/SilyNoMeta/rtx-encore/blob/v2.5.0/docs/GAMES-WITHOUT-DLSS.zh-CN.md)
 
 </details>
 
@@ -150,7 +150,7 @@ Dlssg_for_sm86 的 XeSS 引擎使用自身 CUDA 后端，不等于通用 Intel X
 <summary><b>ANR FG 怎么用？</b></summary>
 
 1. 退出游戏，卸载此前安装的其他插帧补丁。已有 OptiScaler 的游戏请先恢复原安装，或按上游说明使用 addon；管理器不会自动合并它们。
-2. 选择 **ANR FG V.B16**。DX12 通常用 `dxgi.dll`，Vulkan 用 `winmm.dll`；只选一个入口，点击安装。
+2. 选择 **ANR FG V.B20**。DX12 通常用 `dxgi.dll`，Vulkan 用 `winmm.dll`。选一个入口后点击安装。
 3. 游戏内开启 **DLSS 帧生成 / NVIDIA 帧生成**，由 ANR 替换处理。按 **Insert（Ins）** 打开菜单。默认倍率上限为 6X，实际倍率取决于游戏。
 
 Windows 需要 Microsoft Visual C++ 2015–2022 x64 运行库。Linux / Proton 还需为该游戏设置相应 DLL override，例如 `dxgi=n,b` 或 `winmm=n,b`。完整包必须保留模型文件，不要只复制 DLL。

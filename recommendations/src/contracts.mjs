@@ -48,6 +48,7 @@ export const schemes = {
   'rtxfg-0.3.5-dx12-vulkan': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
   'rtxfg-0.4.1-dx12-vulkan': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
   'pipotoufik-mfg-vulkan-sm86-7': ['version.dll'],
+  'pipo-sm86-10': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
 };
 export const NOTES_LIMIT = 5000;
 export function legacyNotes(notes) {
@@ -67,7 +68,7 @@ export function recipe(input) {
     && new Set(input.entries).size === input.entries.length
     && input.entries.every(e => schemes[input.scheme].includes(e)), 'invalid_entries');
   need(!input.entries.some(e => e.endsWith('.asi')) || input.entries.length === 1, 'plugin_proxy_conflict');
-  need(input.scheme!=='anr-fg' || input.entries.length===1,'invalid_entries');
+  need(!['anr-fg','pipo-sm86-10'].includes(input.scheme) || input.entries.length===1,'invalid_entries');
   need(typeof input.patchVersion === 'string' && /^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(input.patchVersion)
     && input.patchVersion.length <= 40, 'invalid_patch_version');
   need(['dx12','vulkan','dx11','unknown'].includes(input.renderer), 'invalid_renderer');
