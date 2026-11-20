@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.3.38 — 2026-11-20
+
+- Fixed ANR FG leaving `anr-vkloader.dll` in the game folder after uninstall. The leftover file could block reinstallation even when the game library showed the patch as uninstalled.
+- The game library now identifies leftover ANR runtimes. Close the game and reinstall ANR directly, or select **Clean leftovers**. Cleanup preserves the game's own Vulkan loader and other OptiScaler plugins.
+
 ## 4.3.37 — 2026-11-20
 
 - Replace the Pipo Vulkan entry with sm86-10 for DX12. The new build defaults to preset C and kernel mode 2. Existing Vulkan installations can still be uninstalled and restored.
