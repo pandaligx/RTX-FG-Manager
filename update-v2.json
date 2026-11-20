@@ -1,14 +1,14 @@
 {
   "schema": 2,
-  "version": "4.3.36",
+  "version": "4.3.37",
   "file": "RTXManager.exe",
-  "sha256": "976826567e514a301b30716654b60f3f9315367d3b4e2beb945b38b30ba436fd",
-  "bytes": 47716944,
+  "sha256": "7df5076b35a3b11f63d65b6555875a3bb6153ff197545c9730adf789c830da93",
+  "bytes": 49464744,
   "notes": {
-    "zh-CN": "## 本次更新\n- 修复多目录游戏卸载时，共用运行库被误判为其他程序修改的问题。\n- 共用的 DLSS/Streamline 文件在最后一处卸载后还原，兼容旧版重复备份。\n- 影之刃零使用正确的 platform/steam 目录，旧错误目录仍可通过卸载清理。\n- 保持其他补丁、界面及自动更新不变。",
-    "en": "## What's new\n- Fix false runtime-conflict errors when uninstalling games with multiple deployment directories.\n- Restore shared DLSS/Streamline files after the last managed directory is removed, including legacy duplicate backups.\n- Use Phantom Blade Zero's platform/steam renderer; retain cleanup access to previously managed launcher files.\n- Keep other patches, the interface and automatic updates unchanged.",
-    "ru": "## Обновления\n- Исправлена ошибка восстановления общих библиотек в играх с несколькими каталогами установки.\n- Общие файлы DLSS/Streamline восстанавливаются после удаления последней установки; поддерживаются старые дублирующиеся резервные копии.\n- Для Phantom Blade Zero используется platform/steam. Старый каталог остаётся доступным для очистки.\n- Другие патчи, интерфейс и обновления не изменены.",
-    "ja": "## 更新内容\n- 複数の配置先で共有するランタイムを削除する際の誤った競合エラーを修正。\n- DLSS/Streamlineは最後の配置先を削除した後に復元。旧版の重複バックアップにも対応。\n- Phantom Blade Zeroはplatform/steamを使用。以前の配置先もアンインストールで清掃可能。\n- その他のパッチ、画面、自動更新は変更なし。",
-    "ko": "## 업데이트 내용\n- 여러 설치 폴더가 런타임을 공유할 때 발생하던 잘못된 충돌 오류를 수정합니다.\n- 마지막 설치를 제거한 뒤 DLSS/Streamline 원본을 복원하며 이전 버전의 중복 백업도 처리합니다.\n- Phantom Blade Zero는 platform/steam을 사용합니다. 이전 설치 위치도 제거 시 정리합니다.\n- 다른 패치, 화면 및 자동 업데이트는 유지합니다."
+    "zh-CN": "## 本次更新\n- Pipo sm86-10（DX12）接替旧 Vulkan 版；旧版仍可卸载还原。\n- RTX Encore 2.5.0 新增 MWSR 空间超分，ANR FG B20 支持 scRGB HDR。\n- 玩家可关联同一游戏的历史分享，查看显卡、实测补丁版本和安装前的运行库对照。修复确认关联时可能闪退的问题。\n- 界面升级至 GPUI Kit 0.10.0 和 GPUI Fast 0.1.16，游戏库支持显示部分勾选状态。",
+    "en": "## What's new\n- Pipo sm86-10 for DX12 replaces the previous Vulkan build. Existing installations can still be restored.\n- RTX Encore 2.5.0 adds MWSR spatial upscaling. ANR FG B20 adds scRGB HDR support.\n- Link older shares to a platform game, see the GPU and tested patch version, and compare runtime versions before installing. Fixed a crash when confirming a game link.\n- Updated to GPUI Kit 0.10.0 and GPUI Fast 0.1.16. The game library now shows partial selections.",
+    "ru": "## Обновления\n- Pipo sm86-10 для DX12 заменяет прежнюю сборку Vulkan. Старую установку можно удалить с восстановлением файлов.\n- RTX Encore 2.5.0 добавляет масштабирование MWSR, а ANR FG B20 — поддержку scRGB HDR.\n- Старые рекомендации можно привязать к игре. В карточках видны видеокарта, проверенная версия патча и сравнение библиотек перед установкой. Исправлен сбой при подтверждении привязки.\n- Обновлены GPUI Kit 0.10.0 и GPUI Fast 0.1.16.",
+    "ja": "## 更新内容\n- Pipo の旧 Vulkan 版を DX12 対応の sm86-10 に更新。旧版のアンインストールと復元にも対応。\n- RTX Encore 2.5.0 の MWSR 空間アップスケーリングと ANR FG B20 の scRGB HDR に対応。\n- 以前の共有設定を同じゲームに関連付け、GPU と検証時のパッチ版、インストール前のランタイム比較を表示。関連付け確認時のクラッシュを修正。\n- GPUI Kit 0.10.0 と GPUI Fast 0.1.16 に更新。",
+    "ko": "## 업데이트 내용\n- 기존 Pipo Vulkan 버전을 DX12용 sm86-10으로 교체했습니다. 기존 설치의 제거 및 복원을 지원합니다.\n- RTX Encore 2.5.0의 MWSR 공간 업스케일링과 ANR FG B20의 scRGB HDR을 지원합니다.\n- 이전 공유 설정을 같은 게임에 연결하고 GPU, 테스트된 패치 버전과 설치 전 런타임 비교를 확인할 수 있습니다. 연결 확인 시 발생할 수 있는 충돌을 수정했습니다.\n- GPUI Kit 0.10.0 및 GPUI Fast 0.1.16으로 업데이트했습니다."
   }
 }
