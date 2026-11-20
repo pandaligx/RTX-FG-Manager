@@ -344,7 +344,7 @@ impl Manager {
             let versions = statuses
                 .iter()
                 .flat_map(|s| &s.versions)
-                .cloned()
+                .map(|version| self.c.text(version))
                 .collect::<std::collections::BTreeSet<_>>();
             let current = if versions.is_empty() {
                 self.c.text("未检测到")
