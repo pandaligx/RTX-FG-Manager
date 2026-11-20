@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.39 — 2026-11-20
+
+- Open a game’s player recommendations to see setups shared under its verified storefront entries in one list. Each setup keeps its original platform. This also fixes missing setups for Arknights: Endfield.
+- On Windows, the library can recognize NetEase official-client installations from their installation records. NetEase Games is also available when sharing a setup.
+- Recommendation cards separate the title and date from details and voting. The detail view and email sign-in controls now follow the manager’s font size and use less space.
+- The DLSS / XeSS window shows the installed and target versions together. Expand **View files** to see multiple locations or native Streamline plugins. The folder button opens the exact plugin directory.
+
 ## 4.3.38 — 2026-11-20
 
 - Fixed ANR FG leaving `anr-vkloader.dll` in the game folder after uninstall. The leftover file could block reinstallation even when the game library showed the patch as uninstalled.
