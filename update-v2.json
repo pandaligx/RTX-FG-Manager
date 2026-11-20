@@ -1,14 +1,14 @@
 {
   "schema": 2,
-  "version": "4.3.37",
+  "version": "4.3.38",
   "file": "RTXManager.exe",
-  "sha256": "7df5076b35a3b11f63d65b6555875a3bb6153ff197545c9730adf789c830da93",
-  "bytes": 49464744,
+  "sha256": "2deaaf73908a82a25c986f2f243465bb7fc634911b40266bef1a018d59cae99b",
+  "bytes": 49491040,
   "notes": {
-    "zh-CN": "## 本次更新\n- Pipo sm86-10（DX12）接替旧 Vulkan 版；旧版仍可卸载还原。\n- RTX Encore 2.5.0 新增 MWSR 空间超分，ANR FG B20 支持 scRGB HDR。\n- 玩家可关联同一游戏的历史分享，查看显卡、实测补丁版本和安装前的运行库对照。修复确认关联时可能闪退的问题。\n- 界面升级至 GPUI Kit 0.10.0 和 GPUI Fast 0.1.16，游戏库支持显示部分勾选状态。",
-    "en": "## What's new\n- Pipo sm86-10 for DX12 replaces the previous Vulkan build. Existing installations can still be restored.\n- RTX Encore 2.5.0 adds MWSR spatial upscaling. ANR FG B20 adds scRGB HDR support.\n- Link older shares to a platform game, see the GPU and tested patch version, and compare runtime versions before installing. Fixed a crash when confirming a game link.\n- Updated to GPUI Kit 0.10.0 and GPUI Fast 0.1.16. The game library now shows partial selections.",
-    "ru": "## Обновления\n- Pipo sm86-10 для DX12 заменяет прежнюю сборку Vulkan. Старую установку можно удалить с восстановлением файлов.\n- RTX Encore 2.5.0 добавляет масштабирование MWSR, а ANR FG B20 — поддержку scRGB HDR.\n- Старые рекомендации можно привязать к игре. В карточках видны видеокарта, проверенная версия патча и сравнение библиотек перед установкой. Исправлен сбой при подтверждении привязки.\n- Обновлены GPUI Kit 0.10.0 и GPUI Fast 0.1.16.",
-    "ja": "## 更新内容\n- Pipo の旧 Vulkan 版を DX12 対応の sm86-10 に更新。旧版のアンインストールと復元にも対応。\n- RTX Encore 2.5.0 の MWSR 空間アップスケーリングと ANR FG B20 の scRGB HDR に対応。\n- 以前の共有設定を同じゲームに関連付け、GPU と検証時のパッチ版、インストール前のランタイム比較を表示。関連付け確認時のクラッシュを修正。\n- GPUI Kit 0.10.0 と GPUI Fast 0.1.16 に更新。",
-    "ko": "## 업데이트 내용\n- 기존 Pipo Vulkan 버전을 DX12용 sm86-10으로 교체했습니다. 기존 설치의 제거 및 복원을 지원합니다.\n- RTX Encore 2.5.0의 MWSR 공간 업스케일링과 ANR FG B20의 scRGB HDR을 지원합니다.\n- 이전 공유 설정을 같은 게임에 연결하고 GPU, 테스트된 패치 버전과 설치 전 런타임 비교를 확인할 수 있습니다. 연결 확인 시 발생할 수 있는 충돌을 수정했습니다.\n- GPUI Kit 0.10.0 및 GPUI Fast 0.1.16으로 업데이트했습니다."
+    "zh-CN": "## 本次更新\n- 修复卸载 ANR FG 后遗留 Vulkan 加载器，导致再次安装时报“已有 OptiScaler”的问题。\n- 游戏库现在会标出旧版 ANR 残留。退出游戏后可直接重装 ANR，或点击“清理残留”。游戏自带的 Vulkan 文件和独立安装的 OptiScaler 插件会保留。",
+    "en": "## What's new\n- Fixed an ANR FG uninstall issue that left its Vulkan loader behind and blocked reinstallation with an “OptiScaler already installed” message.\n- The game library now identifies leftovers from earlier ANR installations. Close the game, then reinstall ANR or select “Clean residuals”. The game's own Vulkan files and independent OptiScaler plugins are preserved.",
+    "ru": "## Обновления\n- Исправлено удаление ANR FG: оставшийся загрузчик Vulkan мешал повторной установке ANR.\n- Библиотека игр теперь показывает остатки прежней установки. Закройте игру и установите ANR снова или выберите очистку остатков. Собственные файлы Vulkan игры и сторонние плагины OptiScaler сохраняются.",
+    "ja": "## 更新内容\n- ANR FG のアンインストール後に Vulkan ローダーが残り、OptiScaler が既に存在するというメッセージで再インストールできない問題を修正しました。\n- 以前の ANR の残留ファイルをゲームライブラリに表示します。ゲームを終了して ANR を再インストールするか、残留ファイルを削除できます。ゲーム付属の Vulkan ファイルと個別に導入した OptiScaler プラグインは保持されます。",
+    "ko": "## 업데이트 내용\n- ANR FG 제거 후 Vulkan 로더가 남아 OptiScaler가 이미 설치되었다는 메시지와 함께 재설치가 차단되던 문제를 수정했습니다.\n- 게임 라이브러리에 이전 ANR 설치의 잔여 파일이 표시됩니다. 게임을 종료한 뒤 ANR을 다시 설치하거나 잔여 파일을 정리할 수 있습니다. 게임 자체의 Vulkan 파일과 별도로 설치한 OptiScaler 플러그인은 보존됩니다."
   }
 }
