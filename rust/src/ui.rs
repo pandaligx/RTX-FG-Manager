@@ -25,7 +25,7 @@ use rtx_fg_manager::{VERSION, core, gpu_alias, hags, i18n, preferences, win};
 use serde_json::{Value, json};
 use std::{
     cell::{Cell, RefCell},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::PathBuf,
     rc::Rc,
     sync::atomic::Ordering,
@@ -231,6 +231,8 @@ pub struct Manager {
     main_window: AnyWindowHandle,
     runtime_game: Option<String>,
     runtime_versions: HashMap<&'static str, String>,
+    runtime_scroll: ScrollHandle,
+    runtime_expanded: HashSet<&'static str>,
     editor_open: bool,
     preset_close: Option<bool>, // true: app exit; false: editor dismissal
     theme_preview: theme_preview::ThemePreview<WindowId>,
@@ -396,6 +398,8 @@ impl Manager {
             main_window: window.window_handle(),
             runtime_game: None,
             runtime_versions: HashMap::new(),
+            runtime_scroll: ScrollHandle::new(),
+            runtime_expanded: HashSet::new(),
             drag_gap: None,
             editor_open: false,
             preset_close: None,
@@ -3085,7 +3089,7 @@ impl Manager {
             .focus_ring(crate::ui_focus::visible(cx))
             .small()
             .tooltip(runtime_label.clone())
-            .label(runtime_label)
+            .label(version)
             .icon(IconName::ChevronDown)
             .disabled(self.c.busy)
             .dropdown_menu(move |mut menu, _, _| {
@@ -3107,13 +3111,15 @@ impl Manager {
         let mut panel = div()
             .v_flex()
             .min_w_0()
-            .gap_2()
+            .gap_1()
             .child(
                 div()
                     .id("nr-summary")
                     .h_flex()
                     .flex_wrap()
-                    .gap_2()
+                    .items_center()
+                    .gap_x_2()
+                    .gap_y_1()
                     .justify_between()
                     .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
                     .child(
@@ -3122,16 +3128,24 @@ impl Manager {
                             .font_weight(FontWeight::MEDIUM)
                             .child(self.t("DLSS神经渲染")),
                     )
-                    .child(runtime_version_indicator(status, version, cx)),
+                    .child(runtime_version_indicator(
+                        status,
+                        runtime_picker.into_any_element(),
+                        cx,
+                    )),
             )
-            .children(statuses.iter().map(|n| self.runtime_path(&n.path, cx)))
+            .children(self.runtime_locations(
+                "nr",
+                statuses.iter().map(|n| n.path.as_path()).collect(),
+                Default::default(),
+                cx,
+            ))
             .child(
                 div()
                     .h_flex()
                     .flex_wrap()
-                    .gap_2()
+                    .gap_1p5()
                     .justify_end()
-                    .child(runtime_picker)
                     .child(
                         self.button("nr-install", label, Command::InstallNeural(version), cx)
                             .small()
@@ -4768,20 +4782,17 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-fn runtime_version_indicator(current: String, selected: &str, cx: &App) -> AnyElement {
+fn runtime_version_indicator(current: String, target: AnyElement, cx: &App) -> AnyElement {
     div()
         .h_flex()
         .flex_wrap()
+        .items_center()
         .gap_1p5()
         .text_xs()
         .text_color(cx.theme().muted_foreground)
         .child(current)
         .child("→")
-        .child(
-            div()
-                .text_color(cx.theme().foreground)
-                .child(selected.to_owned()),
-        )
+        .child(target)
         .into_any_element()
 }
 

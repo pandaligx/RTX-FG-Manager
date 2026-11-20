@@ -1,6 +1,11 @@
 //! A small opt-in inspector; retained status comes from the deployment worker.
 use super::*;
+use gpui_component::scroll::{Scrollbar, ScrollbarMode};
 use rtx_fg_manager::runtime_files;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 struct RuntimeView {
     owner: WeakEntity<Manager>,
@@ -20,8 +25,14 @@ impl Render for RuntimeView {
     }
 }
 impl Manager {
-    pub(super) fn runtime_path(&self, path: &std::path::Path, cx: &mut Context<Self>) -> Div {
-        let folder = path.parent().unwrap_or(path).display().to_string();
+    fn runtime_path(
+        &self,
+        kind: &str,
+        path: &Path,
+        directory: &Path,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let folder = directory.display().to_string();
         let opened = self
             .folder_feedback
             .as_ref()
@@ -35,7 +46,7 @@ impl Manager {
             .text_color(cx.theme().muted_foreground)
             .child(
                 Button::new(SharedString::from(format!(
-                    "runtime-path-{}",
+                    "runtime-path-{kind}-{}",
                     path.display()
                 )))
                 .custom(
@@ -73,6 +84,8 @@ impl Manager {
     pub(super) fn clear_runtime_window(&mut self, cx: &mut Context<Self>) {
         self.runtime_window = None;
         self.runtime_game = None;
+        self.runtime_expanded.clear();
+        self.runtime_scroll = ScrollHandle::new();
         cx.notify();
     }
     pub(super) fn reconcile_runtime_window(&mut self, cx: &mut Context<Self>) {
@@ -94,6 +107,8 @@ impl Manager {
             if !self.c.busy && self.runtime_game != self.c.focus {
                 self.runtime_game = self.c.focus.clone();
                 self.runtime_versions.clear();
+                self.runtime_expanded.clear();
+                self.runtime_scroll = ScrollHandle::new();
                 cx.notify();
             }
             cx.defer(move |cx| {
@@ -116,7 +131,7 @@ impl Manager {
             work.center(),
             size(
                 (window.rem_size() * 52.).min(work.size.width),
-                (window.rem_size() * 47.).min(work.size.height),
+                (window.rem_size() * 38.).min(work.size.height),
             ),
         );
         let options = WindowOptions {
@@ -194,6 +209,82 @@ impl Manager {
             });
         });
     }
+    pub(super) fn runtime_locations(
+        &self,
+        kind: &'static str,
+        paths: BTreeSet<&Path>,
+        groups: BTreeMap<String, &runtime_files::StreamlineStatus>,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        if groups.is_empty() && paths.len() <= 1 {
+            return paths.into_iter().next().map(|path| {
+                self.runtime_path(kind, path, path.parent().unwrap_or(path), cx)
+                    .into_any_element()
+            });
+        }
+        let open = self.runtime_expanded.contains(kind);
+        let mut details = div().v_flex().min_w_0().gap_1().pl_2();
+        if open {
+            for path in paths {
+                details =
+                    details.child(self.runtime_path(kind, path, path.parent().unwrap_or(path), cx));
+            }
+            for group in groups.into_values() {
+                let mut plugins = div()
+                    .v_flex()
+                    .min_w_0()
+                    .gap_1()
+                    .py_1()
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(self.t("Streamline 原生配套插件")),
+                    )
+                    .child(self.runtime_path(kind, &group.directory, &group.directory, cx));
+                let version_row = |name: &str, version: String| {
+                    div()
+                        .h_flex()
+                        .flex_wrap()
+                        .justify_between()
+                        .gap_x_2()
+                        .text_xs()
+                        .child(name.to_owned())
+                        .child(div().text_color(cx.theme().muted_foreground).child(version))
+                };
+                for (name, version) in &group.plugins {
+                    plugins = plugins.child(version_row(name, self.c.text(version)));
+                }
+                details = details.child(plugins.child(version_row(
+                    "sl.interposer.dll",
+                    format!("{} ({})", self.t(&group.interposer), self.t("保留原件")),
+                )));
+            }
+        }
+        let trigger = Button::new(SharedString::from(format!("runtime-files-{kind}")))
+            .small()
+            .ghost()
+            .focus_ring(crate::ui_focus::visible(cx))
+            .icon(if open {
+                IconName::ChevronDown
+            } else {
+                IconName::ChevronRight
+            })
+            .label(self.t("查看文件"))
+            .on_click(cx.listener(move |this, _, _, cx| {
+                if !this.runtime_expanded.remove(kind) {
+                    this.runtime_expanded.insert(kind);
+                }
+                cx.notify();
+            }));
+        Some(
+            gpui_component::collapsible::Collapsible::new()
+                .open(open)
+                .child(div().h_flex().child(trigger))
+                .content(details)
+                .into_any_element(),
+        )
+    }
     fn runtime_body(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let snapshot = self
             .c
@@ -211,12 +302,14 @@ impl Manager {
         let mut rows = div()
             .id("runtime-file-scroll")
             .v_flex()
-            .gap_2()
+            .gap_1()
             .min_w_0()
             .min_h_0()
-            .flex_1()
-            .px_3()
-            .py_2()
+            .h_full()
+            .pl_3()
+            .pr_4()
+            .py_1()
+            .track_scroll(&self.runtime_scroll)
             .overflow_y_scroll();
         for kind in runtime_files::KINDS {
             if kind == "xemfg" {
@@ -246,7 +339,8 @@ impl Manager {
                             .file_name()
                             .is_some_and(|n| n.eq_ignore_ascii_case("nvngx_dlssg.dll"))
                 })
-                .collect::<std::collections::BTreeSet<_>>();
+                .map(|p| p.as_path())
+                .collect::<BTreeSet<_>>();
             let versions = statuses
                 .iter()
                 .flat_map(|s| &s.versions)
@@ -278,7 +372,7 @@ impl Manager {
             };
             let picker = Button::new(SharedString::from(format!("runtime-{kind}-version")))
                 .small()
-                .label(version_label)
+                .label(version_label.clone())
                 .icon(IconName::ChevronDown)
                 .focus_ring(crate::ui_focus::visible(cx))
                 .disabled(self.c.busy || single_version)
@@ -306,11 +400,20 @@ impl Manager {
                     }
                     menu
                 });
+            let target = if single_version {
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().foreground)
+                    .child(version_label)
+                    .into_any_element()
+            } else {
+                picker.into_any_element()
+            };
             let mut card = div()
                 .v_flex()
                 .flex_shrink_0()
-                .gap_2()
-                .pb_2()
+                .gap_1()
+                .py_2()
                 .border_b_1()
                 .border_color(cx.theme().border)
                 .min_w_0()
@@ -318,7 +421,9 @@ impl Manager {
                     div()
                         .h_flex()
                         .flex_wrap()
-                        .gap_2()
+                        .items_center()
+                        .gap_x_2()
+                        .gap_y_1()
                         .justify_between()
                         .child(
                             div()
@@ -328,57 +433,21 @@ impl Manager {
                         .child(if restore_only {
                             div().text_xs().child(current).into_any_element()
                         } else {
-                            runtime_version_indicator(current, &selected, cx)
+                            runtime_version_indicator(current, target, cx)
                         }),
                 );
-            for path in paths {
-                card = card.child(self.runtime_path(path, cx));
-            }
-            if kind == "fg" {
-                let groups = statuses
+            let groups = if kind == "fg" {
+                statuses
                     .iter()
                     .flat_map(|s| &s.streamline)
                     .map(|s| (core::key(&s.directory), s))
-                    .collect::<std::collections::BTreeMap<_, _>>();
-                for group in groups.values() {
-                    let mut table = div()
-                        .v_flex()
-                        .gap_1()
-                        .min_w_0()
-                        .child(
-                            div()
-                                .font_weight(FontWeight::MEDIUM)
-                                .child(self.t("Streamline 原生配套插件")),
-                        )
-                        .child(self.runtime_path(&group.directory, cx));
-                    for (name, version) in &group.plugins {
-                        table = table.child(
-                            div()
-                                .h_flex()
-                                .gap_2()
-                                .flex_wrap()
-                                .justify_between()
-                                .text_xs()
-                                .child(name.clone())
-                                .child(self.t(version)),
-                        );
-                    }
-                    table = table.child(
-                        div()
-                            .h_flex()
-                            .gap_2()
-                            .flex_wrap()
-                            .justify_between()
-                            .text_xs()
-                            .child("sl.interposer.dll")
-                            .child(format!(
-                                "{} ({})",
-                                self.t(&group.interposer),
-                                self.t("保留原件")
-                            )),
-                    );
-                    card = card.child(table);
-                }
+                    .collect()
+            } else {
+                BTreeMap::new()
+            };
+            let locations = self.runtime_locations(kind, paths, groups, cx);
+            if let Some(locations) = locations {
+                card = card.child(locations);
             }
             if kind == "encorefg" && !available && statuses.iter().any(|s| s.applicable) {
                 card = card.child(div().text_xs().text_color(cx.theme().muted_foreground)
@@ -412,10 +481,10 @@ impl Manager {
                 div()
                     .h_flex()
                     .flex_wrap()
-                    .gap_2()
+                    .gap_1p5()
                     .justify_end()
                     .when(!restore_only, |row| {
-                        row.child(picker).child(
+                        row.child(
                             self.button(
                                 match kind {
                                     "sr" => "runtime-sr-install",
@@ -463,9 +532,11 @@ impl Manager {
             .c
             .focus
             .as_ref()
-            .and_then(|e| self.c.games.iter().find(|g| &g.exe == e))
-            .map(|g| self.c.game_name(g))
-            .unwrap_or_default();
+            .and_then(|e| self.c.games.iter().find(|g| &g.exe == e));
+        let title = game.map(|g| self.c.game_name(g)).unwrap_or_default();
+        let game_icon = game
+            .and_then(|g| self.c.icons.get(&g.exe))
+            .and_then(|icon| icon.clone());
         div()
             .v_flex()
             .size_full()
@@ -482,12 +553,53 @@ impl Manager {
                     .px_3()
                     .py_2()
                     .flex_shrink_0()
+                    .border_b_1()
+                    .border_color(cx.theme().border)
                     .child(
                         div()
                             .h_flex()
+                            .items_center()
+                            .flex_wrap()
                             .gap_2()
                             .justify_between()
-                            .child(div().font_weight(FontWeight::SEMIBOLD).child(game))
+                            .child(
+                                div()
+                                    .h_flex()
+                                    .items_center()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .gap_2()
+                                    .child(if let Some(icon) = game_icon {
+                                        img(icon)
+                                            .size_4()
+                                            .flex_shrink_0()
+                                            .object_fit(ObjectFit::Contain)
+                                            .into_any_element()
+                                    } else {
+                                        Icon::new(IconName::LayoutDashboard)
+                                            .size_4()
+                                            .into_any_element()
+                                    })
+                                    .child(
+                                        div()
+                                            .min_w_0()
+                                            .whitespace_normal()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(title),
+                                    ),
+                            )
+                            .when(encore_complete, |row| {
+                                row.child(
+                                    self.button(
+                                        "runtime-encore-complete",
+                                        "选择 Encore 安装组件",
+                                        Command::RuntimeOperation("encore-complete", false),
+                                        cx,
+                                    )
+                                    .small()
+                                    .disabled(self.c.busy || self.c.read_only),
+                                )
+                            })
                             .child(
                                 self.button(
                                     "runtime-refresh",
@@ -500,6 +612,7 @@ impl Manager {
                                     cx,
                                 )
                                 .small()
+                                .icon(IconName::RefreshCw)
                                 .disabled(self.c.busy || self.c.runtime_catalog_load.loading()),
                             ),
                     )
@@ -513,31 +626,26 @@ impl Manager {
                                 cx.theme().muted_foreground
                             })
                             .child(self.t(self.c.runtime_catalog_load.message())),
-                    )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(self.t(
-                                "DLSS 更新保留原件，可随时恢复；游戏共用文件可能影响其他方案。",
-                            )),
-                    )
-                    .when(encore_complete, |header| {
-                        header.child(
-                            div().h_flex().justify_end().child(
-                                self.button(
-                                    "runtime-encore-complete",
-                                    "选择 Encore 安装组件",
-                                    Command::RuntimeOperation("encore-complete", false),
-                                    cx,
-                                )
-                                .small()
-                                .disabled(self.c.busy || self.c.read_only),
-                            ),
-                        )
-                    }),
+                    ),
             )
-            .child(rows)
+            .child(
+                div().relative().flex_1().min_h_0().child(rows).child(
+                    div().absolute().inset_0().child(
+                        Scrollbar::vertical(&self.runtime_scroll).mode(ScrollbarMode::Always),
+                    ),
+                ),
+            )
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .border_t_1()
+                    .border_color(cx.theme().border)
+                    .px_3()
+                    .py_1p5()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(self.t("DLSS 更新保留原件，可随时恢复；游戏共用文件可能影响其他方案。")),
+            )
             .relative()
             .child(self.download_overlay(window, cx))
             .into_any_element()

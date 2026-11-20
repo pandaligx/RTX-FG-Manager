@@ -526,6 +526,21 @@ impl Recommendations {
         let query = self.query.read(cx).value();
         let local = self.names.search(rec::search_title(&query));
         self.candidates = rec::game_choices(&self.names, online, &local);
+        if rec::platform(&self.game) == "netease"
+            && let Some(entry) = game_names::identified(&self.game, &self.names)
+        {
+            let key = format!("catalog:{}", entry.id().to_ascii_lowercase());
+            if let Some(hit) = self
+                .candidates
+                .iter_mut()
+                .find(|c| c.identity.accepts_group(&key, &self.names))
+            {
+                let label = rec::platform_label("netease");
+                if !hit.platforms.iter().any(|p| p == label) {
+                    hit.platforms.push(label.into());
+                }
+            }
+        }
     }
 
     fn find_candidates(&mut self, automatic: bool, cx: &Context<Self>) {
@@ -1462,7 +1477,13 @@ impl Recommendations {
             .into_any_element()
     }
     fn browse(&self, cx: &Context<Self>) -> Div {
-        let mut body = div().v_flex().gap_1p5().flex_shrink_0().min_w_0();
+        let mut body = div()
+            .v_flex()
+            .gap_2()
+            .px_0p5()
+            .py_0p5()
+            .flex_shrink_0()
+            .min_w_0();
         // A failed request is not evidence that this game has no shared setups.
         // Its actual connection error is already shown beside the refresh controls.
         if self.loaded && self.cards.is_empty() && !self.busy && self.message.is_empty() {
@@ -1487,6 +1508,10 @@ impl Recommendations {
                 .child(card.content.display_title());
             let header = div()
                 .h_flex()
+                .items_center()
+                .bg(cx.theme().muted)
+                .px_2p5()
+                .py_1p5()
                 .gap_2()
                 .min_w_0()
                 .child(Self::avatar(cx))
@@ -1576,6 +1601,10 @@ impl Recommendations {
                 .gap_1()
                 .min_w_0()
                 .flex_shrink_0()
+                .px_2p5()
+                .py_1p5()
+                .border_t_1()
+                .border_color(cx.theme().border)
                 .child(
                     div()
                         .h_flex()
@@ -1604,13 +1633,12 @@ impl Recommendations {
                     .v_flex()
                     .min_w_0()
                     .flex_shrink_0()
-                    .gap_1()
-                    .px_2()
-                    .py_1p5()
-                    .rounded_md()
+                    .rounded_lg()
                     .border_1()
-                    .border_color(cx.theme().border)
-                    .bg(cx.theme().background)
+                    .border_color(cx.theme().input)
+                    .bg(cx.theme().popover)
+                    .shadow_xs()
+                    .overflow_hidden()
                     .child(header)
                     .child(detail),
             );
@@ -2385,26 +2413,7 @@ impl Recommendations {
                 ),
                 field(
                     "游戏平台",
-                    self.picker(
-                        "recipe-platform",
-                        &draft.platform,
-                        &[
-                            ("unknown", "来源未注明"),
-                            ("steam", "Steam"),
-                            ("epic", "Epic Games"),
-                            ("gog", "GOG"),
-                            ("ea", "EA App"),
-                            ("ubisoft", "Ubisoft Connect"),
-                            ("xbox", "Xbox / Microsoft Store"),
-                            ("battlenet", "战网"),
-                            ("wegame", "WeGame"),
-                            ("hoyo", "米哈游"),
-                            ("cube", "方块游戏"),
-                            ("sonkwo", "杉果"),
-                            ("standalone", "独立客户端"),
-                        ],
-                        cx,
-                    ),
+                    self.picker("recipe-platform", &draft.platform, rec::PLATFORMS, cx),
                 ),
                 field(
                     "游戏版本",

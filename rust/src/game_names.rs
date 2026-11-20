@@ -173,6 +173,15 @@ impl Catalog {
         // Conflicting independently detected platforms are never resolved by order.
         (indices.len() == 1).then(|| &self.entries[*indices.first().unwrap()])
     }
+    pub(crate) fn unique_registered_title(&self, name: &str) -> Option<&Entry> {
+        let name = name.trim();
+        let mut hits = self
+            .entries
+            .iter()
+            .filter(|e| !name.is_empty() && (e.zh == name || e.en.eq_ignore_ascii_case(name)));
+        let first = hits.next()?;
+        hits.next().is_none().then_some(first)
+    }
     pub fn search(&self, query: &str) -> Vec<Entry> {
         let query = query.trim().to_lowercase();
         let compact = search_key(&query);

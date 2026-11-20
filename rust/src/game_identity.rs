@@ -262,7 +262,7 @@ fn identify_records(
         let mut candidates: Vec<_> = local
             .iter()
             .chain(records.iter())
-            .filter(|i| i.matches(game))
+            .filter(|i| i.matches(game) && (i.source != "NetEase" || steam_root(exe).is_none()))
             .collect();
         candidates.sort_by_key(|i| i.priority);
         // Collect independent IDs so conflicting records cannot be resolved by order.
@@ -327,7 +327,23 @@ fn identify_records(
         if let Some(key) = installs::rail_key(exe) {
             cues.push(key);
         }
-        if let Some(entry) = catalog.rule_match(exe, root, &products, &cues) {
+        let entry = catalog.rule_match(exe, root, &products, &cues).or_else(|| {
+            // A NetEase registration establishes distribution. Only corroborated
+            // game/product metadata may also establish a cross-store identity.
+            if identity.source != "NetEase" || !identity.keys.is_empty() {
+                return None;
+            }
+            let registered = catalog.unique_registered_title(&identity.title)?;
+            products
+                .iter()
+                .any(|p| {
+                    catalog
+                        .unique_registered_title(p)
+                        .is_some_and(|product| product.id() == registered.id())
+                })
+                .then_some(registered)
+        });
+        if let Some(entry) = entry {
             identity.catalog_id = entry.id().into();
             identity.revision = catalog.revision();
             if identity.source.is_empty() {
@@ -342,6 +358,53 @@ fn identify_records(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn netease_game_and_steam_copy_keep_their_own_distribution() {
+        let temp = tempfile::tempdir().unwrap();
+        let names = game_names::bundled();
+        let cancel = AtomicBool::new(false);
+        let native = temp.path().join("Naraka");
+        let steam = temp.path().join("steamapps/common/Naraka");
+        for dir in [&native, &steam] {
+            fs::create_dir_all(dir.join("program")).unwrap();
+            fs::write(dir.join("program/NarakaBladepoint.exe"), []).unwrap();
+        }
+        fs::write(
+            temp.path().join("steamapps/appmanifest_1203220.acf"),
+            r#""AppState"
+{
+    "appid" "1203220"
+    "name" "NARAKA: BLADEPOINT"
+    "installdir" "Naraka"
+}"#,
+        )
+        .unwrap();
+        for (dir, expected) in [(&native, "netease"), (&steam, "steam")] {
+            let mut g = Game {
+                exe: dir
+                    .join("program/NarakaBladepoint.exe")
+                    .display()
+                    .to_string(),
+                root: dir.display().to_string(),
+                title: "NarakaBladepoint".into(),
+                ..Default::default()
+            };
+            let record = Install::new(dir.to_path_buf(), "NetEase", "永劫无间").with_priority(1);
+            let rows = identify_records(
+                std::slice::from_ref(&g),
+                &names,
+                &[record],
+                &BTreeMap::new(),
+                &cancel,
+            );
+            g.extra.insert("name_identity".into(), rows[0].2.clone());
+            assert_eq!(crate::recommendations::platform(&g), expected);
+            assert_eq!(
+                crate::recommendations::identify(&g, &names).unwrap().id,
+                "steam:1203220"
+            );
+        }
+    }
     #[test]
     fn screenshot_standalone_games_and_manual_override() {
         let t = tempfile::tempdir().unwrap();

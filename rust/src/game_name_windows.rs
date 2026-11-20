@@ -17,12 +17,56 @@ use windows::{
 };
 use winreg::{RegKey, enums::*};
 
+fn netease_game_registration(title: &str, publisher: &str, url: &str) -> bool {
+    let publisher = publisher.trim().to_ascii_lowercase();
+    if !matches!(
+        publisher.as_str(),
+        "netease"
+            | "netease games"
+            | "netease, inc."
+            | "netease games global"
+            | "netease (hangzhou) network co., ltd."
+            | "netease interactive entertainment pte. ltd."
+            | "网易"
+            | "网易游戏"
+            | "杭州网易雷火科技有限公司"
+            | "广州网易计算机系统有限公司"
+            | "网易（杭州）网络有限公司"
+            | "杭州网易雷火科技有限公司广州分公司"
+    ) {
+        return false;
+    }
+    // A publisher also sells non-game software. A game-specific official site
+    // or an exact reviewed game title corroborates the per-install record.
+    let site = reqwest::Url::parse(url).ok();
+    let game_site = site
+        .as_ref()
+        .filter(|u| matches!(u.scheme(), "http" | "https"))
+        .and_then(|u| u.host_str())
+        .is_some_and(|host| {
+            matches!(
+                host.strip_prefix("www.").unwrap_or(host),
+                "yjwujian.cn"
+                    | "yysls.cn"
+                    | "16.163.com"
+                    | "n.163.com"
+                    | "xyq.163.com"
+                    | "qrsj.163.com"
+                    | "oncehuman.game"
+            )
+        });
+    static NAMES: std::sync::LazyLock<game_names::Catalog> =
+        std::sync::LazyLock::new(game_names::bundled);
+    game_site || NAMES.unique_registered_title(title).is_some()
+}
+
 fn string(key: &RegKey, name: &str) -> String {
     key.get_value::<String, _>(name)
         .ok()
         .filter(|v| v.len() <= 4096)
         .unwrap_or_default()
 }
+
 fn path(value: &str) -> Option<PathBuf> {
     let value = value.trim().trim_matches('"').replace('/', "\\");
     let p = PathBuf::from(value);
@@ -59,6 +103,23 @@ pub(crate) fn registry(cancel: &AtomicBool) -> Vec<Install> {
                             .to_lowercase()
                             .contains("unins")
                     });
+                    let registered_location = root
+                        .as_ref()
+                        .and_then(|dir| dir.file_name())
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| {
+                            !matches!(
+                                name.to_ascii_lowercase().as_str(),
+                                "games"
+                                    | "common"
+                                    | "program files"
+                                    | "program files (x86)"
+                                    | "netease"
+                                    | "netease games"
+                                    | "loading bay"
+                                    | "网易游戏"
+                            )
+                        });
                     if let Some(root) = root.or_else(|| {
                         target
                             .as_deref()
@@ -72,7 +133,21 @@ pub(crate) fn registry(cancel: &AtomicBool) -> Vec<Install> {
                         if let Some(id) = name.strip_prefix("Uplay Install ") {
                             i.add_key(format!("ubisoft:{id}"));
                         }
-                        i.executable = target;
+                        if i.keys.is_empty()
+                            && registered_location
+                            && netease_game_registration(
+                                &title,
+                                &string(&k, "Publisher"),
+                                &string(&k, "URLInfoAbout"),
+                            )
+                        {
+                            i.source = "NetEase".into();
+                            i.priority = 1;
+                            // DisplayIcon often points to the distribution launcher.
+                            // scan_match must establish the rendering entry separately.
+                        } else {
+                            i.executable = target;
+                        }
                         out.push(i);
                     }
                 }
@@ -333,5 +408,35 @@ fn shortcut_target(path: &Path) -> Option<PathBuf> {
             .ok()?;
         let value = String::from_utf16(&buf[..buf.iter().position(|x| *x == 0)?]).ok()?;
         self::path(&value)
+    }
+}
+
+#[cfg(test)]
+mod netease_tests {
+    use super::netease_game_registration;
+
+    #[test]
+    fn official_game_needs_both_game_and_publisher_evidence() {
+        assert!(netease_game_registration("永劫无间", "网易游戏", ""));
+        assert!(netease_game_registration(
+            "官方测试服",
+            "NetEase Games",
+            "https://www.yysls.cn/download/"
+        ));
+        assert!(!netease_game_registration(
+            "网易云音乐",
+            "网易",
+            "https://music.163.com"
+        ));
+        assert!(!netease_game_registration(
+            "测试",
+            "NetEase Games",
+            "https://www.yysls.cn.example.org"
+        ));
+        assert!(!netease_game_registration(
+            "永劫无间",
+            "Another Publisher",
+            ""
+        ));
     }
 }

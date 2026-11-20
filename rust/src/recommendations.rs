@@ -252,6 +252,23 @@ pub fn historical_match(term: &str, hits: &[GameCandidate]) -> Option<GameIdenti
     let hit = exact.next()?;
     exact.next().is_none().then(|| hit.identity.clone())
 }
+pub const PLATFORMS: &[(&str, &str)] = &[
+    ("unknown", "来源未注明"),
+    ("steam", "Steam"),
+    ("epic", "Epic Games"),
+    ("gog", "GOG"),
+    ("ea", "EA App"),
+    ("ubisoft", "Ubisoft Connect"),
+    ("xbox", "Xbox / Microsoft Store"),
+    ("battlenet", "战网"),
+    ("wegame", "WeGame"),
+    ("netease", "网易游戏"),
+    ("hoyo", "米哈游"),
+    ("cube", "方块游戏"),
+    ("sonkwo", "杉果"),
+    ("standalone", "独立客户端"),
+];
+
 pub fn platform(game: &Game) -> &'static str {
     let keys = game_names::keys(game);
     let names: BTreeSet<_> = keys
@@ -263,41 +280,33 @@ pub fn platform(game: &Game) -> &'static str {
             v => v,
         })
         .collect();
-    if names.len() == 1 {
-        match names.first().copied().unwrap_or("") {
-            "steam" => "steam",
-            "epic" => "epic",
-            "gog" => "gog",
-            "ea" => "ea",
-            "ubisoft" => "ubisoft",
-            "xbox" => "xbox",
-            "battlenet" => "battlenet",
-            "wegame" => "wegame",
-            "hoyo" => "hoyo",
-            "cube" => "cube",
-            "sonkwo" => "sonkwo",
-            _ => "unknown",
-        }
+    if names.is_empty()
+        && game
+            .extra
+            .get("name_identity")
+            .and_then(|v| v["source"].as_str())
+            == Some("NetEase")
+    {
+        "netease"
+    } else if names.len() == 1 {
+        PLATFORMS
+            .iter()
+            .find(|(code, _)| names.contains(code))
+            .map_or("unknown", |p| p.0)
     } else {
         "unknown"
     }
 }
 pub fn platform_label(platform: &str) -> &'static str {
-    match platform {
-        "steam" => "Steam",
-        "epic" | "epic_slug" => "Epic Games",
-        "gog" | "gog_slug" => "GOG",
-        "ea" => "EA App",
-        "ubisoft" => "Ubisoft Connect",
-        "xbox" => "Xbox / Microsoft Store",
-        "battlenet" => "战网",
-        "wegame" => "WeGame",
-        "hoyo" => "米哈游",
-        "cube" => "方块游戏",
-        "sonkwo" => "杉果",
-        "standalone" => "独立客户端",
-        _ => "来源未注明",
-    }
+    let code = match platform {
+        "epic_slug" => "epic",
+        "gog_slug" => "gog",
+        other => other,
+    };
+    PLATFORMS
+        .iter()
+        .find(|p| p.0 == code)
+        .map_or("来源未注明", |p| p.1)
 }
 #[derive(Clone)]
 pub struct GameCandidate {
@@ -374,6 +383,22 @@ pub struct Recipe {
     pub edition: String,
 }
 impl Recipe {
+    // The deployed v1 API and older managers already support standalone plus
+    // a human-readable edition. Keep that public format valid across upgrades.
+    fn for_service(&self) -> std::borrow::Cow<'_, Self> {
+        if self.platform != "netease" {
+            return std::borrow::Cow::Borrowed(self);
+        }
+        let mut wire = self.clone();
+        wire.platform = "standalone".into();
+        wire.edition = if self.edition.is_empty() {
+            NETEASE_EDITION.into()
+        } else {
+            format!("{NETEASE_EDITION} / {}", self.edition)
+        };
+        std::borrow::Cow::Owned(wire)
+    }
+
     pub fn check_runtime_selection(&self) -> Result<()> {
         if let Some(snapshot) = &self.runtimes {
             snapshot.compatible_with(&self.scheme, &self.entries)?;
@@ -467,26 +492,14 @@ impl Recipe {
         }
         self.game.validate()?;
         ensure!(
-            [
-                "",
-                "unknown",
-                "steam",
-                "epic",
-                "gog",
-                "ea",
-                "ubisoft",
-                "xbox",
-                "battlenet",
-                "wegame",
-                "hoyo",
-                "cube",
-                "sonkwo",
-                "standalone"
-            ]
-            .contains(&self.platform.as_str()),
+            self.platform.is_empty() || PLATFORMS.iter().any(|p| p.0 == self.platform),
             "推荐游戏平台无效"
         );
         public_text(&self.edition, 80, true)?;
+        ensure!(
+            self.platform != "netease" || self.edition.chars().count() <= 73,
+            "网易游戏的版本说明最多可填 73 个字符"
+        );
         for (text, max, empty) in [
             (&self.title, 80, false),
             (&self.notes, NOTES_LIMIT, true),
@@ -658,7 +671,36 @@ pub struct Card {
     pub reported: bool,
     pub mine: bool,
     pub status: String,
+    #[serde(
+        deserialize_with = "read_card_content",
+        serialize_with = "write_card_content"
+    )]
     pub content: Recipe,
+}
+
+const NETEASE_EDITION: &str = "网易官服";
+
+fn read_card_content<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Recipe, D::Error> {
+    let mut recipe = Recipe::deserialize(d)?;
+    if recipe.platform == "standalone" {
+        let edition = if recipe.edition == NETEASE_EDITION {
+            Some("")
+        } else {
+            recipe
+                .edition
+                .strip_prefix(NETEASE_EDITION)
+                .and_then(|s| s.strip_prefix(" / "))
+        };
+        if let Some(edition) = edition {
+            recipe.edition = edition.to_owned();
+            recipe.platform = "netease".into();
+        }
+    }
+    Ok(recipe)
+}
+
+fn write_card_content<S: serde::Serializer>(recipe: &Recipe, s: S) -> Result<S::Ok, S::Error> {
+    recipe.for_service().serialize(s)
 }
 impl Card {
     /// The latest content revision is shown even when the publication date exists.
@@ -1278,7 +1320,7 @@ impl Client {
         let card: Card = self.request(
             Method::POST,
             "/v1/recipes",
-            Some(json!({"submission":submission,"content":recipe})),
+            Some(json!({"submission":submission,"content":recipe.for_service()})),
             true,
         )?;
         card.validate(&recipe.game.id, catalog)?;
@@ -1316,7 +1358,7 @@ impl Client {
         let updated: Card = self.request(
             Method::PUT,
             &recipe_route(card, "")?,
-            Some(json!({"revision":card.revision,"content":recipe})),
+            Some(json!({"revision":card.revision,"content":recipe.for_service()})),
             true,
         )?;
         updated.validate(&recipe.game.id, catalog)?;
@@ -2416,6 +2458,34 @@ mod tests {
         assert!(GameIdentity::custom("C:\\Users\\name\\game").is_err());
         assert!(public_text("RTX 3060，DX12", 80, false).is_ok());
         assert!(public_text("https://download.invalid/file.dll", 80, false).is_err());
+    }
+    #[test]
+    fn netease_cards_round_trip_through_the_deployed_v1_format() {
+        let mut c = card("RTX 3060", "", 1);
+        c.content.platform = "netease".into();
+        for edition in [String::new(), "国服 2.1 / 正式服".into(), "版".repeat(73)] {
+            c.content.edition = edition.clone();
+            c.content.validate_public().unwrap();
+            let wire = serde_json::to_value(&c).unwrap();
+            let recipe = &wire["content"];
+            assert_eq!(recipe["platform"], "standalone");
+            assert!(recipe["edition"].as_str().unwrap().chars().count() <= 80);
+            assert_eq!(
+                *recipe,
+                serde_json::to_value(c.content.for_service()).unwrap()
+            );
+            let back: Card = serde_json::from_value(wire).unwrap();
+            assert_eq!(back.content.platform, "netease");
+            assert_eq!(back.content.edition, edition);
+            assert_eq!(back.content.game.id, c.content.game.id);
+        }
+        c.content.edition.push('版');
+        assert!(c.content.validate_public().is_err());
+        c.content.platform = "standalone".into();
+        c.content.edition = "与网易官服跨平台".into();
+        let back: Card = serde_json::from_value(serde_json::to_value(c).unwrap()).unwrap();
+        assert_eq!(back.content.platform, "standalone");
+        assert_eq!(back.content.edition, "与网易官服跨平台");
     }
     #[test]
     #[cfg(windows)]

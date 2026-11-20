@@ -275,7 +275,7 @@ fn auxiliary_exe(name: &str) -> bool {
             "(?i)^(?:crashreportclient(?:editor)?(?:-(?:win64|win32)-(?:shipping|development|debug))?|",
             "crashpad_handler|crashsender[0-9]*|unitycrashhandler(?:32|64)?|",
             "unins[0-9]*|uninstall|uninstaller|",
-            "setup(?:32|64)?|install|installer|launcher|updater|",
+            "setup(?:32|64)?|install|installer|launcher|launchergame|updater|",
             "benchmarkreport|reporter|helper|cefsubprocess|epicwebhelper|qtwebengineprocess|",
             "steamcmd|hlmv|hammer|vpk|vvis|vrad|vbsp|srcds(?:_win64)?|",
             "sandbox|shadercachegen|rc|crysbsrenderapp|gameserver|",
@@ -339,6 +339,29 @@ mod engine_scan_tests {
                 .unwrap()
                 .rows
                 .is_empty()
+        );
+    }
+    #[test]
+    fn netease_registered_game_does_not_select_the_distribution_launcher() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("Naraka");
+        let renderer = root.join("program/NarakaBladepoint.exe");
+        exe(&renderer);
+        exe(&root.join("LauncherGame.exe"));
+        fs::create_dir_all(renderer.parent().unwrap().join("NarakaBladepoint_Data")).unwrap();
+        fs::write(renderer.parent().unwrap().join("UnityPlayer.dll"), []).unwrap();
+        let registration = Install::new(root.clone(), "NetEase", "永劫无间");
+        let report = scan_with_records(
+            &[root],
+            &AtomicBool::new(false),
+            |_, _, _| {},
+            vec![registration],
+        )
+        .unwrap();
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(
+            core::key(Path::new(&report.rows[0].exe)),
+            core::key(&renderer)
         );
     }
     #[test]

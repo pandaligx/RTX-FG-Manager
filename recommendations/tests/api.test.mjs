@@ -14,6 +14,23 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('NetEase official-client editions survive publishing, old readers and edits in the same game', async t => {
+  const f = fixture(t);
+  const user = await f.login();
+  const game = { id: 'steam:1203220', name: '永劫无间' };
+  const setup = { ...content(), game, platform: 'standalone', edition: '网易官服 / 国服 1.0' };
+  const posted = await f.call('POST', '/v1/recipes', { submission: randomUUID(), content: setup }, user.token, 'test-ip', 16);
+  const path = '/v1/recipes/' + posted.id;
+  const legacy = await f.call('GET', path, null, user.token, 'test-ip', 4);
+  assert.equal(legacy.content.platform, 'standalone');
+  assert.equal(legacy.content.edition, setup.edition);
+  await f.call('PUT', path, { revision: 1, content: { ...setup, edition: '网易官服 / 国服 1.1' } }, user.token, 'test-ip', 16);
+  const page = await f.call('GET', '/v1/recipes?game=' + game.id, null, undefined, 'visitor', 16);
+  assert.equal(page.items.length, 1);
+  assert.equal(page.items[0].id, posted.id);
+  assert.equal(page.items[0].content.edition, '网易官服 / 国服 1.1');
+});
+
 test('MWSR and Pipo settings survive legacy reads and edits without mixing forks',async t=>{
   const f=fixture(t),u=await f.login();
   const modern={'x-rtxfg-encore250':'1','x-rtxfg-pipo042':'1'};
