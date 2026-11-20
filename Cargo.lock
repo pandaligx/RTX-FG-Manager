@@ -5740,7 +5740,7 @@ dependencies = [
 
 [[package]]
 name = "rtx-fg-manager"
-version = "4.3.37"
+version = "4.3.38"
 dependencies = [
  "anyhow",
  "base64",
@@ -5752,6 +5752,7 @@ dependencies = [
  "image",
  "libc",
  "libloading",
+ "object",
  "quick-xml",
  "regex",
  "reqwest",

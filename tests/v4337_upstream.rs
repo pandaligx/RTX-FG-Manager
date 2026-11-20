@@ -132,7 +132,18 @@ fn anr_upgrade_owns_every_new_model_and_preserves_unrelated_files() -> Result<()
     for log in &logs {
         fs::write(log, b"ANR log")?;
     }
+    #[cfg(windows)]
+    let loader_copy = {
+        let path = provider.join("anr-vkloader.dll");
+        fs::copy(
+            PathBuf::from(std::env::var("SystemRoot")?).join("System32/vulkan-1.dll"),
+            &path,
+        )?;
+        path
+    };
     assert!(cleanup::clean_outcome_at(&target)?.complete);
+    #[cfg(windows)]
+    assert!(!loader_copy.exists());
     assert!(logs.iter().all(|p| !p.exists()));
     for name in new.files.keys() {
         assert!(!target.directory.join(name).exists(), "{name}");
@@ -149,6 +160,64 @@ fn anr_upgrade_owns_every_new_model_and_preserves_unrelated_files() -> Result<()
         new.files[anr::CONFIG]
     );
     assert!(cleanup::clean_outcome_at(&target)?.complete);
+    Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "uses the system Vulkan loader, anr-b15-catalog.json and signed B15/B16/B20 archives"]
+fn anr_vulkan_loader_uninstall_and_legacy_reinstall() -> Result<()> {
+    let (_dir, target, old_catalog) = fixture()?;
+    let system_loader = PathBuf::from(std::env::var("SystemRoot")?).join("System32/vulkan-1.dll");
+    let opti = target.directory.join("OptiScaler");
+    let provider = target.directory.join(anr::PROVIDER_DIR);
+    let loader = provider.join("anr-vkloader.dll");
+    let current_catalog = cloud::bundled();
+    let current = archived(&current_catalog, anr::SCHEME, "version.dll")?;
+    let b15 = serde_json::from_slice(&fs::read(
+        PathBuf::from(std::env::var("RTXFG_UPDATE_QA")?).join("anr-b15-catalog.json"),
+    )?)?;
+    for catalog in [&b15, &old_catalog, &current_catalog] {
+        let patch = archived(catalog, anr::SCHEME, "version.dll")?;
+        install(&target, &patch, "version.dll")?;
+        fs::copy(&system_loader, &loader)?;
+        assert!(cleanup::clean_outcome_at(&target)?.complete);
+        assert!(
+            !opti.exists(),
+            "ANR's private Vulkan loader survived uninstall"
+        );
+        assert_eq!(core::status_at(&target), "未部署");
+    }
+    // An older uninstall already removed the journal and everything except the loader.
+    for action in ["reinstall", "normal_uninstall", "cleanup_retry"] {
+        fs::create_dir_all(&provider)?;
+        fs::copy(&system_loader, &loader)?;
+        assert!(core::status_at(&target).contains("残留"), "{action}");
+        match action {
+            "reinstall" => install(&target, &current, "version.dll")?,
+            "normal_uninstall" => assert!(cleanup::clean_outcome_at(&target)?.complete),
+            _ => assert!(cleanup::retry_pending_at(&target)?.complete),
+        }
+        assert!(!loader.exists(), "{action}");
+        if action == "reinstall" {
+            // A stale retry must not uninstall a fresh, working deployment.
+            assert!(cleanup::retry_pending_at(&target).is_err());
+            assert!(target.directory.join("version.dll").exists());
+            assert!(cleanup::clean_outcome_at(&target)?.complete);
+        }
+        assert!(!opti.exists(), "{action}");
+    }
+    assert!(target.game_exe.is_file());
+    // A separate conflict must be reported before removing the old loader.
+    fs::create_dir_all(&provider)?;
+    fs::copy(&system_loader, &loader)?;
+    let entry = target.directory.join("version.dll");
+    fs::write(&entry, b"another mod")?;
+    assert!(install(&target, &current, "version.dll").is_err());
+    assert!(loader.is_file());
+    assert_eq!(fs::read(&entry)?, b"another mod");
+    fs::remove_file(entry)?;
+    assert!(cleanup::retry_pending_at(&target)?.complete);
     Ok(())
 }
 

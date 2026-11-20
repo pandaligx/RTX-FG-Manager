@@ -1530,8 +1530,9 @@ impl Manager {
                 .child(self.button("review-close", "关闭详情", Command::CloseReview, cx).small().ghost())
                 .when(kinds.contains(&IssueKind::Unavailable), |buttons| buttons.child(self.button("review-refresh", "刷新", Command::RefreshReview, cx).small().disabled(self.c.busy)))
                 .when(repair, |buttons| buttons.child(self.button("review-recover", "卸载并恢复", Command::RecoverGame, cx).small().disabled(self.c.busy)))
+                .when(kinds.iter().any(|k| k.can_retry_cleanup()), |buttons| buttons
+                    .child(self.button("cleanup-retry-dialog", "清理残留", Command::RetryCleanup, cx).small().disabled(self.c.busy || self.c.read_only)))
                 .when(pending, |buttons| buttons
-                    .child(self.button("cleanup-retry-dialog", "清理残留", Command::RetryCleanup, cx).small().disabled(self.c.busy))
                     .child(self.button("cleanup-preview", "查看可删除文件", Command::DeleteCleanup, cx).small().primary().disabled(self.c.busy || self.c.read_only))))
             .into_any_element()
     }
@@ -3280,7 +3281,7 @@ impl Manager {
                     .child(
                         self.button(
                             "cleanup-details",
-                            if d.cleanup_pending {
+                            if d.issues().iter().any(|i| i.kind().can_retry_cleanup()) {
                                 "清理残留"
                             } else {
                                 "查看原因"

@@ -1064,6 +1064,12 @@ pub fn status_at(target: &DeploymentTarget) -> String {
         if crate::cleanup::orphaned_components(dir) {
             return Ok("已有手动补丁或其他 MOD / 发现旧版配套文件，请先卸载清理".into());
         }
+        if crate::anr::loader_path(dir).try_exists()? {
+            if crate::anr::legacy_loader(dir)?.is_some() {
+                return Ok(crate::anr::RESIDUE_STATUS.into());
+            }
+            return Ok("已有手动补丁或其他 MOD / 卸载会自动识别本项目文件".into());
+        }
         Ok("未部署".into())
     }
     inner(target).unwrap_or_else(|e| format!("需检查：{e}"))
@@ -1226,12 +1232,14 @@ pub fn deploy_prepared_context_at_with_overrides(
         )?;
     }
     let mut existing = record(dir)?;
-    if backend == crate::anr::BACKEND {
-        crate::anr::preflight(
+    let legacy_anr_loader = if backend == crate::anr::BACKEND {
+        crate::anr::install_residue(
             &target,
             existing.as_ref().is_some_and(|r| r.backend == backend),
-        )?;
-    }
+        )?
+    } else {
+        None
+    };
     if let Some(record) = &existing {
         target.validate_record(record)?;
         let next_scheme = context.map(|c| c.scheme.as_str());
@@ -1602,6 +1610,9 @@ pub fn deploy_prepared_context_at_with_overrides(
             !no_links(&root.join(stage_name(n)))?.exists(),
             "存在待恢复的临时文件，请先卸载补丁"
         );
+    }
+    if let Some(hash) = legacy_anr_loader {
+        crate::anr::remove_legacy_loader(dir, &hash)?;
     }
     fs::create_dir_all(&root)?;
     let r = Record {

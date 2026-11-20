@@ -3032,7 +3032,7 @@ impl Controller {
             .map(|s| {
                 s.issues()
                     .iter()
-                    .filter(|i| i.kind() == rtx_fg_manager::deployment::IssueKind::Residuals)
+                    .filter(|i| i.kind().can_retry_cleanup())
                     .map(|i| i.target().clone())
                     .collect::<Vec<_>>()
             })

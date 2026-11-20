@@ -4,10 +4,12 @@ use crate::{
     core, diagnostics,
     presets::{Parameter, Values},
 };
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
+use object::{LittleEndian as LE, pe, read::pe::PeFile64};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    io::{ErrorKind, Read},
     path::{Path, PathBuf},
 };
 
@@ -18,6 +20,8 @@ pub const SCHEME: &str = "anr-fg";
 pub const SOURCE: &str = "https://github.com/apex-compute/ANR";
 pub const CONFIG: &str = "OptiScaler/custom/Apex Neural Rendering FG/dlssg/nr_fg.ini";
 pub const PROVIDER_DIR: &str = "OptiScaler/custom/Apex Neural Rendering FG/dlssg";
+const LOADER: &str = "anr-vkloader.dll";
+pub const RESIDUE_STATUS: &str = "ANR 运行库残留";
 pub const PROXIES: [&str; 3] = ["dxgi.dll", "winmm.dll", "version.dll"];
 
 /// Display the upstream beta label without leaking our sortable transport version.
@@ -196,36 +200,200 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
     result.extend_from_slice(output.as_bytes());
     Ok(result)
 }
-pub fn preflight(target: &core::DeploymentTarget, managed: bool) -> Result<()> {
-    ensure!(
-        target.game_exe.parent() == Some(target.directory.as_path()),
-        "ANR 完整方案请安装到游戏 EXE 所在目录"
-    );
-    if managed {
-        return Ok(());
+pub(crate) fn loader_path(directory: &Path) -> PathBuf {
+    directory.join(PROVIDER_DIR).join(LOADER)
+}
+
+// ANR copies the system Vulkan loader here on first use. Check the original
+// module name and actual PE exports so driver updates do not break recognition.
+fn loader_digest(path: &Path) -> Result<Option<String>> {
+    const LIMIT: u64 = 32 * 1024 * 1024;
+    let path = core::no_links(path)?;
+    if !path.try_exists()? || !path.is_file() || path.metadata()?.len() > LIMIT {
+        return Ok(None);
     }
+    let mut bytes = Vec::new();
+    fs::File::open(&path)
+        .and_then(|f| f.take(LIMIT + 1).read_to_end(&mut bytes))
+        .with_context(|| format!("无法读取 ANR 运行库：{}", path.display()))?;
+    if bytes.len() as u64 > LIMIT {
+        return Ok(None);
+    }
+    let Ok(pe) = PeFile64::parse(bytes.as_slice()) else {
+        return Ok(None);
+    };
+    let header = &pe.nt_headers().file_header;
+    if header.machine.get(LE) != pe::IMAGE_FILE_MACHINE_AMD64
+        || header.characteristics.get(LE) & pe::IMAGE_FILE_DLL == 0
+    {
+        return Ok(None);
+    }
+    let Ok(Some(exports)) = pe.export_table() else {
+        return Ok(None);
+    };
+    let dir = exports.directory();
+    if !exports
+        .name_from_pointer(dir.name.get(LE))
+        .is_ok_and(|name| name.eq_ignore_ascii_case(b"vulkan-1.dll"))
+        || dir.number_of_names.get(LE) > 4096
+    {
+        return Ok(None);
+    }
+    let mut instance = false;
+    let mut device = false;
+    for (pointer, _) in exports.name_iter() {
+        match exports.name_from_pointer(pointer) {
+            Ok(b"vkGetInstanceProcAddr") => instance = true,
+            Ok(b"vkGetDeviceProcAddr") => device = true,
+            _ => {}
+        }
+        if instance && device {
+            return Ok(Some(core::hash(&bytes)));
+        }
+    }
+    Ok(None)
+}
+
+enum HostTree {
+    Empty,
+    Residue(String),
+    Occupied,
+}
+
+// Without an install record, accept only the exact, otherwise empty ANR tree.
+// Stop at the first sibling, unknown file or link. Never recurse into plugins.
+fn host_tree(directory: &Path) -> Result<HostTree> {
+    let rel = Path::new(PROVIDER_DIR).join(LOADER);
+    let mut parts = rel.iter();
+    let mut path = directory.join(parts.next().expect("fixed OptiScaler path"));
+    for part in parts {
+        match fs::symlink_metadata(&path) {
+            Ok(m) if m.is_dir() && !core::is_link(&m) => {}
+            Ok(_) => return Ok(HostTree::Occupied),
+            Err(e) if e.kind() == ErrorKind::NotFound => return Ok(HostTree::Empty),
+            Err(e) => return Err(e.into()),
+        }
+        let mut entries = fs::read_dir(&path)?;
+        let Some(entry) = entries.next().transpose()? else {
+            return Ok(HostTree::Empty);
+        };
+        let name = entry.file_name();
+        if !(name == part || cfg!(windows) && name.eq_ignore_ascii_case(part))
+            || entries.next().transpose()?.is_some()
+        {
+            return Ok(HostTree::Occupied);
+        }
+        path.push(name);
+    }
+    if core::is_link(&fs::symlink_metadata(&path)?) {
+        return Ok(HostTree::Occupied);
+    }
+    Ok(loader_digest(&path)?.map_or(HostTree::Occupied, HostTree::Residue))
+}
+
+fn other_host_file(directory: &Path) -> Result<Option<&'static str>> {
     for name in [
-        "OptiScaler",
         "OptiScaler.ini",
         "OptiScaler.dll",
         "OptiScaler.asi",
         "OptiScaler.log",
     ] {
-        ensure!(
-            !core::no_links(&target.directory.join(name))?.exists(),
+        if core::no_links(&directory.join(name))?.try_exists()? {
+            return Ok(Some(name));
+        }
+    }
+    for name in core::PROXIES {
+        let path = core::no_links(&directory.join(name))?;
+        if path.is_file()
+            && let Ok((_, internal)) = crate::win::file_version(&path)
+            && internal.to_ascii_lowercase().contains("optiscaler")
+        {
+            return Ok(Some(name));
+        }
+    }
+    Ok(None)
+}
+
+pub(crate) fn legacy_loader(directory: &Path) -> Result<Option<String>> {
+    if loader_path(directory).try_exists()?
+        && let HostTree::Residue(hash) = host_tree(directory)?
+        && other_host_file(directory)?.is_none()
+    {
+        return Ok(Some(hash));
+    }
+    Ok(None)
+}
+
+pub(crate) fn remove_legacy_loader(directory: &Path, expected: &str) -> Result<()> {
+    let directory = core::no_links(directory)?;
+    ensure!(
+        legacy_loader(&directory)?.as_deref() == Some(expected),
+        "ANR 目录已变化，请刷新后重试"
+    );
+    let path = core::no_links(&loader_path(&directory))?;
+    fs::remove_file(&path)
+        .with_context(|| format!("请关闭占用 ANR 运行库的程序后重试：{}", path.display()))?;
+    for parent in path
+        .ancestors()
+        .skip(1)
+        .take_while(|p| *p != directory.as_path())
+    {
+        let parent = core::no_links(parent)?;
+        match fs::remove_dir(parent) {
+            Ok(()) => {}
+            Err(e) if e.kind() == ErrorKind::NotFound => {}
+            Err(e) if e.kind() == ErrorKind::DirectoryNotEmpty => break,
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
+}
+
+pub fn preflight(target: &core::DeploymentTarget, managed: bool) -> Result<()> {
+    install_residue(target, managed).map(|_| ())
+}
+
+/// Capture the confirmed old loader before staging. Installation revalidates it
+/// under the game lock after checking all other file conflicts.
+pub(crate) fn install_residue(
+    target: &core::DeploymentTarget,
+    managed: bool,
+) -> Result<Option<String>> {
+    ensure!(
+        target.game_exe.parent() == Some(target.directory.as_path()),
+        "ANR 完整方案请安装到游戏 EXE 所在目录"
+    );
+    if managed {
+        return Ok(None);
+    }
+    let dir = &target.directory;
+    let tree = host_tree(dir)?;
+    let conflict = if matches!(tree, HostTree::Occupied) {
+        Some("OptiScaler")
+    } else {
+        other_host_file(dir)?
+    };
+    if let Some(name) = conflict {
+        anyhow::bail!(
             "检测到已有 {name}。ANR 完整包包含 OptiScaler，请先用原安装方式还原；已有 OptiScaler 的游戏应使用上游 addon，管理器不会覆盖原文件"
         );
     }
-    for name in core::PROXIES {
-        let path = core::no_links(&target.directory.join(name))?;
-        if path.is_file()
-            && let Ok((_, internal)) = crate::win::file_version(&path)
-        {
-            ensure!(
-                !internal.to_ascii_lowercase().contains("optiscaler"),
-                "检测到已有 OptiScaler 入口 {name}，请先还原原安装"
-            );
-        }
+    Ok(match tree {
+        HostTree::Residue(hash) => Some(hash),
+        _ => None,
+    })
+}
+
+pub(crate) fn collect_loader(
+    directory: &Path,
+    targets: &mut BTreeMap<PathBuf, String>,
+    kept: &mut BTreeSet<PathBuf>,
+) -> Result<()> {
+    let path = loader_path(directory);
+    if let Some(hash) = loader_digest(&path)? {
+        targets.insert(path, hash);
+    } else if path.try_exists()? {
+        kept.insert(path);
     }
     Ok(())
 }

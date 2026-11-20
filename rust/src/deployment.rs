@@ -5,6 +5,7 @@ use std::{collections::BTreeSet, path::Path};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IssueKind {
     Residuals,
+    AnrResidue,
     Interrupted,
     Modified,
     External,
@@ -14,6 +15,8 @@ impl IssueKind {
     pub fn from_status(status: &str) -> Option<Self> {
         if status.starts_with("补丁已移除，缓存待清理") {
             Some(Self::Residuals)
+        } else if status == crate::anr::RESIDUE_STATUS {
+            Some(Self::AnrResidue)
         } else if status.starts_with("升级未完成") || status.starts_with("未完成 /") {
             Some(Self::Interrupted)
         } else if status.starts_with("DLL 已调整") || status.contains("参数待恢复") {
@@ -29,6 +32,7 @@ impl IssueKind {
     pub fn label(self) -> &'static str {
         match self {
             Self::Residuals => "残留文件待清理",
+            Self::AnrResidue => crate::anr::RESIDUE_STATUS,
             Self::Interrupted => "补丁安装未完成",
             Self::Modified => "补丁文件已变化",
             Self::External => "发现未受管理的文件",
@@ -37,6 +41,9 @@ impl IssueKind {
     }
     pub fn help(self) -> &'static str {
         match self {
+            Self::AnrResidue => {
+                "旧版 ANR 留下了 Vulkan 加载器。可直接重新安装 ANR，也可点击“清理残留”。"
+            }
             Self::Residuals => {
                 "补丁入口已移除，仍有配套文件、缓存或安装临时文件待处理。点击“查看可删除文件”确认清理，无需手动清空下载缓存。"
             }
@@ -49,6 +56,10 @@ impl IssueKind {
             }
             Self::Unavailable => "暂时无法确认状态。请核对目录是否存在及能否访问，再刷新检测。",
         }
+    }
+
+    pub fn can_retry_cleanup(self) -> bool {
+        matches!(self, Self::Residuals | Self::AnrResidue)
     }
 }
 #[derive(Clone, Debug)]
@@ -115,10 +126,17 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
         }
         if let Some(kind) = IssueKind::from_status(&status) {
             let mut detail = status.clone();
+            if kind == IssueKind::AnrResidue {
+                detail.push_str(&format!(
+                    "\n{}",
+                    crate::anr::loader_path(&target.directory).display()
+                ));
+            }
             if kind == IssueKind::External {
                 for name in core::PROXIES.iter().chain(
                     [
                         core::INI,
+                        "OptiScaler",
                         crate::encore::CONFIG,
                         crate::rtxmfg::CONFIG,
                         ".rtx-fg-script.json",

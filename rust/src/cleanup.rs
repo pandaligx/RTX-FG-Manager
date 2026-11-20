@@ -569,6 +569,11 @@ pub fn blocking_processes(target: &core::DeploymentTarget) -> Result<Vec<win::Bl
     let dir = &target.directory;
     let record = core::record(dir)?;
     let Some(record) = record else {
+        if crate::anr::legacy_loader(dir)?.is_some() {
+            for process in win::processes_holding_files(&[crate::anr::loader_path(dir)])? {
+                processes.insert(process.pid, process);
+            }
+        }
         return Ok(processes.into_values().collect());
     };
     target.validate_record(&record)?;
@@ -587,6 +592,9 @@ pub fn blocking_processes(target: &core::DeploymentTarget) -> Result<Vec<win::Bl
     };
     for name in record.hashes.keys() {
         add(dir.join(name))?;
+    }
+    if record.backend == crate::anr::BACKEND {
+        add(crate::anr::loader_path(dir))?;
     }
     add(dir.join(core::config_name(&record.backend)))?;
     if record.backend == crate::encore::BACKEND {
@@ -659,6 +667,19 @@ fn prune_empty_manager_dirs(root: &Path) -> Result<bool> {
     }
     Ok(changed)
 }
+fn clean_without_record(dir: &Path, fallback: &str) -> Result<CleanOutcome> {
+    let message = if let Some(hash) = crate::anr::legacy_loader(dir)? {
+        crate::anr::remove_legacy_loader(dir, &hash)?;
+        "已清理旧版 ANR 运行库。"
+    } else {
+        fallback
+    };
+    Ok(CleanOutcome {
+        message: message.into(),
+        complete: true,
+    })
+}
+
 fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<CleanOutcome> {
     let target = target.validate(false)?;
     let p = target.game_exe.clone();
@@ -676,10 +697,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     );
     if pending_only {
         let Some(record) = core::record(dir)? else {
-            return Ok(CleanOutcome {
-                message: "没有待清理的卸载记录，状态已刷新。".into(),
-                complete: true,
-            });
+            return clean_without_record(dir, "没有待清理的卸载记录，状态已刷新。");
         };
         target.validate_record(&record)?;
         ensure!(
@@ -740,15 +758,12 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
         Some(r) => r,
         None => {
             let pruned = prune_empty_manager_dirs(&root)?;
-            return Ok(CleanOutcome {
-                message: if pruned {
-                    "已清理管理器的空缓存目录；其他文件保持不变"
-                } else {
-                    "未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留"
-                }
-                .into(),
-                complete: true,
-            });
+            let fallback = if pruned {
+                "已清理管理器的空缓存目录；其他文件保持不变"
+            } else {
+                "未发现可确认归属的补丁；游戏文件、其他 MOD 与未知文件已保留"
+            };
+            return clean_without_record(dir, fallback);
         }
     };
     let mut kept = BTreeSet::new();
@@ -801,6 +816,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     }
     let mut component_pending = Vec::new();
     if record.backend == crate::anr::BACKEND {
+        crate::anr::collect_loader(dir, &mut targets, &mut kept)?;
         crate::anr::cleanup_directories(dir, &mut dirs);
     }
     for &name in private_components(&record) {
