@@ -16,6 +16,9 @@ use std::{
 };
 use zeroize::{Zeroize, Zeroizing};
 
+mod feeds;
+pub use feeds::{FeedCursor, FeedFilter, FeedPage, game_choices};
+
 const ORIGIN: &str = "https://recommend.lgxng.cn";
 // Existing service origin, used only after normal read routes fail. Keep the
 // original HTTPS authority/SNI and certificate checks; never use an IP URL.
@@ -144,7 +147,7 @@ impl GameLink {
     }
     pub fn accepts(game: &Game, catalog: &game_names::Catalog, id: &str) -> bool {
         identify(game, catalog).is_some_and(|primary| {
-            primary.id == id
+            primary.accepts_group(id, catalog)
                 || Self::saved(game, &primary).is_some_and(|link| link.historical.id == id)
         })
     }
@@ -177,6 +180,20 @@ fn exe_stem(name: &str) -> Option<&str> {
 pub fn search_title(name: &str) -> &str {
     let name = name.trim();
     exe_stem(name).unwrap_or(name)
+}
+
+/// Automatic lookups may send a reviewed public title, never an arbitrary
+/// filename, local nickname or path. These results still require a choice.
+pub fn public_search_title(catalog: &game_names::Catalog, name: &str) -> Option<String> {
+    let key = title_key(name);
+    let hits = catalog.search(name);
+    let mut exact = hits.iter().filter(|e| {
+        [e.chinese(), e.original()]
+            .iter()
+            .any(|n| title_key(n) == key)
+    });
+    let entry = exact.next()?;
+    exact.next().is_none().then(|| entry.chinese().to_owned())
 }
 
 /// A filename can suggest a choice, but never binds the game on its own.
@@ -285,6 +302,7 @@ pub fn platform_label(platform: &str) -> &'static str {
 #[derive(Clone)]
 pub struct GameCandidate {
     pub identity: GameIdentity,
+    keys: Vec<String>,
     pub original: String,
     pub platforms: Vec<String>,
     pub shared_count: u64,
@@ -299,6 +317,7 @@ impl GameCandidate {
             .unwrap_or_else(|| format!("catalog:{}", entry.id().to_lowercase()));
         Some(Self {
             identity: GameIdentity::new(id, entry.chinese().into()).ok()?,
+            keys: entry.platform_keys().to_vec(),
             original: entry.original().into(),
             platforms: candidate_platforms(entry.platform_keys()),
             shared_count: 0,
@@ -694,12 +713,13 @@ pub fn complete_email(value: &str, domain: &str) -> String {
 }
 pub fn rank(items: &mut [Card]) {
     // Match the server's global pagination order, including ties.
-    items.sort_by(|a, b| {
-        b.likes
-            .cmp(&a.likes)
-            .then(b.updated_at.cmp(&a.updated_at))
-            .then(a.id.cmp(&b.id))
-    });
+    items.sort_by(card_order);
+}
+fn card_order(a: &Card, b: &Card) -> std::cmp::Ordering {
+    b.likes
+        .cmp(&a.likes)
+        .then(b.updated_at.cmp(&a.updated_at))
+        .then(a.id.cmp(&b.id))
 }
 pub fn date(timestamp: u64) -> Option<String> {
     chrono::DateTime::from_timestamp(i64::try_from(timestamp).ok()?, 0).map(|v| {
@@ -1376,6 +1396,7 @@ impl Client {
                     identity: GameIdentity::new(h.id, h.name)?,
                     original: h.original,
                     platforms: candidate_platforms(&h.keys),
+                    keys: h.keys,
                     shared_count: h.recipes,
                 })
             })
@@ -1484,7 +1505,9 @@ mod tests {
     use super::*;
     use std::io::{BufRead, BufReader, Write};
 
-    fn mock_service(replies: Vec<(u16, Value)>) -> (String, std::thread::JoinHandle<Vec<String>>) {
+    pub(super) fn mock_service(
+        replies: Vec<(u16, Value)>,
+    ) -> (String, std::thread::JoinHandle<Vec<String>>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
@@ -1550,7 +1573,7 @@ mod tests {
         let protected = unseal(&serde_json::to_vec(&session).unwrap(), true).unwrap();
         core::atomic_json(&root.join("session.json"), &*protected).unwrap();
     }
-    fn online_test_client(data: &Path, origin: String) -> Client {
+    pub(super) fn online_test_client(data: &Path, origin: String) -> Client {
         let mut client = Client::new(data).unwrap();
         client.http_factory = Some(Arc::new(|_| {
             Ok(Http::builder()
@@ -2171,7 +2194,7 @@ mod tests {
             assert_eq!(server.join().unwrap().len(), 1);
         }
     }
-    fn card(gpu: &str, driver: &str, likes: u64) -> Card {
+    pub(super) fn card(gpu: &str, driver: &str, likes: u64) -> Card {
         serde_json::from_value(json!({"id":uuid::Uuid::new_v4().to_string(),"author":uuid::Uuid::new_v4().to_string(),"revision":1,"updatedAt":100,"likes":likes,"liked":false,"mine":false,"status":"visible",
           "content":{"schema":1,"game":{"id":"steam:292030","name":"The Witcher 3"},"title":"Working setup","notes":"DX12","scheme":crate::encore::SCHEME,"patchVersion":"1.1.4","entries":["dxgi.dll"],"renderer":"dx12","gpuModel":gpu,"driver":driver,"gpuAlias":"unchanged","neuralRuntime":"none"}})).unwrap()
     }
@@ -2282,6 +2305,7 @@ mod tests {
         let candidate = |name: &str, count| -> Result<GameCandidate> {
             Ok(GameCandidate {
                 identity: GameIdentity::custom(name)?,
+                keys: vec![],
                 original: String::new(),
                 platforms: vec![],
                 shared_count: count,

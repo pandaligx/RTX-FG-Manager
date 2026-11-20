@@ -23,10 +23,10 @@ enum Mode {
 }
 enum Update {
     Init(rec::Client),
-    Page(rec::Page, bool, Option<&'static str>),
+    Page(rec::FeedPage, bool),
     Games(String, Vec<rec::GameCandidate>),
     Draft(rec::Recipe, bool),
-    Code(rec::Challenge),
+    Code(rec::Challenge, String),
     Login(rec::Client),
     Logout(rec::Client),
     Card(rec::Card),
@@ -48,9 +48,10 @@ struct Recommendations {
     cards: Vec<rec::Card>,
     scroll_handles: HashMap<String, ScrollHandle>,
     candidates: Vec<rec::GameCandidate>,
-    next: Option<u32>,
+    next: Option<rec::FeedCursor>,
     visible: usize,
     total: u64,
+    loaded: bool,
     mine: bool,
     reported: bool,
     report_reason: String,
@@ -79,7 +80,7 @@ struct Recommendations {
     email_domain: String,
     code: Entity<InputState>,
     query: Entity<InputState>,
-    challenge: Option<rec::Challenge>,
+    challenge: Option<(rec::Challenge, String)>,
     resend: Instant,
     cooldown: bool,
     refresh_at: Instant,
@@ -112,7 +113,7 @@ impl Recommendations {
         let query = input(&game_names::display(&game, &c.game_names, true), window, cx);
         cx.subscribe(&query, |this, _, event, cx| {
             if matches!(event, InputEvent::Change) {
-                this.candidates.clear();
+                this.update_candidates(&[], cx);
                 cx.notify();
             }
         })
@@ -138,6 +139,12 @@ impl Recommendations {
         })
         .detach();
         let code = input("", window, cx);
+        cx.subscribe(&code, |_, _, event, cx| {
+            if matches!(event, InputEvent::Change) {
+                cx.notify();
+            }
+        })
+        .detach();
         let (tx, rx) = mpsc::channel();
         let gpu = c
             .devices
@@ -177,6 +184,7 @@ impl Recommendations {
             next: None,
             visible: 12,
             total: 0,
+            loaded: false,
             mine: false,
             reported: false,
             report_reason: "方案信息不实".into(),
@@ -256,8 +264,16 @@ impl Recommendations {
     fn t(&self, s: &str) -> String {
         self.tr.t(s)
     }
+    fn avatar(cx: &App) -> Avatar {
+        Avatar::new()
+            .xsmall()
+            .text_color(cx.theme().foreground)
+            .placeholder(Icon::new(IconName::User).size_3())
+            .flex_shrink_0()
+    }
     fn button(&self, id: impl Into<ElementId>, label: &str, cx: &Context<Self>) -> Button {
         Button::new(id)
+            .small()
             .label(self.t(label))
             .focus_ring(crate::ui_focus::visible(cx))
             .disabled(self.busy)
@@ -308,7 +324,7 @@ impl Recommendations {
             match result {
                 Err(e) => {
                     if e == "登录已过期，请重新获取邮箱验证码" {
-                        self.mode = Mode::Login;
+                        self.login(false, window, cx);
                     }
                     super::tasks::notify(super::tasks::FeedbackKind::Error, self.t(&e), window, cx);
                 }
@@ -317,12 +333,15 @@ impl Recommendations {
                     if self.identity.is_some() {
                         self.refresh(false);
                         self.find_historical_shares(cx);
+                    } else {
+                        self.find_candidates(true, cx);
                     }
                 }
-                Ok(Update::Page(page, append, cached)) => {
+                Ok(Update::Page(page, append)) => {
                     if !append {
                         self.cards.clear();
                         self.visible = 12;
+                        self.total = page.total;
                     }
                     for card in page.items {
                         if let Some(old) = self.cards.iter_mut().find(|v| v.id == card.id) {
@@ -332,13 +351,13 @@ impl Recommendations {
                         }
                     }
                     rec::rank(&mut self.cards);
-                    self.total = page.total;
-                    self.next = page.next_offset;
-                    self.cached = cached.is_some();
+                    self.next = page.next;
+                    self.loaded = true;
+                    self.cached = page.notice.is_some();
                     if append {
                         self.visible += 12;
                     }
-                    if let Some(message) = cached {
+                    if let Some(message) = page.notice {
                         self.message = self.t(message);
                     }
                 }
@@ -347,7 +366,7 @@ impl Recommendations {
                         cx.notify();
                         continue;
                     }
-                    self.candidates = games;
+                    self.update_candidates(&games, cx);
                     if self.candidates.is_empty() {
                         self.message = self.t("未找到候选，请核对完整游戏名后确认");
                     }
@@ -377,25 +396,30 @@ impl Recommendations {
                     self.draft = Some(draft);
                     self.mode = Mode::Share;
                 }
-                Ok(Update::Code(code)) => {
+                Ok(Update::Code(code, email)) => {
                     self.cooldown = true;
                     self.resend = Instant::now() + Duration::from_secs(u64::from(code.retry_after));
-                    self.challenge = Some(code);
+                    self.challenge = Some((code, email));
                     self.message = self.t("验证码已发送，请查看邮箱（含垃圾箱）");
                 }
                 Ok(Update::Login(client)) => {
                     self.client = Some(client);
                     self.code.update(cx, |s, cx| s.set_value("", window, cx));
                     self.challenge = None;
+                    let close_login = self.mode == Mode::Login;
                     self.mode = Mode::Browse;
-                    if self.share_after_login {
-                        self.open_share();
+                    if close_login {
+                        window.defer(cx, |window, cx| window.close_dialog(cx));
+                    }
+                    if std::mem::take(&mut self.share_after_login) {
+                        self.open_share(window, cx);
                     } else {
                         self.refresh(false);
                     }
                 }
                 Ok(Update::Logout(client)) => {
                     self.client = Some(client);
+                    self.clear_page();
                     self.mine = false;
                     self.reported = false;
                     self.mode = Mode::Browse;
@@ -404,7 +428,7 @@ impl Recommendations {
                 Ok(Update::Card(card)) => {
                     let published_in_other_group = self
                         .browse_identity()
-                        .is_some_and(|id| id.id != card.content.game.id);
+                        .is_some_and(|id| !id.accepts_group(&card.content.game.id, &self.names));
                     self.editing = None;
                     self.mode = Mode::Browse;
                     if published_in_other_group {
@@ -471,30 +495,22 @@ impl Recommendations {
             return;
         };
         let catalog = self.catalog.clone();
-        let offset = if append { self.next.unwrap_or(0) } else { 0 };
-        let mine = self.mine;
-        let reported = self.reported;
+        let names = self.names.clone();
+        let more = if append { self.next.clone() } else { None };
+        let filter = if self.mine {
+            rec::FeedFilter::Mine
+        } else if self.reported {
+            rec::FeedFilter::Reported
+        } else {
+            rec::FeedFilter::Public
+        };
         self.refresh_at = Instant::now() + Duration::from_secs(45);
-        self.job(
-            move || match client.browse(&id, &catalog, offset, mine, reported) {
-                Ok(page) => Ok(Update::Page(page, append, None)),
-                Err(e) => {
-                    if rec::allows_offline_cache(&e)
-                        && !append
-                        && !mine
-                        && !reported
-                        && let Some(page) = client.cached(&id, &catalog)
-                    {
-                        return Ok(Update::Page(
-                            page,
-                            false,
-                            Some(rec::offline_cache_notice(&e)),
-                        ));
-                    }
-                    Err(e)
-                }
-            },
-        );
+        self.job(move || {
+            Ok(Update::Page(
+                client.browse_feeds(&id, &names, &catalog, filter, more)?,
+                append,
+            ))
+        });
     }
     fn browse_identity(&self) -> Option<rec::GameIdentity> {
         let primary = self.identity.as_ref()?;
@@ -504,6 +520,29 @@ impl Recommendations {
             return Some(link.historical);
         }
         Some(primary.clone())
+    }
+
+    fn update_candidates(&mut self, online: &[rec::GameCandidate], cx: &Context<Self>) {
+        let query = self.query.read(cx).value();
+        let local = self.names.search(rec::search_title(&query));
+        self.candidates = rec::game_choices(&self.names, online, &local);
+    }
+
+    fn find_candidates(&mut self, automatic: bool, cx: &Context<Self>) {
+        self.update_candidates(&[], cx);
+        let Some(client) = self.client.clone() else {
+            return;
+        };
+        let query = self.query.read(cx).value().to_string();
+        let term = if automatic {
+            let Some(title) = rec::public_search_title(&self.names, &query) else {
+                return;
+            };
+            title
+        } else {
+            query.clone()
+        };
+        self.job(move || Ok(Update::Games(query, client.search(&term)?)));
     }
 
     fn find_historical_shares(&mut self, cx: &mut Context<Self>) {
@@ -565,14 +604,49 @@ impl Recommendations {
     fn logged_in(&self) -> bool {
         self.client.as_ref().is_some_and(|c| c.logged_in())
     }
-    fn login(&mut self, share: bool) {
+    fn login(&mut self, share: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.mode == Mode::Login || window.has_active_dialog(cx) {
+            return;
+        }
         self.share_after_login = share;
         self.mode = Mode::Login;
         self.message.clear();
+        let owner = cx.weak_entity();
+        let parent = cx.entity();
+        let editor = cx.new(|cx| {
+            cx.observe(&parent, |_, _, cx| cx.notify()).detach();
+            LoginForm(parent.downgrade())
+        });
+        let title: SharedString = self.t("邮箱登录").into();
+        window.open_dialog(cx, move |dialog, window, cx| {
+            let owner = owner.clone();
+            dialog
+                .centered()
+                .width(
+                    (window.rem_size() * 26.)
+                        .min(window.viewport_size().width - window.rem_size() * 2.),
+                )
+                .title(crate::ui_focus::dialog_title(title.clone(), cx))
+                .close_button(false)
+                .child(editor.clone())
+                .on_close(move |_, _, cx| {
+                    let _ = owner.update(cx, |view, cx| {
+                        if view.mode == Mode::Login {
+                            view.mode = Mode::Browse;
+                            view.share_after_login = false;
+                            cx.notify();
+                        }
+                    });
+                })
+        });
+        let email = self.email.clone();
+        window.defer(cx, move |window, cx| {
+            email.read(cx).focus_handle(cx).focus(window, cx)
+        });
     }
-    fn open_share(&mut self) {
+    fn open_share(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.logged_in() {
-            self.login(true);
+            self.login(true, window, cx);
             return;
         }
         self.read_installed(false);
@@ -664,13 +738,17 @@ impl Recommendations {
             }
         }
     }
-    fn use_group(&mut self, history: bool) {
-        self.show_history = history;
+    fn clear_page(&mut self) {
         self.cards.clear();
         self.total = 0;
+        self.loaded = false;
         self.next = None;
         self.visible = 12;
         self.cached = false;
+    }
+    fn use_group(&mut self, history: bool) {
+        self.show_history = history;
+        self.clear_page();
         self.mode = if self.identity.is_some() {
             Mode::Browse
         } else {
@@ -755,7 +833,7 @@ impl Recommendations {
             );
             anyhow::ensure!(
                 self.browse_identity()
-                    .is_some_and(|id| id.id == card.content.game.id),
+                    .is_some_and(|id| id.accepts_group(&card.content.game.id, &self.names)),
                 "推荐不属于当前游戏"
             );
             card.content.available_version(&owner.c.catalog)?;
@@ -1179,8 +1257,8 @@ impl Recommendations {
                 .min_w_0()
                 .text_color(cx.theme().foreground)
                 .font_weight(FontWeight::MEDIUM)
-                .px_3()
-                .py_1p5()
+                .px_2()
+                .py_1()
                 .when(i == 0, |cell| cell.w(rems(label_width)).flex_shrink_0())
                 .when(i > 0, |cell| cell.flex_1())
                 .when(i < last, |cell| {
@@ -1192,8 +1270,8 @@ impl Recommendations {
             TableRow::new().children(cells.into_iter().enumerate().map(|(i, value)| {
                 TableCell::new()
                     .min_w_0()
-                    .px_3()
-                    .py_1p5()
+                    .px_2()
+                    .py_1()
                     .when(i == 0, |cell| cell.w(rems(label_width)).flex_shrink_0())
                     .when(i > 0, |cell| cell.flex_1())
                     .when(i < last, |cell| {
@@ -1321,9 +1399,9 @@ impl Recommendations {
             })
         })
         .disabled(self.busy || card.mine || self.cached)
-        .on_click(cx.listener(move |this, _, _, cx| {
+        .on_click(cx.listener(move |this, _, window, cx| {
             if !this.logged_in() {
-                this.login(false);
+                this.login(false, window, cx);
             } else if let Some(client) = this.client.clone() {
                 let card = vote.clone();
                 let value = if selected {
@@ -1384,15 +1462,10 @@ impl Recommendations {
             .into_any_element()
     }
     fn browse(&self, cx: &Context<Self>) -> Div {
-        let mut body = div().v_flex().gap_2().flex_shrink_0().min_w_0().child(
-            div()
-                .text_xs()
-                .text_color(cx.theme().muted_foreground)
-                .child(self.t("按有用点赞数从高到低排序。查看完整信息后再选择方案。")),
-        );
+        let mut body = div().v_flex().gap_1p5().flex_shrink_0().min_w_0();
         // A failed request is not evidence that this game has no shared setups.
         // Its actual connection error is already shown beside the refresh controls.
-        if self.cards.is_empty() && !self.busy && self.message.is_empty() {
+        if self.loaded && self.cards.is_empty() && !self.busy && self.message.is_empty() {
             body = body.child(div().py_6().child(self.t(if self.reported {
                 "你还没有举报这款游戏的方案"
             } else if self.mine {
@@ -1413,42 +1486,17 @@ impl Recommendations {
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(card.content.display_title());
             let header = div()
-                .v_flex()
+                .h_flex()
                 .gap_2()
-                .p_3()
+                .min_w_0()
+                .child(Self::avatar(cx))
+                .child(title)
                 .child(
                     div()
-                        .h_flex()
-                        .min_w_0()
-                        .gap_2()
-                        .child(
-                            Avatar::new()
-                                .small()
-                                .text_color(cx.theme().foreground)
-                                .placeholder(Icon::new(IconName::User))
-                                .flex_shrink_0(),
-                        )
-                        .child(title),
-                )
-                .child(
-                    div()
-                        .h_flex()
-                        .gap_2()
-                        .flex_wrap()
-                        .child(
-                            div()
-                                .flex_1()
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(self.card_date(card)),
-                        )
-                        .child(
-                            div()
-                                .h_flex()
-                                .gap_2()
-                                .child(self.vote_button(card, true, cx))
-                                .child(self.vote_button(card, false, cx)),
-                        ),
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .flex_shrink_0()
+                        .child(self.card_date(card)),
                 );
             let mut actions = div().h_flex().gap_2().flex_wrap().child(
                 self.button(
@@ -1504,9 +1552,9 @@ impl Recommendations {
                     )
                     .ghost()
                     .disabled(self.busy || self.cached)
-                    .on_click(cx.listener(move |this, _, _, cx| {
+                    .on_click(cx.listener(move |this, _, window, cx| {
                         if !this.logged_in() {
-                            this.login(false);
+                            this.login(false, window, cx);
                         } else if let Some(client) = this.client.clone() {
                             let card = report.clone();
                             if card.reported {
@@ -1525,12 +1573,24 @@ impl Recommendations {
             }
             let detail = div()
                 .v_flex()
-                .gap_2()
+                .gap_1()
                 .min_w_0()
                 .flex_shrink_0()
-                .px_3()
-                .pb_3()
-                .child(actions)
+                .child(
+                    div()
+                        .h_flex()
+                        .flex_wrap()
+                        .justify_between()
+                        .gap_1()
+                        .child(actions)
+                        .child(
+                            div()
+                                .h_flex()
+                                .gap_1()
+                                .child(self.vote_button(card, true, cx))
+                                .child(self.vote_button(card, false, cx)),
+                        ),
+                )
                 .when(card.status == "hidden", |d| {
                     d.child(
                         div()
@@ -1544,7 +1604,10 @@ impl Recommendations {
                     .v_flex()
                     .min_w_0()
                     .flex_shrink_0()
-                    .rounded_lg()
+                    .gap_1()
+                    .px_2()
+                    .py_1p5()
+                    .rounded_md()
                     .border_1()
                     .border_color(cx.theme().border)
                     .bg(cx.theme().background)
@@ -1609,9 +1672,8 @@ impl Render for Recommendations {
         let mut primary = None;
         let mut install = InstallFooter::default();
         let body = match self.mode {
-            Mode::Browse => self.browse(cx),
+            Mode::Browse | Mode::Login => self.browse(cx),
             Mode::Identity => self.identity_page(cx),
-            Mode::Login => self.login_page(&mut primary, cx),
             Mode::Share => self.share_page(window, &mut primary, cx),
             Mode::Preview => self.preview_page(&mut install, cx),
             Mode::Selected => {
@@ -1712,7 +1774,7 @@ impl Render for Recommendations {
         let scroll_id = format!(
             "recommendations-scroll-{}-{}",
             self.mode as usize,
-            if self.mode == Mode::Browse {
+            if matches!(self.mode, Mode::Browse | Mode::Login) {
                 "list"
             } else {
                 self.preview
@@ -1732,7 +1794,7 @@ impl Render for Recommendations {
             .unwrap_or_else(|_| div().into_any_element());
         let content = div()
             .v_flex()
-            .gap_3()
+            .gap_2()
             .min_w_0()
             .text_sm()
             .when(self.mode != Mode::Preview, |d| d.child(top.flex_shrink_0()))
@@ -1766,7 +1828,7 @@ impl Render for Recommendations {
                     .h_flex()
                     .flex_wrap()
                     .flex_shrink_0()
-                    .pt_3()
+                    .pt_2()
                     .border_t_1()
                     .border_color(cx.theme().border)
                     .justify_between()
@@ -1784,6 +1846,7 @@ impl Render for Recommendations {
                         .ghost()
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.mode = if this.mode == Mode::Browse || this.identity.is_none() {
+                                this.find_candidates(true, cx);
                                 Mode::Identity
                             } else {
                                 Mode::Browse
@@ -1835,9 +1898,12 @@ impl Render for Recommendations {
                         .pl_3()
                         .min_w_0()
                         .child(match game_image {
-                            Some(icon) => img(icon).size_5().into_any_element(),
+                            Some(icon) => img(icon)
+                                .size_4()
+                                .object_fit(ObjectFit::Contain)
+                                .into_any_element(),
                             None => Icon::new(IconName::LayoutDashboard)
-                                .size_5()
+                                .size_4()
                                 .into_any_element(),
                         })
                         .child(div().min_w_0().text_sm().child(game_title)),
@@ -1854,32 +1920,31 @@ struct InstallFooter {
     selection: Option<String>,
     notice: Option<AnyElement>,
 }
+struct LoginForm(WeakEntity<Recommendations>);
+
+impl Render for LoginForm {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.0
+            .update(cx, |view, cx| view.login_form(cx))
+            .unwrap_or_else(|_| div())
+    }
+}
 
 impl Recommendations {
     fn page_header(&self, cx: &Context<Self>) -> Div {
-        let title = self
-            .browse_identity()
-            .map(|id| id.name)
-            .unwrap_or_else(|| game_names::original(&self.game));
-        let mut top = div()
-            .v_flex()
-            .gap_2()
-            .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
-            .child(
+        let mut top = div().v_flex().gap_2();
+        if self.mode == Mode::Identity {
+            top = top.child(
                 div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(format!(
-                        "{} · {}",
-                        self.t(if self.identity.is_some() {
-                            "当前关联游戏"
-                        } else {
-                            "待确认游戏"
-                        }),
-                        self.t(rec::platform_label(rec::platform(&self.game)))
-                    )),
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(self.t("更换游戏关联")),
             );
-        if self.mode == Mode::Browse {
+        }
+        if matches!(self.mode, Mode::Browse | Mode::Login) {
+            let game_title = game_names::display(&self.game, &self.names, true);
+            if let Some(group) = self.browse_identity().filter(|id| id.name != game_title) {
+                top = top.child(div().text_sm().child(group.name));
+            }
             if let Some(active) = self.identity.as_ref()
                 && rec::GameLink::saved(&self.game, active).is_some()
             {
@@ -1966,8 +2031,8 @@ impl Recommendations {
                     )
                     .child(
                         self.button("recipe-share", "分享我的方案", cx)
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.open_share();
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.open_share(window, cx);
                                 cx.notify();
                             })),
                     )
@@ -1981,12 +2046,13 @@ impl Recommendations {
                             },
                             cx,
                         )
-                        .on_click(cx.listener(|this, _, _, cx| {
+                        .on_click(cx.listener(|this, _, window, cx| {
                             if !this.logged_in() {
-                                this.login(false);
+                                this.login(false, window, cx);
                             } else {
                                 this.mine = !this.mine;
                                 this.reported = false;
+                                this.clear_page();
                                 this.refresh(false);
                             }
                             cx.notify();
@@ -2002,12 +2068,13 @@ impl Recommendations {
                             },
                             cx,
                         )
-                        .on_click(cx.listener(|this, _, _, cx| {
+                        .on_click(cx.listener(|this, _, window, cx| {
                             if !this.logged_in() {
-                                this.login(false);
+                                this.login(false, window, cx);
                             } else {
                                 this.reported = !this.reported;
                                 this.mine = false;
+                                this.clear_page();
                                 this.refresh(false);
                             }
                             cx.notify();
@@ -2023,7 +2090,7 @@ impl Recommendations {
                             },
                             cx,
                         )
-                        .on_click(cx.listener(|this, _, _, cx| {
+                        .on_click(cx.listener(|this, _, window, cx| {
                             if let Some(mut client) = this.client.clone().filter(|c| c.logged_in())
                             {
                                 this.job(move || {
@@ -2031,12 +2098,26 @@ impl Recommendations {
                                     Ok(Update::Logout(client))
                                 });
                             } else {
-                                this.login(false);
+                                this.login(false, window, cx);
                             }
                             cx.notify();
                         })),
                     ),
             );
+            if self.loaded || self.busy {
+                let summary = if self.loaded {
+                    self.t("{0} 个方案，按有用数排序")
+                        .replace("{0}", &self.total.to_string())
+                } else {
+                    self.t("正在加载推荐…")
+                };
+                top = top.child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(summary),
+                );
+            }
         }
         if self.mode == Mode::Browse && self.client.as_ref().is_some_and(rec::Client::login_expired)
         {
@@ -2052,88 +2133,69 @@ impl Recommendations {
 
     fn identity_page(&self, cx: &Context<Self>) -> Div {
         let ring = crate::ui_focus::visible(cx);
-        let local = self
-            .names
-            .search(rec::search_title(&self.query.read(cx).value()));
-        let mut body = div()
-            .v_flex()
-            .gap_3()
-            .child(self.t("选中你的游戏即可记住，下次无需再确认。请核对原版、续作或重制版。"))
-            .child(Input::new(&self.query).focus_ring(ring))
-            .child(
-                self.button("recipe-find-game", "查找已有游戏", cx)
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        if let Some(client) = this.client.clone() {
-                            let query = this.query.read(cx).value().to_string();
-                            this.job(move || {
-                                let games = client.search(&query)?;
-                                Ok(Update::Games(query, games))
-                            });
-                        }
-                        cx.notify();
-                    })),
-            );
-        let mut seen = std::collections::HashSet::new();
-        for (index, candidate) in self
-            .candidates
-            .iter()
-            .cloned()
-            .chain(local.iter().filter_map(rec::GameCandidate::from_entry))
-            .filter(|c| seen.insert(c.identity.id.clone()))
-            .take(20)
-            .enumerate()
-        {
-            let id = candidate.identity;
+        let mut body = div().v_flex().gap_2().child(
+            div()
+                .h_flex()
+                .gap_2()
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(Input::new(&self.query).small().focus_ring(ring)),
+                )
+                .child(
+                    self.button("recipe-find-game", "查找已有游戏", cx)
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.find_candidates(false, cx);
+                            cx.notify();
+                        })),
+                ),
+        );
+        for candidate in self.candidates.iter().take(20) {
+            let id = candidate.identity.clone();
+            let mut metadata = Vec::new();
+            if !candidate.original.is_empty() && candidate.original != id.name {
+                metadata.push(candidate.original.clone());
+            }
+            metadata.extend(candidate.platforms.iter().map(|platform| self.t(platform)));
+            if candidate.shared_count > 0 {
+                metadata.push(
+                    self.t("{0} 个公开分享")
+                        .replace("{0}", &candidate.shared_count.to_string()),
+                );
+            }
+            if metadata.is_empty() {
+                metadata.push(self.t("玩家补充的游戏名，请核对后选择"));
+            }
             body = body.child(
                 div()
-                    .v_flex()
-                    .gap_1()
-                    .p_3()
-                    .border_1()
+                    .h_flex()
+                    .gap_2()
+                    .px_2()
+                    .py_1p5()
+                    .border_b_1()
                     .border_color(cx.theme().border)
-                    .rounded_md()
-                    .child(div().font_weight(FontWeight::MEDIUM).child(id.name.clone()))
-                    .when(candidate.shared_count > 0, |d| {
-                        d.child(
-                            div()
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(
-                                    self.t("{0} 个公开分享")
-                                        .replace("{0}", &candidate.shared_count.to_string()),
-                                ),
-                        )
-                    })
-                    .when(
-                        !candidate.original.is_empty() && candidate.original != id.name,
-                        |d| {
-                            d.child(
-                                div()
-                                    .text_sm()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(candidate.original),
-                            )
-                        },
-                    )
                     .child(
                         div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(if candidate.platforms.is_empty() {
-                                self.t("玩家补充的游戏名，请核对后选择")
-                            } else {
-                                candidate
-                                    .platforms
-                                    .iter()
-                                    .map(|p| self.t(p))
-                                    .collect::<Vec<_>>()
-                                    .join(" · ")
-                            }),
+                            .v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .gap_0p5()
+                            .child(div().font_weight(FontWeight::MEDIUM).child(id.name.clone()))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(metadata.join(" / ")),
+                            ),
                     )
                     .child(
-                        self.button(SharedString::from(format!("recipe-game-{index}")), "", cx)
-                            .label(self.t("选择这款游戏"))
-                            .on_click(cx.listener(move |this, _, _, cx| this.bind(id.clone(), cx))),
+                        self.button(
+                            SharedString::from(format!("recipe-game-{}", id.id)),
+                            "选择这款游戏",
+                            cx,
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| this.bind(id.clone(), cx))),
                     ),
             );
         }
@@ -2161,70 +2223,86 @@ impl Recommendations {
         )
     }
 
-    fn login_page(&self, primary: &mut Option<Button>, cx: &Context<Self>) -> Div {
+    fn login_form(&self, cx: &Context<Self>) -> Div {
         let ring = crate::ui_focus::visible(cx);
-        *primary = Some(
-            self.button("recipe-login", "登录", cx)
-                .primary()
-                .disabled(self.busy || self.challenge.is_none())
-                .on_click(cx.listener(|this, _, _, cx| {
-                    if let (Some(mut client), Some(challenge)) =
-                        (this.client.clone(), this.challenge.clone())
-                    {
-                        let code = this.code.read(cx).value().to_string();
-                        this.job(move || {
-                            client.verify(&challenge.challenge, &code)?;
-                            Ok(Update::Login(client))
-                        });
-                    }
-                    cx.notify();
-                })),
-        );
+        let code = self.code.read(cx).value();
+        let address = rec::complete_email(&self.email.read(cx).value(), &self.email_domain);
+        let matches_address = self
+            .challenge
+            .as_ref()
+            .is_some_and(|(_, email)| email.eq_ignore_ascii_case(&address));
+        let login = self
+            .button("recipe-login", "登录", cx)
+            .primary()
+            .disabled(
+                self.busy
+                    || !matches_address
+                    || code.len() != 6
+                    || !code.bytes().all(|b| b.is_ascii_digit()),
+            )
+            .on_click(cx.listener(|this, _, _, cx| {
+                if let (Some(mut client), Some((challenge, _))) =
+                    (this.client.clone(), this.challenge.clone())
+                {
+                    let code = this.code.read(cx).value().to_string();
+                    this.job(move || {
+                        client.verify(&challenge.challenge, &code)?;
+                        Ok(Update::Login(client))
+                    });
+                }
+                cx.notify();
+            }));
+        let send = self
+            .button("recipe-send-code", "发送验证码", cx)
+            .disabled(self.busy || self.cooldown || self.email.read(cx).value().trim().is_empty())
+            .on_click(cx.listener(|this, _, window, cx| {
+                if let Some(client) = this.client.clone() {
+                    let email =
+                        rec::complete_email(&this.email.read(cx).value(), &this.email_domain);
+                    this.email
+                        .update(cx, |s, cx| s.set_value(email.clone(), window, cx));
+                    this.job(move || Ok(Update::Code(client.send_code(&email)?, email)));
+                }
+                cx.notify();
+            }));
         div()
             .v_flex()
-            .gap_2()
+            .w_full()
+            .gap_3()
             .text_sm()
-            .child(self.t("浏览无需登录。分享和点赞只需首次验证邮箱，之后自动保持登录。"))
-            .child(self.t("邮箱账号或完整邮箱"))
             .child(
                 div()
-                    .h_flex()
-                    .gap_2()
+                    .v_flex()
+                    .gap_1()
+                    .child(self.t("邮箱账号或完整邮箱"))
                     .child(
                         div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(Input::new(&self.email).focus_ring(ring)),
-                    )
-                    .child(self.email_suffix(cx)),
+                            .h_flex()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .child(Input::new(&self.email).small().focus_ring(ring)),
+                            )
+                            .child(self.email_suffix(cx)),
+                    ),
             )
             .child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(rec::complete_email(
-                        &self.email.read(cx).value(),
-                        &self.email_domain,
-                    )),
+                div().v_flex().gap_1().child(self.t("验证码")).child(
+                    div()
+                        .h_flex()
+                        .gap_2()
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .child(Input::new(&self.code).small().focus_ring(ring)),
+                        )
+                        .child(send),
+                ),
             )
-            .child(
-                self.button("recipe-send-code", "发送验证码", cx)
-                    .disabled(self.busy || self.cooldown)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        if let Some(client) = this.client.clone() {
-                            let email = rec::complete_email(
-                                &this.email.read(cx).value(),
-                                &this.email_domain,
-                            );
-                            this.email
-                                .update(cx, |s, cx| s.set_value(email.clone(), window, cx));
-                            this.job(move || Ok(Update::Code(client.send_code(&email)?)));
-                        }
-                        cx.notify();
-                    })),
-            )
-            .child(self.t("验证码"))
-            .child(Input::new(&self.code).focus_ring(ring))
+            .child(div().h_flex().justify_end().child(login))
     }
 
     fn share_page(&self, window: &Window, primary: &mut Option<Button>, cx: &Context<Self>) -> Div {
@@ -2446,9 +2524,8 @@ impl Recommendations {
                 .as_ref()
                 .is_ok_and(|v| *v != card.content.patch_version);
             body=body.child(
-                div().h_flex().items_start().min_w_0().gap_3().pb_2()
-                    .child(Avatar::new().small().text_color(cx.theme().foreground)
-                        .placeholder(Icon::new(IconName::User)).flex_shrink_0())
+                div().h_flex().items_start().min_w_0().gap_2().pb_1()
+                    .child(Self::avatar(cx))
                     .child(div().v_flex().flex_1().min_w_0().gap_1()
                         .child(div().font_weight(FontWeight::SEMIBOLD).whitespace_normal().child(card.content.display_title()))
                         .child(div().h_flex().flex_wrap().gap_x_3().gap_y_1().text_xs().text_color(cx.theme().muted_foreground)
@@ -2670,13 +2747,13 @@ impl Manager {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered_at(
                 work.center(),
                 size(
-                    (window.rem_size() * 70.).min(work.size.width),
-                    (window.rem_size() * 48.).min(work.size.height),
+                    (window.rem_size() * 53.).min(work.size.width),
+                    (window.rem_size() * 36.).min(work.size.height),
                 ),
             ))),
             window_min_size: Some(size(
-                px(600.).min(work.size.width),
-                px(480.).min(work.size.height),
+                px(500.).min(work.size.width),
+                px(360.).min(work.size.height),
             )),
             ..Default::default()
         };
