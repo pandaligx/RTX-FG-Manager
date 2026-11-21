@@ -164,7 +164,7 @@ fn dlssg_components(
             Checkbox::new(("dlssg-patch", index))
                 .checked(true)
                 .disabled(true)
-                .label("Dlssg_for_sm86"),
+                .label(option.patch_label.clone()),
             tr.t("补丁与设置文件"),
         ));
     for kind in NativeComponent::ALL {
@@ -205,5 +205,8 @@ fn dlssg_components(
                 }),
         );
     }
-    body
+    body.when(option.miles_profile, |view| view.child(
+        div().text_xs().whitespace_normal().text_color(cx.theme().muted_foreground)
+            .child(tr.t("此游戏的 NVIDIA 倍率将跟随预设，卸载时还原。旧版游戏文件可勾选帧生成和 Streamline 原生插件。"))
+    ))
 }

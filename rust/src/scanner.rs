@@ -68,10 +68,45 @@ pub struct Game {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 impl Game {
+    fn replace_renderer(&mut self, new: String) {
+        for exe in &mut self.targets {
+            if exe.eq_ignore_ascii_case(&self.exe) {
+                new.clone_into(exe);
+            }
+        }
+        let mut seen = BTreeSet::new();
+        self.targets
+            .retain(|exe| seen.insert(core::key(Path::new(exe))));
+        self.exe = new;
+    }
+
+    /// An old runtime journal records the exact EXE used by the old scanner.
+    /// Preserve that owner on rescan until its original components are restored.
+    pub fn preserve_reporter_owner(&mut self, previous: &Game) {
+        let old = Path::new(&previous.exe);
+        if is_name(old, &["crs-handler.exe"])
+            && previous.deployment_dir.is_empty()
+            && old.parent().is_some_and(has_deployment_files)
+            && miles_for_reporter(old)
+                .is_some_and(|p| core::key(&p) == core::key(Path::new(&self.exe)))
+        {
+            self.replace_renderer(previous.exe.clone());
+        }
+    }
+
     /// Repair known bootstrap/compiler false positives in saved libraries without a
     /// disk-wide rescan. Old owned paths remain available only for cleanup.
     pub fn repair_renderer(&mut self) {
         if !self.deployment_dir.is_empty() {
+            return;
+        }
+        if is_name(Path::new(&self.exe), &["crs-handler.exe"]) {
+            let old = Path::new(&self.exe);
+            if old.parent().is_some_and(|dir| !has_deployment_files(dir))
+                && let Some(renderer) = miles_for_reporter(old)
+            {
+                self.replace_renderer(renderer.to_string_lossy().into_owned());
+            }
             return;
         }
         let root = installation_root(Path::new(&self.exe));
@@ -273,7 +308,7 @@ fn auxiliary_exe(name: &str) -> bool {
     let tool = TOOL.get_or_init(|| {
         regex::Regex::new(concat!(
             "(?i)^(?:crashreportclient(?:editor)?(?:-(?:win64|win32)-(?:shipping|development|debug))?|",
-            "crashpad_handler|crashsender[0-9]*|unitycrashhandler(?:32|64)?|",
+            "crs-handler|crashpad_handler|crashsender[0-9]*|unitycrashhandler(?:32|64)?|",
             "unins[0-9]*|uninstall|uninstaller|",
             "setup(?:32|64)?|install|installer|launcher|launchergame|updater|",
             "benchmarkreport|reporter|helper|cefsubprocess|epicwebhelper|qtwebengineprocess|",
@@ -416,6 +451,41 @@ mod engine_scan_tests {
         assert_eq!(core::key(Path::new(&game.exe)), core::key(&renderer));
         assert_eq!(game.targets.len(), 1);
         assert_eq!(game.cleanup_only.len(), 1);
+    }
+    #[test]
+    fn miles_crash_reporter_migrates_only_after_legacy_restoration() {
+        let temp = tempfile::tempdir().unwrap();
+        let apps = temp.path().join("steamapps");
+        let game = apps.join("common/Miles");
+        let renderer = game.join("MilesMorales.exe");
+        let reporter = game.join("crs-handler.exe");
+        exe(&renderer);
+        exe(&reporter);
+        let mut saved: Game = serde_json::from_value(
+            json!({"exe": reporter, "targets": [reporter, renderer], "nickname":"保存的游戏名"}),
+        )
+        .unwrap();
+        assert!(auxiliary_exe("CRS-handler.exe"));
+        assert!(miles_for_reporter(&reporter).is_none());
+        fs::write(
+            apps.join("appmanifest_1817190.acf"),
+            "\"appid\" \"1817190\"\n\"installdir\" \"Miles\"",
+        )
+        .unwrap();
+        assert_eq!(miles_for_reporter(&reporter).unwrap(), renderer);
+        let journal = game.join(".rtx-fg-runtimes");
+        fs::create_dir(&journal).unwrap();
+        saved.repair_renderer();
+        assert_eq!(Path::new(&saved.exe), reporter);
+        let mut rescan: Game =
+            serde_json::from_value(json!({"exe": renderer, "targets":[renderer]})).unwrap();
+        rescan.preserve_reporter_owner(&saved);
+        assert_eq!(Path::new(&rescan.targets[0]), reporter);
+        fs::remove_dir(journal).unwrap();
+        saved.repair_renderer();
+        assert_eq!(Path::new(&saved.exe), renderer);
+        assert_eq!(saved.targets, [saved.exe.clone()]);
+        assert_eq!(saved.extra["nickname"], "保存的游戏名");
     }
     #[test]
     fn pbz_repair_requires_valid_renderer_and_preserves_custom_targets() {
@@ -895,6 +965,29 @@ mod component_inventory_tests {
 fn is_name(p: &Path, names: &[&str]) -> bool {
     p.file_name()
         .is_some_and(|n| names.iter().any(|s| n.eq_ignore_ascii_case(s)))
+}
+fn has_deployment_files(dir: &Path) -> bool {
+    [
+        core::OWN,
+        ".rtx-fg-runtimes",
+        ".rtx-fg-nr",
+        ".rtx-fg-v3-legacy.json",
+    ]
+    .iter()
+    .any(|name| dir.join(name).try_exists().unwrap_or(true))
+}
+
+/// Resolve this crash reporter only inside the verified Steam title, beside its renderer.
+pub(crate) fn miles_for_reporter(exe: &Path) -> Option<PathBuf> {
+    if !is_name(exe, &["crs-handler.exe"]) {
+        return None;
+    }
+    let renderer = core::no_links(&exe.with_file_name("MilesMorales.exe")).ok()?;
+    if !renderer.is_file() || core::pe64(&renderer, false).is_err() {
+        return None;
+    }
+    let mut steam = crate::game_identity::SteamArtworkIndex::default();
+    (steam.lookup(&renderer)?.1 == "1817190").then_some(renderer)
 }
 fn unreal_binary_dir(dir: &Path) -> bool {
     is_name(

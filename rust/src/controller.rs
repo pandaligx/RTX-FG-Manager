@@ -209,10 +209,15 @@ fn defer_if_running(
     Ok(true)
 }
 pub type NativeSelections = BTreeMap<String, BTreeSet<runtime_files::NativeComponent>>;
+fn dlssg_native_options(scheme: &str) -> bool {
+    matches!(scheme, upstream040::SCHEME | cloud::DELTA_041_SCHEME)
+}
 #[derive(Clone)]
 pub struct DlssgInstallOption {
     pub exe: String,
     pub game: String,
+    pub patch_label: String,
+    pub miles_profile: bool,
     pub unavailable: BTreeMap<runtime_files::NativeComponent, String>,
 }
 pub struct PatchInstallPlan {
@@ -2056,6 +2061,7 @@ impl Controller {
                 fresh.exe = chosen.exe.clone();
             }
             for old in &matched {
+                fresh.preserve_reporter_owner(old);
                 for path in old
                     .cleanup_only
                     .iter()
@@ -2422,7 +2428,7 @@ impl Controller {
                     rtx_fg_manager::encore::SCHEME => {
                         rtx_fg_manager::encore::supports_200(Some(version))
                     }
-                    upstream040::SCHEME => semver::Version::parse(version)
+                    id if dlssg_native_options(id) => semver::Version::parse(version)
                         .is_ok_and(|v| v >= semver::Version::new(0, 4, 2)),
                     _ => false,
                 }
@@ -2440,8 +2446,10 @@ impl Controller {
             })
             .filter_map(|g| {
                 let scheme = self.scheme_for(Some(&g.exe));
-                self.has_patch_options(&scheme)
-                    .then(|| (self.game_name(g), scheme, g.clone()))
+                self.has_patch_options(&scheme).then(|| {
+                    let label = self.cloud_label(self.catalog.selected(&scheme));
+                    (self.game_name(g), scheme, label, g.clone())
+                })
             })
             .collect::<Vec<_>>();
         let fingerprint = self.patch_options_fingerprint(&paths);
@@ -2472,18 +2480,24 @@ impl Controller {
             let result = (|| -> Result<PatchInstallPlan> {
                 let mut choices = Vec::new();
                 let mut dlssg_options = Vec::new();
-                for (name, scheme, game) in jobs {
+                for (name, scheme, patch_label, game) in jobs {
                     for target in game.deployment_targets() {
                         let exe = target.game_exe.display().to_string();
                         if !paths.contains(&exe) {
                             continue;
                         }
                         anyhow::ensure!(!cancel.load(Ordering::Relaxed), "已取消");
-                        if scheme == upstream040::SCHEME {
+                        if dlssg_native_options(&scheme) {
                             let unavailable = runtime_files::NativeComponent::unavailable(&target);
                             dlssg_options.push(DlssgInstallOption {
+                                #[cfg(windows)]
+                                miles_profile: scheme == cloud::DELTA_041_SCHEME
+                                    && rtx_fg_manager::miles_profile::is_game(&target.game_exe),
+                                #[cfg(not(windows))]
+                                miles_profile: false,
                                 exe,
                                 game: name.clone(),
+                                patch_label: patch_label.clone(),
                                 unavailable,
                             });
                             continue;
@@ -3307,7 +3321,7 @@ impl Controller {
                     if let Ok(files) = cloud::download_files(&catalog, scheme, *series, proxies) {
                         queue.extend(files);
                     }
-                    if scheme == upstream040::SCHEME {
+                    if dlssg_native_options(scheme) {
                         let kinds: BTreeSet<_> = targets.iter().filter_map(|exe| selected_native.get(exe)).flatten().collect();
                         queue.extend(kinds.into_iter().filter_map(|kind| kind.download().ok()));
                     }
@@ -3327,7 +3341,7 @@ impl Controller {
                     break;
                 }
                 let mut native_groups = BTreeMap::<runtime_files::NativeComponent, Vec<core::DeploymentTarget>>::new();
-                if !clean && scheme == upstream040::SCHEME {
+                if !clean && dlssg_native_options(&scheme) {
                     for exe in &targets {
                         if let Some(checked) = selected_native.get(exe) {
                             let target = game.deployment_target(std::path::Path::new(exe));
@@ -3505,7 +3519,7 @@ impl Controller {
                             let ok = outcome.complete;
                             let s = outcome.message;
                             all_ok &= ok;
-                            if ok && !clean && scheme == upstream040::SCHEME && selected_native.contains_key(&exe) {
+                            if ok && !clean && dlssg_native_options(&scheme) && selected_native.contains_key(&exe) {
                                 awaiting_components.insert(exe.clone());
                             } else {
                                 c.send(Event::PatchResult(ok));

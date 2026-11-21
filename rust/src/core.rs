@@ -976,6 +976,8 @@ pub fn apply_parameters_at(
         return crate::rtxmfg_settings::apply_locked(&target, Some((&before, &after)), values);
     }
     if before == after {
+        #[cfg(windows)]
+        crate::miles_profile::after_preset_locked(&target)?;
         return Ok(());
     }
     let mut temp = tempfile::NamedTempFile::new_in(dir)?;
@@ -985,6 +987,8 @@ pub fn apply_parameters_at(
     ensure!(fs::read(&ini)? == before, "INI 已变化，请刷新后重试");
     assert_target_stopped(&target)?;
     temp.persist(&ini)?;
+    #[cfg(windows)]
+    crate::miles_profile::after_preset_locked(&target)?;
     Ok(())
 }
 pub fn status(exe: &Path) -> String {
@@ -1148,6 +1152,34 @@ pub fn deploy_prepared_context_at(
 /// default preset. JSON runtime updates merge them over the latest disk document.
 #[allow(clippy::too_many_arguments)]
 pub fn deploy_prepared_context_at_with_overrides(
+    target: &DeploymentTarget,
+    backend: &str,
+    proxies: &[String],
+    level: Option<u8>,
+    data: BTreeMap<String, Vec<u8>>,
+    payload_version: Option<&str>,
+    context: Option<&crate::presets::Context>,
+    explicit_overrides: Option<&crate::presets::Values>,
+    upstream_version: Option<&str>,
+) -> Result<String> {
+    let message = deploy_prepared_files(
+        target,
+        backend,
+        proxies,
+        level,
+        data,
+        payload_version,
+        context,
+        explicit_overrides,
+        upstream_version,
+    )?;
+    #[cfg(windows)]
+    crate::miles_profile::after_install(target)?;
+    Ok(message)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn deploy_prepared_files(
     target: &DeploymentTarget,
     backend: &str,
     proxies: &[String],

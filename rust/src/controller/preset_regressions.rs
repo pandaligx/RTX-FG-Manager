@@ -203,23 +203,24 @@ fn finish(c: &mut Controller) -> Result<()> {
 }
 
 #[test]
-fn native_streamline_checkbox_is_scoped_to_standard_dlssg() {
+fn native_runtime_choices_require_standard_or_delta_dlssg_042() {
     let (_data, mut c) = controller();
     assert!(c.has_patch_options(upstream040::SCHEME));
+    assert!(c.has_patch_options(cloud::DELTA_041_SCHEME));
     for other in [
         upstream040::PIPO_SCHEME,
         cloud::DELTA_SCHEME,
-        cloud::DELTA_041_SCHEME,
         rtx_fg_manager::anr::SCHEME,
     ] {
         assert!(!c.has_patch_options(other));
     }
     for p in &mut c.catalog.packages {
-        if p.scheme_id == upstream040::SCHEME {
+        if dlssg_native_options(&p.scheme_id) {
             p.upstream_version = Some("0.4.1".into());
         }
     }
     assert!(!c.has_patch_options(upstream040::SCHEME));
+    assert!(!c.has_patch_options(cloud::DELTA_041_SCHEME));
     let path = "without-native-plugins.exe".to_owned();
     let paths = BTreeSet::from([path.clone()]);
     c.patch_install_plan = Some(PatchInstallPlan {
@@ -229,6 +230,8 @@ fn native_streamline_checkbox_is_scoped_to_standard_dlssg() {
         dlssg_options: vec![DlssgInstallOption {
             exe: path.clone(),
             game: "Game".into(),
+            patch_label: "Dlssg_for_sm86".into(),
+            miles_profile: false,
             unavailable: BTreeMap::from([(
                 runtime_files::NativeComponent::Streamline,
                 "未检测到游戏自带的对应组件".into(),
@@ -253,6 +256,16 @@ fn native_streamline_checkbox_is_scoped_to_standard_dlssg() {
 #[test]
 #[ignore = "requires the standard 0.4.2 archive and native SDK in an isolated cache"]
 fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
+    native_runtime_round_trip(upstream040::SCHEME)
+}
+
+#[test]
+#[ignore = "requires the Delta 0.4.2 archive and native SDK in an isolated cache"]
+fn delta_patch_streamline_opt_in_round_trip() -> Result<()> {
+    native_runtime_round_trip(cloud::DELTA_041_SCHEME)
+}
+
+fn native_runtime_round_trip(scheme: &str) -> Result<()> {
     use runtime_files::NativeComponent;
     let sdk =
         std::fs::read(std::env::var_os("RTXFG_TEST_SL_COMMON").context("missing fixture SDK")?)?;
@@ -288,7 +301,7 @@ fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
     };
     c.focus = Some(game.exe.clone());
     c.games = vec![game.clone()];
-    c.set_selection(upstream040::SCHEME.into(), 1, vec!["version.dll".into()]);
+    c.set_selection(scheme.into(), 1, vec!["version.dll".into()]);
     for kinds in [
         BTreeSet::new(),
         BTreeSet::from([NativeComponent::FrameGeneration]),

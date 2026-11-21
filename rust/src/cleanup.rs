@@ -723,6 +723,8 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
         );
         // NR is independent and may have been installed after the FG uninstall.
     } else {
+        #[cfg(windows)]
+        crate::miles_profile::restore_locked(&target)?;
         crate::neural_runtime::remove_locked(&target)?;
         crate::runtime_files::remove_locked(&target, "xemfg")?;
         crate::runtime_files::remove_locked(&target, "encorefg")?;
