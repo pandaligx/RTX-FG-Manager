@@ -422,7 +422,9 @@ impl Recipe {
         let project = match self.scheme.as_str() {
             crate::upstream040::SCHEME => "Dlssg",
             cloud::DELTA_SCHEME | cloud::DELTA_041_SCHEME => "Dlssg Delta",
-            crate::upstream040::PIPO_SCHEME | "pipotoufik-mfg-vulkan-sm86-7" => "Dlssg Pipo",
+            crate::upstream040::PIPO_SCHEME | "pipotoufik-mfg-vulkan-sm86-7" => {
+                "Dlssg_for_sm86-MFG-version"
+            }
             crate::encore::SCHEME => "RTX Encore",
             "rtx40mfg-1.3.3-hf2" | crate::recommendation_presets::MFG_161_COMPAT => "MFG Unlocker",
             crate::anr::SCHEME => "ANR FG",
@@ -477,10 +479,14 @@ impl Recipe {
         if self.scheme == crate::recommendation_presets::MFG_161_COMPAT {
             ensure!(
                 self.neural_runtime == "none"
-                    && self.runtimes.as_ref().is_none_or(|r| r
-                        .components
-                        .iter()
-                        .all(|c| c.kind != "nr" && c.source != "managed")),
+                    && self
+                        .runtimes
+                        .as_ref()
+                        .is_none_or(|r| r
+                            .components
+                            .iter()
+                            .all(|c| c.kind != "nr"
+                                && (c.source != "managed" || c.kind == "streamline"))),
                 "MFG 1.6.1 不支持 DLSSNR 或独立 XeSS 运行库"
             );
         }
@@ -577,7 +583,11 @@ pub fn installed_recipe(
     driver: String,
 ) -> Result<Recipe> {
     let mut found: Option<Recipe> = None;
-    for target in game.deployment_targets() {
+    let mut native_plugin = None;
+    let mut unverified_native = false;
+    let targets = game.deployment_targets();
+    let multiple = targets.len() > 1;
+    for target in targets {
         let record = core::record(&target.directory)?
             .context("请先为当前游戏安装补丁，再分享已测试的方案")?;
         target.validate_record(&record)?;
@@ -623,9 +633,9 @@ pub fn installed_recipe(
             // must not become an installation requirement for this older MFG.
             current.neural_runtime = "none".into();
             if let Some(runtimes) = &mut current.runtimes {
-                runtimes
-                    .components
-                    .retain(|c| c.kind != "nr" && c.source != "managed");
+                runtimes.components.retain(|c| {
+                    c.kind != "nr" && (c.source != "managed" || c.kind == "streamline")
+                });
             }
         }
         current.presets = Some(crate::recommendation_presets::capture(
@@ -635,6 +645,27 @@ pub fn installed_recipe(
             &current.patch_version,
         )?);
         current.validate(catalog)?;
+        // A secondary renderer may have no native Streamline integration at all.
+        // Compare versions only among renderers that actually use the plugins.
+        if multiple && let Some(snapshot) = &mut current.runtimes {
+            if let Some(index) = snapshot
+                .components
+                .iter()
+                .position(|c| c.kind == "streamline")
+            {
+                let component = snapshot.components.remove(index);
+                ensure!(
+                    native_plugin
+                        .as_ref()
+                        .is_none_or(|known| known == &component),
+                    "各目录的 Streamline 插件版本不同"
+                );
+                native_plugin = Some(component);
+            } else {
+                unverified_native |=
+                    crate::runtime_files::inspect(&target, "streamline").applicable;
+            }
+        }
         if let Some(old) = &found {
             ensure!(
                 old.scheme == current.scheme
@@ -649,7 +680,12 @@ pub fn installed_recipe(
             found = Some(current);
         }
     }
-    found.context("未找到游戏的部署目录")
+    let mut recipe = found.context("未找到游戏的部署目录")?;
+    if let (Some(component), Some(snapshot)) = (native_plugin, &mut recipe.runtimes) {
+        ensure!(!unverified_native, "各目录的 Streamline 插件版本不同");
+        snapshot.components.push(component);
+    }
+    Ok(recipe)
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -1118,6 +1154,7 @@ impl Client {
             .header("X-RTXFG-Encore240", "1")
             .header("X-RTXFG-Encore250", "1")
             .header("X-RTXFG-Pipo042", "1")
+            .header("X-RTXFG-Native-Streamline", "1")
             .header("X-RTXFG-ANR", "1")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
@@ -2385,7 +2422,10 @@ mod tests {
         for (id, label) in [
             (crate::upstream040::SCHEME, "Dlssg"),
             (cloud::DELTA_041_SCHEME, "Dlssg Delta"),
-            (crate::upstream040::PIPO_SCHEME, "Dlssg Pipo"),
+            (
+                crate::upstream040::PIPO_SCHEME,
+                "Dlssg_for_sm86-MFG-version",
+            ),
         ] {
             r.scheme = id.into();
             assert_eq!(r.display_title(), format!("RTX 2060 SUPER · {label} 0.4.2"));

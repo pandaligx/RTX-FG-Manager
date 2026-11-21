@@ -4,9 +4,11 @@ mod controller;
 #[cfg(windows)]
 #[path = "game_icons.rs"]
 mod game_icons;
-#[cfg(not(windows))]
 #[path = "game_icons_linux.rs"]
-mod game_icons;
+mod native_icons;
+#[cfg(not(windows))]
+use native_icons as game_icons;
+mod steam_artwork;
 mod ui;
 mod ui_assets;
 mod ui_focus;

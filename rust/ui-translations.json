@@ -1,4 +1,5 @@
 {
+  "此游戏的 NVIDIA 倍率将跟随预设，卸载时还原。旧版游戏文件可勾选帧生成和 Streamline 原生插件。": ["This game’s NVIDIA multiplier follows the preset and is restored on uninstall. For older game files, select Frame Generation and native Streamline plugins.", "Множитель NVIDIA для этой игры берётся из профиля и восстанавливается при удалении. Для старых файлов игры выберите генерацию кадров и плагины Streamline.", "このゲームの NVIDIA 倍率はプリセットに従い、アンインストール時に元に戻ります。ゲームのファイルが古い場合はフレーム生成と Streamline ネイティブプラグインを選択してください。", "이 게임의 NVIDIA 배율은 프리셋을 따르며 패치 삭제 시 복원됩니다. 게임 파일이 오래되었다면 프레임 생성과 Streamline 네이티브 플러그인을 선택하세요."],
   "版本未知": ["Unknown version", "Версия неизвестна", "バージョン不明", "버전 알 수 없음"],
   "网易游戏": ["NetEase Games", "NetEase Games", "NetEase Games", "넷이즈 게임즈"],
   "网易游戏的版本说明最多可填 73 个字符": ["Use up to 73 characters for the NetEase game edition", "Версия игры NetEase — до 73 символов", "NetEase のゲーム版は 73 文字以内で入力してください", "넷이즈 게임 버전은 73자까지 입력할 수 있습니다"],
@@ -118,6 +119,11 @@
   "更新提醒": ["Update available", "Доступно обновление", "更新のお知らせ", "업데이트 알림"],
   "立即更新": ["Update now", "Обновить сейчас", "今すぐ更新", "지금 업데이트"],
   "下次再说": ["Later", "Позже", "後で", "나중에"],
+  "默认不勾选，如部分老游戏不生效，有需要时再勾选以上组件。": ["These components are off by default. If the patch does not work in an older game, select the components you need.", "По умолчанию компоненты не выбраны. Если патч не работает в старой игре, выберите нужные компоненты.", "初期状態では選択されていません。古いゲームでパッチが動作しない場合に、必要な項目を選んでください。", "기본적으로 선택되어 있지 않습니다. 오래된 게임에서 패치가 작동하지 않을 때 필요한 항목을 선택하세요."],
+  "未检测到游戏自带的对应组件": ["This game has no matching native component.", "В игре не найден соответствующий компонент.", "ゲームに該当するコンポーネントが見つかりません。", "게임에 해당 기본 구성 요소가 없습니다."],
+  "Dlssg_for_sm86 安装选项": ["Dlssg_for_sm86 installation options", "Параметры установки Dlssg_for_sm86", "Dlssg_for_sm86 のインストール設定", "Dlssg_for_sm86 설치 옵션"],
+  "补丁安装选项": ["Patch installation options", "Параметры установки патчей", "パッチのインストール設定", "패치 설치 옵션"],
+  "未检测到可更新的游戏原生 Streamline 插件": ["No updatable native Streamline plugins found in this game.", "В игре не найдены плагины Streamline, доступные для обновления.", "更新できるゲーム標準の Streamline プラグインがありません。", "이 게임에서 업데이트할 수 있는 기본 Streamline 플러그인을 찾지 못했습니다."],
   "Encore 安装选项": ["Encore installation options", "Параметры установки Encore", "Encore のインストール設定", "Encore 설치 옵션"],
   "安装组件": ["Components", "Компоненты", "コンポーネント", "구성 요소"],
   "补丁与设置文件": ["Mod and settings", "Мод и настройки", "MOD と設定ファイル", "모드 및 설정 파일"],

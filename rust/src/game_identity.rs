@@ -76,6 +76,30 @@ fn steam_root(exe: &Path) -> Option<&Path> {
         })
     })
 }
+/// One manifest index per library for the lifetime of an icon refresh.
+#[derive(Default)]
+pub struct SteamArtworkIndex {
+    libraries: BTreeMap<PathBuf, BTreeMap<String, Identity>>,
+}
+
+impl SteamArtworkIndex {
+    pub fn lookup<'a>(&mut self, exe: &'a Path) -> Option<(&'a Path, &str)> {
+        let root = steam_root(exe)?;
+        let apps = root.parent()?.parent()?;
+        let installs = self
+            .libraries
+            .entry(apps.to_owned())
+            .or_insert_with(|| steam_installs(apps, &AtomicBool::new(false)));
+        let id = installs
+            .get(&core::key(root))?
+            .keys
+            .first()?
+            .strip_prefix("steam:")?;
+        let app_id = id.parse::<u32>().ok()?;
+        (app_id != 0 && id.bytes().all(|b| b.is_ascii_digit())).then_some((apps.parent()?, id))
+    }
+}
+
 fn steam_installs(apps: &Path, cancel: &AtomicBool) -> BTreeMap<String, Identity> {
     let mut result = BTreeMap::new();
     let Ok(entries) = fs::read_dir(apps) else {

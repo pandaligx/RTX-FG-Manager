@@ -37,6 +37,8 @@ pub mod jsonc;
 mod manager_shortcuts;
 pub mod mfg_host;
 pub mod mfg_plugin;
+#[cfg(windows)]
+pub mod miles_profile;
 pub mod operation_history;
 #[cfg(target_os = "linux")]
 pub mod pe_version;

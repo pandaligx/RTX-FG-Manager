@@ -48,8 +48,24 @@ test('MWSR and Pipo settings survive legacy reads and edits without mixing forks
     assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',16,modern)).content.presets,c.presets);
   }
   assert.throws(()=>recipe({...mwsr,patchVersion:'2.4.2'}));
-  assert.throws(()=>recipe({...pipo,entries:['version.dll','dxgi.dll']}));
+  assert.deepEqual(recipe({...pipo,entries:['version.dll','dxgi.dll']}).entries,['version.dll','dxgi.dll']);
+  assert.throws(()=>recipe({...pipo,entries:['version.dll','version.dll']}));
   assert.throws(()=>recipe({...pipo,scheme:'pipotoufik-mfg-vulkan-sm86-7'}));
+});
+
+test('native Streamline and multiple loaders round trip without losing the SDK on a legacy edit', async t=>{
+  const f=fixture(t),u=await f.login();
+  const modern={'x-rtxfg-native-streamline':'1','x-rtxfg-pipo042':'1'};
+  const sl={kind:'streamline',source:'managed',versions:['2.14.16'],packageVersion:'2.14.16'};
+  const draft={...content(),scheme:'pipo-sm86-10',patchVersion:'0.4.2-pipo',entries:['version.dll','dxgi.dll'],runtimes:{schema:1,components:[sl]}};
+  const posted=await f.call('POST','/v1/recipes',{submission:randomUUID(),content:draft},u.token,'test-ip',16,modern);
+  const path='/v1/recipes/'+posted.id;
+  assert.deepEqual(posted.content.runtimes.components,[sl]);
+  const old=await f.call('GET',path,null,u.token,'test-ip',16);
+  assert.equal(old.content.runtimes,undefined);
+  await f.call('PUT',path,{revision:1,content:{...old.content,notes:'Updated note'}},u.token,'test-ip',16);
+  assert.deepEqual((await f.call('GET',path,null,u.token,'test-ip',16,modern)).content.runtimes.components,[sl]);
+  assert.throws(()=>recipe({...draft,runtimes:{schema:1,components:[{...sl,packageVersion:'9.9.9'}]}}));
 });
 
 test('ANR parameter shares round trip without breaking legacy clients',async t=>{

@@ -2,7 +2,7 @@
 use gpui::{AssetSource, SharedString};
 use std::borrow::Cow;
 // The default component bundle excludes catalog-only icons.
-gpui::assets::icon_assets!(RecommendationAssets, [UsersRound, Download]);
+gpui::assets::icon_assets!(RecommendationAssets, [UsersRound, Download, Flag]);
 pub struct Assets;
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
@@ -79,6 +79,9 @@ mod tests {
         for path in [
             "icons/cpu.svg",
             "icons/users-round.svg",
+            "icons/flag.svg",
+            "icons/thumbs-up.svg",
+            "icons/thumbs-down.svg",
             "app/trash.svg",
             "icons/github.svg",
             "icons/layout-dashboard.svg",

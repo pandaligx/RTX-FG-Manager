@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.40 — 2026-11-21
+
+- On Windows, the Steam edition of Marvel’s Spider-Man: Miles Morales now uses the selected NVIDIA frame multiplier with the Delta edition of Dlssg_for_sm86 0.4.2. Uninstalling restores the game profile. DLSS defaults to 4X and supports up to 6X. The existing XeSS engine supports up to 4X.
+- The standard and Delta editions of Dlssg_for_sm86 0.4.2 can update a game’s existing DLSS Super Resolution, Ray Reconstruction, Frame Generation and native Streamline plugins independently. All four updates are opt-in and can be restored.
+- Fixed missing or blurry Steam game icons and detection of the Miles Morales crash reporter as the game. Dlssg_for_sm86-MFG-version uses its project name and supports selecting multiple entry DLLs.
+- Player setups can include native Streamline versions and multiple entry DLLs. Vote counts appear below their icons, and the runtime window uses less space.
+
 ## 4.3.39 — 2026-11-20
 
 - Open a game’s player recommendations to see setups shared under its verified storefront entries in one list. Each setup keeps its original platform. This also fixes missing setups for Arknights: Endfield.

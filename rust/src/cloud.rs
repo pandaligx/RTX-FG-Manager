@@ -830,9 +830,6 @@ impl Catalog {
         let Some(policy) = self.scheme_policies.get(id) else {
             return 0;
         };
-        if id == crate::upstream040::PIPO_SCHEME {
-            return 1;
-        }
         if matches!(
             policy.parameter_profile.as_str(),
             crate::upstream040::PROFILE
@@ -1594,6 +1591,16 @@ pub fn known_image(image: &str) -> bool {
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn pipo_dx12_exposes_all_six_actual_loader_choices() {
+        let catalog = bundled();
+        let scheme = crate::upstream040::PIPO_SCHEME;
+        let choices = catalog.proxies(scheme);
+        assert_eq!(choices.len(), 6);
+        assert_eq!(catalog.selection_limit(scheme), choices.len());
+        assert!(choices.contains(&"version.dll".into()) && choices.contains(&"dxgi.dll".into()));
+    }
+
     #[test]
     fn download_plan_counts_a_shared_archive_once_for_multiple_proxies() -> anyhow::Result<()> {
         let c = bundled();

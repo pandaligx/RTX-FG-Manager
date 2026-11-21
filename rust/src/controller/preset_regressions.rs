@@ -203,6 +203,207 @@ fn finish(c: &mut Controller) -> Result<()> {
 }
 
 #[test]
+fn native_runtime_choices_require_standard_or_delta_dlssg_042() {
+    let (_data, mut c) = controller();
+    assert!(c.has_patch_options(upstream040::SCHEME));
+    assert!(c.has_patch_options(cloud::DELTA_041_SCHEME));
+    for other in [
+        upstream040::PIPO_SCHEME,
+        cloud::DELTA_SCHEME,
+        rtx_fg_manager::anr::SCHEME,
+    ] {
+        assert!(!c.has_patch_options(other));
+    }
+    for p in &mut c.catalog.packages {
+        if dlssg_native_options(&p.scheme_id) {
+            p.upstream_version = Some("0.4.1".into());
+        }
+    }
+    assert!(!c.has_patch_options(upstream040::SCHEME));
+    assert!(!c.has_patch_options(cloud::DELTA_041_SCHEME));
+    let path = "without-native-plugins.exe".to_owned();
+    let paths = BTreeSet::from([path.clone()]);
+    c.patch_install_plan = Some(PatchInstallPlan {
+        fingerprint: c.patch_options_fingerprint(&paths),
+        paths,
+        choices: vec![],
+        dlssg_options: vec![DlssgInstallOption {
+            exe: path.clone(),
+            game: "Game".into(),
+            patch_label: "Dlssg_for_sm86".into(),
+            miles_profile: false,
+            unavailable: BTreeMap::from([(
+                runtime_files::NativeComponent::Streamline,
+                "未检测到游戏自带的对应组件".into(),
+            )]),
+        }],
+    });
+    assert!(
+        c.confirm_patch_options(
+            vec![],
+            NativeSelections::from([(
+                path,
+                BTreeSet::from([runtime_files::NativeComponent::Streamline])
+            )])
+        )
+        .is_err()
+    );
+    assert!(c.selected_native_components.is_empty() && !c.busy);
+    c.close();
+    c.tick_close();
+}
+
+#[test]
+#[ignore = "requires the standard 0.4.2 archive and native SDK in an isolated cache"]
+fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
+    native_runtime_round_trip(upstream040::SCHEME)
+}
+
+#[test]
+#[ignore = "requires the Delta 0.4.2 archive and native SDK in an isolated cache"]
+fn delta_patch_streamline_opt_in_round_trip() -> Result<()> {
+    native_runtime_round_trip(cloud::DELTA_041_SCHEME)
+}
+
+fn native_runtime_round_trip(scheme: &str) -> Result<()> {
+    use runtime_files::NativeComponent;
+    let sdk =
+        std::fs::read(std::env::var_os("RTXFG_TEST_SL_COMMON").context("missing fixture SDK")?)?;
+    let mut original = sdk.clone();
+    original.extend_from_slice(b"original game plugin");
+    let (_data, mut c) = controller();
+    let game_dir = tempfile::tempdir()?;
+    let mut targets = Vec::new();
+    for renderer in ["Native", "WithoutStreamline"] {
+        let folder = game_dir.path().join(renderer);
+        std::fs::create_dir(&folder)?;
+        let exe = folder.join("TestGame.exe");
+        std::fs::copy(std::env::current_exe()?, &exe)?;
+        targets.push(exe.display().to_string());
+    }
+    let native = game_dir.path().join("Native");
+    let plugin = native.join("sl.common.dll");
+    let interposer = native.join("sl.interposer.dll");
+    let native_dlls = [
+        (NativeComponent::SuperResolution, "nvngx_dlss.dll"),
+        (NativeComponent::RayReconstruction, "nvngx_dlssd.dll"),
+        (NativeComponent::FrameGeneration, "nvngx_dlssg.dll"),
+    ];
+    for (_, name) in native_dlls {
+        std::fs::write(native.join(name), &original)?;
+    }
+    std::fs::write(&plugin, &original)?;
+    std::fs::write(&interposer, b"original game interposer")?;
+    let game = Game {
+        exe: targets[0].clone(),
+        targets: targets.clone(),
+        ..Default::default()
+    };
+    c.focus = Some(game.exe.clone());
+    c.games = vec![game.clone()];
+    c.set_selection(scheme.into(), 1, vec!["version.dll".into()]);
+    for kinds in [
+        BTreeSet::new(),
+        BTreeSet::from([NativeComponent::FrameGeneration]),
+        BTreeSet::from(NativeComponent::ALL),
+    ] {
+        let opt_in = kinds.contains(&NativeComponent::Streamline);
+        c.request_patch(false);
+        finish(&mut c)?;
+        let choices = &c
+            .patch_install_plan
+            .as_ref()
+            .context("no installation dialog")?
+            .dlssg_options;
+        assert!(
+            choices
+                .iter()
+                .any(|o| o.exe == targets[0] && o.unavailable.is_empty())
+        );
+        assert!(
+            choices
+                .iter()
+                .any(|o| o.exe == targets[1] && o.unavailable.len() == NativeComponent::ALL.len())
+        );
+        assert!(c.selected_native_components.is_empty());
+        // Launcher metadata may arrive between the probe and the click.
+        c.games[0]
+            .extra
+            .insert("name_identity".into(), json!({"title": "Localized game"}));
+        let checked = if kinds.is_empty() {
+            NativeSelections::new()
+        } else {
+            NativeSelections::from([(targets[0].clone(), kinds.clone())])
+        };
+        c.confirm = None; // The native dialog consumes the pending prompt on opening.
+        c.confirm_patch_options(vec![], checked)?;
+        finish(&mut c)?;
+        let deploy = game.deployment_targets();
+        for t in &deploy {
+            assert!(t.directory.join("version.dll").is_file());
+        }
+        assert_eq!(
+            core::digest(&plugin)?,
+            core::hash(if opt_in { &sdk } else { &original })
+        );
+        assert_eq!(
+            runtime_files::installed_package_version(
+                &game.deployment_target(std::path::Path::new(&targets[0])),
+                "streamline"
+            )?
+            .as_deref(),
+            opt_in.then_some(runtime_files::NATIVE_STREAMLINE_VERSION)
+        );
+        assert!(
+            !game_dir
+                .path()
+                .join("WithoutStreamline/sl.common.dll")
+                .exists()
+        );
+        for (kind, name) in native_dlls {
+            let updated = kinds.contains(&kind);
+            assert_eq!(
+                core::digest(&native.join(name))? != core::hash(&original),
+                updated
+            );
+            if updated {
+                assert!(
+                    win::file_version(&native.join(name))?
+                        .0
+                        .starts_with(kind.version())
+                );
+            }
+            assert!(
+                !game_dir
+                    .path()
+                    .join("WithoutStreamline")
+                    .join(name)
+                    .exists()
+            );
+        }
+        assert_eq!(std::fs::read(&interposer)?, b"original game interposer");
+        c.request_patch(true);
+        finish(&mut c)?;
+        assert_eq!(core::digest(&plugin)?, core::hash(&original));
+        for (_, name) in native_dlls {
+            assert_eq!(core::digest(&native.join(name))?, core::hash(&original));
+        }
+        for t in &deploy {
+            assert!(!t.directory.join("version.dll").exists());
+            assert!(!t.directory.join(".rtx-fg-runtimes").exists());
+        }
+    }
+    c.request_patch(false);
+    finish(&mut c)?;
+    assert!(c.selected_native_components.is_empty() && c.patch_install_plan.is_some());
+    c.cancel_patch();
+    assert!(c.patch_install_plan.is_none() && !native.join("version.dll").exists());
+    c.close();
+    c.tick_close();
+    Ok(())
+}
+
+#[test]
 #[ignore = "explicit six-package download and signed-file deployment in isolated LOCALAPPDATA; no DLL execution"]
 fn all_current_signed_schemes_share_uninstall_and_manual_reinstall() -> Result<()> {
     let root = PathBuf::from(std::env::var("RTXFG_PRESET_QA")?);

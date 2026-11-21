@@ -111,7 +111,9 @@ impl RenderOnce for RecommendationEntry {
         let palette = crate::ui_themes::recommendation_accents(theme);
         let phase = self.phase;
         let radius = theme.radius + edge;
-        let icon_color = theme.muted_foreground;
+        let pulse = (phase * TAU).sin();
+        let icon_scale = 1.0 + 0.14 * pulse;
+        let icon_color = theme.foreground.opacity(0.84 + 0.16 * pulse);
         div()
             .relative()
             .w_full()
@@ -204,9 +206,15 @@ impl RenderOnce for RecommendationEntry {
                     .w_full()
                     .rounded(theme.radius)
                     .bg(theme.background)
-                    .child(self.button.icon(
-                        Icon::new(gpui::assets::IconName::UsersRound).text_color(icon_color),
-                    )),
+                    .child(
+                        self.button.icon(
+                            Icon::new(gpui::assets::IconName::UsersRound)
+                                .transform(gpui::Transformation::scale(size(
+                                    icon_scale, icon_scale,
+                                )))
+                                .text_color(icon_color),
+                        ),
+                    ),
             )
     }
 }
