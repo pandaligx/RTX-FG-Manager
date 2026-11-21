@@ -14,7 +14,7 @@ use std::{
 
 const OWN: &str = ".rtx-fg-runtimes";
 const LIMIT: u64 = 512 * 1024 * 1024;
-pub const KINDS: [&str; 5] = ["sr", "rr", "fg", "xemfg", "encorefg"];
+pub const KINDS: [&str; 6] = ["sr", "rr", "fg", "streamline", "xemfg", "encorefg"];
 pub const ENCORE_FG_FILES: [&str; 7] = [
     "nvngx_dlssg.dll",
     "sl.interposer.dll",
@@ -132,7 +132,9 @@ fn native_streamline_paths_from(
                 paths.push(path);
             }
         }
-        paths.push(core::no_links(&folder.join(STREAMLINE_LICENSE))?);
+        if paths.iter().any(|p| p.parent() == Some(folder.as_path())) {
+            paths.push(core::no_links(&folder.join(STREAMLINE_LICENSE))?);
+        }
     }
     Ok(paths)
 }
@@ -152,6 +154,7 @@ pub fn label(kind: &str) -> &'static str {
         "sr" => "DLSS 超分辨率",
         "rr" => "DLSS 光线重建",
         "fg" => "DLSS 帧生成",
+        "streamline" => "Streamline 原生插件",
         "xemfg" => "XeSS 多帧生成",
         "encorefg" => "新增 DLSS 帧生成（无原生帧生成）",
         _ => "运行库",
@@ -481,6 +484,24 @@ pub fn install_native_streamline(
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<()> {
+    update_streamline(
+        targets,
+        bundled_package("streamline")?,
+        github,
+        cancel,
+        progress,
+        false,
+    )
+}
+
+fn update_streamline(
+    targets: &[core::DeploymentTarget],
+    selected: Package,
+    github: bool,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(transfer::Progress),
+    require_match: bool,
+) -> Result<()> {
     let _cache = crate::cache::wait_for_operation(cancel, || {})?;
     let mut ordered = targets
         .iter()
@@ -492,7 +513,6 @@ pub fn install_native_streamline(
     let mut plans = Vec::new();
     let mut seen = BTreeSet::new();
     for t in &ordered {
-        ensure!(encore_200_installed(t)?, "请先安装 RTX Encore 2.0+");
         core::assert_target_stopped(t)?;
         locks.push(win::game_lock(&t.directory)?);
         let mut paths = native_streamline_paths(t)?;
@@ -502,9 +522,10 @@ pub fn install_native_streamline(
         }
     }
     if plans.is_empty() {
+        ensure!(!require_match, "未检测到可更新的游戏原生 Streamline 插件");
         return Ok(());
     }
-    let sources = prepare_package(bundled_package("streamline")?, github, cancel, progress)?;
+    let sources = prepare_package(selected, github, cancel, progress)?;
     for (t, paths) in &plans {
         plan_entries(t, "fg", paths, &sources)?;
     }
@@ -520,6 +541,32 @@ pub fn installed_package_version(
     target: &core::DeploymentTarget,
     kind: &str,
 ) -> Result<Option<String>> {
+    if kind == "streamline" {
+        let paths = match native_streamline_paths(target) {
+            Ok(paths) => paths,
+            Err(_) => return Ok(None),
+        };
+        let dlls: Vec<_> = paths
+            .iter()
+            .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("dll")))
+            .collect();
+        if dlls.is_empty() {
+            return Ok(None);
+        }
+        for version in versions(kind) {
+            let sdk = version_package(kind, &version)?;
+            if dlls.iter().all(|p| {
+                sdk.files.iter().any(|a| {
+                    p.file_name()
+                        .is_some_and(|n| n.eq_ignore_ascii_case(&a.name))
+                        && matches(p, &a.sha256).unwrap_or(false)
+                })
+            }) {
+                return Ok(Some(version));
+            }
+        }
+        return Ok(None);
+    }
     let Some(record) = read(target, kind)? else {
         return Ok(None);
     };
@@ -832,6 +879,15 @@ fn candidate_paths(
     kind: &str,
     evidence: Option<&scanner::Evidence>,
 ) -> Result<Vec<PathBuf>> {
+    if kind == "streamline" {
+        return match evidence {
+            Some(e) => native_streamline_paths_from(target, e, |p| {
+                core::pe64(p, true)?;
+                Ok(win::file_version(p)?.0)
+            }),
+            None => native_streamline_paths(target),
+        };
+    }
     if kind == "encorefg" {
         return added_fg_paths(target, evidence);
     }
@@ -1205,16 +1261,30 @@ fn inspect_with(
         ..Default::default()
     };
     let result = (|| -> Result<()> {
-        if let Some(r) = read(target, kind)? {
-            s.managed = true;
-            s.paths = r.entries.iter().map(|e| PathBuf::from(&e.path)).collect();
-            if !r.complete {
+        let journal = if kind == "streamline" { "fg" } else { kind };
+        if let Some(r) = read(target, journal)? {
+            s.paths = r
+                .entries
+                .iter()
+                .filter(|e| entry_in_component(kind, e))
+                .map(|e| PathBuf::from(&e.path))
+                .collect();
+            s.managed = !s.paths.is_empty();
+            if s.managed && !r.complete {
                 s.warning = Some("运行库安装未完成，可恢复原件后重试。".into());
             }
         }
-        match paths_from(target, kind, evidence) {
+        let paths = if kind == "streamline" {
+            candidate_paths(target, kind, evidence)
+        } else {
+            paths_from(target, kind, evidence)
+        };
+        match paths {
             Ok(p) => {
-                s.available = true;
+                s.available = !p.is_empty();
+                if kind == "streamline" && p.is_empty() {
+                    s.applicable = false;
+                }
                 s.paths.extend(p);
                 s.paths.sort_by_key(|p| core::key(p));
                 s.paths.dedup_by_key(|p| core::key(p));
@@ -1226,12 +1296,6 @@ fn inspect_with(
         s.present = dll_set_present(kind, &s.paths);
         if kind == "encorefg" && s.available && s.warning.is_none() {
             s.warning = Some("实验性组件：仅添加运行库，不自动启用。请在参数设置中选择引擎，并关闭 Smooth Motion。".into());
-        }
-        if kind == "fg" && s.available && encore_200_installed(target)? && s.warning.is_none() {
-            s.warning = Some(
-                "只更新 DLSS 帧生成，保留现有 Streamline。需要更新插件时，请选择 Encore 安装组件。"
-                    .into(),
-            );
         }
         for p in &s.paths {
             if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("dll"))
@@ -1247,7 +1311,7 @@ fn inspect_with(
                 );
             }
         }
-        if kind == "fg" {
+        if kind == "streamline" {
             let owned_evidence;
             let evidence = match evidence {
                 Some(e) => e,
@@ -1428,6 +1492,7 @@ fn install_locked_with(
     mut write_file: impl FnMut(&Path, &Path) -> Result<()>,
 ) -> Result<()> {
     let entries = plan_entries(target, kind, destinations, sources)?;
+    let previous_complete = read(target, kind)?.is_some_and(|r| r.complete);
     let folder = root(target, kind)?;
     fs::create_dir_all(&folder)?;
     for e in &entries {
@@ -1484,8 +1549,12 @@ fn install_locked_with(
         // The batch already holds sibling directory locks (non-reentrant on
         // Linux). Roll back this install's own intent, without transferring
         // ownership to peers or trying to acquire their locks again.
-        remove_locked_impl(target, kind, false)
-            .context(format!("安装失败：{error:#}；恢复未完成，请保留备份"))?;
+        remove_locked_impl(target, kind, false, Some(previous_complete), |entry| {
+            destinations
+                .iter()
+                .any(|p| core::key(p) == core::key(Path::new(&entry.path)))
+        })
+        .context(format!("安装失败：{error:#}；恢复未完成，请保留备份"))?;
         return Err(error.context("运行库安装失败，已恢复原件"));
     }
     record.complete = true;
@@ -1514,8 +1583,24 @@ pub fn install_version(
 ) -> Result<()> {
     // Resolve once before starting the operation; a background catalog refresh
     // cannot change the bytes selected by the user midway through a download.
+    if kind == "fg-with-streamline" {
+        let fg = version_package("fg", version)?;
+        let sl = package("streamline")?;
+        progress(transfer::Progress::plan(vec![
+            fg.download_file(),
+            sl.download_file(),
+        ]));
+        return install_many_with(targets, "fg", cancel, || {
+            let mut sources = prepare_package(fg, github, cancel, progress)?;
+            sources.extend(prepare_package(sl, github, cancel, progress)?);
+            Ok(sources)
+        });
+    }
     let selected = version_package(kind, version)?;
     progress(transfer::Progress::plan(vec![selected.download_file()]));
+    if kind == "streamline" {
+        return update_streamline(targets, selected, github, cancel, progress, true);
+    }
     install_many_with(targets, kind, cancel, || {
         prepare_package(selected, github, cancel, progress)
     })
@@ -1550,11 +1635,9 @@ fn install_many_with(
     let sources = prepare_source()?;
     if kind == "fg" && sources.contains_key("sl.common.dll") {
         for (t, ps) in &mut plans {
-            if encore_200_installed(t)? {
-                for path in native_streamline_paths(t)? {
-                    if seen.insert(core::key(&path)) {
-                        ps.push(path);
-                    }
+            for path in native_streamline_paths(t)? {
+                if seen.insert(core::key(&path)) {
+                    ps.push(path);
                 }
             }
         }
@@ -1575,14 +1658,38 @@ fn install_many_with(
     Ok(())
 }
 pub fn remove_locked(target: &core::DeploymentTarget, kind: &str) -> Result<()> {
-    remove_locked_impl(target, kind, true)
+    remove_locked_impl(target, kind, true, None, |_| true)
 }
-fn remove_locked_impl(target: &core::DeploymentTarget, kind: &str, share: bool) -> Result<()> {
-    let Some(r) = read(target, kind)? else {
+
+fn entry_in_component(kind: &str, entry: &Entry) -> bool {
+    let fg = Path::new(&entry.path)
+        .file_name()
+        .is_some_and(|name| name.eq_ignore_ascii_case("nvngx_dlssg.dll"));
+    match kind {
+        "fg" => fg,
+        "streamline" => !fg,
+        _ => true,
+    }
+}
+fn remove_locked_impl(
+    target: &core::DeploymentTarget,
+    kind: &str,
+    share: bool,
+    previous_complete: Option<bool>,
+    include: impl Fn(&Entry) -> bool,
+) -> Result<()> {
+    let Some(mut r) = read(target, kind)? else {
         return Ok(());
     };
     core::assert_target_stopped(target)?;
     let folder = root(target, kind)?;
+    let (selected, retained): (Vec<_>, Vec<_>) = std::mem::take(&mut r.entries)
+        .into_iter()
+        .partition(include);
+    if selected.is_empty() {
+        return Ok(());
+    }
+    r.entries = selected;
     let shared = if share {
         SharedRemoval::prepare(target, kind, &r)?
     } else {
@@ -1635,12 +1742,23 @@ fn remove_locked_impl(target: &core::DeploymentTarget, kind: &str, share: bool) 
             fs::remove_file(p)?;
         }
     }
-    fs::remove_file(folder.join("ownership.json"))?;
-    for h in r
+    let removed_backups: BTreeSet<_> = r
         .entries
         .iter()
-        .filter_map(|e| e.original.as_ref())
-        .collect::<BTreeSet<_>>()
+        .filter_map(|e| e.original.clone())
+        .collect();
+    r.entries = retained;
+    if let Some(complete) = previous_complete {
+        r.complete = complete;
+    }
+    if r.entries.is_empty() {
+        fs::remove_file(folder.join("ownership.json"))?;
+    } else {
+        core::atomic_json(&folder.join("ownership.json"), &r)?;
+    }
+    for h in removed_backups
+        .iter()
+        .filter(|h| !r.entries.iter().any(|e| e.original.as_ref() == Some(*h)))
     {
         fs::remove_file(core::no_links(&folder.join(format!("{h}.bak")))?)?;
     }
@@ -1832,7 +1950,10 @@ pub fn remove_many(targets: &[core::DeploymentTarget], kind: &str) -> Result<()>
         let r = (|| {
             let t = t.validate(false)?;
             let _lock = win::game_lock(&t.directory)?;
-            remove_locked(&t, kind)
+            let journal = if kind == "streamline" { "fg" } else { kind };
+            remove_locked_impl(&t, journal, true, None, |entry| {
+                entry_in_component(kind, entry)
+            })
         })();
         if let Err(e) = r {
             errors.push(format!("{}：{e:#}", t.directory.display()));
@@ -2043,6 +2164,33 @@ mod tests {
         repair.extend(candidate_paths(&t, "fg", Some(&evidence))?);
         assert!(repair.contains(&folder.join("sl.common.dll")));
         assert!(repair.contains(&folder.join("nvngx_dlssg.dll")));
+        install_locked(&t, "fg", &repair, &src)?;
+        remove_many(std::slice::from_ref(&t), "streamline")?;
+        assert_eq!(
+            fs::read(folder.join("sl.common.dll"))?,
+            b"original sl.common.dll"
+        );
+        assert_eq!(
+            fs::read(folder.join("nvngx_dlssg.dll"))?,
+            fs::read(&src["nvngx_dlssg.dll"])?
+        );
+        assert!(
+            read(&t, "fg")?
+                .unwrap()
+                .entries
+                .iter()
+                .all(|e| entry_in_component("fg", e))
+        );
+        install_locked(&t, "fg", &repair, &src)?;
+        remove_many(std::slice::from_ref(&t), "fg")?;
+        assert_eq!(
+            fs::read(folder.join("nvngx_dlssg.dll"))?,
+            b"original nvngx_dlssg.dll"
+        );
+        assert_eq!(
+            fs::read(folder.join("sl.common.dll"))?,
+            b"new sl.common.dll"
+        );
         install_locked(&t, "fg", &repair, &src)?;
         remove_locked(&t, "fg")?;
         for name in originals {

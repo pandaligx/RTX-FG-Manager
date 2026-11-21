@@ -34,6 +34,17 @@ impl Component {
         if self.source == "patch" || self.preserves_game_files() {
             return false;
         }
+        if self.kind == "streamline" {
+            return !targets.iter().all(|t| {
+                let status = runtime_files::inspect(t, "streamline");
+                !status.applicable
+                    || runtime_files::installed_package_version(t, "streamline")
+                        .ok()
+                        .flatten()
+                        .as_deref()
+                        == self.package_version.as_deref()
+            });
+        }
         !(self.source == "game"
             && self.kind != "nr"
             && targets
@@ -47,6 +58,22 @@ impl Component {
     ) -> Result<Option<runtime_files::Status>> {
         let added = recipe.scheme == crate::encore::SCHEME
             && crate::encore::supports_200(Some(&recipe.patch_version));
+        if self.kind == "streamline" {
+            let status = runtime_files::inspect(target, "streamline");
+            if !status.applicable {
+                return Ok(None);
+            }
+            ensure!(
+                status.available,
+                "{}",
+                status
+                    .warning
+                    .as_deref()
+                    .unwrap_or("原生 Streamline 插件不可更新")
+            );
+
+            return Ok(Some(status));
+        }
         if self.kind == "encorefg" {
             ensure!(added, "新增帧生成组件需要 Encore 2.0+");
             runtime_files::preflight_added_fg(target, None)?;
@@ -143,7 +170,15 @@ pub fn preview_action(
 /// One line per runtime kind; each version still belongs to its original source.
 pub fn grouped(components: &[Component]) -> Vec<(&str, Vec<&Component>)> {
     [
-        "sr", "rr", "fg", "nr", "xess", "xess_fg", "xell", "encorefg",
+        "sr",
+        "rr",
+        "fg",
+        "nr",
+        "xess",
+        "xess_fg",
+        "xell",
+        "encorefg",
+        "streamline",
     ]
     .into_iter()
     .filter_map(|kind| {
@@ -206,6 +241,9 @@ pub fn preview(
                 combined = Some(RuntimeStep::Unavailable);
                 break;
             };
+            if c.kind == "streamline" && checked.is_none() {
+                continue;
+            }
             let step = if c.kind == "nr" {
                 let status = neural_runtime::inspect(target);
                 if status.present || status.warning.is_some() {
@@ -249,6 +287,7 @@ pub fn label(kind: &str) -> &'static str {
         "xess_fg" => "XeSS FG",
         "xell" => "XeLL",
         "encorefg" => "新增 DLSS 帧生成组件",
+        "streamline" => "Streamline 原生插件",
         _ => "运行库",
     }
 }
@@ -296,8 +335,8 @@ impl Snapshot {
             if c.source == "managed" {
                 files.extend(runtime_files::download_files(
                     targets,
-                    if c.kind == "encorefg" {
-                        "encorefg"
+                    if matches!(c.kind.as_str(), "encorefg" | "streamline") {
+                        &c.kind
                     } else {
                         "xemfg"
                     },
@@ -324,7 +363,15 @@ impl Snapshot {
         for c in &self.components {
             ensure!(
                 [
-                    "sr", "rr", "fg", "nr", "xess", "xess_fg", "xell", "encorefg"
+                    "sr",
+                    "rr",
+                    "fg",
+                    "nr",
+                    "xess",
+                    "xess_fg",
+                    "xell",
+                    "encorefg",
+                    "streamline"
                 ]
                 .contains(&c.kind.as_str())
                     && ["game", "patch", "managed"].contains(&c.source.as_str())
@@ -336,14 +383,25 @@ impl Snapshot {
                     && c.package_version
                         .as_ref()
                         .is_none_or(|v| c.source == "managed"
-                            && ["xess_fg", "xell", "encorefg"].contains(&c.kind.as_str())
+                            && ["xess_fg", "xell", "encorefg", "streamline"]
+                                .contains(&c.kind.as_str())
                             && valid_version(v)
                             && v != "unknown"),
                 "运行库分享信息无效"
             );
             ensure!(
-                c.source != "managed" || ["xess_fg", "xell", "encorefg"].contains(&c.kind.as_str()),
+                c.source != "managed"
+                    || ["xess_fg", "xell", "encorefg", "streamline"].contains(&c.kind.as_str()),
                 "运行库来源无效"
+            );
+            ensure!(
+                c.kind != "streamline"
+                    || c.source == "managed"
+                        && c.package_version
+                            .as_ref()
+                            .is_some_and(|v| runtime_files::versions("streamline").contains(v)
+                                && c.versions.as_slice() == std::slice::from_ref(v)),
+                "原生 Streamline 必须指定受支持的 SDK 版本"
             );
             ensure!(
                 c.kind != "encorefg"
@@ -370,6 +428,9 @@ impl Snapshot {
                 continue;
             }
             if c.source == "managed" {
+                if c.kind == "streamline" {
+                    continue;
+                }
                 if c.kind == "encorefg" {
                     ensure!(
                         runtime_files::versions("encorefg")
@@ -405,7 +466,7 @@ impl Snapshot {
         let managed = self
             .components
             .iter()
-            .filter(|c| c.source == "managed" && c.kind != "encorefg")
+            .filter(|c| c.source == "managed" && matches!(c.kind.as_str(), "xess_fg" | "xell"))
             .collect::<Vec<_>>();
         ensure!(
             managed.is_empty()
@@ -459,9 +520,14 @@ impl Snapshot {
     ) -> Result<()> {
         self.compatible_with(&recipe.scheme, &recipe.entries)?;
         for c in &self.components {
+            let mut matched = false;
             for target in targets {
-                c.preflight_target(target, recipe)?;
+                matched |= c.preflight_target(target, recipe)?.is_some();
             }
+            ensure!(
+                c.kind != "streamline" || matched,
+                "此游戏没有可更新的原生 Streamline 插件，可取消运行库后安装方案"
+            );
         }
         Ok(())
     }
@@ -479,7 +545,7 @@ impl Snapshot {
             !self
                 .components
                 .iter()
-                .any(|c| c.source == "managed" && c.kind != "encorefg")
+                .any(|c| c.source == "managed" && matches!(c.kind.as_str(), "xess_fg" | "xell"))
                 || scheme == "rtx40mfg-1.3.3-hf2" && !entries.iter().any(|e| e.ends_with(".asi")),
             "此方案不能使用独立 XeSS 运行库"
         );
@@ -491,9 +557,16 @@ impl Snapshot {
         Ok(())
     }
     pub fn verify_installed(&self, targets: &[core::DeploymentTarget]) -> Result<()> {
+        let mut native_matched = false;
         for target in targets {
             let actual = capture(target)?;
             for expected in &self.components {
+                if expected.kind == "streamline" {
+                    if !runtime_files::inspect(target, "streamline").applicable {
+                        continue;
+                    }
+                    native_matched = true;
+                }
                 if expected.preserves_game_files() {
                     // Explicitly retained native files are not claimed to be
                     // an exact reproduction of the author's installation.
@@ -516,6 +589,10 @@ impl Snapshot {
                 );
             }
         }
+        ensure!(
+            native_matched || !self.components.iter().any(|c| c.kind == "streamline"),
+            "未匹配到分享中的原生 Streamline 插件"
+        );
         Ok(())
     }
     pub fn install(
@@ -539,10 +616,10 @@ impl Snapshot {
                 })
             };
             if c.source == "managed" {
-                if c.kind == "encorefg" {
+                if matches!(c.kind.as_str(), "encorefg" | "streamline") {
                     runtime_files::install_version(
                         targets,
-                        "encorefg",
+                        &c.kind,
                         c.package_version.as_deref().context("新增帧生成版本未知")?,
                         github,
                         cancel,
@@ -598,7 +675,7 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
         Ok(())
     };
     for status in runtime_files::inspect_all(target) {
-        if matches!(status.kind.as_str(), "xemfg" | "encorefg") {
+        if matches!(status.kind.as_str(), "xemfg" | "encorefg" | "streamline") {
             continue;
         }
         for path in status.paths {
@@ -647,6 +724,14 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
             versions: versions.into_iter().collect(),
         })
         .collect();
+    if let Some(version) = runtime_files::installed_package_version(target, "streamline")? {
+        components.push(Component {
+            kind: "streamline".into(),
+            source: "managed".into(),
+            versions: vec![version.clone()],
+            package_version: Some(version),
+        });
+    }
     if let Some(package_version) = runtime_files::installed_package_version(target, "encorefg")? {
         components.push(Component {
             kind: "encorefg".into(),

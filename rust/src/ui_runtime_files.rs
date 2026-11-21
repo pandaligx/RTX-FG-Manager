@@ -107,6 +107,7 @@ impl Manager {
             if !self.c.busy && self.runtime_game != self.c.focus {
                 self.runtime_game = self.c.focus.clone();
                 self.runtime_versions.clear();
+                self.include_native_streamline = false;
                 self.runtime_expanded.clear();
                 self.runtime_scroll = ScrollHandle::new();
                 cx.notify();
@@ -121,6 +122,7 @@ impl Manager {
         }
         self.runtime_game = self.c.focus.clone();
         self.runtime_versions.clear();
+        self.include_native_streamline = false;
         let owner = cx.entity();
         let title = self.t("DLSS / XeSS 运行库");
         let work = window
@@ -351,7 +353,12 @@ impl Manager {
             } else {
                 versions.into_iter().collect::<Vec<_>>().join(" / ")
             };
-            let available = !statuses.is_empty() && statuses.iter().all(|s| s.available);
+            let available = if kind == "streamline" {
+                statuses.iter().any(|s| s.available)
+                    && statuses.iter().all(|s| !s.applicable || s.available)
+            } else {
+                !statuses.is_empty() && statuses.iter().all(|s| s.available)
+            };
             let managed = statuses.iter().any(|s| s.managed);
             let recommended = runtime_files::recommended(kind);
             let choices = runtime_files::versions(kind);
@@ -409,6 +416,54 @@ impl Manager {
             } else {
                 picker.into_any_element()
             };
+            let controls = div()
+                .h_flex()
+                .flex_shrink_0()
+                .gap_1()
+                .when(!restore_only, |row| {
+                    row.child(
+                        self.button(
+                            match kind {
+                                "sr" => "runtime-sr-install",
+                                "rr" => "runtime-rr-install",
+                                "fg" => "runtime-fg-install",
+                                "streamline" => "runtime-streamline-install",
+                                "encorefg" => "runtime-encorefg-install",
+                                _ => "runtime-xemfg-install",
+                            },
+                            if matches!(kind, "xemfg" | "encorefg") {
+                                "安装"
+                            } else {
+                                "备份并更新"
+                            },
+                            Command::RuntimeOperation(kind, false),
+                            cx,
+                        )
+                        .small()
+                        .disabled(self.c.busy || self.c.read_only || !available),
+                    )
+                })
+                .child(
+                    self.button(
+                        match kind {
+                            "sr" => "runtime-sr-restore",
+                            "rr" => "runtime-rr-restore",
+                            "fg" => "runtime-fg-restore",
+                            "streamline" => "runtime-streamline-restore",
+                            "encorefg" => "runtime-encorefg-restore",
+                            _ => "runtime-xemfg-restore",
+                        },
+                        if matches!(kind, "xemfg" | "encorefg") {
+                            "卸载"
+                        } else {
+                            "恢复原件"
+                        },
+                        Command::RuntimeOperation(kind, true),
+                        cx,
+                    )
+                    .small()
+                    .disabled(self.c.busy || self.c.read_only || !managed),
+                );
             let mut card = div()
                 .v_flex()
                 .flex_shrink_0()
@@ -424,9 +479,10 @@ impl Manager {
                         .items_center()
                         .gap_x_2()
                         .gap_y_1()
-                        .justify_between()
                         .child(
                             div()
+                                .flex_grow(1.)
+                                .min_w(rems(8.0))
                                 .font_weight(FontWeight::MEDIUM)
                                 .child(self.t(runtime_files::label(kind))),
                         )
@@ -434,9 +490,10 @@ impl Manager {
                             div().text_xs().child(current).into_any_element()
                         } else {
                             runtime_version_indicator(current, target, cx)
-                        }),
+                        })
+                        .child(controls),
                 );
-            let groups = if kind == "fg" {
+            let groups = if kind == "streamline" {
                 statuses
                     .iter()
                     .flat_map(|s| &s.streamline)
@@ -445,13 +502,44 @@ impl Manager {
             } else {
                 BTreeMap::new()
             };
+            let paths = if kind == "streamline" && !groups.is_empty() {
+                BTreeSet::new()
+            } else {
+                paths
+            };
+            if kind == "fg"
+                && !restore_only
+                && available
+                && snapshot.is_some_and(|s| {
+                    s.runtimes
+                        .iter()
+                        .any(|r| r.kind == "streamline" && r.available)
+                })
+            {
+                card = card.child(
+                    Checkbox::new("fg-native-streamline")
+                        .label(self.t("同时更新游戏已有的 Streamline 插件"))
+                        .checked(self.include_native_streamline)
+                        .disabled(self.c.busy || self.c.read_only)
+                        .on_click(cx.listener(|this, checked, _, cx| {
+                            this.include_native_streamline = *checked;
+                            cx.notify();
+                        })),
+                );
+            }
             let locations = self.runtime_locations(kind, paths, groups, cx);
             if let Some(locations) = locations {
                 card = card.child(locations);
             }
             if kind == "encorefg" && !available && statuses.iter().any(|s| s.applicable) {
-                card = card.child(div().text_xs().text_color(cx.theme().muted_foreground)
-                    .child(self.t("此项仅为无原生帧生成的游戏添加引擎。原生 Streamline 插件显示在上方 DLSS 帧生成中；Encore 的额外引擎提示不代表原生帧生成失效。")));
+                card = card.child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(
+                            self.t("游戏已有原生帧生成时，可在「Streamline 原生插件」中检查更新。"),
+                        ),
+                );
             }
             if let Some(warning) = statuses.iter().find_map(|s| s.warning.as_ref()) {
                 card = card.child(
@@ -477,55 +565,6 @@ impl Manager {
                         .child(self.t(self.c.runtime_catalog_load.single_version_hint(kind))),
                 );
             }
-            card = card.child(
-                div()
-                    .h_flex()
-                    .flex_wrap()
-                    .gap_1p5()
-                    .justify_end()
-                    .when(!restore_only, |row| {
-                        row.child(
-                            self.button(
-                                match kind {
-                                    "sr" => "runtime-sr-install",
-                                    "rr" => "runtime-rr-install",
-                                    "fg" => "runtime-fg-install",
-                                    "encorefg" => "runtime-encorefg-install",
-                                    _ => "runtime-xemfg-install",
-                                },
-                                if matches!(kind, "xemfg" | "encorefg") {
-                                    "安装"
-                                } else {
-                                    "备份并更新"
-                                },
-                                Command::RuntimeOperation(kind, false),
-                                cx,
-                            )
-                            .small()
-                            .disabled(self.c.busy || self.c.read_only || !available),
-                        )
-                    })
-                    .child(
-                        self.button(
-                            match kind {
-                                "sr" => "runtime-sr-restore",
-                                "rr" => "runtime-rr-restore",
-                                "fg" => "runtime-fg-restore",
-                                "encorefg" => "runtime-encorefg-restore",
-                                _ => "runtime-xemfg-restore",
-                            },
-                            if matches!(kind, "xemfg" | "encorefg") {
-                                "卸载"
-                            } else {
-                                "恢复原件"
-                            },
-                            Command::RuntimeOperation(kind, true),
-                            cx,
-                        )
-                        .small()
-                        .disabled(self.c.busy || self.c.read_only || !managed),
-                    ),
-            );
             rows = rows.child(card);
         }
         let game = self

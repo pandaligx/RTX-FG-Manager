@@ -76,6 +76,19 @@ fn steam_root(exe: &Path) -> Option<&Path> {
         })
     })
 }
+/// Resolve local Steam artwork against the same install record used for game names.
+pub fn steam_artwork_id(exe: &Path) -> Option<(&Path, String)> {
+    let root = steam_root(exe)?;
+    let apps = root.parent()?.parent()?;
+    let installs = steam_installs(apps, &AtomicBool::new(false));
+    let id = installs
+        .get(&core::key(root))?
+        .keys
+        .first()?
+        .strip_prefix("steam:")?;
+    Some((apps.parent()?, id.to_owned()))
+}
+
 fn steam_installs(apps: &Path, cancel: &AtomicBool) -> BTreeMap<String, Identity> {
     let mut result = BTreeMap::new();
     let Ok(entries) = fs::read_dir(apps) else {

@@ -1389,6 +1389,11 @@ impl Recommendations {
     fn vote_button(&self, card: &rec::Card, useful: bool, cx: &Context<Self>) -> Button {
         let selected = if useful { card.liked } else { card.disliked };
         let vote = card.clone();
+        let hint = format!(
+            "{} ({})",
+            self.t(if useful { "有用" } else { "无用" }),
+            if useful { card.likes } else { card.dislikes }
+        );
         self.button(
             SharedString::from(format!("recipe-vote-{}-{useful}", card.id)),
             "",
@@ -1400,11 +1405,9 @@ impl Recommendations {
         } else {
             gpui::assets::IconName::ThumbsDown
         }))
-        .label(format!(
-            "{} {}",
-            self.t(if useful { "有用" } else { "无用" }),
-            if useful { card.likes } else { card.dislikes }
-        ))
+        .ghost()
+        .accessibility_label(hint.clone())
+        .tooltip(hint)
         .selected(selected)
         .when(selected, |b| {
             b.text_color(if useful {
@@ -1539,6 +1542,12 @@ impl Recommendations {
                     cx.notify();
                 })),
             );
+            let mut feedback = div()
+                .h_flex()
+                .gap_1()
+                .items_center()
+                .child(self.vote_button(card, true, cx))
+                .child(self.vote_button(card, false, cx));
             if card.mine {
                 actions = actions
                     .child(
@@ -1565,17 +1574,23 @@ impl Recommendations {
                         })),
                     );
             } else {
-                actions = actions.child(
+                let report_hint = self.t(if card.reported {
+                    "撤销举报"
+                } else {
+                    "举报"
+                });
+                feedback = feedback.child(
                     self.button(
                         SharedString::from(format!("recipe-report-{}", card.id)),
-                        if card.reported {
-                            "撤销举报"
-                        } else {
-                            "举报"
-                        },
+                        "",
                         cx,
                     )
+                    .small()
                     .ghost()
+                    .icon(gpui::assets::IconName::Flag)
+                    .selected(card.reported)
+                    .accessibility_label(report_hint.clone())
+                    .tooltip(report_hint)
                     .disabled(self.busy || self.cached)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         if !this.logged_in() {
@@ -1612,13 +1627,7 @@ impl Recommendations {
                         .justify_between()
                         .gap_1()
                         .child(actions)
-                        .child(
-                            div()
-                                .h_flex()
-                                .gap_1()
-                                .child(self.vote_button(card, true, cx))
-                                .child(self.vote_button(card, false, cx)),
-                        ),
+                        .child(feedback),
                 )
                 .when(card.status == "hidden", |d| {
                     d.child(
@@ -2540,9 +2549,9 @@ impl Recommendations {
                         .child(div().h_flex().flex_wrap().gap_x_3().gap_y_1().text_xs().text_color(cx.theme().muted_foreground)
                             .child(self.card_date(card))
                             .child(div().h_flex().gap_1().child(Icon::new(gpui::assets::IconName::ThumbsUp).size_3())
-                                .child(format!("{} {}", self.t("有用"),card.likes)))
+                                .child(card.likes.to_string()))
                             .child(div().h_flex().gap_1().child(Icon::new(gpui::assets::IconName::ThumbsDown).size_3())
-                                .child(format!("{} {}",self.t("无用"),card.dislikes))))))
+                                .child(card.dislikes.to_string())))))
                 .when(!card.content.platform.is_empty() && card.content.platform!="unknown" && card.content.platform!=rec::platform(&self.game),|d|d.child(div().text_sm().text_color(cx.theme().warning).child(self.t("此方案来自其他平台，请核对游戏版本和图形接口后使用。"))))
                 .when(changed,|d|d.child(div().text_sm().text_color(cx.theme().warning).child(self.t("玩家测试版本 {0}；将使用同项目当前版本 {1}。原点赞针对玩家分享，不代表新版已通过测试。").replace("{0}",&card.content.patch_version).replace("{1}",available.as_deref().unwrap_or_default()))))
                 .when_some(available.as_ref().err(),|d,e|d.child(div().text_sm().text_color(cx.theme().warning).child(self.t(&e.to_string()))))
@@ -2749,7 +2758,7 @@ impl Manager {
             .unwrap_or(window.bounds());
         let options = WindowOptions {
             titlebar: Some(TitlebarOptions {
-                title: Some(self.t("玩家推荐方案")),
+                title: Some(self.t("其他玩家分享的方案")),
                 appears_transparent: true,
                 ..Default::default()
             }),

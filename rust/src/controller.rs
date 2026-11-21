@@ -828,6 +828,13 @@ impl Controller {
             "rtxfg-0.3.5-dx12-vulkan" => {
                 Some("Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan")
             }
+            upstream040::PIPO_SCHEME => {
+                let version = p.upstream_version.as_deref().unwrap_or(&p.version);
+                return format!(
+                    "Dlssg_for_sm86-MFG-version · {} · DX12",
+                    version.trim_end_matches("-pipo")
+                );
+            }
             upstream040::PIPO_VULKAN_SCHEME => Some("Dlssg_for_sm86-MFG-version · sm86-7 · Vulkan"),
             "rtx40mfg-1.3.3-hf2" => {
                 return format!(

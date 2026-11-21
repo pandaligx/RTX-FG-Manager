@@ -7,6 +7,11 @@ mod game_icons;
 #[cfg(not(windows))]
 #[path = "game_icons_linux.rs"]
 mod game_icons;
+// The PE resource parser is platform-independent and can run its fixtures on Windows CI.
+#[cfg(all(windows, test))]
+#[path = "game_icons_linux.rs"]
+mod portable_icon_tests;
+mod steam_artwork;
 mod ui;
 mod ui_assets;
 mod ui_focus;

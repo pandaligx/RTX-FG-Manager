@@ -28,6 +28,14 @@ pub fn extract(path: &Path) -> Result<image::RgbaImage> {
             }
         }
     }
+    crate::steam_artwork::resolve(&path, || {
+        let icon = shell_icon(&path)?;
+        ensure!(icon.pixels().any(|p| p[3] > 0), "Empty EXE icon");
+        Ok(icon)
+    })
+}
+
+fn shell_icon(path: &Path) -> Result<image::RgbaImage> {
     let wide = rtx_fg_manager::win::wide(path);
     // SAFETY: Shell extraction reads resources, without loading executable code.
     // Each icon/DC/bitmap is released, including failure paths. The DIB buffer

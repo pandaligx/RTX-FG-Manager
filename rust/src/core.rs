@@ -1161,9 +1161,6 @@ pub fn deploy_prepared_context_at_with_overrides(
     let config = config_name(backend);
     let mut expected =
         deployment_names_for_version(backend, proxies, upstream_version.or(payload_version))?;
-    if context.is_some_and(|c| c.scheme == crate::upstream040::PIPO_SCHEME) {
-        ensure!(proxies.len() == 1, "Pipo 0.4.2 每次仅安装一个 DLL 入口");
-    }
     if backend == crate::encore::BACKEND
         && crate::encore::INTEL_FILES
             .iter()

@@ -68,7 +68,7 @@ export function recipe(input) {
     && new Set(input.entries).size === input.entries.length
     && input.entries.every(e => schemes[input.scheme].includes(e)), 'invalid_entries');
   need(!input.entries.some(e => e.endsWith('.asi')) || input.entries.length === 1, 'plugin_proxy_conflict');
-  need(!['anr-fg','pipo-sm86-10'].includes(input.scheme) || input.entries.length===1,'invalid_entries');
+  need(input.scheme !== 'anr-fg' || input.entries.length === 1, 'invalid_entries');
   need(typeof input.patchVersion === 'string' && /^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(input.patchVersion)
     && input.patchVersion.length <= 40, 'invalid_patch_version');
   need(['dx12','vulkan','dx11','unknown'].includes(input.renderer), 'invalid_renderer');
@@ -79,7 +79,7 @@ export function recipe(input) {
   if(runtimes?.components.some(c=>c.kind==='encorefg')) need(input.scheme==='dlssg-transfusion-1.4.5.3' && Number(input.patchVersion.split('.')[0])>=2,'unsupported_runtime_for_scheme');
   if(input.scheme==='mfg-unlocker-1.6.1-compat'){
     need(input.patchVersion==='1.6.1','invalid_patch_version');
-    need(input.neuralRuntime==='none' && (!runtimes || runtimes.components.every(c=>c.kind!=='nr' && c.source!=='managed')),'unsupported_runtime_for_scheme');
+    need(input.neuralRuntime==='none' && (!runtimes || runtimes.components.every(c=>c.kind!=='nr' && (c.source!=='managed' || c.kind==='streamline'))),'unsupported_runtime_for_scheme');
   }
   return { schema: 1, game, title: text(input.title, 80), notes: text(input.notes || '', NOTES_LIMIT, true),
     ...(input.presets===undefined?{}:{presets:presetSnapshot(input.presets,input.scheme,input.patchVersion)}),

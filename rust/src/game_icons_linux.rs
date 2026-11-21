@@ -6,7 +6,7 @@
 //!
 //! Supported sources:
 //! * standalone `.ico` files (`ICONDIR` / `ICONDIRENTRY`),
-//! * PE resources `RT_GROUP_ICON` (type 3) + `RT_ICON` (type 14), where the
+//! * PE resources `RT_GROUP_ICON` (type 14) + `RT_ICON` (type 3), where the
 //!   icon payload is either a DIB (`BITMAPINFOHEADER`, 32/24/8/4/1 bpp) or an
 //!   embedded PNG.
 //!
@@ -24,9 +24,9 @@ pub const ICON_PIXELS: u32 = 128;
 const MAX_ICON_BYTES: usize = 4 * 1024 * 1024;
 
 /// PE resource type: icon directory group (GRPICONDIR).
-const RT_GROUP_ICON: u32 = 3;
+const RT_GROUP_ICON: u32 = 14;
 /// PE resource type: a single icon bitmap (DIB or PNG).
-const RT_ICON: u32 = 14;
+const RT_ICON: u32 = 3;
 
 const PNG_MAGIC: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
@@ -36,6 +36,10 @@ const PNG_MAGIC: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
 /// Errors with a descriptive message when the file has no icon, is not a PE /
 /// ICO, or the icon cannot be decoded.
 pub fn extract(path: &std::path::Path) -> Result<RgbaImage> {
+    crate::steam_artwork::resolve(path, || native_icon(path))
+}
+
+fn native_icon(path: &std::path::Path) -> Result<RgbaImage> {
     let data = std::fs::read(path)
         .with_context(|| format!("failed to read icon source {}", path.display()))?;
 
@@ -1191,8 +1195,8 @@ mod tests {
             &mut rsrc,
             ROOT_DIR,
             &[
-                (3, 0x8000_0000 | GROUP_DIR as u32), // RT_GROUP_ICON
-                (14, 0x8000_0000 | ICON_DIR as u32), // RT_ICON
+                (3, 0x8000_0000 | ICON_DIR as u32),   // RT_ICON
+                (14, 0x8000_0000 | GROUP_DIR as u32), // RT_GROUP_ICON
             ],
         );
         write_dir(

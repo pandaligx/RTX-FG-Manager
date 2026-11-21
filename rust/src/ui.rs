@@ -233,6 +233,7 @@ pub struct Manager {
     runtime_versions: HashMap<&'static str, String>,
     runtime_scroll: ScrollHandle,
     runtime_expanded: HashSet<&'static str>,
+    include_native_streamline: bool,
     editor_open: bool,
     preset_close: Option<bool>, // true: app exit; false: editor dismissal
     theme_preview: theme_preview::ThemePreview<WindowId>,
@@ -400,6 +401,7 @@ impl Manager {
             runtime_versions: HashMap::new(),
             runtime_scroll: ScrollHandle::new(),
             runtime_expanded: HashSet::new(),
+            include_native_streamline: false,
             drag_gap: None,
             editor_open: false,
             preset_close: None,
@@ -651,6 +653,7 @@ impl Manager {
             }
             Command::ClearCache => self.c.clear_cache(),
             Command::Refresh => {
+                self.c.icons.retain(|_, icon| icon.is_some());
                 if let Some(exe) = self.c.focus.clone() {
                     self.c.evidence.remove(&exe);
                     self.c.inspect(exe);
@@ -690,7 +693,12 @@ impl Manager {
                     })
                     .cloned()
                     .unwrap_or_else(|| rtx_fg_manager::runtime_files::recommended(kind));
-                self.c.runtime_operation(kind, remove, version);
+                let operation = if kind == "fg" && !remove && self.include_native_streamline {
+                    "fg-with-streamline"
+                } else {
+                    kind
+                };
+                self.c.runtime_operation(operation, remove, version);
             }
             Command::RecheckBlocked => {
                 self.dialog_active = false;
@@ -1021,10 +1029,11 @@ impl Manager {
         let button = self
             .button(
                 "game-recommendations",
-                "玩家推荐方案",
+                "其他玩家分享的方案",
                 Command::Recommendations(exe),
                 cx,
             )
+            .tooltip(self.t("如果您不懂如何使用让帧生成生效，点此查看其他玩家推荐方案"))
             .custom(
                 ButtonCustomVariant::new(cx)
                     .color(theme.background)
@@ -2422,8 +2431,6 @@ impl Manager {
             "Insert（Ins）打开菜单。DX12 选 dxgi.dll，Vulkan 选 winmm.dll。需 VC++ 2015–2022 x64；已有 OptiScaler 请先还原。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {
             "单选入口：优先 version.dll，也可选 dinput8 / dxgi / winmm。"
-        } else if self.c.cloud_scheme() == rtx_fg_manager::upstream040::PIPO_SCHEME {
-            "选择一个入口，建议使用 version.dll。"
         } else if rtx_fg_manager::upstream040::is_profile(&self.c.parameter_profile()) {
             "建议只选一个 DLL；多选可能冲突。"
         } else if self.c.cloud_scheme().starts_with("upstream") {

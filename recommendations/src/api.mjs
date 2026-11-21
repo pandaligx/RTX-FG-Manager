@@ -16,7 +16,7 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
-    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, anr:1, notesLimit:NOTES_LIMIT };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, nativeStreamline:1, anr:1, notesLimit:NOTES_LIMIT };
     if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
@@ -48,6 +48,7 @@ export function createApi(db, options) {
     const encore210=p=>p?.profile==='rtx_encore_json_v4' && ['values','defaults'].some(part=>Object.hasOwn(p[part],'xefgSourcePacing'));
     const encore220=p=>p?.profile==='rtx_encore_json_v4' && ['values','defaults'].some(part=>['overrideAutoFrameGeneration','spatialSharpness','spatialAa','spatialAaPlacement','spatialAaQuality'].some(k=>Object.hasOwn(p[part],k)) || p[part].dlssWithoutGameDlssEngine==='nis');
     const encore230=p=>p?.profile==='rtx_encore_json_v4' && ['values','defaults'].some(part=>['xefgSourcePacingMode','xefgSourcePacingLossPercent','xefgSourcePacingManualDetection','xefgSourcePacingManualAdjustments','nrExposureMode'].some(k=>Object.hasOwn(p[part],k)) || p[part].nrPlacement==='present' || p[part].presentOpticalFlow==='game' || p[part].dlssWithoutGameDlssEngine==='fsr1');
+    const nativeSL = headers['x-rtxfg-native-streamline'] === '1';
     const addedFg=r=>r?.components.some(c=>c.kind==='encorefg');
     const crossStore=['4','5','6','7','8','9','10','11','12','13','14','15','16'].includes(feedback);
     const context=url.searchParams.get('game');
@@ -55,6 +56,10 @@ export function createApi(db, options) {
       const result=publicRecipe(db,row,user,['2','3','4','5','6','7','8','9','10','11','12','13','14','15','16'].includes(feedback),['3','4','5','6','7','8','9','10','11','12','13','14','15','16'].includes(feedback),['5','6','7','8','9','10','11','12','13','14','15','16'].includes(feedback));
       if(!['6','7','8','9','10','11','12','13','14','15','16'].includes(feedback)) delete result.content.presets;
       if(!['7','8','9','10','11','12','13','14','15','16'].includes(feedback)) delete result.content.runtimes;
+      if(!nativeSL && result.content.runtimes){
+        result.content.runtimes.components=result.content.runtimes.components.filter(c=>c.kind!=='streamline');
+        if(!result.content.runtimes.components.length)delete result.content.runtimes;
+      }
       if(!['9','10','11','12','13','14','15','16'].includes(feedback) && result.content.presets?.profile==='upstream041') delete result.content.presets;
       if(!['10','11','12','13','14','15','16'].includes(feedback) && result.content.scheme==='mfg-unlocker-1.6.1-compat') delete result.content.presets;
       if(!['11','12','13','14','15','16'].includes(feedback) && newEncore(result.content.presets)) delete result.content.presets;
@@ -198,6 +203,13 @@ export function createApi(db, options) {
       if(!['13','14','15','16'].includes(feedback) && original.scheme===content.scheme && original.patchVersion===content.patchVersion) {
         if(encore200(original.presets)) content.presets=original.presets;
         if(addedFg(original.runtimes)) content.runtimes=original.runtimes;
+      }
+      if(!nativeSL && original.scheme===content.scheme && original.patchVersion===content.patchVersion){
+        const sl=original.runtimes?.components.find(c=>c.kind==='streamline');
+        if(sl){
+          const components=(content.runtimes?.components || []).filter(c=>c.kind!=='streamline');
+          content.runtimes={schema:1,components:[...components,sl]};
+        }
       }
       if(!crossStore)for(const field of ['platform','edition'])if(original[field])content[field]=original[field];
       db.prepare('UPDATE recipes SET content=?,revision=revision+1,updated=? WHERE id=?').run(JSON.stringify(content),t,row.id);

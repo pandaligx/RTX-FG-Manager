@@ -1,4 +1,10 @@
 {
+  "同时更新游戏已有的 Streamline 插件": "Also update this game's native Streamline plugins",
+  "游戏已有原生帧生成时，可在「Streamline 原生插件」中检查更新。": "For games with native frame generation, check Native Streamline plugins for updates.",
+  "Streamline 原生插件": "Native Streamline plugins",
+  "未检测到可更新的游戏原生 Streamline 插件": "No updatable native Streamline plugins found in this game.",
+  "此目录没有可更新的原生 Streamline 插件，可取消运行库后安装方案": "This directory has no eligible native Streamline plugins. Deselect runtimes to install the patch alone.",
+  "原生 Streamline 必须指定受支持的 SDK 版本": "Choose a supported SDK version for native Streamline plugins.",
   "场景切换保护": "Scene-cut protection",
   "计算路径": "Compute path",
   "0.4.2 的 Auto 等同关闭：连同 UI 插帧。严格模式需要游戏提供无 HUD 输入；0.4.1 保持原版本行为。": "In 0.4.2, Auto means off: interpolate the whole image including UI. Strict mode requires HUD-less game input. Version 0.4.1 retains its original behavior.",

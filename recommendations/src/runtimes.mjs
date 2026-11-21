@@ -6,13 +6,14 @@ export function runtimeSnapshot(input){
   const seen=new Set();
   const components=input.components.map(c=>{
     exact(c,['kind','versions','source','packageVersion']);
-    need(['sr','rr','fg','nr','xess','xess_fg','xell','encorefg'].includes(c.kind)
+    need(['sr','rr','fg','nr','xess','xess_fg','xell','encorefg','streamline'].includes(c.kind)
       && ['game','patch','managed'].includes(c.source),'invalid_runtime_component');
     const key=c.source+':'+c.kind;need(!seen.has(key),'duplicate_runtime_component');seen.add(key);
     need(Array.isArray(c.versions) && c.versions.length>0 && c.versions.length<=8
       && c.versions.every(version) && new Set(c.versions).size===c.versions.length,'invalid_runtime_version');
-    need(c.source!=='managed' || ['xess_fg','xell','encorefg'].includes(c.kind),'invalid_runtime_source');
+    need(c.source!=='managed' || ['xess_fg','xell','encorefg','streamline'].includes(c.kind),'invalid_runtime_source');
     need(c.packageVersion===undefined || c.source==='managed' && version(c.packageVersion) && c.packageVersion!=='unknown','invalid_runtime_package');
+    need(c.kind!=='streamline' || c.source==='managed' && c.packageVersion==='2.14.16' && c.versions.length===1 && c.versions[0]===c.packageVersion,'invalid_native_streamline_set');
     need(c.kind!=='encorefg' || c.source==='managed' && c.packageVersion==='2.14.16' && c.versions.length===2 && c.versions.map(v=>v.endsWith('.0') && v.split('.').length===4?v.slice(0,-2):v).sort().join(',')==='2.14.16,310.9.16','invalid_added_fg_set');
     return {kind:c.kind,source:c.source,versions:[...c.versions].sort(),...(c.packageVersion===undefined?{}:{packageVersion:c.packageVersion})};
   }).sort((a,b)=>(a.source+':'+a.kind).localeCompare(b.source+':'+b.kind,'en'));
