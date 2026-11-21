@@ -1,8 +1,7 @@
-//! Pure-Rust game icon extraction for Linux.
+//! Shared, resource-only reader for Windows and Linux game icons.
 //!
-//! A drop-in replacement for the Windows `SHDefExtractIconW` / `ExtractIconExW`
-//! shell APIs: it reads a game's icon out of a PE executable (`.exe` / `.dll`)
-//! or a standalone `.ico` file **without ever executing it**.
+//! Reads original frames from a PE executable (`.exe` / `.dll`) or a standalone
+//! `.ico` file. Windows can fall back to Shell extraction for other layouts.
 //!
 //! Supported sources:
 //! * standalone `.ico` files (`ICONDIR` / `ICONDIRENTRY`),
@@ -10,15 +9,11 @@
 //!   icon payload is either a DIB (`BITMAPINFOHEADER`, 32/24/8/4/1 bpp) or an
 //!   embedded PNG.
 //!
-//! The public contract is exactly a 128x128 RGBA image (`ICON_PIXELS`, same as
-//! the Windows implementation). Anything else is scaled with Lanczos3. A
-//! missing/undecodable icon is always an error, never a blank image.
+//! Original icon frames retain their aspect ratio and pixels for high-DPI rendering.
 
 use anyhow::{Context, Result, anyhow, bail};
 use image::{ImageFormat, RgbaImage};
-
-/// Side length, in pixels, of the image returned by [`extract`].
-pub const ICON_PIXELS: u32 = 128;
+use std::io::{Read, Seek, SeekFrom};
 
 /// Hard cap on any single icon payload we are willing to load/decode.
 const MAX_ICON_BYTES: usize = 4 * 1024 * 1024;
@@ -30,11 +25,12 @@ const RT_ICON: u32 = 3;
 
 const PNG_MAGIC: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
-/// Extract a 128x128 RGBA icon from `path`.
+/// Extract the highest-resolution original RGBA icon from `path`.
 ///
 /// `path` may be a standalone `.ico` file or a PE image (`.exe` / `.dll`).
 /// Errors with a descriptive message when the file has no icon, is not a PE /
 /// ICO, or the icon cannot be decoded.
+#[cfg(any(not(windows), test))]
 pub fn extract(
     path: &std::path::Path,
     index: &mut rtx_fg_manager::game_identity::SteamArtworkIndex,
@@ -42,46 +38,34 @@ pub fn extract(
     crate::steam_artwork::resolve(path, index, || native_icon(path))
 }
 
-fn native_icon(path: &std::path::Path) -> Result<RgbaImage> {
-    let data = std::fs::read(path)
-        .with_context(|| format!("failed to read icon source {}", path.display()))?;
-
-    let image = if data.starts_with(b"MZ") {
-        extract_pe_icon(&data)
+pub(super) fn native_icon(path: &std::path::Path) -> Result<RgbaImage> {
+    let mut file = std::fs::File::open(path)?;
+    let mut magic = [0; 4];
+    file.read_exact(&mut magic)?;
+    file.rewind()?;
+    let image = if magic.starts_with(b"MZ") {
+        read_pe_icon(&mut file)
             .with_context(|| format!("failed to extract icon from PE file {}", path.display()))?
-    } else if data.starts_with(&[0x00, 0x00, 0x01, 0x00]) || has_ico_extension(path) {
-        extract_standalone_ico(&data)
-            .with_context(|| format!("failed to decode .ico file {}", path.display()))?
+    } else if magic == [0, 0, 1, 0]
+        || path
+            .extension()
+            .is_some_and(|s| s.eq_ignore_ascii_case("ico"))
+    {
+        let mut bytes = Vec::new();
+        file.take((MAX_ICON_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)?;
+        cap_icon_size(bytes.len())?;
+        extract_standalone_ico(&bytes)?
     } else {
         bail!(
-            "{} is neither a PE executable (missing 'MZ') nor an .ico file",
+            "{} is neither a PE executable nor an .ico file",
             path.display()
         );
     };
-
-    finalize(image, path)
-}
-
-fn has_ico_extension(path: &std::path::Path) -> bool {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| e.eq_ignore_ascii_case("ico"))
-}
-
-/// Guarantee the exact 128x128 RGBA output contract.
-fn finalize(image: RgbaImage, path: &std::path::Path) -> Result<RgbaImage> {
-    if image.width() == 0 || image.height() == 0 {
-        bail!("decoded icon from {} has zero size", path.display());
+    if !image.pixels().any(|p| p[3] != 0) {
+        bail!("empty game icon");
     }
-    if image.width() == ICON_PIXELS && image.height() == ICON_PIXELS {
-        return Ok(image);
-    }
-    Ok(image::imageops::resize(
-        &image,
-        ICON_PIXELS,
-        ICON_PIXELS,
-        image::imageops::FilterType::Lanczos3,
-    ))
+    Ok(image)
 }
 
 // ---------------------------------------------------------------------------
@@ -135,48 +119,13 @@ fn ico_dim(raw: u8) -> u32 {
 
 /// Pick the best entry among icon directory dimensions.
 ///
-/// Preference: exactly 128x128, then the nearest width above 128, then the
-/// largest width <= 256, and finally the largest available at all.
+/// ICO and RT_GROUP_ICON encode 256 as zero. The directory parser has already
+/// expanded it, so keep the most detailed original frame with no upscaling.
 fn choose_best_index(dims: &[(u32, u32)]) -> Option<usize> {
-    if dims.is_empty() {
-        return None;
-    }
-
-    // 1. Exactly 128x128: the native output size, no resampling needed.
-    for (i, &d) in dims.iter().enumerate() {
-        if d.0 == 128 && d.1 == 128 {
-            return Some(i);
-        }
-    }
-
-    // 2. Nearest above 128 (and <= 256): downscales cleanly.
-    let mut best: Option<(usize, (u32, u32))> = None;
-    for (i, &d) in dims.iter().enumerate() {
-        if d.0 <= 256 && d.1 <= 256 && d.0 > 128 && best.is_none_or(|(_, b)| d < b) {
-            best = Some((i, d));
-        }
-    }
-    if let Some((i, _)) = best {
-        return Some(i);
-    }
-
-    // 3. Largest frame that is still <= 256.
-    for (i, &d) in dims.iter().enumerate() {
-        if d.0 <= 256 && d.1 <= 256 && best.is_none_or(|(_, b)| d > b) {
-            best = Some((i, d));
-        }
-    }
-    if let Some((i, _)) = best {
-        return Some(i);
-    }
-
-    // 4. Anything available, largest first.
-    for (i, &d) in dims.iter().enumerate() {
-        if best.is_none_or(|(_, b)| d > b) {
-            best = Some((i, d));
-        }
-    }
-    best.map(|(i, _)| i)
+    dims.iter()
+        .enumerate()
+        .max_by_key(|(_, (w, h))| u64::from(*w) * u64::from(*h))
+        .map(|(i, _)| i)
 }
 
 // ---------------------------------------------------------------------------
@@ -505,8 +454,15 @@ fn parse_group_icon(bytes: &[u8]) -> Result<Vec<GroupEntry>> {
 }
 
 /// Extract and decode the best icon from a PE image's resources.
+#[cfg(test)]
 fn extract_pe_icon(data: &[u8]) -> Result<RgbaImage> {
-    let layout = parse_pe_sections(data)?;
+    read_pe_icon(&mut std::io::Cursor::new(data))
+}
+fn read_pe_icon(reader: &mut (impl Read + Seek)) -> Result<RgbaImage> {
+    // Even very large games need only their PE headers and resource section.
+    let mut header = Vec::new();
+    reader.by_ref().take(256 * 1024).read_to_end(&mut header)?;
+    let layout = parse_pe_sections(&header)?;
     let resource_rva = layout.resource_rva;
     let sections = &layout.sections;
     let rsrc = sections
@@ -521,10 +477,19 @@ fn extract_pe_icon(data: &[u8]) -> Result<RgbaImage> {
         bail!("PE .rsrc section has no raw data");
     }
 
-    let file_base = rsrc.pointer_to_raw_data as usize;
-    if file_base >= data.len() {
-        bail!("PE .rsrc section lies past end of file");
+    let start = u64::from(rsrc.pointer_to_raw_data);
+    let size = u64::from(rsrc.size_of_raw_data);
+    let end = reader.seek(SeekFrom::End(0))?;
+    if start >= end || size > 64 * 1024 * 1024 {
+        bail!("unavailable or oversized PE resource section");
     }
+    reader.seek(SeekFrom::Start(start))?;
+    let mut section = Vec::new();
+    reader
+        .take(size.min(end - start))
+        .read_to_end(&mut section)?;
+    let data = section.as_slice();
+    let file_base = 0usize;
 
     // The resource directory root lives at the section-relative offset of the
     // DataDirectory RVA; entry offsets are relative to it, not the section.
@@ -625,7 +590,15 @@ fn extract_pe_icon(data: &[u8]) -> Result<RgbaImage> {
 /// Decode one `RT_ICON` / ICO frame payload: an embedded PNG, or a DIB.
 fn decode_icon_resource(bytes: &[u8]) -> Result<RgbaImage> {
     if bytes.len() >= 8 && bytes[..8] == PNG_MAGIC {
-        let image = image::load_from_memory_with_format(bytes, ImageFormat::Png)
+        let mut reader =
+            image::ImageReader::with_format(std::io::Cursor::new(bytes), ImageFormat::Png);
+        let mut limits = image::Limits::default();
+        limits.max_image_width = Some(1024);
+        limits.max_image_height = Some(1024);
+        limits.max_alloc = Some(16 * 1024 * 1024);
+        reader.limits(limits);
+        let image = reader
+            .decode()
             .context("failed to decode PNG payload inside icon resource")?;
         return Ok(image.to_rgba8());
     }
@@ -896,9 +869,9 @@ mod tests {
         Ok(())
     }
 
-    /// A 256x256 frame must not shadow the native 128x128 frame.
+    /// Keep the larger original frame for high-DPI displays.
     #[test]
-    fn standalone_ico_prefers_128_frame() -> Result<()> {
+    fn standalone_ico_prefers_full_resolution_frame() -> Result<()> {
         let big = RgbaImage::from_pixel(256, 256, Rgba([0, 255, 0, 255]));
         let small = RgbaImage::from_pixel(128, 128, Rgba([255, 0, 0, 255]));
         let frames = [
@@ -922,12 +895,8 @@ mod tests {
         let out = extract(&path)?;
         let _ = std::fs::remove_file(&path);
 
-        assert_eq!(out.dimensions(), (128, 128));
-        let center = out.get_pixel(64, 64).0;
-        assert!(
-            center[0] > 240 && center[1] < 15,
-            "expected the red 128x128 frame, got {center:?}"
-        );
+        assert_eq!(out.dimensions(), (256, 256));
+        assert_eq!(out.get_pixel(64, 64).0, [0, 255, 0, 255]);
         Ok(())
     }
 
@@ -1172,9 +1141,7 @@ mod tests {
         for row in 0..h {
             let screen_row = h - 1 - row;
             for x in 0..w {
-                // The whole bottom-right quadrant (screen 8..15) is
-                // transparent: it is far larger than Lanczos3's support, so
-                // samples deep inside stay exactly alpha 0 after 8x scaling.
+                // Bottom-right pixels are transparent in the original DIB.
                 let alpha = if x >= 8 && screen_row >= 8 { 0 } else { 255 };
                 if x < 4 && screen_row < 4 {
                     d.extend_from_slice(&[0, 0, 255, alpha]); // red
@@ -1300,7 +1267,7 @@ mod tests {
     }
 
     #[test]
-    fn synthetic_pe_extracts_and_scales_icon() -> Result<()> {
+    fn synthetic_pe_preserves_original_icon_pixels() -> Result<()> {
         let dib = icon_16x16_dib(true);
         let group = group_icon_data(16, 16, 32, (16 * 16 * 4) as u32, 3);
         let pe = synthetic_pe(&group, &dib, dib.len() as u32);
@@ -1310,25 +1277,16 @@ mod tests {
         let out = extract(&path)?;
         let _ = std::fs::remove_file(&path);
 
-        assert_eq!(out.dimensions(), (128, 128), "PE path must output 128x128");
-        // Top-left quadrant is red; if row order were flipped this would be blue.
-        let red = out.get_pixel(16, 16).0;
-        assert!(
-            red[0] > 240 && red[1] < 15,
-            "expected red quadrant, got {red:?}"
-        );
-        let blue = out.get_pixel(96, 96).0;
-        assert!(
-            blue[2] > 240 && blue[0] < 15,
-            "expected blue area, got {blue:?}"
-        );
-        // The transparent source quadrant (screen 8..15, i.e. output 64..127)
-        // must stay transparent after Lanczos scaling; sample deep inside it.
-        assert_eq!(
-            out.get_pixel(112, 112).0[3],
-            0,
-            "transparent quadrant must survive scaling"
-        );
+        assert_eq!(out.dimensions(), (16, 16));
+        for (x, y, pixel) in out.enumerate_pixels() {
+            let alpha = if x >= 8 && y >= 8 { 0 } else { 255 };
+            let expected = if x < 4 && y < 4 {
+                [255, 0, 0, alpha]
+            } else {
+                [0, 0, 255, alpha]
+            };
+            assert_eq!(pixel.0, expected, "pixel at ({x}, {y})");
+        }
         Ok(())
     }
 
@@ -1343,8 +1301,8 @@ mod tests {
         let out = extract(&path)?;
         let _ = std::fs::remove_file(&path);
 
-        assert_eq!(out.dimensions(), (128, 128));
-        assert_eq!(out.get_pixel(16, 16).0[3], 255, "red quadrant opaque");
+        assert_eq!(out.dimensions(), (16, 16));
+        assert_eq!(out.get_pixel(2, 2).0, [255, 0, 0, 255]);
         Ok(())
     }
 

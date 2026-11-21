@@ -193,7 +193,7 @@ impl Package {
         transfer::DownloadFile::new(&self.sha256, self.bytes, format!("{name} {}", self.version))
     }
 }
-pub fn download_file(kind: &str, version: &str) -> Result<transfer::DownloadFile> {
+pub(crate) fn download_file(kind: &str, version: &str) -> Result<transfer::DownloadFile> {
     Ok(version_package(kind, version)?.download_file())
 }
 pub(crate) fn download_files(
@@ -477,35 +477,124 @@ pub fn complete_encore_selected(
     Ok(())
 }
 
-/// Check only the game's eligible native plugin folders, using the same rules as installation.
-pub fn check_native_streamline(target: &core::DeploymentTarget) -> Result<()> {
-    ensure!(
-        !native_streamline_paths(target)?.is_empty(),
-        "未检测到可更新的游戏原生 Streamline 插件"
-    );
-    Ok(())
+/// Optional game-native components for a standard Dlssg installation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum NativeComponent {
+    SuperResolution,
+    RayReconstruction,
+    FrameGeneration,
+    Streamline,
 }
-
-/// Fetch and check the optional SDK before deploying a patch into any of these directories.
-pub fn prepare_native_streamline_update(
-    targets: &[core::DeploymentTarget],
-    github: bool,
-    cancel: &AtomicBool,
-    progress: &mut dyn FnMut(transfer::Progress),
-) -> Result<()> {
-    let _cache = crate::cache::wait_for_operation(cancel, || {})?;
-    let sdk = version_package("streamline", NATIVE_STREAMLINE_VERSION)?;
-    let sources = prepare_package(sdk, github, cancel, progress)?;
-    for target in targets {
-        ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
-        let paths = native_streamline_paths(target)?;
-        ensure!(
-            !paths.is_empty(),
-            "未检测到可更新的游戏原生 Streamline 插件"
-        );
-        plan_entries(target, "fg", &paths, &sources)?;
+impl NativeComponent {
+    pub const ALL: [Self; 4] = [
+        Self::SuperResolution,
+        Self::RayReconstruction,
+        Self::FrameGeneration,
+        Self::Streamline,
+    ];
+    pub fn kind(self) -> &'static str {
+        match self {
+            Self::SuperResolution => "sr",
+            Self::RayReconstruction => "rr",
+            Self::FrameGeneration => "fg",
+            Self::Streamline => "streamline",
+        }
     }
-    Ok(())
+    pub fn version(self) -> &'static str {
+        if self == Self::Streamline {
+            NATIVE_STREAMLINE_VERSION
+        } else {
+            "310.9.16"
+        }
+    }
+    pub fn download(self) -> Result<transfer::DownloadFile> {
+        download_file(self.kind(), self.version())
+    }
+    fn destinations(
+        self,
+        target: &core::DeploymentTarget,
+        e: &scanner::Evidence,
+    ) -> Result<Vec<PathBuf>> {
+        ensure!(
+            !e.limited,
+            "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
+        );
+        let mut paths = candidate_paths(target, self.kind(), Some(e))?;
+        if self != Self::Streamline {
+            // Ignore optional destinations proposed by a previous Encore installation.
+            paths.retain(|p| p.is_file());
+            for path in &paths {
+                core::pe64(path, true)?;
+                let current = win::file_version(path)?.0;
+                ensure!(
+                    version_numbers(&current) <= version_numbers(self.version()),
+                    "游戏运行库版本较新，已保留原版：{}",
+                    path.display()
+                );
+            }
+        }
+        ensure!(!paths.is_empty(), "未检测到游戏自带的对应组件");
+        Ok(paths)
+    }
+    pub fn unavailable(target: &core::DeploymentTarget) -> BTreeMap<Self, String> {
+        let evidence = scanner::inspect_for_installation(&target.game_exe);
+        Self::ALL
+            .into_iter()
+            .filter_map(|component| {
+                component
+                    .destinations(target, &evidence)
+                    .err()
+                    .map(|e| (component, format!("{e:#}")))
+            })
+            .collect()
+    }
+    fn journal(self) -> &'static str {
+        if self == Self::Streamline {
+            "fg"
+        } else {
+            self.kind()
+        }
+    }
+    /// Download and preflight every selected component before writing the patch.
+    pub fn prepare(
+        self,
+        targets: &[core::DeploymentTarget],
+        github: bool,
+        cancel: &AtomicBool,
+        progress: &mut dyn FnMut(transfer::Progress),
+    ) -> Result<()> {
+        let _cache = crate::cache::wait_for_operation(cancel, || {})?;
+        let sources = prepare_package(
+            version_package(self.kind(), self.version())?,
+            github,
+            cancel,
+            progress,
+        )?;
+        for target in targets {
+            ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
+            let paths =
+                self.destinations(target, &scanner::inspect_for_installation(&target.game_exe))?;
+            plan_entries(target, self.journal(), &paths, &sources)?;
+        }
+        Ok(())
+    }
+    pub fn install(
+        self,
+        targets: &[core::DeploymentTarget],
+        github: bool,
+        cancel: &AtomicBool,
+        progress: &mut dyn FnMut(transfer::Progress),
+    ) -> Result<()> {
+        update_native(
+            targets,
+            self,
+            version_package(self.kind(), self.version())?,
+            github,
+            cancel,
+            progress,
+            true,
+        )
+    }
 }
 
 /// Explicit Streamline update; keeps original interposers and records restoration
@@ -516,8 +605,9 @@ pub fn install_native_streamline(
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(transfer::Progress),
 ) -> Result<()> {
-    update_streamline(
+    update_native(
         targets,
+        NativeComponent::Streamline,
         bundled_package("streamline")?,
         github,
         cancel,
@@ -526,8 +616,9 @@ pub fn install_native_streamline(
     )
 }
 
-fn update_streamline(
+fn update_native(
     targets: &[core::DeploymentTarget],
+    component: NativeComponent,
     selected: Package,
     github: bool,
     cancel: &AtomicBool,
@@ -547,7 +638,11 @@ fn update_streamline(
     for t in &ordered {
         core::assert_target_stopped(t)?;
         locks.push(win::game_lock(&t.directory)?);
-        let mut paths = native_streamline_paths(t)?;
+        let mut paths = if component == NativeComponent::Streamline {
+            native_streamline_paths(t)?
+        } else {
+            component.destinations(t, &scanner::inspect_for_installation(&t.game_exe))?
+        };
         paths.retain(|p| seen.insert(core::key(p)));
         if !paths.is_empty() {
             plans.push((t, paths));
@@ -559,11 +654,11 @@ fn update_streamline(
     }
     let sources = prepare_package(selected, github, cancel, progress)?;
     for (t, paths) in &plans {
-        plan_entries(t, "fg", paths, &sources)?;
+        plan_entries(t, component.journal(), paths, &sources)?;
     }
     for (t, paths) in plans {
         ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
-        install_locked(t, "fg", &paths, &sources)?;
+        install_locked(t, component.journal(), &paths, &sources)?;
     }
     Ok(())
 }
@@ -1618,7 +1713,15 @@ pub fn install_version(
     let selected = version_package(kind, version)?;
     progress(transfer::Progress::plan(vec![selected.download_file()]));
     if kind == "streamline" {
-        return update_streamline(targets, selected, github, cancel, progress, true);
+        return update_native(
+            targets,
+            NativeComponent::Streamline,
+            selected,
+            github,
+            cancel,
+            progress,
+            true,
+        );
     }
     install_many_with(targets, kind, cancel, || {
         prepare_package(selected, github, cancel, progress)

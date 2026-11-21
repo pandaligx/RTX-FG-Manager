@@ -226,17 +226,26 @@ fn native_streamline_checkbox_is_scoped_to_standard_dlssg() {
         fingerprint: c.patch_options_fingerprint(&paths),
         paths,
         choices: vec![],
-        streamline_options: vec![StreamlineInstallOption {
+        dlssg_options: vec![DlssgInstallOption {
             exe: path.clone(),
             game: "Game".into(),
-            unavailable: Some("未检测到可更新的游戏原生 Streamline 插件".into()),
+            unavailable: BTreeMap::from([(
+                runtime_files::NativeComponent::Streamline,
+                "未检测到游戏自带的对应组件".into(),
+            )]),
         }],
     });
     assert!(
-        c.confirm_patch_options(vec![], BTreeSet::from([path]))
-            .is_err()
+        c.confirm_patch_options(
+            vec![],
+            NativeSelections::from([(
+                path,
+                BTreeSet::from([runtime_files::NativeComponent::Streamline])
+            )])
+        )
+        .is_err()
     );
-    assert!(c.selected_native_streamline.is_empty() && !c.busy);
+    assert!(c.selected_native_components.is_empty() && !c.busy);
     c.close();
     c.tick_close();
 }
@@ -244,6 +253,7 @@ fn native_streamline_checkbox_is_scoped_to_standard_dlssg() {
 #[test]
 #[ignore = "requires the standard 0.4.2 archive and native SDK in an isolated cache"]
 fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
+    use runtime_files::NativeComponent;
     let sdk =
         std::fs::read(std::env::var_os("RTXFG_TEST_SL_COMMON").context("missing fixture SDK")?)?;
     let mut original = sdk.clone();
@@ -261,6 +271,14 @@ fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
     let native = game_dir.path().join("Native");
     let plugin = native.join("sl.common.dll");
     let interposer = native.join("sl.interposer.dll");
+    let native_dlls = [
+        (NativeComponent::SuperResolution, "nvngx_dlss.dll"),
+        (NativeComponent::RayReconstruction, "nvngx_dlssd.dll"),
+        (NativeComponent::FrameGeneration, "nvngx_dlssg.dll"),
+    ];
+    for (_, name) in native_dlls {
+        std::fs::write(native.join(name), &original)?;
+    }
     std::fs::write(&plugin, &original)?;
     std::fs::write(&interposer, b"original game interposer")?;
     let game = Game {
@@ -271,33 +289,38 @@ fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
     c.focus = Some(game.exe.clone());
     c.games = vec![game.clone()];
     c.set_selection(upstream040::SCHEME.into(), 1, vec!["version.dll".into()]);
-    for opt_in in [false, true] {
+    for kinds in [
+        BTreeSet::new(),
+        BTreeSet::from([NativeComponent::FrameGeneration]),
+        BTreeSet::from(NativeComponent::ALL),
+    ] {
+        let opt_in = kinds.contains(&NativeComponent::Streamline);
         c.request_patch(false);
         finish(&mut c)?;
         let choices = &c
             .patch_install_plan
             .as_ref()
             .context("no installation dialog")?
-            .streamline_options;
+            .dlssg_options;
         assert!(
             choices
                 .iter()
-                .any(|o| o.exe == targets[0] && o.unavailable.is_none())
+                .any(|o| o.exe == targets[0] && o.unavailable.is_empty())
         );
         assert!(
             choices
                 .iter()
-                .any(|o| o.exe == targets[1] && o.unavailable.is_some())
+                .any(|o| o.exe == targets[1] && o.unavailable.len() == NativeComponent::ALL.len())
         );
-        assert!(c.selected_native_streamline.is_empty());
+        assert!(c.selected_native_components.is_empty());
         // Launcher metadata may arrive between the probe and the click.
         c.games[0]
             .extra
             .insert("name_identity".into(), json!({"title": "Localized game"}));
-        let checked = if opt_in {
-            BTreeSet::from([targets[0].clone()])
+        let checked = if kinds.is_empty() {
+            NativeSelections::new()
         } else {
-            BTreeSet::new()
+            NativeSelections::from([(targets[0].clone(), kinds.clone())])
         };
         c.confirm = None; // The native dialog consumes the pending prompt on opening.
         c.confirm_patch_options(vec![], checked)?;
@@ -324,10 +347,34 @@ fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
                 .join("WithoutStreamline/sl.common.dll")
                 .exists()
         );
+        for (kind, name) in native_dlls {
+            let updated = kinds.contains(&kind);
+            assert_eq!(
+                core::digest(&native.join(name))? != core::hash(&original),
+                updated
+            );
+            if updated {
+                assert!(
+                    win::file_version(&native.join(name))?
+                        .0
+                        .starts_with(kind.version())
+                );
+            }
+            assert!(
+                !game_dir
+                    .path()
+                    .join("WithoutStreamline")
+                    .join(name)
+                    .exists()
+            );
+        }
         assert_eq!(std::fs::read(&interposer)?, b"original game interposer");
         c.request_patch(true);
         finish(&mut c)?;
         assert_eq!(core::digest(&plugin)?, core::hash(&original));
+        for (_, name) in native_dlls {
+            assert_eq!(core::digest(&native.join(name))?, core::hash(&original));
+        }
         for t in &deploy {
             assert!(!t.directory.join("version.dll").exists());
             assert!(!t.directory.join(".rtx-fg-runtimes").exists());
@@ -335,7 +382,7 @@ fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
     }
     c.request_patch(false);
     finish(&mut c)?;
-    assert!(c.selected_native_streamline.is_empty() && c.patch_install_plan.is_some());
+    assert!(c.selected_native_components.is_empty() && c.patch_install_plan.is_some());
     c.cancel_patch();
     assert!(c.patch_install_plan.is_none() && !native.join("version.dll").exists());
     c.close();

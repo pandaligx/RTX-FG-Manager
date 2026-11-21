@@ -1,8 +1,8 @@
 //! Per-install components and first-install engines, separate from the preset editor.
 use super::*;
-use crate::controller::StreamlineInstallOption;
+use crate::controller::{DlssgInstallOption, NativeSelections};
 use rtx_fg_manager::encore_install::{Frames, Reconstruction};
-use std::collections::BTreeSet;
+use rtx_fg_manager::runtime_files::{NativeComponent, label as runtime_label};
 impl Manager {
     pub(super) fn patch_install_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(plan) = &self.c.patch_install_plan else {
@@ -10,9 +10,9 @@ impl Manager {
             return;
         };
         let choices = Rc::new(RefCell::new(plan.choices.clone()));
-        let streamline_options = plan.streamline_options.clone();
-        let selected_streamline = Rc::new(RefCell::new(BTreeSet::new()));
-        let title = match (plan.choices.is_empty(), streamline_options.is_empty()) {
+        let dlssg_options = plan.dlssg_options.clone();
+        let selected_native = Rc::new(RefCell::new(NativeSelections::new()));
+        let title = match (plan.choices.is_empty(), dlssg_options.is_empty()) {
             (true, false) => "Dlssg_for_sm86 安装选项",
             (false, true) => "Encore 安装选项",
             _ => "补丁安装选项",
@@ -83,15 +83,20 @@ impl Manager {
                 }
                 body=body.child(row);
             }
-            for (index, option) in streamline_options.iter().enumerate() {
-                body = body.child(dlssg_components(option, index, selected_streamline.clone(), &tr, cx));
+            for (index, option) in dlssg_options.iter().enumerate() {
+                body = body.child(dlssg_components(option, index, selected_native.clone(), &tr, cx));
             }
-            body=body.child(div().text_xs().text_color(cx.theme().muted_foreground)
-                .child(tr.t("未勾选的现有文件保持不变。恢复原版请使用运行库的恢复按钮。")));
+            let footer_hint = if dlssg_options.is_empty() {
+                tr.t("未勾选的现有文件保持不变。恢复原版请使用运行库的恢复按钮。")
+            } else {
+                let tip = tr.t("默认不勾选，如部分老游戏不生效，有需要时再勾选以上组件。");
+                if choices.borrow().is_empty() { tip } else { format!("Dlssg_for_sm86 — {tip}") }
+            };
+            body=body.child(div().text_xs().text_color(cx.theme().muted_foreground).child(footer_hint));
             let ready=choices.borrow().iter().all(|c|c.values().is_some());
             if !ready { body=body.child(div().text_xs().text_color(cx.theme().warning).child(tr.t("请选择引擎，并勾选其所需组件；也可选择不启用。"))); }
             let accept=owner.clone();let cancel=owner.clone();let selections=choices.clone();
-            let selected_streamline = selected_streamline.clone();
+            let selected_native = selected_native.clone();
             dialog.title(crate::ui_focus::dialog_title(tr.t(title).into(),cx)).width(width).close_button(false)
                 .child(body)
                 .footer(DialogFooter::new()
@@ -101,7 +106,7 @@ impl Manager {
                 .on_ok(move|_,_,cx|{
                     if !selections.borrow().iter().all(|c|c.values().is_some()){return false;}
                     let _=accept.update(cx,|owner,cx|{owner.dialog_active=false;
-                        if let Err(e)=owner.c.confirm_patch_options(selections.borrow().clone(), selected_streamline.borrow().clone()){owner.c.warning=Some(e.to_string());}
+                        if let Err(e)=owner.c.confirm_patch_options(selections.borrow().clone(), selected_native.borrow().clone()){owner.c.warning=Some(e.to_string());}
                         cx.notify();});true
                 })
                 .on_cancel(move|_,_,cx|{let _=cancel.update(cx,|owner,cx|{owner.dialog_active=false;owner.c.cancel_patch();cx.notify();});true})
@@ -110,14 +115,12 @@ impl Manager {
 }
 
 fn dlssg_components(
-    option: &StreamlineInstallOption,
+    option: &DlssgInstallOption,
     index: usize,
-    selected: Rc<RefCell<BTreeSet<String>>>,
+    selected: Rc<RefCell<NativeSelections>>,
     tr: &i18n::Translator,
     cx: &App,
 ) -> impl IntoElement {
-    let exe = option.exe.clone();
-    let checked = selected.borrow().contains(&exe);
     let row = |check: Checkbox, detail: String| {
         div()
             .h_flex()
@@ -133,7 +136,7 @@ fn dlssg_components(
                     .child(detail),
             )
     };
-    div()
+    let mut body = div()
         .v_flex()
         .gap_2()
         .pb_3()
@@ -149,7 +152,7 @@ fn dlssg_components(
                 .text_xs()
                 .text_color(cx.theme().muted_foreground)
                 .whitespace_normal()
-                .child(exe.clone()),
+                .child(option.exe.clone()),
         )
         .child(
             div()
@@ -163,23 +166,44 @@ fn dlssg_components(
                 .disabled(true)
                 .label("Dlssg_for_sm86"),
             tr.t("补丁与设置文件"),
-        ))
-        .child(row(
-            Checkbox::new(("dlssg-native-streamline", index))
-                .checked(checked)
-                .disabled(option.unavailable.is_some())
-                .label(tr.t("更新已有 Streamline 插件至 2.14.16"))
-                .on_click(move |checked, window, _| {
-                    if *checked {
-                        selected.borrow_mut().insert(exe.clone());
-                    } else {
-                        selected.borrow_mut().remove(&exe);
+        ));
+    for kind in NativeComponent::ALL {
+        let exe = option.exe.clone();
+        let selection = selected.clone();
+        let checked = selection
+            .borrow()
+            .get(&exe)
+            .is_some_and(|set| set.contains(&kind));
+        let reason = option.unavailable.get(&kind).map(|reason| tr.t(reason));
+        let check = Checkbox::new((kind.kind(), index))
+            .checked(checked)
+            .disabled(reason.is_some())
+            .label(tr.t(runtime_label(kind.kind())))
+            .on_click(move |checked, window, _| {
+                let mut all = selection.borrow_mut();
+                if *checked {
+                    all.entry(exe.clone()).or_default().insert(kind);
+                } else if let Some(set) = all.get_mut(&exe) {
+                    set.remove(&kind);
+                    if set.is_empty() {
+                        all.remove(&exe);
                     }
-                    window.refresh();
+                }
+                window.refresh();
+            });
+        let detail = match kind {
+            NativeComponent::SuperResolution => "nvngx_dlss.dll",
+            NativeComponent::RayReconstruction => "nvngx_dlssd.dll",
+            NativeComponent::FrameGeneration => "nvngx_dlssg.dll",
+            NativeComponent::Streamline => "Streamline SDK",
+        };
+        body = body.child(
+            row(check, format!("{detail}  {}", kind.version()))
+                .id(SharedString::from(format!("dlssg-{index}-{}", kind.kind())))
+                .when_some(reason, |r, reason| {
+                    r.tooltip(move |w, cx| Tooltip::new(reason.clone()).build(w, cx))
                 }),
-            tr.t(option
-                .unavailable
-                .as_deref()
-                .unwrap_or("默认保留现有插件及 sl.interposer.dll")),
-        ))
+        );
+    }
+    body
 }

@@ -118,6 +118,8 @@
   "更新提醒": ["Update available", "Доступно обновление", "更新のお知らせ", "업데이트 알림"],
   "立即更新": ["Update now", "Обновить сейчас", "今すぐ更新", "지금 업데이트"],
   "下次再说": ["Later", "Позже", "後で", "나중에"],
+  "默认不勾选，如部分老游戏不生效，有需要时再勾选以上组件。": ["These components are off by default. If the patch does not work in an older game, select the components you need.", "По умолчанию компоненты не выбраны. Если патч не работает в старой игре, выберите нужные компоненты.", "初期状態では選択されていません。古いゲームでパッチが動作しない場合に、必要な項目を選んでください。", "기본적으로 선택되어 있지 않습니다. 오래된 게임에서 패치가 작동하지 않을 때 필요한 항목을 선택하세요."],
+  "未检测到游戏自带的对应组件": ["This game has no matching native component.", "В игре не найден соответствующий компонент.", "ゲームに該当するコンポーネントが見つかりません。", "게임에 해당 기본 구성 요소가 없습니다."],
   "Dlssg_for_sm86 安装选项": ["Dlssg_for_sm86 installation options", "Параметры установки Dlssg_for_sm86", "Dlssg_for_sm86 のインストール設定", "Dlssg_for_sm86 설치 옵션"],
   "补丁安装选项": ["Patch installation options", "Параметры установки патчей", "パッチのインストール設定", "패치 설치 옵션"],
   "未检测到可更新的游戏原生 Streamline 插件": ["No updatable native Streamline plugins found in this game.", "В игре не найдены плагины Streamline, доступные для обновления.", "更新できるゲーム標準の Streamline プラグインがありません。", "이 게임에서 업데이트할 수 있는 기본 Streamline 플러그인을 찾지 못했습니다."],

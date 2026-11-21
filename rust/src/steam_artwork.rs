@@ -6,9 +6,36 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub(crate) fn original_pixels(image: image::DynamicImage) -> RgbaImage {
+    if image.width().max(image.height()) > 512 {
+        image.resize(512, 512, FilterType::Lanczos3).into_rgba8()
+    } else {
+        image.into_rgba8()
+    }
+}
+
+fn best_logo(current: Option<RgbaImage>, candidate: RgbaImage) -> RgbaImage {
+    match current {
+        Some(icon)
+            if icon.width().min(icon.height()) >= candidate.width().min(candidate.height()) =>
+        {
+            icon
+        }
+        _ => candidate,
+    }
+}
+
 fn tile(path: &Path, require_square: bool) -> Option<RgbaImage> {
     const LIMIT: u64 = 4 * 1024 * 1024;
-    let file = fs::File::open(rtx_fg_manager::core::no_links(path).ok()?).ok()?;
+    let path = rtx_fg_manager::core::no_links(path).ok()?;
+    if path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("ico"))
+    {
+        let image = crate::native_icons::native_icon(&path).ok()?;
+        return (!require_square || image.width() == image.height()).then_some(image);
+    }
+    let file = fs::File::open(&path).ok()?;
     if file.metadata().ok()?.len() > LIMIT {
         return None;
     }
@@ -29,22 +56,21 @@ fn tile(path: &Path, require_square: bool) -> Option<RgbaImage> {
     if require_square && img.width() != img.height() {
         return None;
     }
-    let icon = img
-        .resize_to_fill(128, 128, FilterType::Lanczos3)
-        .to_rgba8();
+    let icon = original_pixels(img);
     icon.pixels().any(|p| p[3] > 0).then_some(icon)
 }
 
-fn square_art(root: &Path, id: &str) -> Option<RgbaImage> {
+fn launcher_logo(root: &Path, id: &str) -> Option<RgbaImage> {
     let cache = root.join("appcache/librarycache");
     let dir = cache.join(id);
     let mut files = vec![
         dir.join("icon.png"),
         dir.join("icon.jpg"),
+        dir.join("logo.png"),
         cache.join(format!("{id}_icon.jpg")),
     ];
     if let Ok(entries) = fs::read_dir(&dir) {
-        let mut hashed = entries
+        let mut hashed: Vec<_> = entries
             .take(128)
             .flatten()
             .map(|e| e.path())
@@ -52,17 +78,30 @@ fn square_art(root: &Path, id: &str) -> Option<RgbaImage> {
                 p.file_stem()
                     .and_then(|s| s.to_str())
                     .is_some_and(|s| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit()))
-                    && p.extension().and_then(|s| s.to_str()).is_some_and(|s| {
-                        ["jpg", "png", "ico", "jpeg"]
-                            .iter()
-                            .any(|ext| ext.eq_ignore_ascii_case(s))
-                    })
             })
-            .collect::<Vec<_>>();
+            .collect();
         hashed.sort();
-        files.extend(hashed);
+        for path in hashed {
+            if path.is_dir() {
+                files.extend(["icon.png", "icon.jpg", "logo.png"].map(|name| path.join(name)));
+            } else if path.extension().and_then(|s| s.to_str()).is_some_and(|s| {
+                ["jpg", "png", "ico", "jpeg"]
+                    .iter()
+                    .any(|ext| ext.eq_ignore_ascii_case(s))
+            }) {
+                files.push(path);
+            }
+        }
     }
-    files.iter().find_map(|p| tile(p, true))
+    files
+        .iter()
+        .filter_map(|path| {
+            let named_logo = path
+                .file_name()
+                .is_some_and(|n| n.eq_ignore_ascii_case("logo.png"));
+            tile(path, !named_logo)
+        })
+        .max_by_key(|i| i.width().min(i.height()))
 }
 
 fn cover_art(root: &Path, id: &str) -> Option<RgbaImage> {
@@ -89,11 +128,12 @@ pub(crate) fn resolve(
     {
         return native();
     }
-    if let Some(icon) = tile(&exe.with_extension("ico"), false) {
-        return Ok(icon);
-    }
+    let mut logo = tile(&exe.with_extension("ico"), false);
     let Some((library, id)) = index.lookup(exe) else {
-        return native();
+        return match native() {
+            Ok(icon) => Ok(best_logo(logo, icon)),
+            Err(error) => logo.ok_or(error),
+        };
     };
     let mut roots: Vec<PathBuf> = vec![library.to_owned()];
     #[cfg(windows)]
@@ -121,7 +161,7 @@ pub(crate) fn resolve(
                             .is_some_and(|v| v.eq_ignore_ascii_case("ico"))
                         && let Some(icon) = tile(path, false)
                     {
-                        return Ok(icon);
+                        logo = Some(best_logo(logo, icon));
                     }
                 }
             }
@@ -145,10 +185,20 @@ pub(crate) fn resolve(
         ]);
     }
     roots.dedup();
-    if let Some(icon) = roots.iter().find_map(|root| square_art(root, id)) {
-        return Ok(icon);
+    for icon in roots.iter().filter_map(|root| launcher_logo(root, id)) {
+        logo = Some(best_logo(logo, icon));
     }
-    native().or_else(|err| roots.iter().find_map(|root| cover_art(root, id)).ok_or(err))
+    // A verified launcher logo is preferable to a generic executable icon.
+    // Older Steam caches often have only a 32 px thumbnail; try the actual EXE then.
+    if let Some(original) = logo.take_if(|i| i.width().min(i.height()) >= 256) {
+        return Ok(original);
+    }
+    match native() {
+        Ok(icon) => Ok(best_logo(logo, icon)),
+        Err(error) => logo
+            .or_else(|| roots.iter().find_map(|root| cover_art(root, id)))
+            .ok_or(error),
+    }
 }
 
 #[cfg(test)]
@@ -161,22 +211,38 @@ mod tests {
         let game = apps.join("common/Miles Morales");
         fs::create_dir_all(&game)?;
         fs::write(
-            apps.join("appmanifest_1817190.acf"),
-            "\"appid\" \"1817190\"\n\"installdir\" \"Miles Morales\"\n",
+            apps.join("appmanifest_987654301.acf"),
+            "\"appid\" \"987654301\"\n\"installdir\" \"Miles Morales\"\n",
         )?;
         let exe = game.join("game.exe");
         fs::write(&exe, [])?;
-        for (id, color) in [("1817190", 180u8), ("999", 26u8)] {
+        for (id, color) in [("987654301", 180u8), ("999", 26u8)] {
             let art = tmp.path().join("appcache/librarycache").join(id);
             fs::create_dir_all(&art)?;
             image::RgbImage::from_pixel(32, 32, image::Rgb([color, 0, 0]))
                 .save(art.join("abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd.jpg"))?;
         }
         let icon = resolve(&exe, &mut Default::default(), || {
-            panic!("verified square Steam artwork must win over the generic EXE icon")
+            anyhow::bail!("fixture EXE contains no icon")
         })?;
-        assert_eq!(icon.dimensions(), (128, 128));
-        assert!(icon.get_pixel(64, 64)[0] > 170);
+        assert_eq!(icon.dimensions(), (32, 32));
+        assert!(icon.get_pixel(16, 16)[0] > 170);
+        let original =
+            RgbaImage::from_fn(256, 256, |x, y| image::Rgba([x as u8, y as u8, 12, 255]));
+        let logo = resolve(&exe, &mut Default::default(), || Ok(original.clone()))?;
+        assert_eq!(logo, original);
+        let hash_folder = tmp
+            .path()
+            .join("appcache/librarycache/987654301/1111111111111111111111111111111111111111");
+        fs::create_dir_all(&hash_folder)?;
+        let wordmark = RgbaImage::from_fn(240, 96, |x, y| {
+            image::Rgba([0, x as u8, y as u8, if x < 8 { 0 } else { 255 }])
+        });
+        wordmark.save(hash_folder.join("logo.png"))?;
+        let found = resolve(&exe, &mut Default::default(), || {
+            anyhow::bail!("no embedded original")
+        })?;
+        assert_eq!(found, wordmark);
         Ok(())
     }
 }

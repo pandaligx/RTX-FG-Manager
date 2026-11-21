@@ -208,17 +208,18 @@ fn defer_if_running(
     }));
     Ok(true)
 }
+pub type NativeSelections = BTreeMap<String, BTreeSet<runtime_files::NativeComponent>>;
 #[derive(Clone)]
-pub struct StreamlineInstallOption {
+pub struct DlssgInstallOption {
     pub exe: String,
     pub game: String,
-    pub unavailable: Option<String>,
+    pub unavailable: BTreeMap<runtime_files::NativeComponent, String>,
 }
 pub struct PatchInstallPlan {
     pub fingerprint: String,
     pub paths: BTreeSet<String>,
     pub choices: Vec<rtx_fg_manager::encore_install::Choice>,
-    pub streamline_options: Vec<StreamlineInstallOption>,
+    pub dlssg_options: Vec<DlssgInstallOption>,
 }
 struct PatchRequest {
     clean: bool,
@@ -545,7 +546,7 @@ pub struct Controller {
     pending_cleanup: Option<(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>)>,
     pending_patch: Option<PatchRequest>,
     pub patch_install_plan: Option<PatchInstallPlan>,
-    selected_native_streamline: BTreeSet<String>,
+    selected_native_components: NativeSelections,
     encore_install_values: BTreeMap<String, rtx_fg_manager::presets::Values>,
     encore_components: BTreeMap<String, rtx_fg_manager::encore_components::Components>,
     resume_install: Option<BTreeSet<String>>,
@@ -670,7 +671,7 @@ impl Controller {
             pending_cleanup: None,
             pending_patch: None,
             patch_install_plan: None,
-            selected_native_streamline: BTreeSet::new(),
+            selected_native_components: NativeSelections::new(),
             encore_install_values: BTreeMap::new(),
             encore_components: BTreeMap::new(),
             resume_install: None,
@@ -2428,7 +2429,7 @@ impl Controller {
             })
     }
     fn prepare_patch_options(&mut self, paths: BTreeSet<String>) {
-        self.selected_native_streamline.clear();
+        self.selected_native_components.clear();
         let jobs = self
             .games
             .iter()
@@ -2470,7 +2471,7 @@ impl Controller {
         self.channel.operation(move |c| {
             let result = (|| -> Result<PatchInstallPlan> {
                 let mut choices = Vec::new();
-                let mut streamline_options = Vec::new();
+                let mut dlssg_options = Vec::new();
                 for (name, scheme, game) in jobs {
                     for target in game.deployment_targets() {
                         let exe = target.game_exe.display().to_string();
@@ -2479,11 +2480,8 @@ impl Controller {
                         }
                         anyhow::ensure!(!cancel.load(Ordering::Relaxed), "已取消");
                         if scheme == upstream040::SCHEME {
-                            let unavailable =
-                                rtx_fg_manager::runtime_files::check_native_streamline(&target)
-                                    .err()
-                                    .map(|e| format!("{e:#}"));
-                            streamline_options.push(StreamlineInstallOption {
+                            let unavailable = runtime_files::NativeComponent::unavailable(&target);
+                            dlssg_options.push(DlssgInstallOption {
                                 exe,
                                 game: name.clone(),
                                 unavailable,
@@ -2553,7 +2551,7 @@ impl Controller {
                     fingerprint,
                     paths,
                     choices,
-                    streamline_options,
+                    dlssg_options,
                 })
             })();
             c.send(Event::InstallOptionsPrepared(result));
@@ -2563,7 +2561,7 @@ impl Controller {
     pub fn confirm_patch_options(
         &mut self,
         choices: Vec<rtx_fg_manager::encore_install::Choice>,
-        selected_streamline: BTreeSet<String>,
+        selected_native: NativeSelections,
     ) -> Result<()> {
         let plan = self
             .patch_install_plan
@@ -2575,10 +2573,13 @@ impl Controller {
         );
         anyhow::ensure!(choices.len() == plan.choices.len(), "安装选择不完整");
         anyhow::ensure!(
-            selected_streamline.iter().all(|exe| plan
-                .streamline_options
+            selected_native
                 .iter()
-                .any(|option| &option.exe == exe && option.unavailable.is_none())),
+                .all(|(exe, checked)| !checked.is_empty()
+                    && plan.dlssg_options.iter().any(|option| &option.exe == exe
+                        && checked
+                            .iter()
+                            .all(|kind| !option.unavailable.contains_key(kind)))),
             "安装计划已变化"
         );
         let mut values = BTreeMap::new();
@@ -2624,7 +2625,7 @@ impl Controller {
         if !components.is_empty() {
             self.save();
         }
-        self.selected_native_streamline = selected_streamline;
+        self.selected_native_components = selected_native;
         self.encore_components = components;
         self.encore_install_values = values;
         self.perform(false, plan.paths);
@@ -2666,7 +2667,7 @@ impl Controller {
         }
     }
     fn dispatch_patch(&mut self, clean: bool, targets: BTreeSet<String>) {
-        self.selected_native_streamline.clear();
+        self.selected_native_components.clear();
         self.encore_install_values.clear();
         self.encore_components.clear();
         if !clean
@@ -3214,7 +3215,7 @@ impl Controller {
     }
     pub fn cancel_patch(&mut self) {
         self.patch_install_plan = None;
-        self.selected_native_streamline.clear();
+        self.selected_native_components.clear();
         self.encore_install_values.clear();
         self.encore_components.clear();
         self.resume_install = None;
@@ -3283,7 +3284,7 @@ impl Controller {
         let retry = self.retry_request(RetryAction::Patch(clean, paths.clone()));
         let first_install_values = self.encore_install_values.clone();
         let components = self.encore_components.clone();
-        let selected_streamline = self.selected_native_streamline.clone();
+        let selected_native = self.selected_native_components.clone();
         let language = self.tr.language.clone();
         self.channel.operation(move |c| {
             let guards = jobs
@@ -3306,11 +3307,9 @@ impl Controller {
                     if let Ok(files) = cloud::download_files(&catalog, scheme, *series, proxies) {
                         queue.extend(files);
                     }
-                    if scheme == upstream040::SCHEME
-                        && targets.iter().any(|exe| selected_streamline.contains(exe))
-                        && let Ok(file) = runtime_files::download_file("streamline", runtime_files::NATIVE_STREAMLINE_VERSION)
-                    {
-                        queue.push(file);
+                    if scheme == upstream040::SCHEME {
+                        let kinds: BTreeSet<_> = targets.iter().filter_map(|exe| selected_native.get(exe)).flatten().collect();
+                        queue.extend(kinds.into_iter().filter_map(|kind| kind.download().ok()));
                     }
                     if scheme == rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p| &p.scheme_id == scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version))))
                     {
@@ -3327,12 +3326,19 @@ impl Controller {
                 if cancel.load(Ordering::Relaxed) {
                     break;
                 }
-                let streamline_targets: Vec<_> = targets.iter()
-                    .filter(|exe| !clean && scheme == upstream040::SCHEME && selected_streamline.contains(*exe))
-                    .map(|exe| game.deployment_target(std::path::Path::new(exe)))
-                    .collect();
-                let mut sdk_progress = |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
-                    transfer, proxy: "Streamline".into(), package_index: 1, package_count: 1,
+                let mut native_groups = BTreeMap::<runtime_files::NativeComponent, Vec<core::DeploymentTarget>>::new();
+                if !clean && scheme == upstream040::SCHEME {
+                    for exe in &targets {
+                        if let Some(checked) = selected_native.get(exe) {
+                            let target = game.deployment_target(std::path::Path::new(exe));
+                            for kind in checked {
+                                native_groups.entry(*kind).or_default().push(target.clone());
+                            }
+                        }
+                    }
+                }
+                let mut runtime_progress = |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
+                    transfer, proxy: String::new(), package_index: 1, package_count: 1,
                 }));
                 let prepared = if clean {
                     Ok(None)
@@ -3348,8 +3354,8 @@ impl Controller {
                                 &proxies,
                             )?;
                         }
-                        if !streamline_targets.is_empty() {
-                            runtime_files::prepare_native_streamline_update(&streamline_targets, catalog.prefer_github, &cancel, &mut sdk_progress)?;
+                        for (kind, group) in &native_groups {
+                            kind.prepare(group, catalog.prefer_github, &cancel, &mut runtime_progress)?;
                         }
                         if scheme==rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p|p.scheme_id==scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version)))) {
                             for target in game.deployment_targets() {
@@ -3392,7 +3398,7 @@ impl Controller {
                     first_install_values.get(exe).filter(|_|core::record(&game.deployment_target(std::path::Path::new(exe)).directory).is_ok_and(|r|r.is_none())).map(|v|(exe.clone(),v.clone()))
                 }).collect::<Vec<_>>();
                 let mut all_ok = true;
-                let mut installed_with_streamline = Vec::new();
+                let mut awaiting_components = BTreeSet::new();
                 let read_target = targets
                     .first()
                     .map(|exe| game.deployment_target(std::path::Path::new(exe)));
@@ -3499,8 +3505,8 @@ impl Controller {
                             let ok = outcome.complete;
                             let s = outcome.message;
                             all_ok &= ok;
-                            if ok && !clean && scheme == upstream040::SCHEME && selected_streamline.contains(&exe) {
-                                installed_with_streamline.push(game.deployment_target(&p));
+                            if ok && !clean && scheme == upstream040::SCHEME && selected_native.contains_key(&exe) {
+                                awaiting_components.insert(exe.clone());
                             } else {
                                 c.send(Event::PatchResult(ok));
                             }
@@ -3528,22 +3534,24 @@ impl Controller {
                         core::status_at(&game.deployment_target(&p)),
                     ));
                 }
-                if !installed_with_streamline.is_empty() {
-                    // Resolve shared plugin folders once across all successful patch targets.
-                    let result = runtime_files::install_version(
-                        &installed_with_streamline, "streamline", runtime_files::NATIVE_STREAMLINE_VERSION,
-                        catalog.prefer_github, &cancel, &mut sdk_progress,
-                    );
-                    for _ in &installed_with_streamline {
-                        c.send(Event::PatchResult(result.is_ok()));
-                    }
-                    if let Err(error) = result {
-                        all_ok = false;
-                        if rtx_fg_manager::transfer::is_cancelled(&error) {
-                            c.send(Event::TaskCancelled(false));
-                        } else {
-                            errors.push(format!("{primary}：补丁已安装，Streamline 原生插件未更新完成：{error:#}"));
+                if !awaiting_components.is_empty() {
+                    let mut failed = BTreeSet::new();
+                    for (kind, mut group) in native_groups {
+                        group.retain(|t| awaiting_components.contains(&t.game_exe.display().to_string()));
+                        if group.is_empty() { continue; }
+                        if let Err(error) = kind.install(&group, catalog.prefer_github, &cancel, &mut runtime_progress) {
+                            all_ok = false;
+                            if rtx_fg_manager::transfer::is_cancelled(&error) {
+                                c.send(Event::TaskCancelled(false));
+                                failed.extend(awaiting_components.iter().cloned());
+                                break;
+                            }
+                            failed.extend(group.iter().map(|t| t.game_exe.display().to_string()));
+                            errors.push(format!("{primary} — {}: {error:#}", runtime_files::label(kind.kind())));
                         }
+                    }
+                    for exe in awaiting_components {
+                        c.send(Event::PatchResult(!failed.contains(&exe)));
                     }
                 }
                 if all_ok && clean {
@@ -4151,7 +4159,7 @@ impl Controller {
                     if self.closing || self.cancel.load(Ordering::Relaxed) => {}
                 Event::InstallOptionsPrepared(result) => match result {
                     Ok(plan) if plan.fingerprint == self.patch_options_fingerprint(&plan.paths) => {
-                        if plan.choices.is_empty() && plan.streamline_options.is_empty() {
+                        if plan.choices.is_empty() && plan.dlssg_options.is_empty() {
                             self.resume_install = Some(plan.paths);
                         } else {
                             self.patch_install_plan = Some(plan);
@@ -7400,7 +7408,7 @@ mod tests {
             fingerprint: c.patch_options_fingerprint(&paths),
             paths,
             choices: vec![],
-            streamline_options: vec![],
+            dlssg_options: vec![],
         };
         c.cancel.store(true, Ordering::Relaxed);
         c.channel.send(Event::InstallOptionsPrepared(Ok(plan)));
@@ -7421,10 +7429,13 @@ mod tests {
             fingerprint: c.patch_options_fingerprint(&paths),
             paths,
             choices: vec![],
-            streamline_options: vec![],
+            dlssg_options: vec![],
         });
         c.catalog.revision.push_str("-new");
-        assert!(c.confirm_patch_options(vec![], BTreeSet::new()).is_err());
+        assert!(
+            c.confirm_patch_options(vec![], NativeSelections::new())
+                .is_err()
+        );
         assert!(!c.busy && c.encore_install_values.is_empty());
         c.close();
         c.tick_close();

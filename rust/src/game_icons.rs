@@ -14,7 +14,7 @@ use windows::{
     },
     core::PCWSTR,
 };
-const ICON_PIXELS: u32 = 128;
+const ICON_PIXELS: u32 = 256;
 
 pub fn extract(
     path: &Path,
@@ -32,7 +32,7 @@ pub fn extract(
         }
     }
     crate::steam_artwork::resolve(&path, index, || {
-        let icon = shell_icon(&path)?;
+        let icon = crate::native_icons::native_icon(&path).or_else(|_| shell_icon(&path))?;
         ensure!(icon.pixels().any(|p| p[3] > 0), "Empty EXE icon");
         Ok(icon)
     })
@@ -167,22 +167,9 @@ fn package_icon(path: &Path) -> Result<image::RgbaImage> {
     limits.max_image_height = Some(2048);
     limits.max_alloc = Some(32 * 1024 * 1024);
     reader.limits(limits);
-    let icon = reader
-        .decode()?
-        .resize(
-            ICON_PIXELS,
-            ICON_PIXELS,
-            image::imageops::FilterType::Lanczos3,
-        )
-        .to_rgba8();
-    let mut canvas = image::RgbaImage::new(ICON_PIXELS, ICON_PIXELS);
-    image::imageops::overlay(
-        &mut canvas,
-        &icon,
-        ((ICON_PIXELS - icon.width()) / 2) as i64,
-        ((ICON_PIXELS - icon.height()) / 2) as i64,
-    );
-    Ok(canvas)
+    let icon = crate::steam_artwork::original_pixels(reader.decode()?);
+    ensure!(icon.pixels().any(|p| p[3] != 0), "Empty package logo");
+    Ok(icon)
 }
 
 #[cfg(test)]
@@ -210,7 +197,7 @@ mod tests {
             &config,
             r#"<Game><ExecutableList><Executable Name="Protected.exe" TargetDeviceFamily="PC" OverrideLogo="override.png"/></ExecutableList><ShellVisuals Square150x150Logo="game.png"/></Game>"#,
         )?;
-        assert_eq!(extract(&exe)?.get_pixel(64, 64).0, [208, 32, 11, 255]);
+        assert_eq!(extract(&exe)?.get_pixel(32, 32).0, [208, 32, 11, 255]);
         std::fs::write(dir.path().join("override.png"), b"invalid PNG")?;
         assert_eq!(extract(&exe)?.get_pixel(64, 64).0, [21, 144, 39, 255]);
         std::fs::write(
@@ -229,10 +216,14 @@ mod tests {
         );
         let icon = extract(&exe)?;
         ensure!(
-            icon.dimensions() == (128, 128) && icon.pixels().any(|p| p.0[3] != 0),
+            icon.width() > 0 && icon.height() > 0 && icon.pixels().any(|p| p.0[3] != 0),
             "Missing visible package icon"
         );
-        println!("Read-only Xbox icon probe: {} / 128x128", exe.display());
+        println!(
+            "Read-only Xbox icon probe: {} / {:?}",
+            exe.display(),
+            icon.dimensions()
+        );
         Ok(())
     }
     #[test]

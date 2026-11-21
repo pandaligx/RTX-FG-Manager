@@ -1900,7 +1900,12 @@ impl Manager {
             .icons
             .get(&exe)
             .and_then(|i| i.as_ref())
-            .map(|i| img(i.clone()).size_full().into_any_element())
+            .map(|i| {
+                img(i.clone())
+                    .object_fit(ObjectFit::Contain)
+                    .size_full()
+                    .into_any_element()
+            })
             .unwrap_or_else(|| {
                 Self::icon(IconName::LayoutDashboard)
                     .size_10()
@@ -3201,7 +3206,13 @@ impl Manager {
         let game_icon = game
             .and_then(|g| self.c.icons.get(&g.exe))
             .and_then(|i| i.as_ref())
-            .map(|i| img(i.clone()).size_8().flex_shrink_0().into_any_element())
+            .map(|i| {
+                img(i.clone())
+                    .object_fit(ObjectFit::Contain)
+                    .size_8()
+                    .flex_shrink_0()
+                    .into_any_element()
+            })
             .unwrap_or_else(|| {
                 Self::icon(IconName::LayoutDashboard)
                     .size_8()
@@ -4253,7 +4264,12 @@ impl Manager {
             for (exe, name, path, icon) in &removal_rows {
                 let icon = icon
                     .as_ref()
-                    .map(|i| img(i.clone()).size_8().into_any_element())
+                    .map(|i| {
+                        img(i.clone())
+                            .object_fit(ObjectFit::Contain)
+                            .size_8()
+                            .into_any_element()
+                    })
                     .unwrap_or_else(|| {
                         Self::icon(IconName::LayoutDashboard)
                             .size_8()
