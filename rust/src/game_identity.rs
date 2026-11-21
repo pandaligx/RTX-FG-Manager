@@ -95,7 +95,8 @@ impl SteamArtworkIndex {
             .keys
             .first()?
             .strip_prefix("steam:")?;
-        Some((apps.parent()?, id))
+        let app_id = id.parse::<u32>().ok()?;
+        (app_id != 0 && id.bytes().all(|b| b.is_ascii_digit())).then_some((apps.parent()?, id))
     }
 }
 
