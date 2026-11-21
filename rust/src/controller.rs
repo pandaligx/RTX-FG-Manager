@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use rtx_fg_manager::{
-    cleanup, cloud, core, game_names, gpu_alias, hags, i18n, preferences,
+    cleanup, cloud, core, game_names, gpu_alias, hags, i18n, preferences, runtime_files,
     scanner::{self, Game},
     updater, upstream040, win,
 };
@@ -25,7 +25,7 @@ pub struct ScanProgress {
 }
 
 pub enum Event {
-    EncorePrepared(Result<EncoreInstallPlan>),
+    InstallOptionsPrepared(Result<PatchInstallPlan>),
     GameNamesCached(game_names::Catalog),
     GameIdentities(u64, Vec<(String, String, Value)>),
     GameNames(Result<game_names::Catalog>, bool),
@@ -208,10 +208,17 @@ fn defer_if_running(
     }));
     Ok(true)
 }
-pub struct EncoreInstallPlan {
+#[derive(Clone)]
+pub struct StreamlineInstallOption {
+    pub exe: String,
+    pub game: String,
+    pub unavailable: Option<String>,
+}
+pub struct PatchInstallPlan {
     pub fingerprint: String,
     pub paths: BTreeSet<String>,
     pub choices: Vec<rtx_fg_manager::encore_install::Choice>,
+    pub streamline_options: Vec<StreamlineInstallOption>,
 }
 struct PatchRequest {
     clean: bool,
@@ -537,7 +544,8 @@ pub struct Controller {
     pub confirm: Option<String>,
     pending_cleanup: Option<(u64, String, Vec<rtx_fg_manager::cleanup_pending::Plan>)>,
     pending_patch: Option<PatchRequest>,
-    pub encore_install: Option<EncoreInstallPlan>,
+    pub patch_install_plan: Option<PatchInstallPlan>,
+    selected_native_streamline: BTreeSet<String>,
     encore_install_values: BTreeMap<String, rtx_fg_manager::presets::Values>,
     encore_components: BTreeMap<String, rtx_fg_manager::encore_components::Components>,
     resume_install: Option<BTreeSet<String>>,
@@ -661,7 +669,8 @@ impl Controller {
             confirm: None,
             pending_cleanup: None,
             pending_patch: None,
-            encore_install: None,
+            patch_install_plan: None,
+            selected_native_streamline: BTreeSet::new(),
             encore_install_values: BTreeMap::new(),
             encore_components: BTreeMap::new(),
             resume_install: None,
@@ -2372,7 +2381,54 @@ impl Controller {
             .unwrap_or_else(|| self.text(label));
         self.tasks.start(false, title);
     }
-    fn prepare_encore_install(&mut self, paths: BTreeSet<String>) {
+    /// A name lookup or library redraw must not invalidate an open install dialog.
+    /// Include the inputs affecting the pending writes, including sibling process guards.
+    fn patch_options_fingerprint(&self, paths: &BTreeSet<String>) -> String {
+        let mut games = BTreeMap::new();
+        for game in &self.games {
+            let targets: Vec<_> = game
+                .deployment_targets()
+                .into_iter()
+                .filter(|target| paths.contains(&target.game_exe.display().to_string()))
+                .map(|target| (target.game_exe, target.directory, target.guard_exes))
+                .collect();
+            if !targets.is_empty() {
+                let scheme = self.scheme_for(Some(&game.exe));
+                games.insert(
+                    &game.exe,
+                    json!([
+                        targets,
+                        scheme,
+                        self.series_for(Some(&game.exe)),
+                        self.proxies_for(Some(&game.exe)),
+                        self.explicit_preset_values(&game.exe, &scheme),
+                        game.extra.get("encore_components")
+                    ]),
+                );
+            }
+        }
+        let inputs = json!([self.focus, self.catalog.revision, paths, games]);
+        core::hash(inputs.to_string().as_bytes())
+    }
+    fn has_patch_options(&self, scheme: &str) -> bool {
+        self.catalog
+            .packages
+            .iter()
+            .filter(|p| p.scheme_id == scheme)
+            .any(|p| {
+                let version = p.upstream_version.as_deref().unwrap_or(&p.version);
+                match scheme {
+                    rtx_fg_manager::encore::SCHEME => {
+                        rtx_fg_manager::encore::supports_200(Some(version))
+                    }
+                    upstream040::SCHEME => semver::Version::parse(version)
+                        .is_ok_and(|v| v >= semver::Version::new(0, 4, 2)),
+                    _ => false,
+                }
+            })
+    }
+    fn prepare_patch_options(&mut self, paths: BTreeSet<String>) {
+        self.selected_native_streamline.clear();
         let jobs = self
             .games
             .iter()
@@ -2381,10 +2437,13 @@ impl Controller {
                     .iter()
                     .any(|exe| paths.contains(exe))
             })
-            .filter(|g| self.scheme_for(Some(&g.exe)) == rtx_fg_manager::encore::SCHEME)
-            .map(|g| (self.game_name(g), g.clone()))
+            .filter_map(|g| {
+                let scheme = self.scheme_for(Some(&g.exe));
+                self.has_patch_options(&scheme)
+                    .then(|| (self.game_name(g), scheme, g.clone()))
+            })
             .collect::<Vec<_>>();
-        let fingerprint = self.retry_fingerprint();
+        let fingerprint = self.patch_options_fingerprint(&paths);
         let nis_available = self.catalog.packages.iter().any(|p| {
             p.scheme_id == rtx_fg_manager::encore::SCHEME
                 && rtx_fg_manager::encore::supports_220(
@@ -2409,15 +2468,28 @@ impl Controller {
         self.cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.cancel.clone();
         self.channel.operation(move |c| {
-            let result = (|| -> Result<EncoreInstallPlan> {
+            let result = (|| -> Result<PatchInstallPlan> {
                 let mut choices = Vec::new();
-                for (name, game) in jobs {
+                let mut streamline_options = Vec::new();
+                for (name, scheme, game) in jobs {
                     for target in game.deployment_targets() {
                         let exe = target.game_exe.display().to_string();
                         if !paths.contains(&exe) {
                             continue;
                         }
                         anyhow::ensure!(!cancel.load(Ordering::Relaxed), "已取消");
+                        if scheme == upstream040::SCHEME {
+                            let unavailable =
+                                rtx_fg_manager::runtime_files::check_native_streamline(&target)
+                                    .err()
+                                    .map(|e| format!("{e:#}"));
+                            streamline_options.push(StreamlineInstallOption {
+                                exe,
+                                game: name.clone(),
+                                unavailable,
+                            });
+                            continue;
+                        }
                         let e = scanner::inspect_for_installation(&target.game_exe);
                         anyhow::ensure!(
                             !e.limited,
@@ -2477,29 +2549,38 @@ impl Controller {
                         choices.push(choice);
                     }
                 }
-                Ok(EncoreInstallPlan {
+                Ok(PatchInstallPlan {
                     fingerprint,
                     paths,
                     choices,
+                    streamline_options,
                 })
             })();
-            c.send(Event::EncorePrepared(result));
+            c.send(Event::InstallOptionsPrepared(result));
             Ok(())
         });
     }
-    pub fn confirm_encore_install(
+    pub fn confirm_patch_options(
         &mut self,
         choices: Vec<rtx_fg_manager::encore_install::Choice>,
+        selected_streamline: BTreeSet<String>,
     ) -> Result<()> {
         let plan = self
-            .encore_install
+            .patch_install_plan
             .take()
             .context("安装计划已失效，请重试")?;
         anyhow::ensure!(
-            plan.fingerprint == self.retry_fingerprint(),
+            plan.fingerprint == self.patch_options_fingerprint(&plan.paths),
             "游戏或配置已变化，请重新发起操作。"
         );
         anyhow::ensure!(choices.len() == plan.choices.len(), "安装选择不完整");
+        anyhow::ensure!(
+            selected_streamline.iter().all(|exe| plan
+                .streamline_options
+                .iter()
+                .any(|option| &option.exe == exe && option.unavailable.is_none())),
+            "安装计划已变化"
+        );
         let mut values = BTreeMap::new();
         let mut components = BTreeMap::new();
         for (selected, original) in choices.into_iter().zip(plan.choices) {
@@ -2540,7 +2621,10 @@ impl Controller {
                 }
             }
         }
-        self.save();
+        if !components.is_empty() {
+            self.save();
+        }
+        self.selected_native_streamline = selected_streamline;
         self.encore_components = components;
         self.encore_install_values = values;
         self.perform(false, plan.paths);
@@ -2557,7 +2641,7 @@ impl Controller {
         if self.closing
             || self.busy
             || self.pending_patch.is_some()
-            || self.encore_install.is_some()
+            || self.patch_install_plan.is_some()
             || (self.read_only && !clean)
         {
             return;
@@ -2582,23 +2666,18 @@ impl Controller {
         }
     }
     fn dispatch_patch(&mut self, clean: bool, targets: BTreeSet<String>) {
+        self.selected_native_streamline.clear();
         self.encore_install_values.clear();
         self.encore_components.clear();
         if !clean
             && self.games.iter().any(|g| {
-                self.scheme_for(Some(&g.exe)) == rtx_fg_manager::encore::SCHEME
+                self.has_patch_options(&self.scheme_for(Some(&g.exe)))
                     && g.deployment_executables()
                         .iter()
                         .any(|p| targets.contains(p))
             })
-            && self.catalog.packages.iter().any(|p| {
-                p.scheme_id == rtx_fg_manager::encore::SCHEME
-                    && rtx_fg_manager::encore::supports_200(
-                        p.upstream_version.as_deref().or(Some(&p.version)),
-                    )
-            })
         {
-            self.prepare_encore_install(targets);
+            self.prepare_patch_options(targets);
             return;
         }
         self.perform(clean, targets);
@@ -2714,7 +2793,7 @@ impl Controller {
             }
             self.encore_components.clear();
             self.encore_install_values.clear();
-            self.prepare_encore_install(game.deployment_executables().into_iter().collect());
+            self.prepare_patch_options(game.deployment_executables().into_iter().collect());
             return;
         }
         let targets = game.deployment_targets();
@@ -3134,7 +3213,8 @@ impl Controller {
         }
     }
     pub fn cancel_patch(&mut self) {
-        self.encore_install = None;
+        self.patch_install_plan = None;
+        self.selected_native_streamline.clear();
         self.encore_install_values.clear();
         self.encore_components.clear();
         self.resume_install = None;
@@ -3142,7 +3222,7 @@ impl Controller {
         self.pending_cleanup = None;
         if matches!(
             self.confirm.as_deref(),
-            Some("deploy_batch" | "clean_batch" | "recover_patch")
+            Some("deploy_batch" | "clean_batch" | "recover_patch" | "patch_options")
         ) {
             self.confirm = None;
         }
@@ -3203,6 +3283,7 @@ impl Controller {
         let retry = self.retry_request(RetryAction::Patch(clean, paths.clone()));
         let first_install_values = self.encore_install_values.clone();
         let components = self.encore_components.clone();
+        let selected_streamline = self.selected_native_streamline.clone();
         let language = self.tr.language.clone();
         self.channel.operation(move |c| {
             let guards = jobs
@@ -3225,6 +3306,12 @@ impl Controller {
                     if let Ok(files) = cloud::download_files(&catalog, scheme, *series, proxies) {
                         queue.extend(files);
                     }
+                    if scheme == upstream040::SCHEME
+                        && targets.iter().any(|exe| selected_streamline.contains(exe))
+                        && let Ok(file) = runtime_files::download_file("streamline", runtime_files::NATIVE_STREAMLINE_VERSION)
+                    {
+                        queue.push(file);
+                    }
                     if scheme == rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p| &p.scheme_id == scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version))))
                     {
                         for target in game.deployment_targets() {
@@ -3240,6 +3327,13 @@ impl Controller {
                 if cancel.load(Ordering::Relaxed) {
                     break;
                 }
+                let streamline_targets: Vec<_> = targets.iter()
+                    .filter(|exe| !clean && scheme == upstream040::SCHEME && selected_streamline.contains(*exe))
+                    .map(|exe| game.deployment_target(std::path::Path::new(exe)))
+                    .collect();
+                let mut sdk_progress = |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
+                    transfer, proxy: "Streamline".into(), package_index: 1, package_count: 1,
+                }));
                 let prepared = if clean {
                     Ok(None)
                 } else {
@@ -3253,6 +3347,9 @@ impl Controller {
                                 &game.deployment_target(std::path::Path::new(exe)),
                                 &proxies,
                             )?;
+                        }
+                        if !streamline_targets.is_empty() {
+                            runtime_files::prepare_native_streamline_update(&streamline_targets, catalog.prefer_github, &cancel, &mut sdk_progress)?;
                         }
                         if scheme==rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p|p.scheme_id==scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version)))) {
                             for target in game.deployment_targets() {
@@ -3295,6 +3392,7 @@ impl Controller {
                     first_install_values.get(exe).filter(|_|core::record(&game.deployment_target(std::path::Path::new(exe)).directory).is_ok_and(|r|r.is_none())).map(|v|(exe.clone(),v.clone()))
                 }).collect::<Vec<_>>();
                 let mut all_ok = true;
+                let mut installed_with_streamline = Vec::new();
                 let read_target = targets
                     .first()
                     .map(|exe| game.deployment_target(std::path::Path::new(exe)));
@@ -3401,7 +3499,11 @@ impl Controller {
                             let ok = outcome.complete;
                             let s = outcome.message;
                             all_ok &= ok;
-                            c.send(Event::PatchResult(ok));
+                            if ok && !clean && scheme == upstream040::SCHEME && selected_streamline.contains(&exe) {
+                                installed_with_streamline.push(game.deployment_target(&p));
+                            } else {
+                                c.send(Event::PatchResult(ok));
+                            }
                             if ok {
                                 c.send(Event::Log(format!(
                                     "{}：{s}",
@@ -3425,6 +3527,24 @@ impl Controller {
                         exe,
                         core::status_at(&game.deployment_target(&p)),
                     ));
+                }
+                if !installed_with_streamline.is_empty() {
+                    // Resolve shared plugin folders once across all successful patch targets.
+                    let result = runtime_files::install_version(
+                        &installed_with_streamline, "streamline", runtime_files::NATIVE_STREAMLINE_VERSION,
+                        catalog.prefer_github, &cancel, &mut sdk_progress,
+                    );
+                    for _ in &installed_with_streamline {
+                        c.send(Event::PatchResult(result.is_ok()));
+                    }
+                    if let Err(error) = result {
+                        all_ok = false;
+                        if rtx_fg_manager::transfer::is_cancelled(&error) {
+                            c.send(Event::TaskCancelled(false));
+                        } else {
+                            errors.push(format!("{primary}：补丁已安装，Streamline 原生插件未更新完成：{error:#}"));
+                        }
+                    }
                 }
                 if all_ok && clean {
                     let snapshot = rtx_fg_manager::deployment::inspect(&game, &catalog);
@@ -4027,15 +4147,15 @@ impl Controller {
                         self.merge_scan(r.rows)
                     }
                 }
-                Event::EncorePrepared(_) if self.closing || self.cancel.load(Ordering::Relaxed) => {
-                }
-                Event::EncorePrepared(result) => match result {
-                    Ok(plan) if plan.fingerprint == self.retry_fingerprint() => {
-                        if plan.choices.is_empty() {
+                Event::InstallOptionsPrepared(_)
+                    if self.closing || self.cancel.load(Ordering::Relaxed) => {}
+                Event::InstallOptionsPrepared(result) => match result {
+                    Ok(plan) if plan.fingerprint == self.patch_options_fingerprint(&plan.paths) => {
+                        if plan.choices.is_empty() && plan.streamline_options.is_empty() {
                             self.resume_install = Some(plan.paths);
                         } else {
-                            self.encore_install = Some(plan);
-                            self.confirm = Some("encore_engines".into());
+                            self.patch_install_plan = Some(plan);
+                            self.confirm = Some("patch_options".into());
                         }
                     }
                     Ok(_) => self.warning = Some("游戏或配置已变化，请重新发起操作。".into()),
@@ -4411,6 +4531,7 @@ impl Controller {
                             && self.warning.is_none()
                             && task.error.is_none()
                             && self.resume_install.is_none()
+                            && self.patch_install_plan.is_none()
                             && self.blocked.is_none()
                         {
                             if self.cancel.load(Ordering::Relaxed) {
@@ -6347,7 +6468,7 @@ mod tests {
         assert_eq!(c.statuses.get(&b).map(String::as_str), Some("正在安装…"));
         assert!(!c.statuses.contains_key(&a));
         assert!(
-            c.encore_install.is_none(),
+            c.patch_install_plan.is_none(),
             "A's Encore selection must not start an Encore plan for B"
         );
         c.close();
@@ -7274,17 +7395,19 @@ mod tests {
         let (_dir, mut c) = controller();
         c.begin_work("检查安装内容");
         let epoch = c.status_epoch;
-        let plan = EncoreInstallPlan {
-            fingerprint: c.retry_fingerprint(),
-            paths: BTreeSet::from(["cancelled.exe".into()]),
+        let paths = BTreeSet::from(["cancelled.exe".into()]);
+        let plan = PatchInstallPlan {
+            fingerprint: c.patch_options_fingerprint(&paths),
+            paths,
             choices: vec![],
+            streamline_options: vec![],
         };
         c.cancel.store(true, Ordering::Relaxed);
-        c.channel.send(Event::EncorePrepared(Ok(plan)));
+        c.channel.send(Event::InstallOptionsPrepared(Ok(plan)));
         c.channel.send(Event::Done);
         c.events();
         assert_eq!(c.status_epoch, epoch);
-        assert!(!c.busy && c.encore_install.is_none() && c.resume_install.is_none());
+        assert!(!c.busy && c.patch_install_plan.is_none() && c.resume_install.is_none());
         assert_eq!(c.tasks.work.as_ref().unwrap().stage, "已取消");
         c.close();
         c.tick_close();
@@ -7293,13 +7416,15 @@ mod tests {
     #[test]
     fn changed_catalog_invalidates_a_first_install_plan_before_any_write() {
         let (_dir, mut c) = controller();
-        c.encore_install = Some(EncoreInstallPlan {
-            fingerprint: c.retry_fingerprint(),
-            paths: BTreeSet::from(["unchanged.exe".into()]),
+        let paths = BTreeSet::from(["unchanged.exe".into()]);
+        c.patch_install_plan = Some(PatchInstallPlan {
+            fingerprint: c.patch_options_fingerprint(&paths),
+            paths,
             choices: vec![],
+            streamline_options: vec![],
         });
         c.catalog.revision.push_str("-new");
-        assert!(c.confirm_encore_install(vec![]).is_err());
+        assert!(c.confirm_patch_options(vec![], BTreeSet::new()).is_err());
         assert!(!c.busy && c.encore_install_values.is_empty());
         c.close();
         c.tick_close();

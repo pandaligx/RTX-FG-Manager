@@ -233,7 +233,6 @@ pub struct Manager {
     runtime_versions: HashMap<&'static str, String>,
     runtime_scroll: ScrollHandle,
     runtime_expanded: HashSet<&'static str>,
-    include_native_streamline: bool,
     editor_open: bool,
     preset_close: Option<bool>, // true: app exit; false: editor dismissal
     theme_preview: theme_preview::ThemePreview<WindowId>,
@@ -401,7 +400,6 @@ impl Manager {
             runtime_versions: HashMap::new(),
             runtime_scroll: ScrollHandle::new(),
             runtime_expanded: HashSet::new(),
-            include_native_streamline: false,
             drag_gap: None,
             editor_open: false,
             preset_close: None,
@@ -693,12 +691,7 @@ impl Manager {
                     })
                     .cloned()
                     .unwrap_or_else(|| rtx_fg_manager::runtime_files::recommended(kind));
-                let operation = if kind == "fg" && !remove && self.include_native_streamline {
-                    "fg-with-streamline"
-                } else {
-                    kind
-                };
-                self.c.runtime_operation(operation, remove, version);
+                self.c.runtime_operation(kind, remove, version);
             }
             Command::RecheckBlocked => {
                 self.dialog_active = false;
@@ -4056,8 +4049,8 @@ impl Manager {
         if self.dialog_active || !self.accepts_feedback(window) {
             return;
         }
-        if self.c.confirm.as_deref() == Some("encore_engines") && self.c.warning.is_none() {
-            self.encore_install_dialog(window, cx);
+        if self.c.confirm.as_deref() == Some("patch_options") && self.c.warning.is_none() {
+            self.patch_install_dialog(window, cx);
             return;
         }
         if self.c.warning.is_none()

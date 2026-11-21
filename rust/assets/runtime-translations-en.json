@@ -1,8 +1,6 @@
 {
-  "同时更新游戏已有的 Streamline 插件": "Also update this game's native Streamline plugins",
   "游戏已有原生帧生成时，可在「Streamline 原生插件」中检查更新。": "For games with native frame generation, check Native Streamline plugins for updates.",
   "Streamline 原生插件": "Native Streamline plugins",
-  "未检测到可更新的游戏原生 Streamline 插件": "No updatable native Streamline plugins found in this game.",
   "此目录没有可更新的原生 Streamline 插件，可取消运行库后安装方案": "This directory has no eligible native Streamline plugins. Deselect runtimes to install the patch alone.",
   "原生 Streamline 必须指定受支持的 SDK 版本": "Choose a supported SDK version for native Streamline plugins.",
   "场景切换保护": "Scene-cut protection",

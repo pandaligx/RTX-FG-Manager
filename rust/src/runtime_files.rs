@@ -36,6 +36,7 @@ const STREAMLINE_PLUGINS: [&str; 10] = [
     "sl.pcl.dll",
     "sl.reflex.dll",
 ];
+pub const NATIVE_STREAMLINE_VERSION: &str = "2.14.16";
 const STREAMLINE_LICENSE: &str = "RTXFG-Streamline-LICENSE.txt";
 
 /// Update the native plugin locations, never add an interposer beside a different
@@ -192,7 +193,7 @@ impl Package {
         transfer::DownloadFile::new(&self.sha256, self.bytes, format!("{name} {}", self.version))
     }
 }
-pub(crate) fn download_file(kind: &str, version: &str) -> Result<transfer::DownloadFile> {
+pub fn download_file(kind: &str, version: &str) -> Result<transfer::DownloadFile> {
     Ok(version_package(kind, version)?.download_file())
 }
 pub(crate) fn download_files(
@@ -472,6 +473,37 @@ pub fn complete_encore_selected(
             cancel,
             progress,
         )?;
+    }
+    Ok(())
+}
+
+/// Check only the game's eligible native plugin folders, using the same rules as installation.
+pub fn check_native_streamline(target: &core::DeploymentTarget) -> Result<()> {
+    ensure!(
+        !native_streamline_paths(target)?.is_empty(),
+        "未检测到可更新的游戏原生 Streamline 插件"
+    );
+    Ok(())
+}
+
+/// Fetch and check the optional SDK before deploying a patch into any of these directories.
+pub fn prepare_native_streamline_update(
+    targets: &[core::DeploymentTarget],
+    github: bool,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(transfer::Progress),
+) -> Result<()> {
+    let _cache = crate::cache::wait_for_operation(cancel, || {})?;
+    let sdk = version_package("streamline", NATIVE_STREAMLINE_VERSION)?;
+    let sources = prepare_package(sdk, github, cancel, progress)?;
+    for target in targets {
+        ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
+        let paths = native_streamline_paths(target)?;
+        ensure!(
+            !paths.is_empty(),
+            "未检测到可更新的游戏原生 Streamline 插件"
+        );
+        plan_entries(target, "fg", &paths, &sources)?;
     }
     Ok(())
 }
@@ -1583,19 +1615,6 @@ pub fn install_version(
 ) -> Result<()> {
     // Resolve once before starting the operation; a background catalog refresh
     // cannot change the bytes selected by the user midway through a download.
-    if kind == "fg-with-streamline" {
-        let fg = version_package("fg", version)?;
-        let sl = package("streamline")?;
-        progress(transfer::Progress::plan(vec![
-            fg.download_file(),
-            sl.download_file(),
-        ]));
-        return install_many_with(targets, "fg", cancel, || {
-            let mut sources = prepare_package(fg, github, cancel, progress)?;
-            sources.extend(prepare_package(sl, github, cancel, progress)?);
-            Ok(sources)
-        });
-    }
     let selected = version_package(kind, version)?;
     progress(transfer::Progress::plan(vec![selected.download_file()]));
     if kind == "streamline" {
@@ -1633,15 +1652,6 @@ fn install_many_with(
         }
     }
     let sources = prepare_source()?;
-    if kind == "fg" && sources.contains_key("sl.common.dll") {
-        for (t, ps) in &mut plans {
-            for path in native_streamline_paths(t)? {
-                if seen.insert(core::key(&path)) {
-                    ps.push(path);
-                }
-            }
-        }
-    }
     // Detect an existing conflict in any directory before changing the first.
     for (t, ps) in &plans {
         plan_entries(t, kind, ps, &sources)?;

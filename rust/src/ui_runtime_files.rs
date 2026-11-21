@@ -107,7 +107,6 @@ impl Manager {
             if !self.c.busy && self.runtime_game != self.c.focus {
                 self.runtime_game = self.c.focus.clone();
                 self.runtime_versions.clear();
-                self.include_native_streamline = false;
                 self.runtime_expanded.clear();
                 self.runtime_scroll = ScrollHandle::new();
                 cx.notify();
@@ -122,7 +121,6 @@ impl Manager {
         }
         self.runtime_game = self.c.focus.clone();
         self.runtime_versions.clear();
-        self.include_native_streamline = false;
         let owner = cx.entity();
         let title = self.t("DLSS / XeSS 运行库");
         let work = window
@@ -507,26 +505,6 @@ impl Manager {
             } else {
                 paths
             };
-            if kind == "fg"
-                && !restore_only
-                && available
-                && snapshot.is_some_and(|s| {
-                    s.runtimes
-                        .iter()
-                        .any(|r| r.kind == "streamline" && r.available)
-                })
-            {
-                card = card.child(
-                    Checkbox::new("fg-native-streamline")
-                        .label(self.t("同时更新游戏已有的 Streamline 插件"))
-                        .checked(self.include_native_streamline)
-                        .disabled(self.c.busy || self.c.read_only)
-                        .on_click(cx.listener(|this, checked, _, cx| {
-                            this.include_native_streamline = *checked;
-                            cx.notify();
-                        })),
-                );
-            }
             let locations = self.runtime_locations(kind, paths, groups, cx);
             if let Some(locations) = locations {
                 card = card.child(locations);
