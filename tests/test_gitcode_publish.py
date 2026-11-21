@@ -333,8 +333,11 @@ class PublicationTests(unittest.TestCase):
         # Git blobs keep LF even when the Windows checkout uses CRLF.
         current = (root/'cloud/bundles/catalog.json').read_text('utf-8').encode()
         catalog = json.loads(current)
+        # Registration recovery only applies to a scheme whose entire archive
+        # set belongs to one release. A version-gated upgrade needs a new index.
+        flat_scheme = next(s for s in catalog['schemes'] if not s.get('release'))
         prior = {**catalog, 'schemes':[s for s in catalog['schemes']
-                                      if s['id'] != 'rtxfg-0.4.1-dx12-vulkan']}
+                                      if s['id'] != flat_scheme['id']]}
         prior_raw = json.dumps(prior).encode()
         index = 'cloud/bundles/indexes/'+catalog['revision']+'.json'
         contents = {'old':prior_raw, 'new':current, 'index':(root/index).read_text('utf-8').encode(),
