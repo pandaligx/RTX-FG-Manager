@@ -1617,7 +1617,7 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn old_managers_can_install_their_last_compatible_anr_and_encore() -> anyhow::Result<()> {
+    fn old_managers_can_install_their_last_compatible_patches() -> anyhow::Result<()> {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cloud/bundles");
         let raw = fs::read(dir.join("catalog.json"))?;
         let parse = || serde_json::from_slice::<CompactCatalog>(&raw);
@@ -1627,6 +1627,21 @@ mod tests {
         )?;
         let old = parse()?.expand_for_manager_version(&index, "4.3.36")?;
         let current = parse()?.expand(&index)?;
+        let pre_miles = parse()?.expand_for_manager_version(&index, "4.3.39")?;
+        assert_eq!(
+            pre_miles
+                .selected(DELTA_041_SCHEME)
+                .upstream_version
+                .as_deref(),
+            Some(crate::delta::SIX_X_VERSION)
+        );
+        assert_eq!(
+            current
+                .selected(DELTA_041_SCHEME)
+                .upstream_version
+                .as_deref(),
+            Some(crate::delta::MILES_INI_VERSION)
+        );
         assert_eq!(
             old.selected(crate::anr::SCHEME).upstream_version.as_deref(),
             Some("0.0.16-B16")
@@ -1729,7 +1744,7 @@ mod tests {
                 .packages
                 .iter()
                 .filter(|p| p.scheme_id == DELTA_041_SCHEME)
-                .all(|p| p.upstream_version.as_deref() == Some(crate::delta::SIX_X_VERSION))
+                .all(|p| p.upstream_version.as_deref() == Some(crate::delta::MILES_INI_VERSION))
         );
     }
 

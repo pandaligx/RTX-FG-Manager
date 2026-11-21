@@ -43,17 +43,33 @@ fn mutable_config(record: &core::Record, name: &str) -> bool {
 }
 
 fn custom_revision_upgrade(old: &core::Record, new: &core::Record) -> bool {
-    old.scheme_id.as_deref() == Some(crate::cloud::DELTA_041_SCHEME)
-        && matching_scheme(old, new)
-        && old.backend == upstream040::BACKEND
-        && old
-            .upstream_version
-            .as_deref()
-            .or(old.payload_version.as_deref())
-            == Some("0.4.1")
-        && new.upstream_version.as_deref() == Some(crate::delta::SIX_X_VERSION)
-        && old.payload_version.as_deref() == Some("0.4.1")
-        && new.payload_version.as_deref() == Some("0.4.1")
+    if old.scheme_id.as_deref() != Some(crate::cloud::DELTA_041_SCHEME)
+        || !matching_backend(old, new)
+        || old.backend != upstream040::BACKEND
+        || old.payload_version != new.payload_version
+    {
+        return false;
+    }
+    let from = old
+        .upstream_version
+        .as_deref()
+        .or(old.payload_version.as_deref());
+    matches!(
+        (
+            old.payload_version.as_deref(),
+            from,
+            new.upstream_version.as_deref()
+        ),
+        (
+            Some("0.4.1"),
+            Some("0.4.1"),
+            Some("0.4.1+rtxfg.2" | crate::delta::SIX_X_VERSION)
+        ) | (
+            Some("0.4.2"),
+            Some("0.4.2" | crate::delta::SIX_X_VERSION),
+            Some(crate::delta::MILES_INI_VERSION)
+        )
+    )
 }
 
 #[derive(Serialize, Deserialize)]

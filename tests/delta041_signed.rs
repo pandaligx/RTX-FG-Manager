@@ -138,9 +138,12 @@ fn signed_delta041_all_entries_install_apply_cleanup_and_fresh_defaults() -> Res
                 "5"
             );
             assert!(String::from_utf8_lossy(&changed).contains("DeltaForceGeneratedFrames=5"));
-            assert_eq!(
-                record.upstream_version.as_deref(),
-                Some(delta::SIX_X_VERSION)
+            assert_eq!(record.upstream_version, prepared.upstream_version);
+            assert!(
+                record
+                    .upstream_version
+                    .as_deref()
+                    .is_some_and(delta::supports_six_x)
             );
         }
         install()?;

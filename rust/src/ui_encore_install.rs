@@ -207,6 +207,6 @@ fn dlssg_components(
     }
     body.when(option.miles_profile, |view| view.child(
         div().text_xs().whitespace_normal().text_color(cx.theme().muted_foreground)
-            .child(tr.t("此游戏的 NVIDIA 倍率将跟随预设，卸载时还原。旧版游戏文件可勾选帧生成和 Streamline 原生插件。"))
+            .child(tr.t("在预设参数中选择帧生成倍率。游戏仍只有 2X 时，可勾选更新帧生成和 Streamline 原生插件。"))
     ))
 }

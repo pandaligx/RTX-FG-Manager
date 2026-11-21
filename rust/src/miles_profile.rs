@@ -1,6 +1,6 @@
-//! Per-title NVIDIA frame generation for the Steam edition of Miles Morales.
-//! Steam and the NVIDIA driver independently identify the title. Only the
-//! custom 0.4.2 graphics scheme opts in. Native runtime updates are separate.
+//! Driver profile compatibility for older custom Miles Morales patches.
+//! New patches read their own INI. Only a pre-existing owned driver setting
+//! needs to be restored when moving to them.
 use crate::{cloud, core, game_identity::SteamArtworkIndex, upstream040};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
@@ -31,11 +31,9 @@ pub fn is_game(path: &Path) -> bool {
             .is_some_and(|(_, id)| id == "1817190"))
         || crate::scanner::miles_for_reporter(path).is_some()
 }
-fn supported(scheme: Option<&str>, version: Option<&str>) -> bool {
+fn needs_driver_profile(scheme: Option<&str>, version: Option<&str>) -> bool {
     scheme == Some(cloud::DELTA_041_SCHEME)
-        && version
-            .and_then(|v| semver::Version::parse(v).ok())
-            .is_some_and(|v| v >= semver::Version::new(0, 4, 2))
+        && matches!(version, Some("0.4.2" | crate::delta::SIX_X_VERSION))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -201,7 +199,7 @@ fn sync_locked(target: &core::DeploymentTarget) -> Result<()> {
     };
     target.validate_record(&record)?;
     if record.backend != upstream040::BACKEND
-        || !supported(
+        || !needs_driver_profile(
             record.scheme_id.as_deref(),
             record
                 .upstream_version

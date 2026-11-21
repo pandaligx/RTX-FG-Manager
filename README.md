@@ -80,9 +80,9 @@ AppImage has its own automatic update channel. Windows-only GPU scheduling, driv
 | Scheme | What to know | Settings / menu |
 | :--- | :--- | :--- |
 | **Dlssg_for_sm86 · 0.4.2** | Complete bundle with XeSS 2X–4X; fresh installs default to `Optimized=1`, preset A and SR off. | Manager / INI |
-| **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | Private Streamline 2.14.16; DLSS up to 6X, default 4X; XeSS up to 4X. Restart after changing resolution with Vulkan XeSS. | Manager / INI |
+| **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | Delta Force uses private Streamline 2.14.16. Miles Morales on Steam reads the multiplier from the INI. DLSS defaults to 4X and supports up to 6X. XeSS supports up to 4X. Restart after changing resolution with Vulkan XeSS. | Manager / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | Retained custom route with additional Delta Force support. Choose according to the actual game's requirements. | Manager / INI |
-| **Dlssg_for_sm86 · 0.4.2 Pipo · DX12** | sm86-10 replaces this fork’s older Vulkan entry. Defaults to preset C, kernel mode 2 and 4X. Choose one of six entry DLLs. | Manager / INI |
+| **Dlssg_for_sm86-MFG-version · 0.4.2 · DX12** | sm86-10 replaces the older Vulkan entry. Defaults to preset C, kernel mode 2 and 4X. You can select multiple entry DLLs. | Manager / INI |
 | **MFG-Unlocker · 1.7.1** | Standalone DLL as before; plugin mode requires a complete existing OptiScaler 10 installation and backs up its host before updating the paired file. These modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
 | **MFG-Unlocker · 1.6.1** | Compatibility fallback; XeMFG requires the existing OptiScaler plugin route. | **Backspace** standalone; OptiScaler menu in plugin mode |
 | **RTX Encore · 2.5.0** | SR/RR/FG, DLSSNR, Smooth Motion and XeSS/XeFG. Games without native DLSS can also use MWSR spatial upscaling. | **Insert** by default |

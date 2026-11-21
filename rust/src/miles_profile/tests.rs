@@ -42,13 +42,20 @@ fn source_and_title_both_have_to_match() -> Result<()> {
         "\"appid\" \"42\"\n\"installdir\" \"Miles\"",
     )?;
     assert!(!is_game(&exe));
-    assert!(supported(Some(cloud::DELTA_041_SCHEME), Some("0.4.2")));
+    for revision in ["0.4.2", crate::delta::SIX_X_VERSION] {
+        assert!(needs_driver_profile(
+            Some(cloud::DELTA_041_SCHEME),
+            Some(revision)
+        ));
+    }
     for (scheme, version) in [
         (upstream040::SCHEME, "0.4.2"),
         ("pipo", "0.4.2"),
         (cloud::DELTA_041_SCHEME, "0.4.1"),
+        (cloud::DELTA_041_SCHEME, crate::delta::MILES_INI_VERSION),
+        (cloud::DELTA_041_SCHEME, "0.5.0"),
     ] {
-        assert!(!supported(Some(scheme), Some(version)));
+        assert!(!needs_driver_profile(Some(scheme), Some(version)));
     }
     Ok(())
 }

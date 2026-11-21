@@ -80,9 +80,9 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | 方案 | 主要说明 | 参数 / 菜单 |
 | :--- | :--- | :--- |
 | **Dlssg_for_sm86 · 0.4.2** | 完整组件包，含 XeSS 2X–4X；新安装默认 `Optimized=1`、预设 A、SR 关闭。 | 管理器 / INI |
-| **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | 私有 Streamline 2.14.16；DLSS 最高 6X、默认 4X，XeSS 最高 4X。Vulkan XeSS 改变分辨率需重启游戏。 | 管理器 / INI |
+| **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | 三角洲使用私有 Streamline 2.14.16。《迈尔斯》Steam 版从 INI 读取倍率。DLSS 默认 4X、最高 6X，XeSS 最高 4X。Vulkan XeSS 改变分辨率后需重启游戏。 | 管理器 / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
-| **Dlssg_for_sm86 · 0.4.2 Pipo · DX12** | sm86-10 接替该分支的旧 Vulkan 入口。默认预设 C、内核模式 2、4X。六个 DLL 入口选一个。 | 管理器 / INI |
+| **Dlssg_for_sm86-MFG-version · 0.4.2 · DX12** | sm86-10 接替该分支的旧 Vulkan 入口。默认预设 C、内核模式 2、4X。六个 DLL 入口可多选。 | 管理器 / INI |
 | **MFG-Unlocker · 1.7.1** | 普通安装仍使用独立 DLL；已有完整 OptiScaler 10 时可选插件模式，备份并更新配套主文件。两种模式互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **RTX Encore · 2.5.0** | 提供 SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG。无原生 DLSS 的游戏也可选 MWSR 空间超分。 | 默认 **Insert** |

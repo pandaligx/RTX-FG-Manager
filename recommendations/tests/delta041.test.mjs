@@ -10,7 +10,7 @@ test('custom Delta 041 is separate from legacy and accepts only public parameter
     presets:{schema:1,profile:'upstream041',values:{fg_engine:'XeSS',max_generated_frames:'3',optimized:'1'},
       defaults:{fg_engine:'DLSS',max_generated_frames:'3',optimized:'1'}}};
   assert.deepEqual(recipe(c).presets,c.presets);
-  for (const patchVersion of ['0.4.1+rtxfg.2','0.4.2+rtxfg.1']) {
+  for (const patchVersion of ['0.4.1+rtxfg.2','0.4.2+rtxfg.1','0.4.2+rtxfg.2']) {
     const dlss=structuredClone(c);
     dlss.patchVersion=patchVersion;
     dlss.presets.values.fg_engine='DLSS';
