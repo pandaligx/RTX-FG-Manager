@@ -84,7 +84,7 @@ impl Game {
     /// Preserve that owner on rescan until its original components are restored.
     pub fn preserve_reporter_owner(&mut self, previous: &Game) {
         let old = Path::new(&previous.exe);
-        if is_name(old, &["crs-handler.exe"])
+        if is_nixxes_reporter(old)
             && previous.deployment_dir.is_empty()
             && old.parent().is_some_and(has_deployment_files)
             && miles_for_reporter(old)
@@ -100,7 +100,7 @@ impl Game {
         if !self.deployment_dir.is_empty() {
             return;
         }
-        if is_name(Path::new(&self.exe), &["crs-handler.exe"]) {
+        if is_nixxes_reporter(Path::new(&self.exe)) {
             let old = Path::new(&self.exe);
             if old.parent().is_some_and(|dir| !has_deployment_files(dir))
                 && let Some(renderer) = miles_for_reporter(old)
@@ -275,7 +275,8 @@ pub fn is_gpu_diagnostic_tool(exe: &Path) -> bool {
     })
 }
 fn auxiliary_exe(name: &str) -> bool {
-    if is_gpu_diagnostic_tool(Path::new(name)) {
+    let path = Path::new(name);
+    if is_nixxes_reporter(path) || is_gpu_diagnostic_tool(path) {
         return true;
     }
     let role = executable_role(name);
@@ -308,7 +309,7 @@ fn auxiliary_exe(name: &str) -> bool {
     let tool = TOOL.get_or_init(|| {
         regex::Regex::new(concat!(
             "(?i)^(?:crashreportclient(?:editor)?(?:-(?:win64|win32)-(?:shipping|development|debug))?|",
-            "crs-handler|crashpad_handler|crashsender[0-9]*|unitycrashhandler(?:32|64)?|",
+            "crashpad_handler|crashsender[0-9]*|unitycrashhandler(?:32|64)?|",
             "unins[0-9]*|uninstall|uninstaller|",
             "setup(?:32|64)?|install|installer|launcher|launchergame|updater|",
             "benchmarkreport|reporter|helper|cefsubprocess|epicwebhelper|qtwebengineprocess|",
@@ -458,34 +459,52 @@ mod engine_scan_tests {
         let apps = temp.path().join("steamapps");
         let game = apps.join("common/Miles");
         let renderer = game.join("MilesMorales.exe");
-        let reporter = game.join("crs-handler.exe");
         exe(&renderer);
-        exe(&reporter);
-        let mut saved: Game = serde_json::from_value(
-            json!({"exe": reporter, "targets": [reporter, renderer], "nickname":"保存的游戏名"}),
-        )
-        .unwrap();
-        assert!(auxiliary_exe("CRS-handler.exe"));
-        assert!(miles_for_reporter(&reporter).is_none());
+        let reporters = [game.join("CRS-handler.exe"), game.join("crs-video.exe")];
+        for reporter in &reporters {
+            exe(reporter);
+            assert!(
+                auxiliary_exe(reporter.file_name().unwrap().to_str().unwrap()),
+                "{}",
+                reporter.display()
+            );
+            assert!(miles_for_reporter(reporter).is_none());
+        }
         fs::write(
             apps.join("appmanifest_1817190.acf"),
             "\"appid\" \"1817190\"\n\"installdir\" \"Miles\"",
         )
         .unwrap();
-        assert_eq!(miles_for_reporter(&reporter).unwrap(), renderer);
+        fs::write(game.join("nvngx_dlssg.dll"), b"FG").unwrap();
+        let report = scan_with_records(
+            std::slice::from_ref(&game),
+            &AtomicBool::new(false),
+            |_, _, _| {},
+            vec![Install::new(game.clone(), "Steam", "Miles Morales")],
+        )
+        .unwrap();
+        assert_eq!(report.rows.len(), 1);
+        assert_eq!(Path::new(&report.rows[0].exe), renderer);
         let journal = game.join(".rtx-fg-runtimes");
-        fs::create_dir(&journal).unwrap();
-        saved.repair_renderer();
-        assert_eq!(Path::new(&saved.exe), reporter);
-        let mut rescan: Game =
-            serde_json::from_value(json!({"exe": renderer, "targets":[renderer]})).unwrap();
-        rescan.preserve_reporter_owner(&saved);
-        assert_eq!(Path::new(&rescan.targets[0]), reporter);
-        fs::remove_dir(journal).unwrap();
-        saved.repair_renderer();
-        assert_eq!(Path::new(&saved.exe), renderer);
-        assert_eq!(saved.targets, [saved.exe.clone()]);
-        assert_eq!(saved.extra["nickname"], "保存的游戏名");
+        for reporter in &reporters {
+            assert_eq!(miles_for_reporter(reporter).unwrap(), renderer);
+            let mut saved: Game = serde_json::from_value(
+                json!({"exe": reporter, "targets": [reporter, renderer], "nickname":"保存的游戏名"}),
+            )
+            .unwrap();
+            fs::create_dir(&journal).unwrap();
+            saved.repair_renderer();
+            assert_eq!(Path::new(&saved.exe), reporter);
+            let mut rescan: Game =
+                serde_json::from_value(json!({"exe": renderer, "targets":[renderer]})).unwrap();
+            rescan.preserve_reporter_owner(&saved);
+            assert_eq!(Path::new(&rescan.targets[0]), reporter);
+            fs::remove_dir(&journal).unwrap();
+            saved.repair_renderer();
+            assert_eq!(Path::new(&saved.exe), renderer);
+            assert_eq!(saved.targets, [saved.exe.clone()]);
+            assert_eq!(saved.extra["nickname"], "保存的游戏名");
+        }
     }
     #[test]
     fn pbz_repair_requires_valid_renderer_and_preserves_custom_targets() {
@@ -977,9 +996,21 @@ fn has_deployment_files(dir: &Path) -> bool {
     .any(|name| dir.join(name).try_exists().unwrap_or(true))
 }
 
-/// Resolve this crash reporter only inside the verified Steam title, beside its renderer.
+pub(crate) fn is_nixxes_reporter(exe: &Path) -> bool {
+    is_name(exe, &["crs-handler.exe", "crs-video.exe"])
+}
+
+pub fn is_steam_miles(exe: &Path) -> bool {
+    (is_name(exe, &["MilesMorales.exe"])
+        && crate::game_identity::SteamArtworkIndex::default()
+            .lookup(exe)
+            .is_some_and(|(_, id)| id == "1817190"))
+        || miles_for_reporter(exe).is_some()
+}
+
+/// Resolve a crash reporter only inside the verified Steam title, beside its renderer.
 pub(crate) fn miles_for_reporter(exe: &Path) -> Option<PathBuf> {
-    if !is_name(exe, &["crs-handler.exe"]) {
+    if !is_nixxes_reporter(exe) {
         return None;
     }
     let renderer = core::no_links(&exe.with_file_name("MilesMorales.exe")).ok()?;

@@ -1,7 +1,8 @@
 //! Driver profile compatibility for older custom Miles Morales patches.
 //! New patches read their own INI. Only a pre-existing owned driver setting
 //! needs to be restored when moving to them.
-use crate::{cloud, core, game_identity::SteamArtworkIndex, upstream040};
+use crate::scanner::is_nixxes_reporter;
+use crate::{cloud, core, upstream040};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -20,16 +21,8 @@ fn has_title_name(path: &Path) -> bool {
     path.file_name()
         .is_some_and(|n| n.eq_ignore_ascii_case("MilesMorales.exe"))
 }
-fn is_reporter(path: &Path) -> bool {
-    path.file_name()
-        .is_some_and(|n| n.eq_ignore_ascii_case("crs-handler.exe"))
-}
 pub fn is_game(path: &Path) -> bool {
-    (has_title_name(path)
-        && SteamArtworkIndex::default()
-            .lookup(path)
-            .is_some_and(|(_, id)| id == "1817190"))
-        || crate::scanner::miles_for_reporter(path).is_some()
+    crate::scanner::is_steam_miles(path)
 }
 fn needs_driver_profile(scheme: Option<&str>, version: Option<&str>) -> bool {
     scheme == Some(cloud::DELTA_041_SCHEME)
@@ -181,7 +174,7 @@ fn requested(ini: &[u8]) -> Result<Option<u32>> {
 }
 
 pub(crate) fn restore_locked(target: &core::DeploymentTarget) -> Result<()> {
-    if !has_title_name(&target.game_exe) && !is_reporter(&target.game_exe) {
+    if !has_title_name(&target.game_exe) && !is_nixxes_reporter(&target.game_exe) {
         return Ok(());
     }
     let path = receipt_path()?;
@@ -222,7 +215,7 @@ fn sync_locked(target: &core::DeploymentTarget) -> Result<()> {
     }
 }
 pub(crate) fn after_install(target: &core::DeploymentTarget) -> Result<()> {
-    if !has_title_name(&target.game_exe) && !is_reporter(&target.game_exe) {
+    if !has_title_name(&target.game_exe) && !is_nixxes_reporter(&target.game_exe) {
         return Ok(());
     }
     let target = target.validate(true)?;
@@ -231,7 +224,7 @@ pub(crate) fn after_install(target: &core::DeploymentTarget) -> Result<()> {
     sync_locked(&target).context("补丁已安装，NVIDIA 倍率未同步。请退出游戏后重新应用预设")
 }
 pub(crate) fn after_preset_locked(target: &core::DeploymentTarget) -> Result<()> {
-    if !has_title_name(&target.game_exe) && !is_reporter(&target.game_exe) {
+    if !has_title_name(&target.game_exe) && !is_nixxes_reporter(&target.game_exe) {
         return Ok(());
     }
     sync_locked(target).context("预设已写入，NVIDIA 倍率未同步。请退出游戏后重新应用方案")

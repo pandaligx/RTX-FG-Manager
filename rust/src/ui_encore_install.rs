@@ -207,6 +207,6 @@ fn dlssg_components(
     }
     body.when(option.miles_profile, |view| view.child(
         div().text_xs().whitespace_normal().text_color(cx.theme().muted_foreground)
-            .child(tr.t("在预设参数中选择帧生成倍率。游戏仍只有 2X 时，可勾选更新帧生成和 Streamline 原生插件。"))
+            .child(tr.t("《迈尔斯》要使用 4X 或 6X DLSS 帧生成，请同时勾选「DLSS 帧生成」和「Streamline 原生插件」。卸载时会还原游戏原件。"))
     ))
 }

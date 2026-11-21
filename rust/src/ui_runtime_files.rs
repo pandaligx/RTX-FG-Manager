@@ -257,7 +257,15 @@ impl Manager {
                 }
                 details = details.child(plugins.child(version_row(
                     "sl.interposer.dll",
-                    format!("{} ({})", self.t(&group.interposer), self.t("保留原件")),
+                    format!(
+                        "{} ({})",
+                        self.t(&group.interposer),
+                        self.t(if group.interposer_managed {
+                            "原件已备份"
+                        } else {
+                            "保留原件"
+                        })
+                    ),
                 )));
             }
         }

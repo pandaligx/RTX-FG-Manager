@@ -2447,8 +2447,21 @@ impl Controller {
             .filter_map(|g| {
                 let scheme = self.scheme_for(Some(&g.exe));
                 self.has_patch_options(&scheme).then(|| {
-                    let label = self.cloud_label(self.catalog.selected(&scheme));
-                    (self.game_name(g), scheme, label, g.clone())
+                    let package = self.catalog.selected(&scheme);
+                    let miles_patch = rtx_fg_manager::delta::uses_miles_ini(
+                        Some(&scheme),
+                        package
+                            .upstream_version
+                            .as_deref()
+                            .or(Some(&package.version)),
+                    );
+                    (
+                        self.game_name(g),
+                        scheme,
+                        self.cloud_label(package),
+                        miles_patch,
+                        g.clone(),
+                    )
                 })
             })
             .collect::<Vec<_>>();
@@ -2480,7 +2493,7 @@ impl Controller {
             let result = (|| -> Result<PatchInstallPlan> {
                 let mut choices = Vec::new();
                 let mut dlssg_options = Vec::new();
-                for (name, scheme, patch_label, game) in jobs {
+                for (name, scheme, patch_label, miles_patch, game) in jobs {
                     for target in game.deployment_targets() {
                         let exe = target.game_exe.display().to_string();
                         if !paths.contains(&exe) {
@@ -2488,13 +2501,11 @@ impl Controller {
                         }
                         anyhow::ensure!(!cancel.load(Ordering::Relaxed), "已取消");
                         if dlssg_native_options(&scheme) {
-                            let unavailable = runtime_files::NativeComponent::unavailable(&target);
+                            let unavailable =
+                                runtime_files::NativeComponent::unavailable(&target, miles_patch);
                             dlssg_options.push(DlssgInstallOption {
-                                #[cfg(windows)]
-                                miles_profile: scheme == cloud::DELTA_041_SCHEME
-                                    && rtx_fg_manager::miles_profile::is_game(&target.game_exe),
-                                #[cfg(not(windows))]
-                                miles_profile: false,
+                                miles_profile: miles_patch
+                                    && scanner::is_steam_miles(&target.game_exe),
                                 exe,
                                 game: name.clone(),
                                 patch_label: patch_label.clone(),
@@ -3369,7 +3380,9 @@ impl Controller {
                             )?;
                         }
                         for (kind, group) in &native_groups {
-                            kind.prepare(group, catalog.prefer_github, &cancel, &mut runtime_progress)?;
+                            let package = catalog.selected(&scheme);
+                            let miles_patch = rtx_fg_manager::delta::uses_miles_ini(Some(&scheme), package.upstream_version.as_deref().or(Some(&package.version)));
+                            kind.prepare(group, miles_patch, catalog.prefer_github, &cancel, &mut runtime_progress)?;
                         }
                         if scheme==rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p|p.scheme_id==scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version)))) {
                             for target in game.deployment_targets() {

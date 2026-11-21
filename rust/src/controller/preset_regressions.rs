@@ -256,16 +256,22 @@ fn native_runtime_choices_require_standard_or_delta_dlssg_042() {
 #[test]
 #[ignore = "requires the standard 0.4.2 archive and native SDK in an isolated cache"]
 fn standard_patch_streamline_opt_in_round_trip() -> Result<()> {
-    native_runtime_round_trip(upstream040::SCHEME)
+    native_runtime_round_trip(upstream040::SCHEME, false)
 }
 
 #[test]
 #[ignore = "requires the Delta 0.4.2 archive and native SDK in an isolated cache"]
 fn delta_patch_streamline_opt_in_round_trip() -> Result<()> {
-    native_runtime_round_trip(cloud::DELTA_041_SCHEME)
+    native_runtime_round_trip(cloud::DELTA_041_SCHEME, false)
 }
 
-fn native_runtime_round_trip(scheme: &str) -> Result<()> {
+#[test]
+#[ignore = "requires the signed Delta patch and official Streamline SDK in an isolated cache"]
+fn miles_patch_streamline_opt_in_round_trip() -> Result<()> {
+    native_runtime_round_trip(cloud::DELTA_041_SCHEME, true)
+}
+
+fn native_runtime_round_trip(scheme: &str, miles: bool) -> Result<()> {
     use runtime_files::NativeComponent;
     let sdk =
         std::fs::read(std::env::var_os("RTXFG_TEST_SL_COMMON").context("missing fixture SDK")?)?;
@@ -273,15 +279,30 @@ fn native_runtime_round_trip(scheme: &str) -> Result<()> {
     original.extend_from_slice(b"original game plugin");
     let (_data, mut c) = controller();
     let game_dir = tempfile::tempdir()?;
+    let base = if miles {
+        let apps = game_dir.path().join("steamapps");
+        std::fs::create_dir_all(apps.join("common"))?;
+        std::fs::write(
+            apps.join("appmanifest_1817190.acf"),
+            "\"appid\" \"1817190\"\n\"installdir\" \"Native\"",
+        )?;
+        apps.join("common")
+    } else {
+        game_dir.path().to_path_buf()
+    };
     let mut targets = Vec::new();
     for renderer in ["Native", "WithoutStreamline"] {
-        let folder = game_dir.path().join(renderer);
+        let folder = base.join(renderer);
         std::fs::create_dir(&folder)?;
-        let exe = folder.join("TestGame.exe");
+        let exe = folder.join(if miles && renderer == "Native" {
+            "MilesMorales.exe"
+        } else {
+            "TestGame.exe"
+        });
         std::fs::copy(std::env::current_exe()?, &exe)?;
         targets.push(exe.display().to_string());
     }
-    let native = game_dir.path().join("Native");
+    let native = base.join("Native");
     let plugin = native.join("sl.common.dll");
     let interposer = native.join("sl.interposer.dll");
     let native_dlls = [
@@ -293,7 +314,15 @@ fn native_runtime_round_trip(scheme: &str) -> Result<()> {
         std::fs::write(native.join(name), &original)?;
     }
     std::fs::write(&plugin, &original)?;
-    std::fs::write(&interposer, b"original game interposer")?;
+    let original_entry: &[u8] = if miles {
+        &original
+    } else {
+        b"original game interposer"
+    };
+    std::fs::write(&interposer, original_entry)?;
+    if miles {
+        std::fs::write(native.join("sl.dlss_g.dll"), &original)?;
+    }
     let game = Game {
         exe: targets[0].clone(),
         targets: targets.clone(),
@@ -354,12 +383,7 @@ fn native_runtime_round_trip(scheme: &str) -> Result<()> {
             .as_deref(),
             opt_in.then_some(runtime_files::NATIVE_STREAMLINE_VERSION)
         );
-        assert!(
-            !game_dir
-                .path()
-                .join("WithoutStreamline/sl.common.dll")
-                .exists()
-        );
+        assert!(!base.join("WithoutStreamline/sl.common.dll").exists());
         for (kind, name) in native_dlls {
             let updated = kinds.contains(&kind);
             assert_eq!(
@@ -373,18 +397,20 @@ fn native_runtime_round_trip(scheme: &str) -> Result<()> {
                         .starts_with(kind.version())
                 );
             }
-            assert!(
-                !game_dir
-                    .path()
-                    .join("WithoutStreamline")
-                    .join(name)
-                    .exists()
-            );
+            assert!(!base.join("WithoutStreamline").join(name).exists());
         }
-        assert_eq!(std::fs::read(&interposer)?, b"original game interposer");
+        if miles && opt_in {
+            assert_eq!(
+                core::digest(&interposer)?,
+                "b1d7395aebd7b9722841d64dcf7433680020b6a8e421f851c16d5ba0c2182edf"
+            );
+        } else {
+            assert_eq!(std::fs::read(&interposer)?, original_entry);
+        }
         c.request_patch(true);
         finish(&mut c)?;
         assert_eq!(core::digest(&plugin)?, core::hash(&original));
+        assert_eq!(std::fs::read(&interposer)?, original_entry);
         for (_, name) in native_dlls {
             assert_eq!(core::digest(&native.join(name))?, core::hash(&original));
         }

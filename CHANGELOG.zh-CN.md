@@ -2,7 +2,7 @@
 
 ## 4.3.40 — 2026-11-21
 
-- Steam 版《漫威蜘蛛侠：迈尔斯·莫拉莱斯》使用三角洲版 Dlssg_for_sm86 0.4.2 时，补丁直接读取 `dlssg_sm86.ini` 中的帧生成倍率，手动安装也可使用。DLSS 默认 4X、最高 6X，XeSS 最高 4X。
+- Steam 版《漫威蜘蛛侠：迈尔斯·莫拉莱斯》的三角洲补丁从 `dlssg_sm86.ini` 读取倍率。要使用 DLSS 4X 或 6X，请同时勾选 DLSS 帧生成和 Streamline 原生插件；管理器会备份原来的 Streamline 入口，卸载时还原。DLSS 默认 4X，XeSS 最高 4X。
 - 安装标准版或三角洲版 Dlssg_for_sm86 0.4.2 时，可分别更新游戏已有的 DLSS 超分辨率、光线重建、帧生成和 Streamline 插件。四项默认关闭，已更新的文件可还原。
 - 修复 Steam 游戏图标缺失或模糊，以及把《迈尔斯》的崩溃报告程序识别为游戏的问题。Dlssg_for_sm86-MFG-version 恢复项目名称，支持多选 DLL 入口。
 - 玩家可以分享原生 Streamline 插件版本和多个 DLL 入口。推荐卡片在评价图标下显示票数，运行库窗口更紧凑。

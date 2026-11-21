@@ -1,6 +1,6 @@
 //! Opt-in runtime updates. Existing game files are backed up; later edits win.
 //! Added FG is a separate matched set for Encore 2 games with no native FG.
-//! Native Streamline plugins are opt-in; the game's interposer stays intact.
+//! Native Streamline updates include the existing interposer only for the tested Miles patch.
 use crate::{assets, core, scanner, transfer, win};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
@@ -38,6 +38,7 @@ const STREAMLINE_PLUGINS: [&str; 10] = [
 ];
 pub const NATIVE_STREAMLINE_VERSION: &str = "2.14.16";
 const STREAMLINE_LICENSE: &str = "RTXFG-Streamline-LICENSE.txt";
+const INTERPOSER: &str = "sl.interposer.dll";
 
 /// Update the native plugin locations, never add an interposer beside a different
 /// executable. This is independent from Encore's added-FG integration.
@@ -51,6 +52,15 @@ fn native_streamline_paths(target: &core::DeploymentTarget) -> Result<Vec<PathBu
 fn native_streamline_paths_from(
     target: &core::DeploymentTarget,
     evidence: &scanner::Evidence,
+    version: impl FnMut(&Path) -> Result<String>,
+) -> Result<Vec<PathBuf>> {
+    native_streamline_plan(target, evidence, None, version)
+}
+
+fn native_streamline_plan(
+    target: &core::DeploymentTarget,
+    evidence: &scanner::Evidence,
+    incoming_miles_patch: Option<bool>,
     mut version: impl FnMut(&Path) -> Result<String>,
 ) -> Result<Vec<PathBuf>> {
     ensure!(
@@ -64,9 +74,10 @@ fn native_streamline_paths_from(
         for entry in &record.entries {
             let path = destination(target, "fg", entry)?;
             if path.file_name().is_some_and(|name| {
-                STREAMLINE_PLUGINS
-                    .iter()
-                    .any(|n| name.eq_ignore_ascii_case(n))
+                name.eq_ignore_ascii_case(INTERPOSER)
+                    || STREAMLINE_PLUGINS
+                        .iter()
+                        .any(|n| name.eq_ignore_ascii_case(n))
             }) {
                 folders.insert(path.parent().context("Streamline 目录无效")?.to_path_buf());
                 tracked.insert(core::key(&path));
@@ -84,6 +95,24 @@ fn native_streamline_paths_from(
             folders.insert(path.parent().context("Streamline 目录无效")?.to_path_buf());
         }
     }
+    let match_interposer =
+        if incoming_miles_patch == Some(false) || !scanner::is_steam_miles(&target.game_exe) {
+            false
+        } else if let Some(planned) = incoming_miles_patch {
+            planned
+        } else if let Some(installed) = core::record(&target.directory)? {
+            target.validate_record(&installed)?;
+            !installed.cache_pending
+                && crate::delta::uses_miles_ini(
+                    installed.scheme_id.as_deref(),
+                    installed
+                        .upstream_version
+                        .as_deref()
+                        .or(installed.payload_version.as_deref()),
+                )
+        } else {
+            false
+        };
     let mut paths = Vec::new();
     for folder in folders {
         // An installed, added-FG set has its own matched-package ownership.
@@ -110,7 +139,17 @@ fn native_streamline_paths_from(
         }
         let has_fg = folder.join("sl.dlss_g.dll").is_file();
         let has_sr = folder.join("sl.dlss.dll").is_file() || folder.join("sl.dlss_d.dll").is_file();
-        for name in STREAMLINE_PLUGINS {
+        let interposer = folder.join(INTERPOSER);
+        let include_interposer = match_interposer
+            && target
+                .game_exe
+                .parent()
+                .is_some_and(|p| core::key(p) == core::key(&folder))
+            && (has_fg && interposer.is_file() || tracked.contains(&core::key(&interposer)));
+        for name in STREAMLINE_PLUGINS
+            .into_iter()
+            .chain(include_interposer.then_some(INTERPOSER))
+        {
             let path = core::no_links(&folder.join(name))?;
             if path.is_file()
                 || tracked.contains(&core::key(&path))
@@ -514,13 +553,19 @@ impl NativeComponent {
         self,
         target: &core::DeploymentTarget,
         e: &scanner::Evidence,
+        incoming_miles_patch: Option<bool>,
     ) -> Result<Vec<PathBuf>> {
         ensure!(
             !e.limited,
             "组件检测未完成，请刷新后重试；不会向未知位置添加运行库"
         );
-        let mut paths = candidate_paths(target, self.kind(), Some(e))?;
-        if self != Self::Streamline {
+        let paths = if self == Self::Streamline {
+            native_streamline_plan(target, e, incoming_miles_patch, |p| {
+                core::pe64(p, true)?;
+                Ok(win::file_version(p)?.0)
+            })?
+        } else {
+            let mut paths = candidate_paths(target, self.kind(), Some(e))?;
             // Ignore optional destinations proposed by a previous Encore installation.
             paths.retain(|p| p.is_file());
             for path in &paths {
@@ -532,17 +577,21 @@ impl NativeComponent {
                     path.display()
                 );
             }
-        }
+            paths
+        };
         ensure!(!paths.is_empty(), "未检测到游戏自带的对应组件");
         Ok(paths)
     }
-    pub fn unavailable(target: &core::DeploymentTarget) -> BTreeMap<Self, String> {
+    pub fn unavailable(
+        target: &core::DeploymentTarget,
+        miles_patch: bool,
+    ) -> BTreeMap<Self, String> {
         let evidence = scanner::inspect_for_installation(&target.game_exe);
         Self::ALL
             .into_iter()
             .filter_map(|component| {
                 component
-                    .destinations(target, &evidence)
+                    .destinations(target, &evidence, Some(miles_patch))
                     .err()
                     .map(|e| (component, format!("{e:#}")))
             })
@@ -559,6 +608,7 @@ impl NativeComponent {
     pub fn prepare(
         self,
         targets: &[core::DeploymentTarget],
+        miles_patch: bool,
         github: bool,
         cancel: &AtomicBool,
         progress: &mut dyn FnMut(transfer::Progress),
@@ -572,8 +622,11 @@ impl NativeComponent {
         )?;
         for target in targets {
             ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
-            let paths =
-                self.destinations(target, &scanner::inspect_for_installation(&target.game_exe))?;
+            let paths = self.destinations(
+                target,
+                &scanner::inspect_for_installation(&target.game_exe),
+                Some(miles_patch),
+            )?;
             plan_entries(target, self.journal(), &paths, &sources)?;
         }
         Ok(())
@@ -597,8 +650,7 @@ impl NativeComponent {
     }
 }
 
-/// Explicit Streamline update; keeps original interposers and records restoration
-/// beside the existing FG journal so older installations remain recoverable.
+/// Explicit Streamline update, backed up in the existing FG journal.
 pub fn install_native_streamline(
     targets: &[core::DeploymentTarget],
     github: bool,
@@ -641,7 +693,7 @@ fn update_native(
         let mut paths = if component == NativeComponent::Streamline {
             native_streamline_paths(t)?
         } else {
-            component.destinations(t, &scanner::inspect_for_installation(&t.game_exe))?
+            component.destinations(t, &scanner::inspect_for_installation(&t.game_exe), None)?
         };
         paths.retain(|p| seen.insert(core::key(p)));
         if !paths.is_empty() {
@@ -834,6 +886,7 @@ pub struct StreamlineStatus {
     pub directory: PathBuf,
     pub plugins: BTreeMap<String, String>,
     pub interposer: String,
+    pub interposer_managed: bool,
 }
 
 fn streamline_status(
@@ -843,6 +896,7 @@ fn streamline_status(
     mut version: impl FnMut(&Path) -> String,
 ) -> Result<Vec<StreamlineStatus>> {
     let added = read(target, "encorefg")?;
+    let native = read(target, "fg")?;
     let mut folders = BTreeSet::new();
     for path in evidence.frame_integration_paths.iter().chain(tracked) {
         if path.file_name().is_some_and(|n| {
@@ -906,10 +960,16 @@ fn streamline_status(
             .map(|n| Ok((n.clone(), file_version(&n)?)))
             .collect::<Result<BTreeMap<_, _>>>()?;
         let interposer = file_version("sl.interposer.dll")?;
+        let interposer_managed = native.as_ref().is_some_and(|r| {
+            r.entries
+                .iter()
+                .any(|e| core::key(Path::new(&e.path)) == core::key(&directory.join(INTERPOSER)))
+        });
         groups.push(StreamlineStatus {
             directory,
             plugins,
             interposer,
+            interposer_managed,
         });
     }
     Ok(groups)
@@ -1281,6 +1341,15 @@ fn destination(target: &core::DeploymentTarget, kind: &str, entry: &Entry) -> Re
                 .any(|s| n.eq_ignore_ascii_case(s))
         } else if kind == "fg" {
             n.eq_ignore_ascii_case("nvngx_dlssg.dll")
+                || (n.eq_ignore_ascii_case(INTERPOSER)
+                    && entry.original.is_some()
+                    && target.game_exe.file_name().is_some_and(|e| {
+                        e.eq_ignore_ascii_case("MilesMorales.exe")
+                            || scanner::is_nixxes_reporter(&target.game_exe)
+                    })
+                    && p.parent()
+                        .zip(target.game_exe.parent())
+                        .is_some_and(|(a, b)| core::key(a) == core::key(b)))
                 || STREAMLINE_PLUGINS
                     .iter()
                     .any(|name| n.eq_ignore_ascii_case(name))
@@ -2314,6 +2383,89 @@ mod tests {
         }
         assert!(!folder.join("sl.reflex.dll").exists());
         assert!(!folder.join(STREAMLINE_LICENSE).exists());
+        Ok(())
+    }
+    #[test]
+    fn miles_native_interposer_is_opt_in_and_recoverable() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let apps = tmp.path().join("steamapps");
+        let base = target(&apps.join("common/Miles"))?;
+        let exe = base.directory.join("MilesMorales.exe");
+        fs::rename(&base.game_exe, &exe)?;
+        let t = core::DeploymentTarget::for_game(&exe);
+        let interposer = t.directory.join(INTERPOSER);
+        let fg_plugin = t.directory.join("sl.dlss_g.dll");
+        fs::write(&interposer, b"original native entry")?;
+        fs::write(&fg_plugin, b"original FG plugin")?;
+        let evidence = scanner::inspect(&exe);
+        let paths =
+            |planned| native_streamline_plan(&t, &evidence, planned, |_| Ok("2.4.0.0".into()));
+        assert!(!paths(Some(true))?.contains(&interposer));
+        fs::write(
+            apps.join("appmanifest_1817190.acf"),
+            "\"appid\" \"1817190\"\n\"installdir\" \"Miles\"",
+        )?;
+        assert!(!paths(None)?.contains(&interposer));
+        assert!(!paths(Some(false))?.contains(&interposer));
+        assert!(paths(Some(true))?.contains(&interposer));
+        assert!(
+            native_streamline_plan(&t, &evidence, Some(true), |p| Ok(
+                if p.ends_with(INTERPOSER) {
+                    "2.15.0"
+                } else {
+                    "2.4.0"
+                }
+                .into()
+            ))
+            .is_err()
+        );
+
+        let nested = t.directory.join("Other");
+        fs::create_dir(&nested)?;
+        fs::write(nested.join(INTERPOSER), b"other entry")?;
+        fs::write(nested.join("sl.dlss_g.dll"), b"other plugin")?;
+        let mut nested_evidence = evidence.clone();
+        nested_evidence
+            .frame_integration_paths
+            .push(nested.join("sl.dlss_g.dll"));
+        assert!(
+            !native_streamline_plan(&t, &nested_evidence, Some(true), |_| Ok("2.4.0".into()))?
+                .contains(&nested.join(INTERPOSER))
+        );
+        fs::remove_file(&fg_plugin)?;
+        assert!(!paths(Some(true))?.contains(&interposer));
+        fs::write(&fg_plugin, b"original FG plugin")?;
+
+        let dll = t.directory.join("nvngx_dlssg.dll");
+        fs::write(&dll, b"original FG")?;
+        let update = paths(Some(true))?;
+        let mut sdk = sources(&tmp.path().join("sdk"), "fg")?;
+        for path in &update {
+            let name = path.file_name().unwrap().to_str().unwrap();
+            let source = tmp.path().join("sdk").join(name);
+            fs::write(&source, format!("updated {name}"))?;
+            sdk.insert(name.to_owned(), source);
+        }
+        for remove_plugins_first in [true, false] {
+            install_locked(&t, "fg", std::slice::from_ref(&dll), &sdk)?;
+            install_locked(&t, "fg", &update, &sdk)?;
+            assert_eq!(fs::read(&interposer)?, b"updated sl.interposer.dll");
+            assert!(
+                streamline_status(&t, &evidence, &[], |_| "2.14.16".into())?
+                    .iter()
+                    .any(|g| g.interposer_managed)
+            );
+            if remove_plugins_first {
+                remove_many(std::slice::from_ref(&t), "streamline")?;
+                assert_eq!(fs::read(&interposer)?, b"original native entry");
+                assert_ne!(fs::read(&dll)?, b"original FG");
+            }
+            remove_locked(&t, "fg")?;
+            assert_eq!(fs::read(&interposer)?, b"original native entry");
+            assert_eq!(fs::read(&dll)?, b"original FG");
+            assert_eq!(fs::read(&fg_plugin)?, b"original FG plugin");
+            assert_eq!(fs::read(nested.join(INTERPOSER))?, b"other entry");
+        }
         Ok(())
     }
     #[test]

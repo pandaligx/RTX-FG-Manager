@@ -2,7 +2,7 @@
 
 ## 4.3.40 — 2026-11-21
 
-- The Delta edition of Dlssg_for_sm86 0.4.2 now reads the frame multiplier from `dlssg_sm86.ini` for the Steam edition of Marvel’s Spider-Man: Miles Morales, including manual installations. DLSS defaults to 4X and supports up to 6X. XeSS supports up to 4X.
+- In Miles Morales on Steam, the Delta patch reads its multiplier from `dlssg_sm86.ini`. Select DLSS Frame Generation and native Streamline plugins for 4X or 6X DLSS. The manager backs up the original Streamline entry point and restores it on uninstall. DLSS defaults to 4X. XeSS supports up to 4X.
 - The standard and Delta editions of Dlssg_for_sm86 0.4.2 can update a game’s existing DLSS Super Resolution, Ray Reconstruction, Frame Generation and native Streamline plugins independently. All four updates are opt-in and can be restored.
 - Fixed missing or blurry Steam game icons and detection of the Miles Morales crash reporter as the game. Dlssg_for_sm86-MFG-version uses its project name and supports selecting multiple entry DLLs.
 - Player setups can include native Streamline versions and multiple entry DLLs. Vote counts appear below their icons, and the runtime window uses less space.
