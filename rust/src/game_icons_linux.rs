@@ -35,8 +35,11 @@ const PNG_MAGIC: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
 /// `path` may be a standalone `.ico` file or a PE image (`.exe` / `.dll`).
 /// Errors with a descriptive message when the file has no icon, is not a PE /
 /// ICO, or the icon cannot be decoded.
-pub fn extract(path: &std::path::Path) -> Result<RgbaImage> {
-    crate::steam_artwork::resolve(path, || native_icon(path))
+pub fn extract(
+    path: &std::path::Path,
+    index: &mut rtx_fg_manager::game_identity::SteamArtworkIndex,
+) -> Result<RgbaImage> {
+    crate::steam_artwork::resolve(path, index, || native_icon(path))
 }
 
 fn native_icon(path: &std::path::Path) -> Result<RgbaImage> {
@@ -849,6 +852,10 @@ mod tests {
         d.extend_from_slice(&clr_used.to_le_bytes()); // biClrUsed
         d.extend_from_slice(&0u32.to_le_bytes()); // biClrImportant
         d
+    }
+
+    fn extract(path: &std::path::Path) -> Result<RgbaImage> {
+        super::extract(path, &mut Default::default())
     }
 
     #[test]

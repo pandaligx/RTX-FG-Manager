@@ -76,17 +76,27 @@ fn steam_root(exe: &Path) -> Option<&Path> {
         })
     })
 }
-/// Resolve local Steam artwork against the same install record used for game names.
-pub fn steam_artwork_id(exe: &Path) -> Option<(&Path, String)> {
-    let root = steam_root(exe)?;
-    let apps = root.parent()?.parent()?;
-    let installs = steam_installs(apps, &AtomicBool::new(false));
-    let id = installs
-        .get(&core::key(root))?
-        .keys
-        .first()?
-        .strip_prefix("steam:")?;
-    Some((apps.parent()?, id.to_owned()))
+/// One manifest index per library for the lifetime of an icon refresh.
+#[derive(Default)]
+pub struct SteamArtworkIndex {
+    libraries: BTreeMap<PathBuf, BTreeMap<String, Identity>>,
+}
+
+impl SteamArtworkIndex {
+    pub fn lookup<'a>(&mut self, exe: &'a Path) -> Option<(&'a Path, &str)> {
+        let root = steam_root(exe)?;
+        let apps = root.parent()?.parent()?;
+        let installs = self
+            .libraries
+            .entry(apps.to_owned())
+            .or_insert_with(|| steam_installs(apps, &AtomicBool::new(false)));
+        let id = installs
+            .get(&core::key(root))?
+            .keys
+            .first()?
+            .strip_prefix("steam:")?;
+        Some((apps.parent()?, id))
+    }
 }
 
 fn steam_installs(apps: &Path, cancel: &AtomicBool) -> BTreeMap<String, Identity> {

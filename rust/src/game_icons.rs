@@ -16,7 +16,10 @@ use windows::{
 };
 const ICON_PIXELS: u32 = 128;
 
-pub fn extract(path: &Path) -> Result<image::RgbaImage> {
+pub fn extract(
+    path: &Path,
+    index: &mut rtx_fg_manager::game_identity::SteamArtworkIndex,
+) -> Result<image::RgbaImage> {
     let path = rtx_fg_manager::core::no_links(path)?;
     ensure!(path.is_file(), "Icon file missing");
     // Protected Xbox executables may not expose PE resources even elevated.
@@ -28,7 +31,7 @@ pub fn extract(path: &Path) -> Result<image::RgbaImage> {
             }
         }
     }
-    crate::steam_artwork::resolve(&path, || {
+    crate::steam_artwork::resolve(&path, index, || {
         let icon = shell_icon(&path)?;
         ensure!(icon.pixels().any(|p| p[3] > 0), "Empty EXE icon");
         Ok(icon)
@@ -189,6 +192,10 @@ mod tests {
         ExtendedColorType,
         codecs::ico::{IcoEncoder, IcoFrame},
     };
+    fn extract(path: &Path) -> Result<image::RgbaImage> {
+        super::extract(path, &mut Default::default())
+    }
+
     #[test]
     fn xbox_package_visuals_use_overrides_and_fall_back_when_an_asset_is_missing() -> Result<()> {
         let dir = tempfile::tempdir()?;

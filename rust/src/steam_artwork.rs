@@ -80,6 +80,7 @@ fn cover_art(root: &Path, id: &str) -> Option<RgbaImage> {
 
 pub(crate) fn resolve(
     exe: &Path,
+    index: &mut rtx_fg_manager::game_identity::SteamArtworkIndex,
     native: impl FnOnce() -> anyhow::Result<RgbaImage>,
 ) -> anyhow::Result<RgbaImage> {
     if !exe
@@ -91,7 +92,7 @@ pub(crate) fn resolve(
     if let Some(icon) = tile(&exe.with_extension("ico"), false) {
         return Ok(icon);
     }
-    let Some((library, id)) = rtx_fg_manager::game_identity::steam_artwork_id(exe) else {
+    let Some((library, id)) = index.lookup(exe) else {
         return native();
     };
     let mut roots: Vec<PathBuf> = vec![library.to_owned()];
@@ -144,15 +145,10 @@ pub(crate) fn resolve(
         ]);
     }
     roots.dedup();
-    if let Some(icon) = roots.iter().find_map(|root| square_art(root, &id)) {
+    if let Some(icon) = roots.iter().find_map(|root| square_art(root, id)) {
         return Ok(icon);
     }
-    native().or_else(|err| {
-        roots
-            .iter()
-            .find_map(|root| cover_art(root, &id))
-            .ok_or(err)
-    })
+    native().or_else(|err| roots.iter().find_map(|root| cover_art(root, id)).ok_or(err))
 }
 
 #[cfg(test)]
@@ -176,7 +172,7 @@ mod tests {
             image::RgbImage::from_pixel(32, 32, image::Rgb([color, 0, 0]))
                 .save(art.join("abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd.jpg"))?;
         }
-        let icon = resolve(&exe, || {
+        let icon = resolve(&exe, &mut Default::default(), || {
             panic!("verified square Steam artwork must win over the generic EXE icon")
         })?;
         assert_eq!(icon.dimensions(), (128, 128));

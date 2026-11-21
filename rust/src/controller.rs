@@ -1842,6 +1842,7 @@ impl Controller {
         }
         if !missing.is_empty() {
             self.channel.job(move |c| {
+                let mut steam_index = rtx_fg_manager::game_identity::SteamArtworkIndex::default();
                 for chunk in missing.chunks(16) {
                     c.send(Event::Icons(
                         chunk
@@ -1849,7 +1850,11 @@ impl Controller {
                             .map(|exe| {
                                 (
                                     exe.clone(),
-                                    crate::game_icons::extract(std::path::Path::new(exe)).ok(),
+                                    crate::game_icons::extract(
+                                        std::path::Path::new(exe),
+                                        &mut steam_index,
+                                    )
+                                    .ok(),
                                 )
                             })
                             .collect(),
