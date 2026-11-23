@@ -1,14 +1,14 @@
 {
   "schema": 3,
-  "version": "4.3.41",
-  "file": "RTXManager-4.3.41-x86_64.AppImage",
-  "bytes": 23099896,
-  "sha256": "b6ebd41f949c5df77e20b2a175fbf221f3e3240487bccf7702d598474ee6d8ff",
+  "version": "4.3.42",
+  "file": "RTXManager-4.3.42-x86_64.AppImage",
+  "bytes": 23349752,
+  "sha256": "bb7321d9e4de7e7351568318bfd93c58c25f4e302807c499047b8e883ce8d985",
   "notes": {
-    "zh-CN": "## 本次更新\n- MFG-Unlocker 升级到 1.7.2。支持通过游戏的 DLSS 帧生成开关使用固定倍率 XeMFG。为已有 OptiScaler 更新配套文件后，卸载会还原原文件。\n- Steam 版《漫威蜘蛛侠：迈尔斯·莫拉莱斯》使用三角洲版 R3 时，管理器会将所选倍率同步到这款游戏的 NVIDIA 配置。选择默认倍率或卸载可还原原设置。DLSS 最高 6X，XeSS 最高 4X。\n- 分享方案时可附上抖音、哔哩哔哩和小黑盒主页，以及一条视频教程。可直接粘贴手机复制的整段分享文字，支持抖音和哔哩哔哩短链。主页入口在分享日期旁，点击卡片上“查看完整信息”右侧的播放图标即可看教程。配套运行库只列出需要安装或更新的文件。\n- 修复了清理旧补丁时可能误删原有 OptiScaler，以及刷新后已撤下的方案重新出现的问题。",
-    "en": "## What's new\n- Updated MFG-Unlocker to 1.7.2. Supported games can use their DLSS Frame Generation switch for fixed-multiplier XeMFG. Uninstalling restores the original host when the manager updated an existing OptiScaler installation.\n- For the Steam edition of Marvel’s Spider-Man: Miles Morales with the Delta R3 patch, applying a multiplier also updates the game’s NVIDIA profile. Selecting the default multiplier or uninstalling restores the original setting. DLSS supports up to 6X and XeSS up to 4X.\n- Players can add Douyin, Bilibili and HeyBox profiles beside a setup’s share date. When a setup includes a video tutorial, a play button beside the details button opens it from the card. Paste the full message copied from a mobile app, including Douyin and Bilibili short links. The runtime list shows only files that need installing or updating.\n- Fixed two cleanup and catalog issues that could remove an existing OptiScaler host or bring back a withdrawn scheme after a refresh.",
-    "ru": "## Обновление\n- MFG-Unlocker обновлён до 1.7.2. Исправлено восстановление OptiScaler при удалении.\n- В Steam-версии Miles Morales патч Delta R3 сохраняет выбранный множитель после перезагрузки. DLSS до 6X, XeSS до 4X.\n- В карточках игроков появились ссылки на профили и видеоурок.",
-    "ja": "## 更新内容\n- MFG-Unlocker を 1.7.2 に更新し、アンインストール時の OptiScaler の復元を修正しました。\n- Steam 版『マイルズ・モラレス』の Delta R3 で、再起動後も設定した倍率を維持します。DLSS は最大 6X、XeSS は最大 4X です。\n- プレイヤーのカードからプロフィールと解説動画を開けます。",
-    "ko": "## 업데이트\n- MFG-Unlocker를 1.7.2로 업데이트하고 제거 시 OptiScaler 원본 복원을 수정했습니다.\n- Steam판 마일스 모랄레스에서 Delta R3 배율이 재부팅 후에도 유지됩니다. DLSS 최대 6X, XeSS 최대 4X입니다.\n- 플레이어 카드에서 프로필과 튜토리얼 영상을 바로 열 수 있습니다."
+    "zh-CN": "## 本次更新\n- 分享方案时可以填写昵称，其他玩家在卡片头像旁就能看到。把鼠标移到主页图标上，可以看到对应的平台名称。\n- 玩家方案入口增加了向按钮内侧扩散的彩色光晕，四秒绕行一圈。修复人形图标缩放时左侧闪线的问题。\n- 补齐多处界面翻译，桌面界面更新至 GPUI Kit 0.11.0 和 GPUI Fast 0.1.19。",
+    "en": "## What's new\n- Add an optional display name when sharing a setup. It appears beside the avatar, and profile link tooltips now name the platform.\n- The player setups button has a four-second color sweep that glows inward. Fixed a flickering line beside the animated people icon.\n- Filled in missing interface translations and updated the desktop UI to GPUI Kit 0.11.0 and GPUI Fast 0.1.19.",
+    "ru": "## Обновление\n- При публикации настройки можно указать имя. Рядом с аватаром появится имя, а подсказки ссылок укажут платформу.\n- Обновлена подсветка кнопки настроек игроков, устранено мерцание возле значка. Дополнены переводы интерфейса.",
+    "ja": "## 更新内容\n- 設定の共有時に任意の表示名を指定できます。カードのアバター横に表示され、プロフィールのツールチップにはサービス名が表示されます。\n- プレイヤー設定ボタンの光が内側に広がるようになり、アイコン横のちらつきを修正しました。画面の翻訳も補いました。",
+    "ko": "## 업데이트\n- 설정을 공유할 때 표시 이름을 입력할 수 있습니다. 아바타 옆에 이름이 표시되며 프로필 링크에 마우스를 올리면 플랫폼 이름이 보입니다.\n- 플레이어 설정 버튼의 빛이 안쪽으로 퍼지도록 변경하고 아이콘 옆의 깜빡임을 수정했습니다. 누락된 화면 번역도 보완했습니다."
   }
 }

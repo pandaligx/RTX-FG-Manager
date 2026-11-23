@@ -19,14 +19,14 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.41/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.42/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.42/RTXManager-4.3.42-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
 
 </div>
 
 ---
 
-> **4.3.41 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
+> **4.3.42 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager game library](docs/screenshot-home.png)
 
@@ -44,34 +44,34 @@
 
 ## Download
 
-**Version 4.3.41** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
+**Version 4.3.42** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.41 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.41) | Default domestic source |
-| **GitHub** | [Open 4.3.41 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.41) | Primary project and fallback |
-| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage) | Linux x86_64 domestic mirror |
-| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage) | Linux x86_64 download |
+| **GitCode** | [Open 4.3.42 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.42) | Default domestic source |
+| **GitHub** | [Open 4.3.42 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.42) | Primary project and fallback |
+| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.42/RTXManager-4.3.42-x86_64.AppImage) | Linux x86_64 domestic mirror |
+| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.42/RTXManager-4.3.42-x86_64.AppImage) | Linux x86_64 download |
 
 On Windows, download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 ### Linux (experimental)
 
-Download **`RTXManager-4.3.41-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
+Download **`RTXManager-4.3.42-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
 
 ```sh
-chmod +x RTXManager-4.3.41-x86_64.AppImage
-./RTXManager-4.3.41-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.42-x86_64.AppImage
+./RTXManager-4.3.42-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 Replace the prefix with the game's actual Wine directory; Steam Proton normally uses `steamapps/compatdata/<AppID>/pfx`. Add the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope. Releases include a separate `SHA256SUMS-linux.txt`; see the [Linux instructions](BUILDING.md#linux-appimage-experimental--实验性) for dependencies, running without FUSE and source builds.
 
 AppImage has its own automatic update channel. Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 
-## 4.3.41 highlights
+## 4.3.42 highlights
 
-- Paste a Douyin or Bilibili share message into a setup, or add a HeyBox profile. Cards with a video tutorial show a play button beside the details button.
-- Updated MFG-Unlocker to 1.7.2. In the Steam edition of Miles Morales, Delta R3 fixes the multiplier reverting to 2X after a restart. DLSS supports up to 6X and XeSS up to 4X.
+- Player setups can now show an optional display name beside the avatar. Hover over a profile icon to see which platform it opens.
+- The player setups button has a four-second color sweep with an inward glow. The update also fixes the flickering line beside its icon and fills in missing translations.
 
 [Full changelog →](CHANGELOG.md)
 
