@@ -19,14 +19,14 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.40/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.40/RTXManager-4.3.40-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.41/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
 
 </div>
 
 ---
 
-> **4.3.40 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
+> **4.3.41 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager game library](docs/screenshot-home.png)
 
@@ -44,34 +44,34 @@
 
 ## Download
 
-**Version 4.3.40** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
+**Version 4.3.41** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.40 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.40) | Default domestic source |
-| **GitHub** | [Open 4.3.40 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.40) | Primary project and fallback |
-| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.40/RTXManager-4.3.40-x86_64.AppImage) | Linux x86_64 domestic mirror |
-| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.40/RTXManager-4.3.40-x86_64.AppImage) | Linux x86_64 download |
+| **GitCode** | [Open 4.3.41 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.41) | Default domestic source |
+| **GitHub** | [Open 4.3.41 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.41) | Primary project and fallback |
+| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage) | Linux x86_64 domestic mirror |
+| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage) | Linux x86_64 download |
 
 On Windows, download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 ### Linux (experimental)
 
-Download **`RTXManager-4.3.40-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
+Download **`RTXManager-4.3.41-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
 
 ```sh
-chmod +x RTXManager-4.3.40-x86_64.AppImage
-./RTXManager-4.3.40-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.41-x86_64.AppImage
+./RTXManager-4.3.41-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 Replace the prefix with the game's actual Wine directory; Steam Proton normally uses `steamapps/compatdata/<AppID>/pfx`. Add the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope. Releases include a separate `SHA256SUMS-linux.txt`; see the [Linux instructions](BUILDING.md#linux-appimage-experimental--实验性) for dependencies, running without FUSE and source builds.
 
 AppImage has its own automatic update channel. Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 
-## 4.3.40 highlights
+## 4.3.41 highlights
 
-- In Miles Morales on Steam, select **DLSS Frame Generation** and **native Streamline plugins** when installing the Delta patch for 4X or 6X DLSS. The patch reads the multiplier from its INI and defaults to 4X. The original XeSS engine supports up to 4X.
-- Both 0.4.2 editions let you update existing DLSS and Streamline files individually. Player setups can share Streamline versions and multiple DLL entries.
+- Paste a Douyin or Bilibili share message into a setup, or add a HeyBox profile. Cards with a video tutorial show a play button beside the details button.
+- Updated MFG-Unlocker to 1.7.2. In the Steam edition of Miles Morales, Delta R3 fixes the multiplier reverting to 2X after a restart. DLSS supports up to 6X and XeSS up to 4X.
 
 [Full changelog →](CHANGELOG.md)
 
@@ -83,7 +83,7 @@ AppImage has its own automatic update channel. Windows-only GPU scheduling, driv
 | **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | Delta Force uses private Streamline 2.14.16. Miles Morales on Steam reads the multiplier from the INI. DLSS defaults to 4X and supports up to 6X. XeSS supports up to 4X. Restart after changing resolution with Vulkan XeSS. | Manager / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | Retained custom route with additional Delta Force support. Choose according to the actual game's requirements. | Manager / INI |
 | **Dlssg_for_sm86-MFG-version · 0.4.2 · DX12** | sm86-10 replaces the older Vulkan entry. Defaults to preset C, kernel mode 2 and 4X. You can select multiple entry DLLs. | Manager / INI |
-| **MFG-Unlocker · 1.7.1** | Standalone DLL as before; plugin mode requires a complete existing OptiScaler 10 installation and backs up its host before updating the paired file. These modes are exclusive. | **Backspace** standalone; OptiScaler menu for plugin mode |
+| **MFG-Unlocker · 1.7.2** | Choose one DLL for standalone installation. Games with OptiScaler 10 can also use plugin mode. Uninstalling restores the original host. | **Backspace** in standalone mode, OptiScaler menu in plugin mode |
 | **MFG-Unlocker · 1.6.1** | Compatibility fallback; XeMFG requires the existing OptiScaler plugin route. | **Backspace** standalone; OptiScaler menu in plugin mode |
 | **RTX Encore · 2.5.0** | SR/RR/FG, DLSSNR, Smooth Motion and XeSS/XeFG. Games without native DLSS can also use MWSR spatial upscaling. | **Insert** by default |
 | **ANR FG · V.B20** | Includes OptiScaler and 23 model programs for different GPUs and output formats, including Blackwell and scRGB HDR. Choose one entry. Default cap is 6X. | **Insert (Ins)** or manager settings |
@@ -97,7 +97,7 @@ GPU detection provides information, not an installation gate. Each upstream patc
 | Dlssg_for_sm86 · 0.4.2 | Supported | Supported | Supported | Supported |
 | 0.4.2 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Supported |
 | 0.3.5 · Extra Delta Force support · DX12/Vulkan | Supported | Supported | Supported | Not supported |
-| MFG-Unlocker · 1.7.1 / 1.6.1 | Supported | Supported | Supported | Supported |
+| MFG-Unlocker · 1.7.2 / 1.6.1 | Supported | Supported | Supported | Supported |
 | RTX Encore · 2.5.0 | Supported | Supported | Supported | Supported |
 | ANR FG · V.B20 | Supported | Supported | Supported | Supported |
 
@@ -105,7 +105,7 @@ The Pipo author tested the DX12 build on an RTX 3070. RTX 20 support is unconfir
 
 Sources: [Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [Pipo fork](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [Encore compatibility](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md). “Not supported” means outside the documented support scope of the distributed scheme. Experimental features and driver/runtime requirements still apply; this is not a guarantee for every game. Delta Force packages are custom adaptations.
 
-MFG's DLSS route requires an existing Streamline DLSS FG integration; Preset C needs 310.9.16, and RTX 20 requires specific 310.9 runtimes. **The experimental standalone XeMFG route in 1.7.1 can support eligible NVIDIA / AMD / Intel GPUs**, subject to Intel runtime, driver and DX12 / Vulkan requirements. This does not enable DLSS or DLSSNR on AMD / Intel. Version 1.6.1 lacks 1.7.0's standalone XeMFG route.
+MFG's DLSS mode requires native Streamline DLSS Frame Generation. Preset C needs 310.9.16, and RTX 20 needs a compatible 310.9 runtime. In eligible DX12 games, 1.7.2 can use the game's DLSS Frame Generation switch for fixed-multiplier XeMFG. The standalone XeMFG path supports eligible NVIDIA, AMD and Intel GPUs with the required Intel runtime and driver. [Upstream XeMFG guide](https://github.com/dashdogy/MFG-Unlocker/blob/v1.7.2/docs/xemfg.md)
 
 Dlssg_for_sm86's XeSS engine uses its own CUDA backend, not a general-purpose Intel XeSS DLL; it does not add AMD / Intel support. Standard 0.4.2 targets DX12; the custom Delta Force and Vulkan packages are separate choices. Encore does not support GTX, AMD or Intel GPUs. Workstation, CMP and unlisted models have no explicit upstream guarantee; changing a GPU name cannot change its hardware capabilities.
 

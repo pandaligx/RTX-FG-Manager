@@ -19,14 +19,14 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.40/RTXManager.exe"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="232" height="64"></a>
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.40/RTXManager-4.3.40-x86_64.AppImage"><img src="docs/download-linux-zh.svg" alt="下载 Linux x86_64 AppImage（实验性）" width="232" height="64"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.41/RTXManager.exe"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="232" height="64"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage"><img src="docs/download-linux-zh.svg" alt="下载 Linux x86_64 AppImage（实验性）" width="232" height="64"></a>
 
 </div>
 
 ---
 
-> **4.3.40 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
+> **4.3.41 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 游戏库](docs/screenshot-home-zh.png)
 
@@ -44,34 +44,34 @@
 
 ## 下载
 
-**版本 4.3.40** · Windows 10 / 11 x64 · Linux x86_64（实验性）
+**版本 4.3.41** · Windows 10 / 11 x64 · Linux x86_64（实验性）
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.40 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.40) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.40 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.40) | 主项目与备用源 |
-| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.40/RTXManager-4.3.40-x86_64.AppImage) | Linux x86_64 国内下载 |
-| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.40/RTXManager-4.3.40-x86_64.AppImage) | Linux x86_64 备用下载 |
+| **GitCode** | [打开 4.3.41 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.41) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.41 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.41) | 主项目与备用源 |
+| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage) | Linux x86_64 国内下载 |
+| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.41/RTXManager-4.3.41-x86_64.AppImage) | Linux x86_64 备用下载 |
 
 Windows 用户下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
 ### Linux（实验性）
 
-下载上方 **`RTXManager-4.3.40-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
+下载上方 **`RTXManager-4.3.41-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
 
 ```sh
-chmod +x RTXManager-4.3.40-x86_64.AppImage
-./RTXManager-4.3.40-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.41-x86_64.AppImage
+./RTXManager-4.3.41-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 将前缀路径替换为游戏实际使用的 Wine 目录；Steam Proton 通常选择 `steamapps/compatdata/<AppID>/pfx`。再添加游戏的 Windows EXE，不用于原生 Linux ELF 游戏，也不自动配置 Proton 启动参数。发行页提供独立的 `SHA256SUMS-linux.txt`；依赖、免 FUSE 启动和源码构建见[Linux 说明](BUILDING.md#linux-appimage-experimental--实验性)。
 
 AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
 
-## 4.3.40 更新亮点
+## 4.3.41 更新亮点
 
-- Steam 版《迈尔斯》使用三角洲方案时，同时勾选 **DLSS 帧生成** 和 **Streamline 原生插件**，即可通过补丁 INI 选择 DLSS 4X 或 6X。默认 4X，原 XeSS 内核最高 4X。
-- 两个 0.4.2 方案均可按需更新游戏原有的 DLSS 和 Streamline 文件。玩家方案可以一起分享 Streamline 版本和多个 DLL 入口。
+- 分享方案时可以直接粘贴抖音、哔哩哔哩的分享文字，也可以附上小黑盒主页。有视频教程的卡片在“查看完整信息”右边显示播放图标。
+- MFG-Unlocker 更新至 1.7.2。Steam 版《迈尔斯》的三角洲 R3 修复重启后倍率回到 2X 的问题，DLSS 最高 6X，XeSS 最高 4X。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -83,7 +83,7 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | **Dlssg_for_sm86 · 0.4.2 · 额外支持三角洲专用 · DX12/Vulkan** | 三角洲使用私有 Streamline 2.14.16。《迈尔斯》Steam 版从 INI 读取倍率。DLSS 默认 4X、最高 6X，XeSS 最高 4X。Vulkan XeSS 改变分辨率后需重启游戏。 | 管理器 / INI |
 | **Dlssg_for_sm86 · 0.3.5 · 额外支持三角洲专用 · DX12/Vulkan** | 保留额外支持三角洲的自定义方案，按游戏实际要求选择。 | 管理器 / INI |
 | **Dlssg_for_sm86-MFG-version · 0.4.2 · DX12** | sm86-10 接替该分支的旧 Vulkan 入口。默认预设 C、内核模式 2、4X。六个 DLL 入口可多选。 | 管理器 / INI |
-| **MFG-Unlocker · 1.7.1** | 普通安装仍使用独立 DLL；已有完整 OptiScaler 10 时可选插件模式，备份并更新配套主文件。两种模式互斥。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
+| **MFG-Unlocker · 1.7.2** | 普通安装选一个 DLL。游戏已有 OptiScaler 10 时也可选插件模式，卸载会还原主文件。 | 独立模式 **Backspace**，插件模式用 OptiScaler 菜单 |
 | **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **RTX Encore · 2.5.0** | 提供 SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG。无原生 DLSS 的游戏也可选 MWSR 空间超分。 | 默认 **Insert** |
 | **ANR FG · V.B20** | 包含 OptiScaler 和 23 个模型程序，支持 scRGB HDR 和 Blackwell 显卡。选一个入口，默认最高 6X。 | **Insert（Ins）** 或管理器预设 |
@@ -97,7 +97,7 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | Dlssg_for_sm86 · 0.4.2 | 支持 | 支持 | 支持 | 支持 |
 | 0.4.2 · 三角洲专用 · DX12/Vulkan | 支持 | 支持 | 支持 | 支持 |
 | 0.3.5 · 三角洲专用 · DX12/Vulkan | 支持 | 支持 | 支持 | 不支持 |
-| MFG-Unlocker · 1.7.1 / 1.6.1 | 支持 | 支持 | 支持 | 支持 |
+| MFG-Unlocker · 1.7.2 / 1.6.1 | 支持 | 支持 | 支持 | 支持 |
 | RTX Encore · 2.5.0 | 支持 | 支持 | 支持 | 支持 |
 | ANR FG · V.B20 | 支持 | 支持 | 支持 | 支持 |
 
@@ -105,7 +105,7 @@ Pipo 作者使用 RTX 3070 测试 DX12 版，RTX 20 的兼容性仍待确认。�
 
 依据：[Dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[Pipo 分支](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[Encore 兼容性](https://github.com/SilyNoMeta/rtx-encore/blob/main/docs/COMPATIBILITY.md)。“不支持”表示未纳入当前分发方案的明确支持范围；实验性功能、驱动和运行库条件仍适用，不保证所有游戏兼容。三角洲方案为本项目自定义适配。
 
-MFG 的 DLSS 路线要求游戏已有 Streamline DLSS FG 接入；Preset C 需 310.9.16，RTX 20 限特定 310.9 运行库。**1.7.1 的 XeMFG 是独立实验路线，可用于符合条件的 NVIDIA / AMD / Intel 显卡**，需匹配 Intel 运行库、驱动及 DX12 / Vulkan 游戏；这不代表 AMD / Intel 获得 DLSS 或 DLSSNR 支持。1.6.1 没有 1.7.0 的独立 XeMFG 路线。
+MFG 的 DLSS 模式需要游戏原生支持 Streamline DLSS 帧生成。Preset C 需要 310.9.16，RTX 20 需要对应的 310.9 运行库。1.7.2 在符合条件的 DX12 游戏中可通过游戏的 DLSS 帧生成开关使用 XeMFG 固定倍率。独立 XeMFG 路径支持符合 Intel 运行库和驱动要求的 NVIDIA、AMD 和 Intel 显卡。[上游 XeMFG 说明](https://github.com/dashdogy/MFG-Unlocker/blob/v1.7.2/docs/xemfg.md)
 
 Dlssg_for_sm86 的 XeSS 引擎使用自身 CUDA 后端，不等于通用 Intel XeSS DLL，也不因此支持 AMD / Intel。原版 0.4.2 面向 DX12；三角洲和 Vulkan 方案另行选择。Encore 不支持 GTX、AMD 或 Intel 显卡。专业卡、CMP 及未列出的型号未获上游明确保证；修改名称不会改变硬件能力。
 
