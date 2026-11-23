@@ -367,6 +367,8 @@ pub struct Recipe {
     pub schema: u32,
     pub game: GameIdentity,
     pub title: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub author_name: String,
     pub notes: String,
     #[serde(default, skip_serializing_if = "CreatorLinks::is_empty")]
     pub links: CreatorLinks,
@@ -509,6 +511,15 @@ impl Recipe {
         );
         public_text(&self.edition, 80, true)?;
         ensure!(
+            self.author_name.chars().count() <= 32
+                && !self
+                    .author_name
+                    .chars()
+                    .any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}')),
+            "分享者名字最多 32 个字符，只能写一行"
+        );
+        public_text(&self.author_name, 32, true)?;
+        ensure!(
             self.platform != "netease" || self.edition.chars().count() <= 73,
             "网易游戏的版本说明最多可填 73 个字符"
         );
@@ -602,6 +613,7 @@ pub fn installed_recipe(
         let mut entries = record.selected();
         entries.sort();
         let current = Recipe {
+            author_name: String::new(),
             links: CreatorLinks::default(),
             schema: 1,
             platform: platform(game).into(),
@@ -1185,6 +1197,7 @@ impl Client {
             .header("X-RTXFG-MFG171", "1")
             .header("X-RTXFG-MFG172", "1")
             .header("X-RTXFG-Creator-Links", "1")
+            .header("X-RTXFG-Author-Name", "1")
             .header("X-RTXFG-Encore240", "1")
             .header("X-RTXFG-Encore250", "1")
             .header("X-RTXFG-Pipo042", "1")

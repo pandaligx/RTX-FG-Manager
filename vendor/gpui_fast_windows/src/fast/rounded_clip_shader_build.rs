@@ -25,14 +25,26 @@ pub fn stage() {
 }
 
 pub fn source(original: &str, alpha: &str) -> String {
-    let mut source = original.replace("#include \"alpha_correction.hlsl\"", alpha);
+    // Windows checkouts may use CRLF; the patterns below are written with LF.
+    let original = original.replace("\r\n", "\n");
+    let alpha = alpha.replace("\r\n", "\n");
+    let mut source = original.replace("#include \"alpha_correction.hlsl\"", &alpha);
+    // Scenes drawn without the opaque pre-pass (rounded clip content, layer
+    // tiles) set `global_pad.x`: their quad pass draws opaque rectangles too.
+    let cull = "    if (is_opaque_rectangle(quad)) {\n        QuadFragmentInput culled";
+    assert!(source.contains(cull), "upstream quad_vertex opaque cull");
+    source = source.replacen(
+        cull,
+        "    if (global_pad.x == 0u && is_opaque_rectangle(quad)) {\n        QuadFragmentInput culled",
+        1,
+    );
     for name in [
         "quad_fragment",
         "shadow_fragment",
         "underline_fragment",
         "monochrome_sprite_fragment",
         "polychrome_sprite_fragment",
-        "path_sprite_fragment",
+        "path_tile_fragment",
         "subpixel_sprite_fragment",
     ] {
         let start = source
@@ -68,7 +80,7 @@ pub fn source(original: &str, alpha: &str) -> String {
                 result.push_str(&format!(
                     "return fast_clip_color({}, input.position.xy, {});",
                     &rest[start + 7..end],
-                    name == "path_sprite_fragment"
+                    name == "path_tile_fragment"
                 ));
                 rest = &rest[end + 1..];
             }

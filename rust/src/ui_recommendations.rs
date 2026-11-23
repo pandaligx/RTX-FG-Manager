@@ -75,6 +75,7 @@ struct Recommendations {
     operation_busy: bool,
     submission: String,
     title: Entity<InputState>,
+    author_name: Entity<InputState>,
     edition: Entity<InputState>,
     notes: Entity<TextareaState>,
     link_fields: [Entity<InputState>; 4],
@@ -122,6 +123,7 @@ impl Recommendations {
         })
         .detach();
         let title = input("", window, cx);
+        let author_name = input("", window, cx);
         let link_fields = [
             "https://v.douyin.com/…",
             "https://b23.tv/…",
@@ -215,6 +217,7 @@ impl Recommendations {
             operation_busy: false,
             submission: String::new(),
             title,
+            author_name,
             edition,
             notes,
             link_fields,
@@ -243,6 +246,9 @@ impl Recommendations {
             if std::env::var("RTXFG_RECIPE_PREVIEW_MODE").as_deref() == Ok("share") {
                 view.title.update(cx, |s, cx| {
                     s.set_value(card.content.title.clone(), window, cx)
+                });
+                view.author_name.update(cx, |s, cx| {
+                    s.set_value(card.content.author_name.clone(), window, cx)
                 });
                 view.notes.update(cx, |s, cx| {
                     s.set_value(card.content.notes.clone(), window, cx)
@@ -393,6 +399,9 @@ impl Recommendations {
                             .update(cx, |s, cx| s.set_value(draft.title.clone(), window, cx));
                     }
                     if !reload {
+                        self.author_name.update(cx, |s, cx| {
+                            s.set_value(draft.author_name.clone(), window, cx)
+                        });
                         self.fill_links(&draft.links, window, cx);
                         self.editing = None;
                         self.title
@@ -734,6 +743,9 @@ impl Recommendations {
             s.set_value(card.content.display_title(), window, cx)
         });
         self.fill_links(&card.content.links, window, cx);
+        self.author_name.update(cx, |s, cx| {
+            s.set_value(card.content.author_name.clone(), window, cx)
+        });
         self.notes.update(cx, |s, cx| {
             s.set_value(card.content.notes.clone(), window, cx)
         });
@@ -1531,17 +1543,31 @@ impl Recommendations {
                 .gap_2()
                 .min_w_0()
                 .child(Self::avatar(cx))
+                .when(!card.content.author_name.is_empty(), |row| {
+                    row.child(
+                        div()
+                            .min_w_0()
+                            .max_w(rems(8.))
+                            .truncate()
+                            .text_sm()
+                            .child(card.content.author_name.clone()),
+                    )
+                })
                 .child(title)
                 .children(
                     [
-                        ("抖音", "app/profile-douyin.jpg", &card.content.links.douyin),
                         (
-                            "哔哩哔哩",
+                            "访问他的抖音",
+                            "app/profile-douyin.jpg",
+                            &card.content.links.douyin,
+                        ),
+                        (
+                            "访问他的哔哩哔哩",
                             "app/profile-bilibili.jpg",
                             &card.content.links.bilibili,
                         ),
                         (
-                            "小黑盒",
+                            "访问他的小黑盒",
                             "app/profile-heybox.jpg",
                             &card.content.links.heybox,
                         ),
@@ -1550,14 +1576,14 @@ impl Recommendations {
                     .filter(|(_, _, url)| !url.is_empty())
                     .map(|(site, icon, url)| {
                         let url = url.clone();
-                        let hint = self.t("访问博主主页");
+                        let hint = self.t(site);
                         Button::new(SharedString::from(format!("profile-{}-{site}", card.id)))
                             .ghost()
                             .p_0()
                             .w(rems(1.45))
                             .h(rems(1.45))
                             .child(gpui::img(icon).size(rems(1.15)).rounded_sm())
-                            .accessibility_label(format!("{site} {}", hint))
+                            .accessibility_label(hint.clone())
                             .tooltip(hint)
                             .on_click(move |_, _, cx| cx.open_url(&url))
                     }),
@@ -2525,6 +2551,12 @@ impl Recommendations {
                     ),
                 ),
                 field("玩家备注", notes),
+                field(
+                    "分享者名字（选填）",
+                    Input::new(&self.author_name)
+                        .focus_ring(ring)
+                        .into_any_element(),
+                ),
             ];
             for (label, input) in [
                 "抖音主页（选填）",
@@ -2585,6 +2617,7 @@ impl Recommendations {
                         let update_suggestion =
                             this.editing.is_none() && title == recipe.suggested_title();
                         recipe.notes = this.notes.read(cx).value().trim().to_owned();
+                        recipe.author_name = this.author_name.read(cx).value().trim().to_owned();
                         let [douyin, bilibili, heybox, tutorial] = this
                             .link_fields
                             .each_ref()

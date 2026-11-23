@@ -11,11 +11,11 @@ implementation remain intact. No global environment variable or GamePP
 setting is changed. This app policy does not support transparent backdrops or
 native composition surfaces; revisit it if such a feature is introduced.
 
-Baseline: the published `gpui-fast-windows` **0.1.16** crate from crates.io
-(`gpui-fast-windows-0.1.16.crate` SHA-256
-`eefc0adacde37f6d5291225177d5ba90e5cf51274b0d9a4ef4201e0a801e8aa9`).
+Baseline: the published `gpui-fast-windows` **0.1.19** crate from crates.io
+(`gpui-fast-windows-0.1.19.crate` SHA-256
+`8051f3079f399692b4cddbcd413f08610a0bd30732e051ce5f9d0de331e3a9a5`).
 The crate's Apache-2.0 `LICENSE`, README and original manifest are retained.
-The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.16`
+The normalized standalone manifest pins its `gpui-fast` dependency to `=0.1.19`
 and sets `publish = false`.
 
 The manager previously applied equivalent compatibility changes to Zed commit

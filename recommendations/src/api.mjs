@@ -16,7 +16,7 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
-    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, mfg172:1, creatorLinks:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, nativeStreamline:1, anr:1, notesLimit:NOTES_LIMIT };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, mfg172:1, creatorLinks:1, authorName:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, nativeStreamline:1, anr:1, notesLimit:NOTES_LIMIT };
     if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
@@ -33,6 +33,7 @@ export function createApi(db, options) {
       && ['values','defaults'].some(part=>Number(content.presets[part]?.max_generated_frames)>3);
     const mfg171=headers['x-rtxfg-mfg171']==='1';
     const creatorLinks = headers['x-rtxfg-creator-links'] === '1';
+    const supportsAuthorName = headers['x-rtxfg-author-name'] === '1';
     const mfg172 = headers['x-rtxfg-mfg172'] === '1';
     const supportsEncore240=headers['x-rtxfg-encore240']==='1';
     const unsupportedPreset = content => content.presets && (
@@ -75,6 +76,7 @@ export function createApi(db, options) {
       if(!supportsDelta6 && delta6(result.content)) delete result.content.presets;
       if(!mfg171 && newMfg(result.content.presets)) delete result.content.presets;
       if (!creatorLinks) delete result.content.links;
+      if (!supportsAuthorName) delete result.content.authorName;
       if (!mfg172 && result.content.presets?.profile === 'rtxmfg_universal_133') {
         for (const part of ['values','defaults']) delete result.content.presets[part].rtx_xemfg_route;
         if (!Object.keys(result.content.presets.values).length) delete result.content.presets;
@@ -185,6 +187,7 @@ export function createApi(db, options) {
       const content=recipe(body.content); need(games.resolve(content.game.id)===games.resolve(row.game),'game_cannot_change');
       const original=JSON.parse(row.content);content.game=original.game;
       if (!creatorLinks && original.links) content.links = original.links;
+      if (!supportsAuthorName && original.authorName) content.authorName = original.authorName;
       if (!mfg172 && original.scheme === content.scheme && original.patchVersion === content.patchVersion
           && original.presets?.profile === 'rtxmfg_universal_133') {
         for (const part of ['values','defaults']) {

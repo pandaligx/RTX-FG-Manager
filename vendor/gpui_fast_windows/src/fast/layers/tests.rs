@@ -15,10 +15,11 @@ use std::slice;
 use anyhow::{Context as _, Result};
 use gpui::{
     AtlasKey, AtlasTile, Bounds, ContentMask, Corners, DevicePixels, Edges, FontId, GlyphId, Hsla,
-    ImageId, LayerFrame, LayerKey, MonochromeSprite, Path, PlatformAtlas, PolychromeSprite, Quad,
-    RenderGlyphParams, RenderImageParams, Rgba, ScaledPixels, Scene, SceneLayers, Shadow, Size,
-    SubpixelSprite, TileCoord, TransformationMatrix, Underline, layer_tile_id,
-    layer_tile_texture_id, linear_color_stop, linear_gradient, point, px, rgba, size,
+    ImageId, LayerFrame, LayerKey, MonochromeSprite, PaintedPath, PathBuilder, PlatformAtlas,
+    PolychromeSprite, Quad, RenderGlyphParams, RenderImageParams, Rgba, ScaledPixels, Scene,
+    SceneLayers, Shadow, Size, SubpixelSprite, TileCoord, TransformationMatrix, Underline,
+    layer_tile_id, layer_tile_texture_id, linear_color_stop, linear_gradient, point, px, rgba,
+    size,
 };
 use windows::Win32::{
     Foundation::HMODULE,
@@ -41,9 +42,8 @@ use windows::Win32::{
 use crate::DirectXAtlas;
 use crate::directx_renderer::{
     DirectXGlobalElements, DirectXRenderPipelines, RENDER_TARGET_FORMAT,
-    create_path_intermediate_msaa_texture_and_view, create_path_intermediate_texture,
 };
-use crate::fast::frame::{FrameState, PathTargets, Target, draw_scene, upload};
+use crate::fast::frame::{FrameState, Target, draw_scene, upload};
 use crate::fast::layers::TileCache;
 use crate::fast::layers::raster::{clear_color, rasterize};
 use crate::fast::layers::tile_cache::create_globals;
@@ -560,9 +560,9 @@ fn add_content(
         corner_radii: Corners::all(ScaledPixels(6.)),
         content_mask: mask(clip),
         color: Hsla::from(rgba(0x00000080)),
-        element_bounds: at(380., 420., 120., 70.),
-        element_corner_radii: Corners::all(ScaledPixels(6.)),
-        inset: 0,
+        shape_bounds: at(380., 420., 120., 70.),
+        shape_corner_radii: Corners::all(ScaledPixels(6.)),
+        inset: false.into(),
         pad: 0,
     });
     scene.insert_primitive(Quad {
@@ -606,7 +606,7 @@ fn add_content(
     let mono = glyph_tile(harness, 1, false);
     scene.insert_primitive(MonochromeSprite {
         order: 0,
-        pad: 0,
+        animation: Default::default(),
         bounds: at(505., 700., 16., 16.),
         content_mask: mask(clip),
         color: Hsla::from(rgba(0xffffffff)),
@@ -651,15 +651,19 @@ fn add_covered_paths(
         (200., 410.25, 1., -1.),
     ] {
         let corner = point(px(x + ox), px(y + oy));
-        let mut path = Path::new(corner);
+        let mut path = PathBuilder::fill();
+        path.move_to(corner);
         path.line_to(corner + point(px(9. * dx), px(0.)));
         path.curve_to(corner + point(px(0.), px(9. * dy)), corner);
         path.line_to(corner);
-        path.content_mask = ContentMask {
-            bounds: clip.map(|c| px(c.0)),
-        };
-        path.color = Hsla::from(rgba(0x3366ccff)).into();
-        scene.insert_primitive(path.scale(1.));
+        scene.insert_primitive(PaintedPath::new(
+            path.build().expect("path"),
+            1.,
+            ContentMask {
+                bounds: clip.map(|c| px(c.0)),
+            },
+            Hsla::from(rgba(0x3366ccff)).into(),
+        ));
     }
     scene.insert_primitive(Quad {
         bounds: sp(200. + ox, 330. + oy, 130.5, 80.25),
@@ -672,25 +676,29 @@ fn add_covered_paths(
     });
     scene.insert_primitive(MonochromeSprite {
         order: 0,
-        pad: 0,
+        animation: Default::default(),
         bounds: sp(204. + ox, 334. + oy, 16., 16.),
         content_mask: mask,
         color: Hsla::from(rgba(0xff8800ff)),
         tile: glyph_tile(harness, 1, false),
         transformation: TransformationMatrix::unit(),
     });
-    let mut path = Path::new(point(px(250. + ox), px(360. + oy)));
+    let mut path = PathBuilder::fill();
+    path.move_to(point(px(250. + ox), px(360. + oy)));
     path.line_to(point(px(290.5 + ox), px(372. + oy)));
     path.curve_to(
         point(px(255. + ox), px(400. + oy)),
         point(px(300. + ox), px(395. + oy)),
     );
     path.line_to(point(px(250. + ox), px(360. + oy)));
-    path.content_mask = ContentMask {
-        bounds: clip.map(|c| px(c.0)),
-    };
-    path.color = Hsla::from(rgba(0x8800ffcc)).into();
-    scene.insert_primitive(path.scale(1.));
+    scene.insert_primitive(PaintedPath::new(
+        path.build().expect("path"),
+        1.,
+        ContentMask {
+            bounds: clip.map(|c| px(c.0)),
+        },
+        Hsla::from(rgba(0x8800ffcc)).into(),
+    ));
 }
 
 /// A 16×16 glyph of a made-up font, uploaded to the harness's atlas: a
@@ -843,7 +851,7 @@ impl Harness {
                 device_context: &self.context,
                 atlas: &self.atlas,
                 globals: &self.globals,
-                paths: None,
+                depth_scale: None,
             };
             rasterize(&tiles, &mut self.pipelines, &mut self.frame, scene)?;
         }
@@ -855,23 +863,12 @@ impl Harness {
             self.device
                 .CreateRenderTargetView(&texture, None, Some(&mut render_target))?
         };
-        // The window's path textures, as `DirectXResources::new` makes them.
-        let (intermediate_texture, intermediate_srv) =
-            create_path_intermediate_texture(&self.device, width, height)?;
-        let (msaa_texture, msaa_view) =
-            create_path_intermediate_msaa_texture_and_view(&self.device, width, height)?;
         let target = Target {
             device: &self.device,
             device_context: &self.context,
             atlas: &self.atlas,
             globals: &self.globals,
-            paths: Some(PathTargets {
-                render_target_view: &render_target,
-                intermediate_texture: &intermediate_texture,
-                intermediate_srv: &intermediate_srv,
-                msaa_texture: &msaa_texture,
-                msaa_view: &msaa_view,
-            }),
+            depth_scale: None,
         };
         let globals = create_globals(&self.device, width, height)?;
         // What `DirectXRenderer::pre_draw` binds.
@@ -1059,7 +1056,7 @@ fn composition_whole_scene_matches_replayed_surface_pixels(cx: &mut gpui::TestAp
             };
             let empty = gpui::ComposedSceneLayer {
                 ranges: vec![],
-                ..full.clone()
+                ..full
             };
             for (layers, expected_target) in [
                 (vec![full.clone(), empty.clone()], 0),
@@ -1090,4 +1087,857 @@ fn composition_whole_scene_matches_replayed_surface_pixels(cx: &mut gpui::TestAp
             }
         })
         .unwrap();
+}
+
+// --- Overdraw culling (`fast::occlusion`) --- //
+
+/// Draws `scene` with culling off and on and checks that culling changed no
+/// byte; returns whether culling hid anything.
+fn culling_keeps_pixels(harness: &mut Harness, scene: &Scene) -> bool {
+    let size = device_size(1024, 1024);
+    harness.frame.skip_occlusion = true;
+    let everything = harness.render(scene, size, rgba(0xffffffff));
+    harness.frame.skip_occlusion = false;
+    let culled = harness.render(scene, size, rgba(0xffffffff));
+    assert_same_pixels(&culled, &everything, 1024);
+    let occlusion = crate::fast::occlusion::Occlusion::of(scene, |sprite| {
+        harness.atlas.is_opaque(&sprite.tile)
+    });
+    scene.quads.iter().any(|q| occlusion.hides_quad(q))
+        || scene.shadows.iter().any(|s| occlusion.hides_shadow(s))
+        || scene
+            .polychrome_sprites
+            .iter()
+            .any(|s| occlusion.hides_sprite(s))
+}
+
+/// Every kind of primitive (`add_content`) over nested plain backgrounds
+/// (a window, a content area under a top bar, a translucent page), then
+/// `cover` over them.
+fn covered_scene(harness: &Harness, cover: Option<Quad>) -> Scene {
+    let mut scene = Scene::default();
+    scene.insert_primitive(quad(sp(0., 0., 1024., 1024.), Hsla::from(rgba(0x101010ff))));
+    scene.insert_primitive(quad(
+        sp(0., 40.5, 1024., 983.5),
+        Hsla::from(rgba(0x202830ff)),
+    ));
+    scene.insert_primitive(quad(
+        sp(176., 40.5, 848., 983.5),
+        Hsla::from(rgba(0x30405080)),
+    ));
+    add_content(&mut scene, harness, (0., 0.), sp(0., 0., 1024., 1024.));
+    if let Some(cover) = cover {
+        scene.insert_primitive(cover);
+    }
+    scene.finish();
+    scene
+}
+
+#[test]
+fn culling_nested_backgrounds_changes_no_pixel() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    let scene = covered_scene(&harness, None);
+    // Partly covered backgrounds are no longer cut into pieces: upstream's
+    // opaque depth pre-pass already shades each covered pixel once, so
+    // culling only has to leave every pixel unchanged here.
+    culling_keeps_pixels(&mut harness, &scene);
+}
+
+#[test]
+fn culling_under_covers_changes_no_pixel() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    let opaque = Hsla::from(rgba(0x445566ff));
+    let cover = |bounds| quad(bounds, opaque);
+    let cases: Vec<(&str, Quad)> = vec![
+        ("opaque", cover(sp(80., 80., 560., 480.))),
+        ("fractional", cover(sp(80.5, 79.25, 560.25, 480.75))),
+        (
+            "translucent",
+            quad(sp(80., 80., 560., 480.), Hsla::from(rgba(0x44556680))),
+        ),
+        (
+            "rounded",
+            Quad {
+                corner_radii: Corners::all(ScaledPixels(16.)),
+                ..cover(sp(80., 80., 560., 480.))
+            },
+        ),
+        (
+            "masked",
+            Quad {
+                content_mask: ContentMask {
+                    bounds: sp(80., 80., 300., 200.),
+                },
+                ..cover(sp(0., 0., 1024., 1024.))
+            },
+        ),
+        (
+            "translucent border",
+            Quad {
+                border_widths: Edges::all(ScaledPixels(4.)),
+                border_color: Hsla::from(rgba(0xffffff80)),
+                ..cover(sp(80., 80., 560., 480.))
+            },
+        ),
+        (
+            "opaque border",
+            Quad {
+                border_widths: Edges::all(ScaledPixels(4.)),
+                border_color: Hsla::from(rgba(0xffffffff)),
+                ..cover(sp(80., 80., 560., 480.))
+            },
+        ),
+        // The shadow at (380, 420) 120x70 blurs 8 px: its tail reaches 24 px out.
+        (
+            "opaque border, fractional",
+            Quad {
+                border_widths: Edges::all(ScaledPixels(4.)),
+                border_color: Hsla::from(rgba(0xffffffff)),
+                ..cover(sp(80.5, 79.25, 560.25, 480.75))
+            },
+        ),
+        ("shadow body only", cover(sp(380., 420., 120., 70.))),
+        ("shadow and tail", cover(sp(350., 390., 180., 130.))),
+        ("everything", cover(sp(0., 0., 1024., 1024.))),
+    ];
+    for (name, cover) in cases {
+        let scene = covered_scene(&harness, Some(cover));
+        eprintln!("cover: {name}");
+        culling_keeps_pixels(&mut harness, &scene);
+    }
+    // A full cover hides everything under it.
+    let scene = covered_scene(&harness, Some(cover(sp(0., 0., 1024., 1024.))));
+    let occlusion = crate::fast::occlusion::Occlusion::of(&scene, |sprite| {
+        harness.atlas.is_opaque(&sprite.tile)
+    });
+    let last = scene.quads.iter().map(|q| q.order).max().unwrap();
+    assert!(
+        scene
+            .quads
+            .iter()
+            .filter(|q| q.order < last)
+            .all(|q| occlusion.hides_quad(q))
+    );
+    assert!(scene.shadows.iter().all(|s| occlusion.hides_shadow(s)));
+    assert!(!scene.monochrome_sprites.is_empty() && !scene.subpixel_sprites.is_empty());
+    assert!(
+        scene
+            .monochrome_sprites
+            .iter()
+            .all(|s| occlusion.hides_glyph(s.order, &s.bounds, &s.content_mask, &s.transformation))
+    );
+    assert!(scene.subpixel_sprites.iter().all(|s| occlusion.hides_glyph(
+        s.order,
+        &s.bounds,
+        &s.content_mask,
+        &s.transformation
+    )));
+}
+
+/// A 20x20 image, opaque or with one translucent pixel.
+fn image_cover_tile(harness: &Harness, id: usize, opaque: bool) -> AtlasTile {
+    let key = AtlasKey::Image(RenderImageParams {
+        image_id: ImageId(id),
+        frame_index: 0,
+    });
+    let bytes: Vec<u8> = (0..20 * 20)
+        .flat_map(|i: u32| {
+            let alpha = if !opaque && i == 210 { 254 } else { 255 };
+            [
+                (i * 5 % 256) as u8,
+                (i * 11 % 256) as u8,
+                (i * 17 % 256) as u8,
+                alpha,
+            ]
+        })
+        .collect();
+    harness
+        .atlas
+        .get_or_insert_with(key, &mut || {
+            Ok(Some((device_size(20, 20), Cow::Owned(bytes.clone()))))
+        })
+        .expect("image uploaded")
+        .expect("image tile")
+}
+
+fn image_cover(tile: AtlasTile, bounds: Bounds<ScaledPixels>, opacity: f32) -> PolychromeSprite {
+    PolychromeSprite {
+        order: 0,
+        pad: 0,
+        grayscale: false.into(),
+        opacity,
+        bounds,
+        content_mask: no_mask(),
+        corner_radii: Corners::default(),
+        tile,
+    }
+}
+
+#[test]
+fn culling_under_images_changes_no_pixel() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    assert!(
+        harness
+            .atlas
+            .is_opaque(&image_cover_tile(&harness, 9_001, true))
+    );
+    assert!(
+        !harness
+            .atlas
+            .is_opaque(&image_cover_tile(&harness, 9_002, false))
+    );
+    // A video frame over the player's background: magnified, at fractional
+    // bounds, so that bilinear sampling reaches the image's edges.
+    let bounds = sp(60.5, 70.25, 700.75, 520.5);
+    for (name, id, opaque, opacity, hides) in [
+        ("opaque image", 9_001, true, 1.0, true),
+        ("translucent pixel", 9_002, false, 1.0, false),
+        ("drawn translucent", 9_001, true, 0.99, false),
+    ] {
+        eprintln!("image cover: {name}");
+        let tile = image_cover_tile(&harness, id, opaque);
+        let mut scene = Scene::default();
+        scene.insert_primitive(quad(sp(0., 0., 1024., 1024.), Hsla::from(rgba(0x000000ff))));
+        add_content(&mut scene, &harness, (0., 0.), sp(0., 0., 1024., 1024.));
+        scene.insert_primitive(image_cover(tile, bounds, opacity));
+        scene.finish();
+        culling_keeps_pixels(&mut harness, &scene);
+        let occlusion = crate::fast::occlusion::Occlusion::of(&scene, |sprite| {
+            harness.atlas.is_opaque(&sprite.tile)
+        });
+        // What is under the image's middle, away from the content's own
+        // covers, is hidden only when the image hides.
+        let mut under = quad(sp(400., 300., 20., 20.), Hsla::from(rgba(0x000000ff)));
+        under.order = scene.quads[0].order;
+        assert_eq!(occlusion.hides_quad(&under), hides, "{name}");
+    }
+}
+
+/// A primitive whose mask's right (bottom) edge falls on a pixel centre
+/// exactly where a cover's right (bottom) edge does: the clip keeps that
+/// column (a centre on the clip plane is kept), the cover does not (the
+/// rasterizer's top-left rule drops a centre on its right edge). The hidden
+/// quad is plain (drawn through `Occlusion::pieces`) or bordered (tested by
+/// `Occlusion::hides_quad`); neither may be culled at that column.
+#[test]
+fn culling_at_a_shared_edge_on_a_pixel_centre_changes_no_pixel() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    // The hidden quad's bounds reach past the cover only where its mask
+    // cuts them, at the cover's edge.
+    for (name, hidden_bounds, hidden_mask, cover_bounds) in [
+        (
+            "right",
+            sp(100., 100., 600., 400.),
+            sp(0., 0., 640.5, 1024.),
+            sp(80., 80., 560.5, 480.),
+        ),
+        (
+            "bottom",
+            sp(100., 100., 400., 600.),
+            sp(0., 0., 1024., 560.5),
+            sp(80., 80., 560., 480.5),
+        ),
+    ] {
+        for bordered in [false, true] {
+            eprintln!("shared edge: {name}, bordered {bordered}");
+            let mut hidden = Quad {
+                content_mask: ContentMask {
+                    bounds: hidden_mask,
+                },
+                ..quad(hidden_bounds, Hsla::from(rgba(0xcc3322ff)))
+            };
+            if bordered {
+                hidden.border_widths = Edges::all(ScaledPixels(2.));
+                hidden.border_color = Hsla::from(rgba(0x22cc33ff));
+            }
+            let mut scene = Scene::default();
+            scene.insert_primitive(quad(sp(0., 0., 1024., 1024.), Hsla::from(rgba(0x101010ff))));
+            scene.insert_primitive(hidden);
+            scene.insert_primitive(quad(cover_bounds, Hsla::from(rgba(0x445566ff))));
+            scene.finish();
+            culling_keeps_pixels(&mut harness, &scene);
+            let occlusion = crate::fast::occlusion::Occlusion::of(&scene, |_| false);
+            assert!(!occlusion.hides_quad(&scene.quads[1]), "{name} {bordered}");
+        }
+    }
+}
+
+// --- Partial redraw (`fast::partial`) --- //
+
+/// Draws a scene for `fast::partial::Partial` as `Harness::draw` does, into
+/// the canvas it is given.
+struct PartialDrawer<'a> {
+    harness: &'a mut Harness,
+    scene: &'a Scene,
+    size: (u32, u32),
+    clear: Rgba,
+    target: Option<windows::Win32::Graphics::Direct3D11::ID3D11RenderTargetView>,
+    /// Drawing fails (a device error mid-frame).
+    fail: bool,
+}
+
+impl crate::fast::partial::Drawer for PartialDrawer<'_> {
+    fn clear(&self) -> [f32; 4] {
+        [self.clear.r, self.clear.g, self.clear.b, self.clear.a]
+    }
+
+    fn prepare(&mut self) -> Result<()> {
+        let harness = &mut *self.harness;
+        let tiles = Target {
+            device: &harness.device,
+            device_context: &harness.context,
+            atlas: &harness.atlas,
+            globals: &harness.globals,
+            depth_scale: None,
+        };
+        rasterize(
+            &tiles,
+            &mut harness.pipelines,
+            &mut harness.frame,
+            self.scene,
+        )
+    }
+
+    fn begin(
+        &mut self,
+        target: &Option<windows::Win32::Graphics::Direct3D11::ID3D11RenderTargetView>,
+    ) -> Result<()> {
+        let (width, height) = self.size;
+        let clear = crate::fast::partial::Drawer::clear(self);
+        let globals = create_globals(&self.harness.device, width, height)?;
+        let context = &self.harness.context;
+        unsafe {
+            context.ClearRenderTargetView(target.as_ref().context("canvas view")?, &clear);
+            context.OMSetRenderTargets(Some(slice::from_ref(target)), None);
+            context.RSSetViewports(Some(&[D3D11_VIEWPORT {
+                TopLeftX: 0.,
+                TopLeftY: 0.,
+                Width: width as f32,
+                Height: height as f32,
+                MinDepth: 0.,
+                MaxDepth: 1.,
+            }]));
+            context.VSSetConstantBuffers(0, Some(slice::from_ref(&globals)));
+            context.VSSetConstantBuffers(
+                1,
+                Some(slice::from_ref(&self.harness.globals.batch_params_buffer)),
+            );
+            context.PSSetConstantBuffers(0, Some(slice::from_ref(&globals)));
+        }
+        self.target = target.clone();
+        Ok(())
+    }
+
+    fn upload(&mut self) -> Result<()> {
+        let harness = &mut *self.harness;
+        let target = Target {
+            device: &harness.device,
+            device_context: &harness.context,
+            atlas: &harness.atlas,
+            globals: &harness.globals,
+            depth_scale: None,
+        };
+        upload(&target, &mut harness.pipelines, self.scene)
+    }
+
+    fn draw(&mut self) -> Result<bool> {
+        if self.fail {
+            anyhow::bail!("the drawer fails");
+        }
+        let harness = &mut *self.harness;
+        let target = Target {
+            device: &harness.device,
+            device_context: &harness.context,
+            atlas: &harness.atlas,
+            globals: &harness.globals,
+            depth_scale: None,
+        };
+        draw_scene(
+            &target,
+            &mut harness.pipelines,
+            &mut harness.frame,
+            self.scene,
+        )?;
+        Ok(true)
+    }
+}
+
+/// Draws `scene` as the next frame of `partial` and checks it against the
+/// scene drawn whole, byte for byte. Returns how the frame was made:
+/// whether pixels were copied moved, and how many rectangles were drawn
+/// again (`None`: drawn whole).
+fn partial_frame(
+    harness: &mut Harness,
+    partial: &mut crate::fast::partial::Partial,
+    scene: &Scene,
+    uploaded: &[AtlasTile],
+) -> Option<(bool, usize)> {
+    partial_frame_cleared(harness, partial, scene, uploaded, rgba(0xffffffff))
+}
+
+/// [`partial_frame`] in a window cleared to `clear`.
+fn partial_frame_cleared(
+    harness: &mut Harness,
+    partial: &mut crate::fast::partial::Partial,
+    scene: &Scene,
+    uploaded: &[AtlasTile],
+    clear: Rgba,
+) -> Option<(bool, usize)> {
+    let size = (1024u32, 1024u32);
+    let uploaded = uploaded
+        .iter()
+        .map(|tile| (tile.texture_id, tile.tile_id.0))
+        .collect();
+    let (device, context) = (harness.device.clone(), harness.context.clone());
+    let canvas = {
+        let mut drawer = PartialDrawer {
+            harness,
+            scene,
+            size,
+            clear,
+            target: None,
+            fail: false,
+        };
+        partial
+            .frame(&device, &context, size, scene, &uploaded, &mut drawer)
+            .expect("frame drawn")
+            .expect("a canvas")
+    };
+    unsafe { context.OMSetRenderTargets(None, None) };
+    let made = read_back(&device, &context, &canvas).expect("canvas read");
+    let whole = harness.render(scene, device_size(1024, 1024), clear);
+    assert_same_pixels(&made, &whole, 1024);
+    partial
+        .last_plan
+        .as_ref()
+        .map(|plan| (plan.shift.is_some(), plan.damage.len()))
+}
+
+/// A window: a rounded header and two translucent bars that stay, the bars
+/// across the scrolled content; and in a clip below the header, scrolled by
+/// `offset`, every kind of primitive (`add_content`) and a column of
+/// rounded rows that runs past the clip's bottom. `backdrop`: over a plain
+/// background (else the cleared window shows).
+fn scrolled_scene(harness: &Harness, offset: f32, extra: Option<Quad>, backdrop: bool) -> Scene {
+    let clip = sp(32., 96., 960., 896.);
+    let mut scene = Scene::default();
+    if backdrop {
+        scene.insert_primitive(quad(sp(0., 0., 1024., 1024.), Hsla::from(rgba(0x101418ff))));
+    }
+    add_content(&mut scene, harness, (0., offset), clip);
+    for row in 0..14 {
+        scene.insert_primitive(Quad {
+            content_mask: ContentMask { bounds: clip },
+            corner_radii: Corners::all(ScaledPixels(8.)),
+            ..quad(
+                sp(820., 110. + 110. * row as f32 + offset, 150., 90.),
+                Hsla::from(rgba(0x2266aaff + 0x0c0700 * row)),
+            )
+        });
+    }
+    if let Some(extra) = extra {
+        scene.insert_primitive(extra);
+    }
+    scene.insert_primitive(Quad {
+        corner_radii: Corners::all(ScaledPixels(10.)),
+        ..quad(sp(16., 16., 992., 64.), Hsla::from(rgba(0x334455ff)))
+    });
+    // Two bars that stay over the scrolled content: a rounded one (drawn
+    // again wherever the copy moved pixels under it) and a plain one (the
+    // same colour over every pixel: only its edges are).
+    scene.insert_primitive(Quad {
+        corner_radii: Corners::all(ScaledPixels(6.)),
+        ..quad(sp(32., 400., 960., 40.), Hsla::from(rgba(0x00000080)))
+    });
+    scene.insert_primitive(quad(sp(32., 640., 960., 30.), Hsla::from(rgba(0x80000060))));
+    scene.finish();
+    scene
+}
+
+#[test]
+fn partial_redraw_of_a_scroll_equals_whole_drawing() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    for backdrop in [true, false] {
+        let mut partial = crate::fast::partial::Partial::enabled();
+        let frame = |harness: &mut Harness, partial: &mut _, offset: f32, extra: Option<Quad>| {
+            let scene = scrolled_scene(harness, offset, extra, backdrop);
+            partial_frame(harness, partial, &scene, &[])
+        };
+        // The first frame is drawn whole.
+        assert_eq!(frame(&mut harness, &mut partial, 0., None), None);
+        // Scrolled up, twice: moved pixels and damage.
+        for offset in [-48., -96.] {
+            let made =
+                frame(&mut harness, &mut partial, offset, None).expect("made from the last frame");
+            assert!(made.0, "pixels are copied moved at {offset}");
+        }
+        // Nothing changed: nothing drawn.
+        assert_eq!(
+            frame(&mut harness, &mut partial, -96., None),
+            Some((false, 0))
+        );
+        // Something new without a scroll: only that is drawn again.
+        let extra = Quad {
+            content_mask: ContentMask {
+                bounds: sp(32., 96., 960., 896.),
+            },
+            ..quad(sp(600., 500., 120., 80.), Hsla::from(rgba(0xffaa00ff)))
+        };
+        assert_eq!(
+            frame(&mut harness, &mut partial, -96., Some(extra)),
+            Some((false, 1))
+        );
+        // It goes while the content scrolls back down.
+        let made = frame(&mut harness, &mut partial, -80., None).expect("made from the last frame");
+        assert!(made.0);
+        // A fractional offset copies nothing (drawn whole, or what moved drawn
+        // again), and the next whole offset is made from it.
+        let made = frame(&mut harness, &mut partial, -80.5, None);
+        assert!(made.is_none_or(|(moved, _)| !moved));
+        frame(&mut harness, &mut partial, -64., None);
+        frame(&mut harness, &mut partial, 0., None);
+    }
+}
+
+#[test]
+fn partial_redraw_draws_a_tile_uploaded_again() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    let mut partial = crate::fast::partial::Partial::enabled();
+    let scene = scrolled_scene(&harness, 0., None, true);
+    assert_eq!(partial_frame(&mut harness, &mut partial, &scene, &[]), None);
+    // The same primitives, but the image's tile was uploaded since: its
+    // sprite is drawn again.
+    let image = image_tile(&harness);
+    assert_eq!(
+        partial_frame(&mut harness, &mut partial, &scene, &[image]),
+        Some((false, 1))
+    );
+}
+
+/// A glyph drawn large and turned by `angle` about its centre, over a
+/// plain background.
+fn turned_sprite_scene(harness: &Harness, angle: f32) -> Scene {
+    let mut scene = Scene::default();
+    scene.insert_primitive(quad(sp(0., 0., 1024., 1024.), Hsla::from(rgba(0x101418ff))));
+    let (sin, cos) = angle.sin_cos();
+    let (cx, cy) = (400. + 60., 400. + 60.);
+    scene.insert_primitive(MonochromeSprite {
+        order: 0,
+        animation: Default::default(),
+        bounds: sp(400., 400., 120., 120.),
+        content_mask: ContentMask {
+            bounds: sp(0., 0., 1024., 1024.),
+        },
+        color: Hsla::from(rgba(0xffffffff)),
+        tile: glyph_tile(harness, 1, false),
+        transformation: TransformationMatrix {
+            rotation_scale: [[cos, -sin], [sin, cos]],
+            translation: [cx - cos * cx + sin * cy, cy - sin * cx - cos * cy],
+        },
+    });
+    scene.finish();
+    scene
+}
+
+#[test]
+fn partial_redraw_reaches_where_a_transformation_takes_a_sprite() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    let mut partial = crate::fast::partial::Partial::enabled();
+    let mut made = Vec::new();
+    for angle in [0., 0.4, 0.8, 1.9] {
+        let scene = turned_sprite_scene(&harness, angle);
+        made.push(partial_frame(&mut harness, &mut partial, &scene, &[]));
+    }
+    // Each turn is one rectangle of damage, the turned sprite's corners in it.
+    assert_eq!(
+        made,
+        [None, Some((false, 1)), Some((false, 1)), Some((false, 1))]
+    );
+}
+
+#[test]
+fn partial_redraw_draws_whole_when_the_clear_colour_changes() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    let mut partial = crate::fast::partial::Partial::enabled();
+    // No background: the clear colour shows between the primitives.
+    let scene = scrolled_scene(&harness, 0., None, false);
+    let white = rgba(0xffffffff);
+    let clear = rgba(0x00000000);
+    assert_eq!(
+        partial_frame_cleared(&mut harness, &mut partial, &scene, &[], white),
+        None
+    );
+    assert_eq!(
+        partial_frame_cleared(&mut harness, &mut partial, &scene, &[], white),
+        Some((false, 0))
+    );
+    assert_eq!(
+        partial_frame_cleared(&mut harness, &mut partial, &scene, &[], clear),
+        None
+    );
+    assert_eq!(
+        partial_frame_cleared(&mut harness, &mut partial, &scene, &[], clear),
+        Some((false, 0))
+    );
+}
+
+#[test]
+fn partial_redraw_puts_the_rasterizer_state_back_when_drawing_fails() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    let mut partial = crate::fast::partial::Partial::enabled();
+    let scene = scrolled_scene(&harness, 0., None, true);
+    assert_eq!(partial_frame(&mut harness, &mut partial, &scene, &[]), None);
+    let (device, context) = (harness.device.clone(), harness.context.clone());
+    let bound = || unsafe { context.RSGetState() }.ok();
+    let before = bound();
+    // A frame of damage whose drawing fails.
+    let scrolled = scrolled_scene(&harness, -48., None, true);
+    let failed = {
+        let mut drawer = PartialDrawer {
+            harness: &mut harness,
+            scene: &scrolled,
+            size: (1024, 1024),
+            clear: rgba(0xffffffff),
+            target: None,
+            fail: true,
+        };
+        partial.frame(
+            &device,
+            &context,
+            (1024, 1024),
+            &scrolled,
+            &Default::default(),
+            &mut drawer,
+        )
+    };
+    assert!(failed.is_err());
+    assert_eq!(bound(), before, "the scissor test is left on");
+    // The half-drawn canvas is forgotten: the next frame is drawn whole,
+    // and right.
+    assert_eq!(
+        partial_frame(&mut harness, &mut partial, &scrolled, &[]),
+        None
+    );
+}
+
+/// A glyph drawn through `transformation` in `color` (`None`: no glyph),
+/// over a plain background.
+fn transformed_sprite_scene(
+    harness: &Harness,
+    sprite: Option<(TransformationMatrix, u32)>,
+) -> Scene {
+    let mut scene = Scene::default();
+    scene.insert_primitive(quad(sp(0., 0., 1024., 1024.), Hsla::from(rgba(0x101418ff))));
+    if let Some((transformation, color)) = sprite {
+        scene.insert_primitive(MonochromeSprite {
+            order: 0,
+            animation: Default::default(),
+            bounds: sp(200., 200., 120., 120.),
+            content_mask: ContentMask {
+                bounds: sp(0., 0., 1024., 1024.),
+            },
+            color: Hsla::from(rgba(color)),
+            tile: glyph_tile(harness, 1, false),
+            transformation,
+        });
+    }
+    scene.finish();
+    scene
+}
+
+/// A turn by `angle` about (`cx`, `cy`).
+fn turn_about(angle: f32, cx: f32, cy: f32) -> TransformationMatrix {
+    let (sin, cos) = angle.sin_cos();
+    TransformationMatrix {
+        rotation_scale: [[cos, -sin], [sin, cos]],
+        translation: [cx - cos * cx + sin * cy, cy - sin * cx - cos * cy],
+    }
+}
+
+#[test]
+fn partial_redraw_follows_sprites_moved_scaled_turned_and_removed() {
+    let Some(mut harness) = Harness::new() else {
+        eprintln!("skipped: no Direct3D 11 device");
+        return;
+    };
+    let mut partial = crate::fast::partial::Partial::enabled();
+    let moved = TransformationMatrix {
+        rotation_scale: [[1., 0.], [0., 1.]],
+        translation: [300., 40.],
+    };
+    let scaled = TransformationMatrix {
+        rotation_scale: [[2., 0.], [0., 1.5]],
+        translation: [0., 0.],
+    };
+    let states = [
+        None,
+        // Comes, drawn away from its bounds.
+        Some((moved, 0xffffffff)),
+        // Changes colour there.
+        Some((moved, 0xff4040ff)),
+        // Scaled, turned, and gone from where the turn took it.
+        Some((scaled, 0xff4040ff)),
+        Some((turn_about(0.7, 260., 260.), 0xffffffff)),
+        None,
+        // Comes scaled, and goes.
+        Some((scaled, 0xffffffff)),
+        None,
+    ];
+    for (n, state) in states.into_iter().enumerate() {
+        let scene = transformed_sprite_scene(&harness, state);
+        let made = partial_frame(&mut harness, &mut partial, &scene, &[]);
+        if n > 0 {
+            let (copied, rects) = made.expect("made from the last frame");
+            assert!(!copied && rects >= 1, "state {n}: {made:?}");
+        }
+    }
+}
+
+/// `source` (a window with one rounded clip) again, with a glyph turned by
+/// `angle` among the clip's content (`None`: without), reaching past the
+/// clip's edge. `side`: the window's.
+#[cfg(feature = "test-support")]
+fn clip_with_turned_sprite(
+    harness: &Harness,
+    source: &Scene,
+    side: f32,
+    angle: Option<f32>,
+) -> Scene {
+    // The scene's primitives again, in the order they are painted in.
+    fn again(source: &Scene, scene: &mut Scene) {
+        assert!(
+            source.shadows.is_empty()
+                && source.underlines.is_empty()
+                && source.paths.is_empty()
+                && source.monochrome_sprites.is_empty()
+                && source.subpixel_sprites.is_empty()
+        );
+        let mut quads = source.quads.iter().peekable();
+        let mut sprites = source.polychrome_sprites.iter().peekable();
+        loop {
+            let quad_first = match (quads.peek(), sprites.peek()) {
+                (Some(quad), Some(sprite)) => quad.order <= sprite.order,
+                (Some(_), None) => true,
+                (None, Some(_)) => false,
+                (None, None) => break,
+            };
+            if quad_first {
+                scene.insert_primitive(*quads.next().unwrap());
+            } else {
+                scene.insert_primitive(*sprites.next().unwrap());
+            }
+        }
+    }
+    let group = source
+        .polychrome_sprites
+        .iter()
+        .find_map(|sprite| crate::fast::rounded_clip::group(source, sprite.tile.texture_id))
+        .expect("a rounded clip");
+    let content = group.content.scene().expect("the clip's content");
+    let mut child = Scene::default();
+    again(content, &mut child);
+    if let Some(angle) = angle {
+        // Near the clip's right edge: turned, its corners pass the edge.
+        let bounds = sp(side * 0.55, side * 0.3, side * 0.4, side * 0.4);
+        child.insert_primitive(MonochromeSprite {
+            order: 0,
+            animation: Default::default(),
+            bounds,
+            content_mask: ContentMask {
+                bounds: sp(0., 0., 1024., 1024.),
+            },
+            color: Hsla::from(rgba(0xff4040ff)),
+            tile: glyph_tile(harness, 1, false),
+            transformation: turn_about(angle, side * 0.75, side * 0.5),
+        });
+    }
+    child.layers.frames = content.layers.frames.clone();
+    child.finish();
+    let mut scene = Scene::default();
+    again(source, &mut scene);
+    scene.layers.frames = source
+        .layers
+        .frames
+        .iter()
+        .map(|frame| {
+            if frame.key == group.key {
+                LayerFrame {
+                    generation: frame.generation + 1,
+                    content: Scene::default().into(),
+                    ..frame.clone()
+                }
+            } else {
+                frame.clone()
+            }
+        })
+        .collect();
+    let key = group.key;
+    if let Some(frame) = scene
+        .layers
+        .frames
+        .iter_mut()
+        .find(|frame| frame.key == key)
+    {
+        frame.content = child.into();
+    }
+    scene.finish();
+    scene
+}
+
+#[cfg(feature = "test-support")]
+#[gpui::test]
+fn partial_redraw_follows_a_transformed_sprite_inside_a_rounded_clip(
+    cx: &mut gpui::TestAppContext,
+) {
+    let mut harness =
+        Harness::new().expect("rounded clipping regression requires Direct3D or WARP");
+    rounded_clip_tests::render_with(cx, rounded_clip_tests::square_fixture, |source, size| {
+        let side = size.width.0 as f32;
+        let extent = device_size(1024, 1024);
+        let white = rgba(0xffffffff);
+        let without = clip_with_turned_sprite(&harness, source, side, None);
+        let with = clip_with_turned_sprite(&harness, source, side, Some(0.6));
+        // The glyph is drawn, and the clip is.
+        let plain = harness.render(&without, extent, white);
+        assert_ne!(plain, harness.render(&with, extent, white));
+        assert_same_pixels(&plain, &harness.render(source, extent, white), 1024);
+
+        let mut partial = crate::fast::partial::Partial::enabled();
+        for (n, angle) in [None, Some(0.6), Some(1.3), None, Some(2.0), None]
+            .into_iter()
+            .enumerate()
+        {
+            let scene = clip_with_turned_sprite(&harness, source, side, angle);
+            let made = partial_frame(&mut harness, &mut partial, &scene, &[]);
+            assert_eq!(made.is_some(), n > 0, "frame {n}: {made:?}");
+        }
+        plain
+    });
 }

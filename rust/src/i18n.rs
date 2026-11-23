@@ -133,3 +133,32 @@ impl Translator {
         s.into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sharing_and_detection_labels_follow_the_selected_language() {
+        let keys = [
+            "访问他的抖音",
+            "访问他的哔哩哔哩",
+            "访问他的小黑盒",
+            "分享者名字（选填）",
+            "DLSS：正在检测…",
+            "反作弊：未检测到",
+            "加载更多",
+        ];
+        let english = Translator::new("en");
+        for locale in ["en", "ru", "ja", "ko"] {
+            let translator = Translator::new(locale);
+            for key in keys {
+                let value = translator.t(key);
+                assert_ne!(value, key, "{locale}: {key}");
+                if locale != "en" {
+                    assert_ne!(value, english.t(key), "{locale}: {key}");
+                }
+            }
+        }
+    }
+}

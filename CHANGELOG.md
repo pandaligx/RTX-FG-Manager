@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.42 — 2026-11-23
+
+- Add an optional display name when sharing a setup. It appears beside the avatar, and profile link tooltips now name the platform.
+- The player setups button has a four-second color sweep that glows inward. Fixed a flickering line beside the animated people icon.
+- Filled in missing interface translations and updated the desktop UI to GPUI Kit 0.11.0 and GPUI Fast 0.1.19.
+
 ## 4.3.41 — 2026-11-23
 
 - Updated MFG-Unlocker to 1.7.2. Supported games can use their DLSS Frame Generation switch for fixed-multiplier XeMFG. Uninstalling restores the original host when the manager updated an existing OptiScaler installation.

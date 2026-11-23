@@ -41,6 +41,26 @@ test('creator homepages and the 1.7.2 route survive a legacy edit; the author ca
   }
 });
 
+test('optional display name survives old clients and can be edited and cleared', async t => {
+  const f = fixture(t), user = await f.login(), modern = {'x-rtxfg-author-name':'1'};
+  assert.equal((await f.call('GET','/v1/capabilities')).authorName,1);
+  const created = await f.call('POST','/v1/recipes',{submission:randomUUID(),content:{...content(),authorName:' 星野🌙 '}},user.token,'ip',16,modern);
+  const path = '/v1/recipes/'+created.id;
+  const read = headers => f.call('GET',path,null,undefined,'guest',16,headers);
+  const edit = (revision, data, headers) => f.call('PUT',path,{revision,content:data},user.token,'ip',16,headers);
+  assert.equal((await read(modern)).content.authorName,'星野🌙');
+  const legacy = (await read({})).content;
+  assert.equal(legacy.authorName,undefined);
+  await edit(created.revision,{...legacy,notes:'new notes'},{});
+  const kept = await read(modern);
+  assert.equal(kept.content.authorName,'星野🌙');
+  const renamed = await edit(kept.revision,{...kept.content,authorName:'Luna'},modern);
+  assert.equal(renamed.content.authorName,'Luna');
+  await edit(renamed.revision,{...renamed.content,authorName:''},modern);
+  assert.equal((await read(modern)).content.authorName,undefined);
+  for (const bad of ['A\nB','A\u2028B','x'.repeat(33),'<script>']) assert.throws(()=>recipe({...content(),authorName:bad}));
+});
+
 test('mobile share profiles and a tutorial round-trip through new and edited cards', async t => {
   const f = fixture(t), user = await f.login();
   const headers = {'x-rtxfg-creator-links':'1'};

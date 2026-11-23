@@ -309,6 +309,7 @@ impl Manager {
             .detach();
         gpui::base::set_reduce_motion_preference(motion_preference(&state), cx);
         let mut c = Controller::new(data, state, error, smoke);
+        window.set_window_title(&c.text("RTX 帧生成管理器"));
         if !c.boolean("sidebar_compact_default_v3", false) {
             c.state["sidebar_collapsed"] = json!(true);
             c.state["sidebar_compact_default_v3"] = json!(true);
@@ -835,6 +836,18 @@ impl Manager {
             Command::Language(s) => {
                 self.c.language(&s);
                 self.language = self.c.tr.language.clone();
+                for (handle, label) in [
+                    (Some(self.main_window), "RTX 帧生成管理器"),
+                    (self.settings_window, "设置"),
+                ] {
+                    if let Some(handle) = handle {
+                        let title = self.c.text(label);
+                        cx.defer(move |cx| {
+                            let _ =
+                                handle.update(cx, |_, window, _| window.set_window_title(&title));
+                        });
+                    }
+                }
                 self.search.update(cx, |state, cx| {
                     state.set_placeholder(self.c.text("搜索游戏"), window, cx)
                 });
@@ -985,10 +998,17 @@ impl Manager {
         action: Command,
         cx: &Context<Self>,
     ) -> Button {
+        self.action_button(id, action, cx).label(self.t(label))
+    }
+    fn action_button(
+        &self,
+        id: impl Into<ElementId>,
+        action: Command,
+        cx: &Context<Self>,
+    ) -> Button {
         Button::new(id)
             .focus_ring(crate::ui_focus::visible(cx))
             .small()
-            .label(self.t(label))
             .on_click(cx.listener(move |this, _, window, cx| {
                 cx.stop_propagation();
                 this.act(action.clone(), window, cx)
@@ -1017,26 +1037,15 @@ impl Manager {
         Icon::new(name).size(px(20.))
     }
     fn recommendation_entry(&self, exe: String, cx: &Context<Self>) -> AnyElement {
-        let theme = cx.theme();
         let animate = !cx.reduce_motion();
+        let label = self.t("其他玩家分享的方案");
         let button = self
-            .button(
-                "game-recommendations",
-                "其他玩家分享的方案",
-                Command::Recommendations(exe),
-                cx,
-            )
+            .action_button("game-recommendations", Command::Recommendations(exe), cx)
+            .accessibility_label(label.clone())
             .tooltip(self.t("如果您不懂如何使用让帧生成生效，点此查看其他玩家推荐方案"))
-            .custom(
-                ButtonCustomVariant::new(cx)
-                    .color(theme.background)
-                    .foreground(theme.foreground)
-                    .hover(theme.secondary_hover)
-                    .active(theme.secondary_active),
-            )
             .w_full();
         // Keep the same clock while menus/dialogs open so motion never resets.
-        let entry = recommendation_entry::RecommendationEntry::new(button);
+        let entry = recommendation_entry::RecommendationEntry::new(button, label);
         if animate {
             entry
                 .with_animation(
@@ -4741,7 +4750,7 @@ pub fn run(data: PathBuf, smoke: Option<PathBuf>) -> Result<()> {
             let window_size = bounds.size;
             let options = WindowOptions {
                 titlebar: Some(TitlebarOptions {
-                    title: Some("RTX 帧生成管理器".into()),
+                    title: Some("RTX-FG-Manager".into()),
                     appears_transparent: true,
                     ..Default::default()
                 }),

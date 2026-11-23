@@ -381,6 +381,8 @@ impl DirectWriteState {
             let res = maybe!({
                 let font_face_ref = unsafe { font.GetFontFaceReference(index).log_err()? };
                 let font_face = unsafe { font_face_ref.CreateFontFace().log_err()? };
+                let font_face =
+                    crate::fast::synthetic_italic::face(&font_face_ref, font_face, style);
                 let direct_write_features =
                     unsafe { Self::generate_font_features(factory, features).log_err()? };
                 let fallbacks = fallbacks.as_ref().and_then(|fallbacks| {
@@ -1603,7 +1605,7 @@ fn font_face_to_font(font_face: &IDWriteFontFace3, locale: &HSTRING) -> Option<F
     let localized_family_name = unsafe { font_face.GetFamilyNames().log_err() }?;
     let family_name = get_name(localized_family_name, locale).log_err()?;
     let weight = unsafe { font_face.GetWeight() };
-    let style = unsafe { font_face.GetStyle() };
+    let style = crate::fast::synthetic_italic::style_of(font_face);
     Some(Font {
         family: family_name.into(),
         features: FontFeatures::default(),

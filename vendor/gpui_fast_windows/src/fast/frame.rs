@@ -15,18 +15,17 @@
 use std::slice;
 
 use anyhow::{Context as _, Result};
-use gpui::{Path, PrimitiveBatch, ScaledPixels, Scene};
+use gpui::{PaintedPath, PrimitiveBatch, Scene};
 use windows::Win32::Graphics::{
-    Direct3D::{D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP},
+    Direct3D::D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
     Direct3D11::{
-        ID3D11Buffer, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView,
-        ID3D11SamplerState, ID3D11ShaderResourceView, ID3D11Texture2D,
+        D3D11_VIEWPORT, ID3D11Buffer, ID3D11Device, ID3D11DeviceContext, ID3D11SamplerState,
+        ID3D11ShaderResourceView,
     },
 };
 
 use crate::directx_renderer::{
-    DirectXGlobalElements, DirectXRenderPipelines, DirectXResources, PathRasterizationSprite,
-    PathSprite, PipelineState, RENDER_TARGET_FORMAT,
+    DirectXGlobalElements, DirectXRenderPipelines, GlobalParams, PipelineState,
 };
 use crate::fast::draw_state::DrawState;
 use crate::fast::globals::UploadedGlobals;
@@ -38,11 +37,42 @@ use crate::{DirectXAtlas, DirectXRenderer};
 pub(crate) struct FrameState {
     pub(crate) globals: UploadedGlobals,
     pub(crate) state: DrawState,
-    path_vertices: Vec<PathRasterizationSprite>,
-    path_sprites: Vec<PathSprite>,
+    /// The frame's path tiles, curves and paints, kept from frame to frame.
+    path_tiles: Vec<gpui::PathTile>,
+    path_curves: Vec<gpui::PathCurve>,
+    path_paints: Vec<gpui::PathPaint>,
+    /// The depth the scene being drawn gives a rounded clip group's content
+    /// (`None` where it is drawn without a depth buffer).
+    pub(crate) group_depth: Option<f32>,
     /// The scroll layer tiles the frames composite.
     pub(crate) layers: TileCache,
     pub(crate) rounded_masks: crate::fast::rounded_clip::Masks,
+    /// Set where overdraw culling is not wanted (`fast::occlusion::wanted`).
+    pub(crate) skip_occlusion: bool,
+}
+
+impl FrameState {
+    /// The state of a renderer on `adapter`: culling on a software adapter
+    /// only, and the atlas recording opaque tiles only there too.
+    pub(crate) fn for_adapter(
+        atlas: &DirectXAtlas,
+        adapter: &windows::Win32::Graphics::Dxgi::IDXGIAdapter1,
+    ) -> FrameState {
+        let mut state = FrameState::default();
+        FrameState::adapter_changed(&mut state, atlas, adapter);
+        state
+    }
+
+    /// Follows a new adapter (after a lost device).
+    pub(crate) fn adapter_changed(
+        &mut self,
+        atlas: &DirectXAtlas,
+        adapter: &windows::Win32::Graphics::Dxgi::IDXGIAdapter1,
+    ) {
+        let cull = crate::fast::occlusion::wanted(adapter);
+        self.skip_occlusion = !cull;
+        atlas.track_opaque_tiles(cull);
+    }
 }
 
 /// The Direct3D objects a scene is drawn with.
@@ -51,33 +81,11 @@ pub(crate) struct Target<'a> {
     pub(crate) device_context: &'a ID3D11DeviceContext,
     pub(crate) atlas: &'a DirectXAtlas,
     pub(crate) globals: &'a DirectXGlobalElements,
-    /// What the frame's paths are drawn through; `None` for targets that
-    /// never draw paths.
-    pub(crate) paths: Option<PathTargets<'a>>,
-}
-
-/// The render target a frame's paths are drawn into and upstream's path
-/// intermediate textures they are rasterized through: the window's, from its
-/// [`DirectXResources`], or ones the layer pixel tests make for their target.
-#[derive(Clone, Copy)]
-pub(crate) struct PathTargets<'a> {
-    pub(crate) render_target_view: &'a Option<ID3D11RenderTargetView>,
-    pub(crate) intermediate_texture: &'a ID3D11Texture2D,
-    pub(crate) intermediate_srv: &'a Option<ID3D11ShaderResourceView>,
-    pub(crate) msaa_texture: &'a ID3D11Texture2D,
-    pub(crate) msaa_view: &'a Option<ID3D11RenderTargetView>,
-}
-
-impl<'a> PathTargets<'a> {
-    pub(crate) fn of(resources: &'a DirectXResources) -> Self {
-        PathTargets {
-            render_target_view: &resources.render_target_view,
-            intermediate_texture: &resources.path_intermediate_texture,
-            intermediate_srv: &resources.path_intermediate_srv,
-            msaa_texture: &resources.path_intermediate_msaa_texture,
-            msaa_view: &resources.path_intermediate_msaa_view,
-        }
-    }
+    /// The quad depth scale of a scene drawn with the depth buffer and the
+    /// opaque pre-pass, as `DirectXRenderer::render`; `None` for targets
+    /// drawn without a depth buffer (layer tiles), whose quad pass draws
+    /// opaque rectangles too.
+    pub(crate) depth_scale: Option<f32>,
 }
 
 /// Draws `scene`'s batches in place of `DirectXRenderer::render`'s loop, once
@@ -94,13 +102,12 @@ pub(crate) fn draw_batches(renderer: &mut DirectXRenderer, scene: &Scene) -> Res
     if capturing && scene.layers.frames.is_empty() {
         return Ok(false);
     }
-    let resources = renderer.resources.as_ref().context("resources missing")?;
     let target = Target {
         device: &devices.device,
         device_context: &devices.device_context,
         atlas: &renderer.atlas,
         globals: &renderer.globals,
-        paths: Some(PathTargets::of(resources)),
+        depth_scale: Some(gpui::quad_depth_scale(scene.quads.len())),
     };
     draw_scene(
         &target,
@@ -146,6 +153,45 @@ pub(crate) fn upload(
     Ok(())
 }
 
+/// Uploads `scene`'s path tiles, curves and paints, as
+/// `DirectXRenderer::upload_scene_buffers` does, into buffers `frame` keeps.
+pub(crate) fn upload_paths(
+    target: &Target<'_>,
+    pipelines: &mut DirectXRenderPipelines,
+    frame: &mut FrameState,
+    scene: &Scene,
+) -> Result<()> {
+    if scene.paths.is_empty() {
+        return Ok(());
+    }
+    let (device, context) = (target.device, target.device_context);
+    let (tiles, curves, paints) = (
+        &mut frame.path_tiles,
+        &mut frame.path_curves,
+        &mut frame.path_paints,
+    );
+    tiles.clear();
+    curves.clear();
+    paints.clear();
+    for path in &scene.paths {
+        path.append_to(paints, curves, tiles);
+    }
+    pipelines
+        .path_tile_pipeline
+        .update_buffer(device, context, tiles)?;
+    pipelines.path_curves.write(device, context, curves)?;
+    pipelines.path_paints.write(device, context, paints)?;
+    let buffers = [
+        pipelines.path_curves.view.clone(),
+        pipelines.path_paints.view.clone(),
+    ];
+    unsafe {
+        context.VSSetShaderResources(2, Some(&buffers));
+        context.PSSetShaderResources(2, Some(&buffers));
+    }
+    Ok(())
+}
+
 /// Draws `scene`'s batches, whose instances are uploaded, into the render
 /// target bound on the device context.
 pub(crate) fn draw_scene(
@@ -174,8 +220,52 @@ pub(crate) fn draw_scene_masked(
     let device_context = target.device_context;
     frame.state.forget();
     let mut restore_upload = false;
+    // Primitives a later opaque rectangle hides are not drawn (none under
+    // a mask, whose antialiased edge would show them).
+    let occlusion = if mask.is_none() && !frame.skip_occlusion {
+        crate::fast::occlusion::Occlusion::of(scene, |sprite| target.atlas.is_opaque(&sprite.tile))
+    } else {
+        crate::fast::occlusion::Occlusion::default()
+    };
+    // `DirectXRenderer::upload_scene_buffers` uploaded the frame's own.
+    if target.depth_scale.is_none() {
+        upload_paths(target, pipelines, frame, scene)?;
+    }
+    // As `DirectXRenderer::render`: opaque rectangles first, writing depth,
+    // then each batch at the depth of the quads before it.
+    let viewport = depth_viewport(target)?;
+    if let (Some(depth_scale), Some(viewport)) = (target.depth_scale, viewport)
+        && !scene.quads.is_empty()
+    {
+        set_depth_range(device_context, &viewport, 0.0, 1.0);
+        pipelines.opaque_quad_pipeline.draw(
+            device_context,
+            &pipelines.quad_pipeline,
+            batch_params,
+            scene.quads.len() as u32,
+        )?;
+        let _ = depth_scale;
+    }
+    // The opaque pass wrote the batch start behind the draw state's back.
+    frame.state.forget();
+    let mut quad_cursor: u32 = 0;
+    let mut path_tile_cursor = 0;
 
     for batch in scene.batches() {
+        if let (Some(depth_scale), Some(viewport)) = (target.depth_scale, viewport.as_ref()) {
+            if matches!(&batch, PrimitiveBatch::Quads(_)) {
+                set_depth_range(device_context, viewport, 0.0, 1.0);
+            } else {
+                let depth = gpui::quad_depth(quad_cursor, depth_scale);
+                set_depth_range(device_context, viewport, depth, depth);
+            }
+            frame.group_depth = Some(gpui::quad_depth(quad_cursor, depth_scale));
+        } else {
+            frame.group_depth = None;
+        }
+        if let PrimitiveBatch::Quads(range) = &batch {
+            quad_cursor += range.len() as u32;
+        }
         if let PrimitiveBatch::PolychromeSprites {
             texture_id,
             ref range,
@@ -197,16 +287,15 @@ pub(crate) fn draw_scene_masked(
         }
         if restore_upload {
             upload(target, pipelines, scene)?;
+            upload_paths(target, pipelines, frame, scene)?;
+            if let (Some(depth_scale), Some(viewport)) = (target.depth_scale, viewport.as_ref()) {
+                let depth = gpui::quad_depth(quad_cursor, depth_scale);
+                set_depth_range(device_context, viewport, depth, depth);
+            }
             restore_upload = false;
         }
         crate::fast::rounded_clip::bind(target, &mut frame.rounded_masks, mask)?;
-        let FrameState {
-            state,
-            path_vertices,
-            path_sprites,
-            layers,
-            ..
-        } = frame;
+        let FrameState { state, layers, .. } = frame;
         let mut draw = Draw {
             device_context,
             state,
@@ -214,40 +303,44 @@ pub(crate) fn draw_scene_masked(
             sampler: &target.globals.sampler,
         };
         match batch {
+            PrimitiveBatch::Shadows(range) if !occlusion.is_empty() => {
+                crate::fast::occlusion::visible_runs(range, |i| {
+                    occlusion.hides_shadow(&scene.shadows[i])
+                })
+                .into_iter()
+                .try_for_each(|run| {
+                    draw.instances(&pipelines.shadow_pipeline, run.start, run.len(), None)
+                })
+            }
             PrimitiveBatch::Shadows(range) => {
                 draw.instances(&pipelines.shadow_pipeline, range.start, range.len(), None)
+            }
+            PrimitiveBatch::Quads(range) if !occlusion.is_empty() => {
+                // Hidden quads are skipped; the depth buffer culls what a
+                // partly covered one has under later opaque rectangles.
+                crate::fast::occlusion::visible_runs(range, |i| {
+                    occlusion.hides_quad(&scene.quads[i])
+                })
+                .into_iter()
+                .try_for_each(|run| {
+                    draw.instances(&pipelines.quad_pipeline, run.start, run.len(), None)
+                })
             }
             PrimitiveBatch::Quads(range) => {
                 draw.instances(&pipelines.quad_pipeline, range.start, range.len(), None)
             }
             PrimitiveBatch::Paths(range) => {
-                let paths = &scene.paths[range];
-                if paths.is_empty() {
-                    continue;
-                }
-                let Some(targets) = &target.paths else {
-                    // Layer tiles never hold paths (spec §5.6).
-                    debug_assert!(false, "paths drawn into a target without path textures");
-                    continue;
-                };
-                rasterize_paths(
-                    &mut draw,
-                    target.device,
-                    targets,
-                    &mut pipelines.path_rasterization_pipeline,
-                    path_vertices,
-                    paths,
+                let tiles_start = path_tile_cursor;
+                path_tile_cursor += scene.paths[range]
+                    .iter()
+                    .map(PaintedPath::tile_count)
+                    .sum::<usize>();
+                draw.instances(
+                    &pipelines.path_tile_pipeline,
+                    tiles_start,
+                    path_tile_cursor - tiles_start,
+                    None,
                 )
-                .and_then(|()| {
-                    composite_paths(
-                        &mut draw,
-                        target.device,
-                        targets,
-                        &mut pipelines.path_sprite_pipeline,
-                        path_sprites,
-                        paths,
-                    )
-                })
             }
             PrimitiveBatch::Underlines(range) => draw.instances(
                 &pipelines.underline_pipeline,
@@ -261,7 +354,22 @@ pub(crate) fn draw_scene_masked(
                     continue;
                 };
                 let pipeline = &pipelines.mono_sprites;
-                draw.instances(pipeline, range.start, range.len(), Some(&view))
+                if occlusion.is_empty() {
+                    draw.instances(pipeline, range.start, range.len(), Some(&view))
+                } else {
+                    let sprites = &scene.monochrome_sprites;
+                    crate::fast::occlusion::visible_runs(range, |i| {
+                        let s = &sprites[i];
+                        occlusion.hides_glyph(
+                            s.order,
+                            &s.bounds,
+                            &s.content_mask,
+                            &s.transformation,
+                        )
+                    })
+                    .into_iter()
+                    .try_for_each(|run| draw.instances(pipeline, run.start, run.len(), Some(&view)))
+                }
             }
             PrimitiveBatch::SubpixelSprites { texture_id, range } => {
                 // The atlas has released the texture; upstream skips the batch.
@@ -269,7 +377,22 @@ pub(crate) fn draw_scene_masked(
                     continue;
                 };
                 let pipeline = &pipelines.subpixel_sprites;
-                draw.instances(pipeline, range.start, range.len(), Some(&view))
+                if occlusion.is_empty() {
+                    draw.instances(pipeline, range.start, range.len(), Some(&view))
+                } else {
+                    let sprites = &scene.subpixel_sprites;
+                    crate::fast::occlusion::visible_runs(range, |i| {
+                        let s = &sprites[i];
+                        occlusion.hides_glyph(
+                            s.order,
+                            &s.bounds,
+                            &s.content_mask,
+                            &s.transformation,
+                        )
+                    })
+                    .into_iter()
+                    .try_for_each(|run| draw.instances(pipeline, run.start, run.len(), Some(&view)))
+                }
             }
             PrimitiveBatch::PolychromeSprites { texture_id, range }
                 if composite::is_layer_texture(texture_id) =>
@@ -294,12 +417,26 @@ pub(crate) fn draw_scene_masked(
                     continue;
                 };
                 let pipeline = &pipelines.poly_sprites;
-                draw.instances(pipeline, range.start, range.len(), Some(&view))
+                if occlusion.is_empty() {
+                    draw.instances(pipeline, range.start, range.len(), Some(&view))
+                } else {
+                    crate::fast::occlusion::visible_runs(range, |i| {
+                        occlusion.hides_sprite(&scene.polychrome_sprites[i])
+                    })
+                    .into_iter()
+                    .try_for_each(|run| draw.instances(pipeline, run.start, run.len(), Some(&view)))
+                }
             }
             // Upstream draws nothing for surfaces on Windows either.
             PrimitiveBatch::Surfaces(_) => Ok(()),
+            // Native views are only composited on macOS.
+            PrimitiveBatch::NativeViews(_) => Ok(()),
         }
         .with_context(|| scene_too_large(scene))?;
+    }
+    frame.group_depth = None;
+    if let Some(viewport) = viewport {
+        set_depth_range(device_context, &viewport, 0.0, 1.0);
     }
     Ok(())
 }
@@ -326,9 +463,9 @@ impl Draw<'_> {
             return Ok(());
         }
         anyhow::ensure!(
-            first_instance + instance_count <= pipeline.buffer_size,
+            first_instance + instance_count <= pipeline.instances.capacity,
             "DirectX instance range exceeds the {} buffer",
-            pipeline.label
+            pipeline.instances.label
         );
         let context = self.device_context;
         self.state
@@ -343,87 +480,51 @@ impl Draw<'_> {
     }
 }
 
-/// Upstream's `DirectXRenderer::draw_paths_to_intermediate`.
-fn rasterize_paths(
-    draw: &mut Draw<'_>,
-    device: &ID3D11Device,
-    targets: &PathTargets<'_>,
-    pipeline: &mut PipelineState<PathRasterizationSprite>,
-    vertices: &mut Vec<PathRasterizationSprite>,
-    paths: &[Path<ScaledPixels>],
-) -> Result<()> {
-    let context = draw.device_context;
+/// The viewport bound for a scene drawn with the depth buffer, whose depth
+/// range each batch narrows; `None` for scenes drawn without one.
+fn depth_viewport(target: &Target<'_>) -> Result<Option<D3D11_VIEWPORT>> {
+    if target.depth_scale.is_none() {
+        return Ok(None);
+    }
+    let mut count = 1;
+    let mut viewport = [D3D11_VIEWPORT::default()];
     unsafe {
-        context.ClearRenderTargetView(targets.msaa_view.as_ref().unwrap(), &[0.0; 4]);
-        context.OMSetRenderTargets(Some(slice::from_ref(targets.msaa_view)), None);
-    }
-    draw.state.forget_views();
-
-    vertices.clear();
-    for path in paths {
-        let bounds = path.clipped_bounds();
-        vertices.extend(path.vertices.iter().map(|v| PathRasterizationSprite {
-            xy_position: v.xy_position,
-            st_position: v.st_position,
-            color: path.color,
-            bounds,
-        }));
-    }
-    pipeline.update_buffer(device, context, vertices)?;
-    draw.state
-        .set_pipeline(context, pipeline, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    unsafe {
-        context.DrawInstanced(vertices.len() as u32, 1, 0, 0);
-        context.ResolveSubresource(
-            targets.intermediate_texture,
-            0,
-            targets.msaa_texture,
-            0,
-            RENDER_TARGET_FORMAT,
-        );
-        context.OMSetRenderTargets(Some(slice::from_ref(targets.render_target_view)), None);
-    }
-    draw.state.forget_views();
-    Ok(())
+        target
+            .device_context
+            .RSGetViewports(&mut count, Some(viewport.as_mut_ptr()))
+    };
+    anyhow::ensure!(count == 1, "no viewport bound");
+    Ok(Some(viewport[0]))
 }
 
-/// Upstream's `DirectXRenderer::draw_paths_from_intermediate`.
-fn composite_paths(
-    draw: &mut Draw<'_>,
-    device: &ID3D11Device,
-    targets: &PathTargets<'_>,
-    pipeline: &mut PipelineState<PathSprite>,
-    sprites: &mut Vec<PathSprite>,
-    paths: &[Path<ScaledPixels>],
-) -> Result<()> {
-    let (Some(first_path), Some(last_path)) = (paths.first(), paths.last()) else {
-        return Ok(());
+/// Upstream's `DirectXRenderer::set_viewport_depth_range`.
+fn set_depth_range(
+    context: &ID3D11DeviceContext,
+    viewport: &D3D11_VIEWPORT,
+    minimum_depth: f32,
+    maximum_depth: f32,
+) {
+    let viewport = D3D11_VIEWPORT {
+        MinDepth: minimum_depth,
+        MaxDepth: maximum_depth,
+        ..*viewport
     };
+    unsafe { context.RSSetViewports(Some(slice::from_ref(&viewport))) };
+}
 
-    // Each pixel must be copied only once, in case of transparent paths.
-    // Paths of one draw order are disjoint and copied one by one; a batch
-    // mixing draw orders is copied as one rect spanning all of them.
-    sprites.clear();
-    if last_path.order == first_path.order {
-        sprites.extend(paths.iter().map(|path| PathSprite {
-            bounds: path.clipped_bounds(),
-        }));
-    } else {
-        let mut bounds = first_path.clipped_bounds();
-        for path in &paths[1..] {
-            bounds = bounds.union(&path.clipped_bounds());
-        }
-        sprites.push(PathSprite { bounds });
+/// The globals a scene's draws read: the frame's, with `depth_scale`, and
+/// whether its quad pass draws opaque rectangles (`global_pad.x`).
+pub(crate) fn scene_globals(viewport: &D3D11_VIEWPORT, draws_opaque: bool) -> GlobalParams {
+    let font_info = crate::DirectXRenderer::get_font_info();
+    GlobalParams {
+        gamma_ratios: font_info.gamma_ratios,
+        viewport_size: [viewport.Width, viewport.Height],
+        grayscale_enhanced_contrast: font_info.grayscale_enhanced_contrast,
+        subpixel_enhanced_contrast: font_info.subpixel_enhanced_contrast,
+        is_bgr: font_info.is_bgr as u32,
+        depth_scale: 0.0,
+        _pad: [draws_opaque as u32, 0],
     }
-
-    let context = draw.device_context;
-    pipeline.update_buffer(device, context, sprites)?;
-    draw.state
-        .set_pipeline(context, pipeline, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-    draw.state
-        .set_texture(context, targets.intermediate_srv, draw.sampler);
-    unsafe { context.DrawInstanced(4, sprites.len() as u32, 0, 0) };
-    Ok(())
 }
 
 fn scene_too_large(scene: &Scene) -> String {

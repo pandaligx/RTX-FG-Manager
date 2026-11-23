@@ -13,17 +13,13 @@ use windows::{
     Win32::Graphics::Direct3D11::{
         D3D11_BIND_CONSTANT_BUFFER, D3D11_BIND_SHADER_RESOURCE, D3D11_BUFFER_DESC,
         D3D11_SUBRESOURCE_DATA, D3D11_TEXTURE2D_DESC, D3D11_USAGE_IMMUTABLE, ID3D11Buffer,
-        ID3D11Device, ID3D11RenderTargetView, ID3D11ShaderResourceView, ID3D11Texture2D,
+        ID3D11Device, ID3D11ShaderResourceView,
     },
     Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_R32G32B32A32_FLOAT, DXGI_SAMPLE_DESC},
-    core::Interface as _,
 };
 
-use crate::directx_renderer::{
-    DirectXRenderPipelines, create_path_intermediate_msaa_texture_and_view,
-    create_path_intermediate_texture,
-};
-use crate::fast::frame::{FrameState, PathTargets, Target, draw_scene_masked, upload};
+use crate::directx_renderer::DirectXRenderPipelines;
+use crate::fast::frame::{FrameState, Target, draw_scene_masked, upload};
 
 #[cfg(debug_assertions)]
 pub(crate) fn shader_path(original: PathBuf, out_dir: &str) -> PathBuf {
@@ -54,7 +50,6 @@ pub(crate) struct Masks {
     device: Option<ID3D11Device>,
     flags: Option<ID3D11Buffer>,
     clips: Vec<Clip>,
-    paths: Vec<PathSlot>,
 }
 
 #[repr(C)]
@@ -63,20 +58,6 @@ struct Clip {
     bounds: [f32; 4],
     horizontal: [f32; 4],
     vertical: [f32; 4],
-}
-
-struct PathSlot {
-    size: (u32, u32),
-    used: bool,
-    image: PathImage,
-}
-
-#[derive(Clone)]
-struct PathImage {
-    intermediate: ID3D11Texture2D,
-    view: Option<ID3D11ShaderResourceView>,
-    msaa: ID3D11Texture2D,
-    msaa_target: Option<ID3D11RenderTargetView>,
 }
 
 impl Masks {
@@ -123,36 +104,10 @@ impl Masks {
         }
         Ok(view)
     }
-
-    fn paths(&mut self, device: &ID3D11Device, size: (u32, u32)) -> Result<PathImage> {
-        if let Some(slot) = self.paths.iter_mut().find(|slot| slot.size == size) {
-            slot.used = true;
-            return Ok(slot.image.clone());
-        }
-        let (intermediate, view) = create_path_intermediate_texture(device, size.0, size.1)?;
-        let (msaa, msaa_target) =
-            create_path_intermediate_msaa_texture_and_view(device, size.0, size.1)?;
-        let image = PathImage {
-            intermediate,
-            view,
-            msaa,
-            msaa_target,
-        };
-        self.paths.push(PathSlot {
-            size,
-            used: true,
-            image: image.clone(),
-        });
-        Ok(image)
-    }
 }
 
 pub(crate) fn begin_frame(masks: &mut Masks) {
     masks.clips.clear();
-    masks.paths.retain(|slot| slot.used);
-    for slot in &mut masks.paths {
-        slot.used = false;
-    }
 }
 
 pub(crate) fn bind(
@@ -227,49 +182,88 @@ pub(crate) fn draw_group(
     let result = (|| {
         let view = frame.rounded_masks.clip_view(target.device)?;
         let context = target.device_context;
-        let mut parent = [None];
-        unsafe {
-            context.OMGetRenderTargets(Some(&mut parent), None);
-        }
-        let render_target = parent[0].clone().context("rounded clip render target")?;
-        let resource = unsafe { render_target.GetResource()? };
-        let texture: ID3D11Texture2D = resource.cast()?;
-        let mut desc = D3D11_TEXTURE2D_DESC::default();
-        unsafe {
-            texture.GetDesc(&mut desc);
-        }
-        let size = (desc.Width, desc.Height);
-        let fallback = if target.paths.is_none() {
-            Some(frame.rounded_masks.paths(target.device, size)?)
-        } else {
-            None
-        };
-        let parent_view = Some(render_target);
-        let paths = target.paths.unwrap_or_else(|| {
-            let image = fallback.as_ref().unwrap();
-            PathTargets {
-                render_target_view: &parent_view,
-                intermediate_texture: &image.intermediate,
-                intermediate_srv: &image.view,
-                msaa_texture: &image.msaa,
-                msaa_view: &image.msaa_target,
-            }
-        });
         let content_target = Target {
             device: target.device,
             device_context: context,
             atlas: target.atlas,
             globals: target.globals,
-            paths: Some(PathTargets {
-                render_target_view: &parent_view,
-                ..paths
-            }),
+            // The content is drawn at the group's depth, no pre-pass.
+            depth_scale: None,
         };
+        // Under the parent's depth buffer, the content is drawn at the
+        // group's depth with its quad pass drawing opaque rectangles (no
+        // opaque pre-pass: it could not be masked); its globals say so.
+        let depth = frame.group_depth;
+        let viewport = group_globals(target, frame, depth, true)?;
         upload(&content_target, pipelines, child)?;
-        draw_scene_masked(&content_target, pipelines, frame, child, view.as_ref())
+        let drawn = draw_scene_masked(&content_target, pipelines, frame, child, view.as_ref());
+        if let Some(viewport) = viewport {
+            restore_globals(target, frame, &viewport)?;
+        }
+        drawn
     })();
     frame.rounded_masks.clips.pop();
     bind(target, &mut frame.rounded_masks, parent_mask)?;
     frame.state.forget();
     result
+}
+
+/// Writes the frame globals for a group's content drawn under a depth buffer
+/// at `depth`: its quad pass draws opaque rectangles. Returns the parent's
+/// viewport to restore; `None` (nothing written) without a depth buffer,
+/// where the globals already say so (layer tiles).
+fn group_globals(
+    target: &Target<'_>,
+    frame: &crate::fast::frame::FrameState,
+    depth: Option<f32>,
+    draws_opaque: bool,
+) -> Result<Option<windows::Win32::Graphics::Direct3D11::D3D11_VIEWPORT>> {
+    let Some(depth) = depth else {
+        return Ok(None);
+    };
+    let context = target.device_context;
+    let mut count = 1;
+    let mut viewport = [windows::Win32::Graphics::Direct3D11::D3D11_VIEWPORT::default()];
+    unsafe { context.RSGetViewports(&mut count, Some(viewport.as_mut_ptr())) };
+    let viewport = viewport[0];
+    let buffer = target
+        .globals
+        .global_params_buffer
+        .as_ref()
+        .context("global params buffer missing")?;
+    crate::fast::globals::write_globals(
+        frame,
+        context,
+        buffer,
+        &[crate::fast::frame::scene_globals(&viewport, draws_opaque)],
+    )?;
+    let at_depth = windows::Win32::Graphics::Direct3D11::D3D11_VIEWPORT {
+        MinDepth: depth,
+        MaxDepth: depth,
+        ..viewport
+    };
+    unsafe { context.RSSetViewports(Some(slice::from_ref(&at_depth))) };
+    Ok(Some(viewport))
+}
+
+/// Restores the frame globals and viewport [`group_globals`] replaced.
+fn restore_globals(
+    target: &Target<'_>,
+    frame: &crate::fast::frame::FrameState,
+    viewport: &windows::Win32::Graphics::Direct3D11::D3D11_VIEWPORT,
+) -> Result<()> {
+    let buffer = target
+        .globals
+        .global_params_buffer
+        .as_ref()
+        .context("global params buffer missing")?;
+    let mut params = crate::fast::frame::scene_globals(viewport, false);
+    params.depth_scale = target.depth_scale.unwrap_or(0.0);
+    crate::fast::globals::write_globals(frame, target.device_context, buffer, &[params])?;
+    unsafe {
+        target
+            .device_context
+            .RSSetViewports(Some(slice::from_ref(viewport)))
+    };
+    Ok(())
 }

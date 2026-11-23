@@ -16,32 +16,27 @@ pub(crate) fn nvidia_brand() -> gpui::Hsla {
 /// Product accent tokens for the optional community light border. Separate from
 /// status/chart colors: the stock chart palette is monochrome blue. Luminance
 /// follows the surface mode so the thin decorative edge works in both themes.
-pub(crate) fn recommendation_accents(theme: &Theme) -> [gpui::Hsla; 5] {
-    let lightness = if theme.mode.is_dark() { 0.65 } else { 0.43 };
-    [0.52, 0.70, 0.90, 0.10, 0.40].map(|hue| gpui::hsla(hue, 0.64, lightness, 1.))
+pub(crate) fn recommendation_accents(theme: &Theme) -> [gpui::Hsla; 7] {
+    let stops = if theme.mode.is_dark() {
+        [
+            0x39e8fa, 0x5476ff, 0xad61ff, 0xff4cad, 0xff784c, 0xffcb42, 0x49eca6,
+        ]
+    } else {
+        [
+            0x007ea7, 0x3456d7, 0x823acd, 0xc42887, 0xc74c24, 0xae7608, 0x00875e,
+        ]
+    };
+    stops.map(|rgb| gpui::rgb(rgb).into())
 }
 
-pub(crate) fn flowing_accent(palette: &[gpui::Hsla; 5], phase: f32) -> gpui::Hsla {
+pub(crate) fn flowing_accent(palette: &[gpui::Hsla; 7], phase: f32) -> gpui::Hsla {
     use gpui::component::Colorize;
     let position = phase.rem_euclid(1.) * palette.len() as f32;
     let index = position.floor() as usize % palette.len();
     let t = position.fract();
-    // Periodic cubic B-spline: position, velocity and acceleration match at every
-    // color join. Unlike per-segment easing, the ribbon never pauses on a color.
-    let weights = [
-        (1. - t).powi(3) / 6.,
-        (3. * t.powi(3) - 6. * t * t + 4.) / 6.,
-        (-3. * t.powi(3) + 3. * t * t + 3. * t + 1.) / 6.,
-        t.powi(3) / 6.,
-    ];
-    let mut color = palette[(index + palette.len() - 1) % palette.len()];
-    let mut total = weights[0];
-    for (offset, weight) in weights.into_iter().enumerate().skip(1) {
-        let next = total + weight;
-        color = color.mix_oklab(palette[(index + offset - 1) % palette.len()], total / next);
-        total = next;
-    }
-    color
+    // Visit each saturated stop exactly, including the seam back to cyan.
+    let blend = t * t * (3. - 2. * t);
+    palette[(index + 1) % palette.len()].mix_oklab(palette[index], blend)
 }
 
 /// A preview is an ephemeral choice; only an explicit confirmation persists it.
@@ -289,8 +284,8 @@ mod tests {
     #[test]
     fn flowing_border_has_no_color_jump_at_any_seam() {
         let palette = recommendation_accents(&Theme::default());
-        for step in 0..=5 {
-            let phase = step as f32 / 5.;
+        for step in 0..=palette.len() {
+            let phase = step as f32 / palette.len() as f32;
             let left = flowing_accent(&palette, phase - 0.00001).to_rgb();
             let right = flowing_accent(&palette, phase + 0.00001).to_rgb();
             assert!((left.r - right.r).abs() < 0.001);

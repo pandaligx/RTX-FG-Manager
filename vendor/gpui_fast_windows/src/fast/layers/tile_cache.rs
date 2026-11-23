@@ -355,7 +355,10 @@ pub(crate) fn global_params(width: u32, height: u32) -> GlobalParams {
         grayscale_enhanced_contrast: font_info.grayscale_enhanced_contrast,
         subpixel_enhanced_contrast: font_info.subpixel_enhanced_contrast,
         is_bgr: font_info.is_bgr as u32,
-        _pad: [0; 3],
+        // Tiles are drawn without a depth buffer or the opaque pre-pass:
+        // their quad pass draws opaque rectangles too.
+        depth_scale: 0.0,
+        _pad: [1, 0],
     }
 }
 

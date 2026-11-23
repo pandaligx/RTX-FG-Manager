@@ -555,16 +555,17 @@ impl WindowsWindow {
             draw_coordinator,
             parent_hwnd,
         };
+        let fast_rect = crate::fast::initial_placement::create_rect(display, params.bounds);
         let creation_result = unsafe {
             CreateWindowExW(
                 dwexstyle,
                 WINDOW_CLASS_NAME,
                 &window_name,
                 dwstyle,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
+                fast_rect.0,
+                fast_rect.1,
+                fast_rect.2,
+                fast_rect.3,
                 parent_hwnd,
                 None,
                 Some(hinstance.into()),

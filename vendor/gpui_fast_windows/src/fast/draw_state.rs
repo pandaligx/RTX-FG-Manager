@@ -39,6 +39,7 @@ pub(crate) struct DrawState {
     sampler: Option<Option<ID3D11SamplerState>>,
     /// The batch constant buffer and the first instance written to it.
     batch_start: Option<(ID3D11Buffer, u32)>,
+    depth_stencil_state: Option<windows::Win32::Graphics::Direct3D11::ID3D11DepthStencilState>,
 }
 
 impl DrawState {
@@ -63,11 +64,11 @@ impl DrawState {
         topology: D3D_PRIMITIVE_TOPOLOGY,
     ) {
         unsafe {
-            if self.instances.as_ref() != Some(&pipeline.view) {
-                let view = std::slice::from_ref(&pipeline.view);
+            if self.instances.as_ref() != Some(&pipeline.instances.view) {
+                let view = std::slice::from_ref(&pipeline.instances.view);
                 device_context.VSSetShaderResources(1, Some(view));
                 device_context.PSSetShaderResources(1, Some(view));
-                self.instances = Some(pipeline.view.clone());
+                self.instances = Some(pipeline.instances.view.clone());
             }
             if self.topology != Some(topology) {
                 device_context.IASetPrimitiveTopology(topology);
@@ -84,6 +85,10 @@ impl DrawState {
             if self.blend_state.as_ref() != Some(&pipeline.blend_state) {
                 device_context.OMSetBlendState(&pipeline.blend_state, None, 0xFFFFFFFF);
                 self.blend_state = Some(pipeline.blend_state.clone());
+            }
+            if self.depth_stencil_state.as_ref() != Some(&pipeline.depth_stencil_state) {
+                device_context.OMSetDepthStencilState(&pipeline.depth_stencil_state, 0);
+                self.depth_stencil_state = Some(pipeline.depth_stencil_state.clone());
             }
         }
     }

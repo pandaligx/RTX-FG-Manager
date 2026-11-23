@@ -88,7 +88,9 @@ export function legacyNotes(notes) {
   return chars.length<=500 ? notes : chars.slice(0,500-[...suffix].length).join('')+suffix;
 }
 export function recipe(input) {
-  exact(input, ['schema','game','title','notes','scheme','patchVersion','entries','renderer','gpuModel','driver','gpuAlias','neuralRuntime','platform','edition','presets','runtimes','links']);
+  exact(input, ['schema','game','title','notes','scheme','patchVersion','entries','renderer','gpuModel','driver','gpuAlias','neuralRuntime','platform','edition','presets','runtimes','links','authorName']);
+  const authorName = input.authorName === undefined ? '' : text(input.authorName, 32, true);
+  need(!/[\p{Cc}\p{Zl}\p{Zp}]/u.test(authorName), 'invalid_text');
   const links = creatorLinks(input.links);
   need(input.schema === 1, 'unsupported_schema');
   exact(input.game, ['id','name']);
@@ -116,6 +118,7 @@ export function recipe(input) {
   }
   return { schema: 1, game, title: text(input.title, 80), notes: text(input.notes || '', NOTES_LIMIT, true),
     ...(Object.keys(links).length ? {links} : {}),
+    ...(authorName ? {authorName} : {}),
     ...(input.presets===undefined?{}:{presets:presetSnapshot(input.presets,input.scheme,input.patchVersion)}),
     ...(runtimes===undefined?{}:{runtimes}),
     ...(input.platform?{platform:input.platform}:{}),...(input.edition?{edition:text(input.edition,80)}:{}),
