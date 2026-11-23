@@ -1,6 +1,5 @@
-//! Driver profile compatibility for older custom Miles Morales patches.
-//! New patches read their own INI. Only a pre-existing owned driver setting
-//! needs to be restored when moving to them.
+//! Synchronize the committed preset with the Steam Miles Morales driver profile
+//! for patches that require it. The game's NGX path reads this count at launch.
 use crate::scanner::is_nixxes_reporter;
 use crate::{cloud, core, upstream040};
 use anyhow::{Context, Result, ensure};
@@ -26,7 +25,10 @@ pub fn is_game(path: &Path) -> bool {
 }
 fn needs_driver_profile(scheme: Option<&str>, version: Option<&str>) -> bool {
     scheme == Some(cloud::DELTA_041_SCHEME)
-        && matches!(version, Some("0.4.2" | crate::delta::SIX_X_VERSION))
+        && matches!(
+            version,
+            Some("0.4.2" | crate::delta::SIX_X_VERSION | crate::delta::MILES_R3)
+        )
 }
 
 #[derive(Serialize, Deserialize)]
@@ -162,6 +164,9 @@ fn change(
 }
 fn requested(ini: &[u8]) -> Result<Option<u32>> {
     let values = upstream040::read_041(ini)?;
+    if values.get("enabled").is_some_and(|value| value == "0") {
+        return Ok(None);
+    }
     let n: u32 = values
         .get("max_generated_frames")
         .map_or("3", String::as_str)

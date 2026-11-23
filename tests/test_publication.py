@@ -67,14 +67,20 @@ class SourceAllowlistTests(unittest.TestCase):
                 base = set(scheme['archives'])
                 current = base
                 declared = base.copy()
-                if release := scheme.get('release'):
+                baseline = version_tuple(scheme['min_manager_version'])
+                selected = baseline
+                seen = {baseline}
+                releases = ([scheme['release']] if 'release' in scheme else []) + scheme.get('releases', [])
+                for release in releases:
                     newer = set(release['archives'])
+                    minimum = version_tuple(release['min_manager_version'])
                     self.assertTrue(base and newer)
-                    self.assertGreater(version_tuple(release['min_manager_version']),
-                                       version_tuple(scheme['min_manager_version']))
+                    self.assertGreater(minimum, baseline)
+                    self.assertNotIn(minimum, seen)
+                    seen.add(minimum)
                     declared.update(newer)
-                    if version_tuple(version) >= version_tuple(release['min_manager_version']):
-                        current = newer
+                    if selected < minimum <= version_tuple(version):
+                        selected, current = minimum, newer
                 self.assertEqual(current, archives)
                 indexed = {p['archive'] for p in index['packages'] if p['scheme_id'] == scheme_id}
                 self.assertEqual(declared, indexed, 'Both current and fallback archives must be downloadable')
@@ -82,6 +88,8 @@ class SourceAllowlistTests(unittest.TestCase):
     def test_current_reviewed_export_is_accepted_by_the_source_mirror(self):
         files = current_source_export_files()
         for required in ('Cargo.toml', 'Cargo.lock', 'rust/src/ui_themes.rs',
+                         'app/assets/profile-bilibili.jpg', 'app/assets/profile-douyin.jpg',
+                         'app/assets/profile-heybox.jpg',
                          '.github/workflows/build-linux.yml', 'packaging/AppRun',
                          'packaging/build-appimage.sh', 'packaging/rtx-fg-manager.desktop',
                          'packaging/rtx-fg-manager.png',

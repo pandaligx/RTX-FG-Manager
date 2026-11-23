@@ -65,6 +65,7 @@ foreach ($name in @(
     'BUILDING.md', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'rust/build.rs',
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json', 'rust/ui-translations.json',
     'app/assets/cleanup-catalog.json', 'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',
+    'app/assets/profile-bilibili.jpg', 'app/assets/profile-douyin.jpg', 'app/assets/profile-heybox.jpg',
     'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/GPUI-FAST-LICENSE', 'rust/assets/licenses/LUCIDE-LICENSE',
     'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json',
     'tools/build-resources.json', 'tools/Get-VerifiedResources.ps1', 'tools/prepare-build.ps1', 'tools/build_scheme_bundles.py',
@@ -138,7 +139,7 @@ if (-not $ExcludeCloudMetadata) {
 foreach ($name in @('.github/workflows/mirror-gitee.yml', '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml')) { Add-File $name $false }
 foreach ($name in @('docs/brand-banner.svg', 'docs/brand-banner.png', 'docs/download-en.svg', 'docs/download-zh.svg', 'docs/download-linux-en.svg', 'docs/download-linux-zh.svg', 'docs/download-buttons-LICENSE.txt', 'docs/screenshot-home.png', 'docs/screenshot-home-zh.png')) { Add-File $name $false }
 
-$binaryExtensions = @('.png', '.ico')
+$binaryExtensions = @('.png', '.ico', '.jpg')
 $findings = [Collections.Generic.List[string]]::new()
 $rules = [ordered]@{
     'private-key material' = '-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'

@@ -66,8 +66,9 @@ struct Recommendations {
     editing: Option<rec::Card>,
     preview: Option<rec::Card>,
     preview_generation: u64,
-    runtime_plan:
-        Option<std::collections::BTreeMap<(String, String), recommendation_runtimes::RuntimeStep>>,
+    runtime_plan: Option<
+        std::collections::BTreeMap<(String, String), recommendation_runtimes::RuntimeChange>,
+    >,
     recheck_after_install: bool,
     selected_action: RecipeAction,
     selected_parts: [bool; 3],
@@ -76,6 +77,7 @@ struct Recommendations {
     title: Entity<InputState>,
     edition: Entity<InputState>,
     notes: Entity<TextareaState>,
+    link_fields: [Entity<InputState>; 4],
     gpu_input: Entity<InputState>,
     email: Entity<InputState>,
     email_domain: String,
@@ -120,6 +122,13 @@ impl Recommendations {
         })
         .detach();
         let title = input("", window, cx);
+        let link_fields = [
+            "https://v.douyin.com/…",
+            "https://b23.tv/…",
+            "https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=…",
+            "https://v.douyin.com/…  /  https://b23.tv/…",
+        ]
+        .map(|example| cx.new(|cx| InputState::new(window, cx).placeholder(example)));
         let edition = input("", window, cx);
         let notes = cx.new(|cx| TextareaState::new(window, cx).auto_grow(4, 8));
         cx.subscribe(&notes, |_, _, _: &InputEvent, cx| cx.notify())
@@ -208,6 +217,7 @@ impl Recommendations {
             title,
             edition,
             notes,
+            link_fields,
             gpu_input,
             email,
             email_domain: "qq.com".into(),
@@ -383,6 +393,7 @@ impl Recommendations {
                             .update(cx, |s, cx| s.set_value(draft.title.clone(), window, cx));
                     }
                     if !reload {
+                        self.fill_links(&draft.links, window, cx);
                         self.editing = None;
                         self.title
                             .update(cx, |s, cx| s.set_value(self.tr.t(&draft.title), window, cx));
@@ -615,7 +626,7 @@ impl Recommendations {
         let game = self.game.clone();
         cx.spawn(async move |this, cx| {
             let plan = smol::unblock(move || {
-                recommendation_runtimes::preview(&recipe, &game.deployment_targets())
+                recommendation_runtimes::preview_changes(&recipe, &game.deployment_targets())
             })
             .await;
             let _ = this.update(cx, |view, cx| {
@@ -696,12 +707,24 @@ impl Recommendations {
         let catalog = self.catalog.clone();
         let gpu = self.hardware_gpu.clone();
         let driver = self.driver.clone();
+        let client = self.client.clone();
         self.job(move || {
-            Ok(Update::Draft(
-                rec::installed_recipe(&game, id, &catalog, gpu, driver)?,
-                reload,
-            ))
+            let mut draft = rec::installed_recipe(&game, id, &catalog, gpu, driver)?;
+            if !reload && let Some(client) = client {
+                draft.links = client.profile_defaults();
+            }
+            Ok(Update::Draft(draft, reload))
         });
+    }
+    fn fill_links(&self, links: &rec::CreatorLinks, window: &mut Window, cx: &mut Context<Self>) {
+        for (field, value) in self.link_fields.iter().zip([
+            &links.douyin,
+            &links.bilibili,
+            &links.heybox,
+            &links.tutorial,
+        ]) {
+            field.update(cx, |s, cx| s.set_value(value.clone(), window, cx));
+        }
     }
     fn edit_share(&mut self, card: rec::Card, window: &mut Window, cx: &mut Context<Self>) {
         if self.busy || self.cached || !card.mine || !self.logged_in() {
@@ -710,6 +733,7 @@ impl Recommendations {
         self.title.update(cx, |s, cx| {
             s.set_value(card.content.display_title(), window, cx)
         });
+        self.fill_links(&card.content.links, window, cx);
         self.notes.update(cx, |s, cx| {
             s.set_value(card.content.notes.clone(), window, cx)
         });
@@ -1003,132 +1027,97 @@ impl Recommendations {
         compatible: bool,
         cx: &Context<Self>,
     ) -> Div {
-        let panel = div().v_flex().min_w_0().child(
-            div()
-                .pb_2()
-                .font_weight(FontWeight::MEDIUM)
-                .child(self.t("配套运行库")),
-        );
-        let components = recommendation_runtimes::displayed_components(recipe);
-        if components.is_empty() {
-            return panel.child(
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(self.t(if recipe.runtimes.is_some() {
-                        "未检测到可共享的运行库"
-                    } else {
-                        "此分享未提供运行库版本"
-                    })),
-            );
-        }
+        use recommendation_runtimes::RuntimeStep;
         let inspecting = self.mode == Mode::Preview;
-        let sources: Vec<_> = [
-            ("game", "游戏目录"),
-            ("patch", "补丁内置"),
-            ("managed", "管理器安装"),
-        ]
-        .into_iter()
-        .filter(|(key, _)| components.iter().any(|c| c.source == *key))
-        .collect();
-        let mut headings = vec!["组件"];
-        headings.extend(sources.iter().map(|(_, label)| *label));
-        if inspecting {
-            headings.push("本次操作");
+        let components = recommendation_runtimes::displayed_components(recipe);
+        let panel = div().v_flex().gap_1().min_w_0();
+        if components.is_empty() || (inspecting && !self.selected_parts[2]) {
+            return panel;
         }
+        let cell = |value: String| div().whitespace_normal().child(value).into_any_element();
         let mut rows = Vec::new();
         for (kind, group) in recommendation_runtimes::grouped(&components) {
-            let mut row = vec![
-                div()
-                    .child(self.t(recommendation_runtimes::label(kind)))
-                    .into_any_element(),
-            ];
-            let mut actions = div().v_flex().min_w_0().gap_1();
-            for &(source, label) in &sources {
-                let Some(c) = group.iter().find(|c| c.source == source) else {
-                    row.push(
+            let label = self.t(match kind {
+                "sr" => "DLSS 超分辨率",
+                "rr" => "DLSS 光线重建",
+                "fg" => "DLSS 帧生成",
+                "nr" => "DLSS 神经渲染",
+                _ => recommendation_runtimes::label(kind),
+            });
+            for component in group {
+                let wanted = component
+                    .package_version
+                    .clone()
+                    .unwrap_or_else(|| component.versions.join(" / "));
+                if !inspecting {
+                    let source = match component.source.as_str() {
+                        "patch" => "随补丁安装",
+                        "managed" => "管理器安装",
+                        _ => "游戏目录",
+                    };
+                    rows.push(vec![
+                        cell(label.clone()),
+                        cell(self.t(source)),
+                        cell(self.t(&wanted)),
+                    ]);
+                    continue;
+                }
+                if component.source == "patch" {
+                    continue;
+                }
+                let Some(plan) = self.runtime_plan.as_ref() else {
+                    return panel.child(
                         div()
+                            .text_xs()
                             .text_color(cx.theme().muted_foreground)
-                            .child("—")
-                            .into_any_element(),
+                            .child(self.t("正在检查本机…")),
                     );
+                };
+                let Some(change) = plan.get(&(component.kind.clone(), component.source.clone()))
+                else {
                     continue;
                 };
-                let versions = c
-                    .versions
-                    .iter()
-                    .map(|v| {
-                        if v == "unknown" {
-                            self.t("版本未知")
-                        } else {
-                            v.clone()
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" / ");
-                let cell = div()
-                    .v_flex()
-                    .min_w_0()
-                    .whitespace_normal()
-                    .child(versions)
-                    .when_some(c.package_version.as_ref(), |d, p| {
-                        d.child(
-                            div()
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(format!("SDK {p}")),
-                        )
-                    });
-                row.push(cell.into_any_element());
-                if inspecting {
-                    let outcome = if available.is_none() {
-                        "当前无法安装"
-                    } else {
-                        recommendation_runtimes::preview_action(
-                            source,
-                            self.selected_parts[0],
-                            self.selected_parts[2],
-                            compatible,
-                            self.runtime_plan.as_ref().and_then(|p| {
-                                p.get(&(kind.to_owned(), source.to_owned())).copied()
-                            }),
-                        )
-                    };
-                    let mut line = div().min_w_0().whitespace_normal();
-                    if group.len() > 1 {
-                        line = line.child(
-                            div()
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(self.t(label)),
-                        );
-                    }
-                    actions = actions.child(line.child(self.t(outcome)));
+                if change.step == RuntimeStep::Keep {
+                    continue;
                 }
+                let action = if available.is_none() || !compatible {
+                    "当前无法安装"
+                } else {
+                    change.step.label()
+                };
+                let local = if change.installed.is_empty() {
+                    self.t(if change.step == RuntimeStep::Install {
+                        "未安装"
+                    } else {
+                        "版本未知"
+                    })
+                } else {
+                    change
+                        .installed
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(" / ")
+                };
+                rows.push(vec![
+                    cell(label.clone()),
+                    cell(local),
+                    cell(self.t(&wanted)),
+                    cell(self.t(action)),
+                ]);
             }
-            if inspecting {
-                row.push(actions.into_any_element());
-            }
-            rows.push(row);
         }
-        let panel = panel.child(self.recipe_table("recipe-runtimes", &headings, rows, cx));
-        let action = RecipeAction::Selected {
-            patch: self.selected_parts[0],
-            parameters: false,
-            runtimes: self.selected_parts[2],
+        if rows.is_empty() {
+            return panel;
+        }
+        let (title, headers): (&str, &[&str]) = if inspecting {
+            ("运行库变更", &["组件", "本机版本", "方案版本", "本次操作"])
+        } else {
+            ("分享的运行库", &["组件", "来源", "版本"])
         };
-        panel.when(
-            inspecting && available.is_some_and(|v| recipe.completes_encore(v, action)),
-            |d| {
-                d.child(
-                    div()
-                        .pt_2()
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(self.t("Encore 基础运行库会按游戏需要补齐。")),
-                )
-            },
-        )
+        panel
+            .child(div().font_weight(FontWeight::MEDIUM).child(self.t(title)))
+            .child(self.recipe_table("recipe-runtimes", headers, rows, cx))
     }
     fn picker(
         &self,
@@ -1543,6 +1532,36 @@ impl Recommendations {
                 .min_w_0()
                 .child(Self::avatar(cx))
                 .child(title)
+                .children(
+                    [
+                        ("抖音", "app/profile-douyin.jpg", &card.content.links.douyin),
+                        (
+                            "哔哩哔哩",
+                            "app/profile-bilibili.jpg",
+                            &card.content.links.bilibili,
+                        ),
+                        (
+                            "小黑盒",
+                            "app/profile-heybox.jpg",
+                            &card.content.links.heybox,
+                        ),
+                    ]
+                    .into_iter()
+                    .filter(|(_, _, url)| !url.is_empty())
+                    .map(|(site, icon, url)| {
+                        let url = url.clone();
+                        let hint = self.t("访问博主主页");
+                        Button::new(SharedString::from(format!("profile-{}-{site}", card.id)))
+                            .ghost()
+                            .p_0()
+                            .w(rems(1.45))
+                            .h(rems(1.45))
+                            .child(gpui::img(icon).size(rems(1.15)).rounded_sm())
+                            .accessibility_label(format!("{site} {}", hint))
+                            .tooltip(hint)
+                            .on_click(move |_, _, cx| cx.open_url(&url))
+                    }),
+                )
                 .child(
                     div()
                         .text_xs()
@@ -1550,7 +1569,7 @@ impl Recommendations {
                         .flex_shrink_0()
                         .child(self.card_date(card)),
                 );
-            let mut actions = div().h_flex().gap_2().flex_wrap().child(
+            let mut view_actions = div().h_flex().items_center().gap_1().child(
                 self.button(
                     SharedString::from(format!("recipe-preview-{}", card.id)),
                     "查看完整信息",
@@ -1566,6 +1585,21 @@ impl Recommendations {
                     cx.notify();
                 })),
             );
+            if card.status != "hidden" && !card.content.links.tutorial.is_empty() {
+                let url = card.content.links.tutorial.clone();
+                let hint = self.t("看视频教程");
+                view_actions = view_actions.child(
+                    Button::new(SharedString::from(format!("recipe-tutorial-{}", card.id)))
+                        .small()
+                        .icon(gpui::assets::IconName::CirclePlay)
+                        .accessibility_label(hint.clone())
+                        .tooltip(hint)
+                        .focus_ring(crate::ui_focus::visible(cx))
+                        .disabled(self.busy)
+                        .on_click(move |_, _, cx| cx.open_url(&url)),
+                );
+            }
+            let mut actions = div().h_flex().gap_2().flex_wrap().child(view_actions);
             let mut feedback = div()
                 .h_flex()
                 .gap_1()
@@ -2441,7 +2475,7 @@ impl Recommendations {
                         )),
                 )
                 .into_any_element();
-            let fields = vec![
+            let mut fields = vec![
                 field(
                     "方案名称",
                     Input::new(&self.title).focus_ring(ring).into_any_element(),
@@ -2492,6 +2526,36 @@ impl Recommendations {
                 ),
                 field("玩家备注", notes),
             ];
+            for (label, input) in [
+                "抖音主页（选填）",
+                "哔哩哔哩主页（选填）",
+                "小黑盒主页（选填）",
+                "视频教程（选填）",
+            ]
+            .into_iter()
+            .zip(&self.link_fields)
+            {
+                let target = input.clone();
+                fields.push(field(
+                    label,
+                    Input::new(input)
+                        .focus_ring(ring)
+                        .on_paste(move |item, window, cx| {
+                            let Some(text) = item.text() else {
+                                return false;
+                            };
+                            // Keep clipboard line boundaries until after URL extraction.
+                            let clean = rec::extract_share_url(&text)
+                                .unwrap_or_else(|_| text.replace(['\r', '\n'], " "));
+                            if clean == text {
+                                return false;
+                            }
+                            target.update(cx, |state, cx| state.replace(clean, window, cx));
+                            true
+                        })
+                        .into_any_element(),
+                ));
+            }
             body = body
                 .child(self.recipe_summary(draft, cx))
                 .child(self.parameter_comparison(draft, cx))
@@ -2521,6 +2585,16 @@ impl Recommendations {
                         let update_suggestion =
                             this.editing.is_none() && title == recipe.suggested_title();
                         recipe.notes = this.notes.read(cx).value().trim().to_owned();
+                        let [douyin, bilibili, heybox, tutorial] = this
+                            .link_fields
+                            .each_ref()
+                            .map(|f| f.read(cx).value().trim().to_owned());
+                        let pasted_links = rec::CreatorLinks {
+                            douyin,
+                            bilibili,
+                            heybox,
+                            tutorial,
+                        };
                         recipe.edition = this.edition.read(cx).value().trim().to_owned();
                         recipe.gpu_model = this.gpu_input.read(cx).value().trim().to_owned();
                         recipe.title = if update_suggestion {
@@ -2536,6 +2610,7 @@ impl Recommendations {
                         let submission = this.submission.clone();
                         let editing = this.editing.clone();
                         this.job(move || {
+                            recipe.links = pasted_links.prepare_for_sharing()?;
                             let card = if let Some(original) = editing {
                                 client.update_share(&original, &recipe, &catalog)?
                             } else {
@@ -2562,7 +2637,7 @@ impl Recommendations {
                 .map(|e| e.to_string());
             let blocked_here = self.runtime_plan.as_ref().is_some_and(|p| {
                 p.values()
-                    .any(|step| *step == recommendation_runtimes::RuntimeStep::Unavailable)
+                    .any(|change| change.step == recommendation_runtimes::RuntimeStep::Unavailable)
             });
             let changed = available
                 .as_ref()

@@ -54,6 +54,7 @@ ALLOWED = {
     'rust/cloud-catalog.json', 'rust/cloud-identities.json', 'rust/delta-runtime.json',
     'rust/ui-translations.json', 'app/assets/cleanup-catalog.json',
     'app/assets/FONTAWESOME_LICENSE.txt', 'app/assets/licenses/aria2/COPYING',
+    'app/assets/profile-bilibili.jpg', 'app/assets/profile-douyin.jpg', 'app/assets/profile-heybox.jpg',
     'rust/assets/licenses/GPUI-COMPONENT-LICENSE', 'rust/assets/licenses/GPUI-FAST-LICENSE',
     'rust/assets/licenses/LUCIDE-LICENSE', 'rust/assets/themes/LICENSE-APACHE',
     'app/locales/en.json', 'app/locales/ru.json', 'app/locales/ja.json', 'app/locales/ko.json',
@@ -126,6 +127,10 @@ def allowed_source(path):
 def validate_content(path, data):
     if len(data) > 20 * 1024 * 1024:
         raise RuntimeError('Oversized source input: ' + path)
+    if Path(path).suffix.lower() == '.jpg':
+        if path not in ALLOWED or not data.startswith(b'\xff\xd8\xff') or not data.endswith(b'\xff\xd9'):
+            raise RuntimeError('Invalid JPEG source asset: ' + path)
+        return
     if Path(path).suffix.lower() in ('.png', '.ico'):
         return
     try:

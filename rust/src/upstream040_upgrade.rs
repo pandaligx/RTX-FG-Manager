@@ -68,6 +68,10 @@ fn custom_revision_upgrade(old: &core::Record, new: &core::Record) -> bool {
             Some("0.4.2"),
             Some("0.4.2" | crate::delta::SIX_X_VERSION),
             Some(crate::delta::MILES_INI_VERSION)
+        ) | (
+            Some("0.4.2"),
+            Some("0.4.2" | crate::delta::SIX_X_VERSION | crate::delta::MILES_INI_VERSION),
+            Some(crate::delta::MILES_R3)
         )
     )
 }

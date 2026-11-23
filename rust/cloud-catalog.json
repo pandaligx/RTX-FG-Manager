@@ -898,23 +898,23 @@
       "version": "0.4.2"
     },
     {
-      "archive": "mfg-unlocker-1.7.1-complete-fdeecb534906.zip",
-      "archive_prefix": "mfg-unlocker-1.7.1-universal",
+      "archive": "mfg-unlocker-1.7.2-complete-522358ba8834.zip",
+      "archive_prefix": "mfg-unlocker-1.7.2-universal",
       "backends": [
         "rtx40mfg"
       ],
-      "bytes": 10811440,
+      "bytes": 12974973,
       "component": false,
       "files": [
         {
-          "bytes": 7470192,
+          "bytes": 15936712,
           "name": "version.dll",
-          "sha256": "a6b51a6fff2035acfe902c817ca32c7f93e1635c9efb04804c5b2e6bf588d129"
+          "sha256": "e0fd9fa55d08b2dc62a3ea95f5149dd4d57fbac3e00eb9293e8b83c9fbf16f34"
         },
         {
-          "bytes": 27982040,
+          "bytes": 28620960,
           "name": "OptiScaler.dll",
-          "sha256": "f1374c87e1752386696fd9be8e9773e1335a649eb7c5d73821a900ffdf8b3e61"
+          "sha256": "dd64e1b13642ab118a9edded86e1c7b4e72e8712d5644933eb13359a0e3bc196"
         },
         {
           "bytes": 115,
@@ -922,29 +922,29 @@
           "sha256": "e9fdd691bc81bca1cf7972c69affaefef210cccef5e49fc81ebdba2c67c06a31"
         },
         {
-          "bytes": 37629,
+          "bytes": 37522,
           "name": "MFG-Unlocker-NOTICES.txt",
-          "sha256": "bf04a767d3fc3a95a67d918af8c4aced6f4dcdee5c1ac566d0e84bc529d68bff"
+          "sha256": "dc33dc3739916129d79335d3a7434c783b4638e4e1a91254c4ad436b9db1326d"
         }
       ],
-      "id": "mfg-unlocker-1.7.1-universal",
-      "label": "MFG Unlocker · 1.7.1",
+      "id": "mfg-unlocker-1.7.2-universal",
+      "label": "MFG Unlocker · 1.7.2",
       "labels": {
-        "en": "MFG Unlocker · 1.7.1",
-        "ja": "MFG Unlocker · 1.7.1",
-        "ko": "MFG Unlocker · 1.7.1",
-        "ru": "MFG Unlocker · 1.7.1",
-        "zh": "MFG Unlocker · 1.7.1"
+        "en": "MFG Unlocker · 1.7.2",
+        "ja": "MFG Unlocker · 1.7.2",
+        "ko": "MFG Unlocker · 1.7.2",
+        "ru": "MFG Unlocker · 1.7.2",
+        "zh": "MFG Unlocker · 1.7.2"
       },
       "proxy": "version.dll",
       "scheme_id": "rtx40mfg-1.3.3-hf2",
-      "sha256": "fdeecb534906e962514effa2870c95b8f43d633c823e0c14893f5e533fe9dcbc",
-      "upstream_version": "1.7.1",
+      "sha256": "522358ba88344a0b65ce6e060ef822ad40f489776e5d86252ef3acbc566164c0",
+      "upstream_version": "1.7.2",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/mfg-unlocker-1.7.1-complete-fdeecb534906.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/mfg-unlocker-1.7.1-complete-fdeecb534906.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/mfg-unlocker-1.7.2-complete-522358ba8834.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/mfg-unlocker-1.7.2-complete-522358ba8834.zip"
       },
-      "version": "1.7.1"
+      "version": "1.7.2"
     },
     {
       "archive": "rtx-encore-2.5.0-complete-91bd6b9244b9.zip",
@@ -1599,12 +1599,12 @@
       "version": "0.0.20"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-version-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-version-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": false,
       "files": [
         {
@@ -1615,35 +1615,35 @@
         {
           "bytes": 5737640,
           "name": "version.dll",
-          "sha256": "07d17804e8205fa324c9ea290e93dc3b19ec8b659f4a181dc133688208f8ee49"
+          "sha256": "2e13a11d05f5b9e1979181226750e1b0927907644fc040a1902da3e81f306cd0"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-version-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-version-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-winmm-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-winmm-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": false,
       "files": [
         {
@@ -1654,41 +1654,41 @@
         {
           "bytes": 5749008,
           "name": "winmm.dll",
-          "sha256": "e62f02cbb36a9ccb9134abb5c35c1d440a0e40501065b52a6ff35b3372f4953a"
+          "sha256": "fef428864c99da454355e48f4f066314ce83e383450a75069cdaabd17d4b6240"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-winmm-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-winmm-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "winmm.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dbghelp-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dbghelp-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": false,
       "files": [
         {
           "bytes": 5755704,
           "name": "dbghelp.dll",
-          "sha256": "2d416d698079649dd5db15999d9496a61a31ca4b67ac78cb65c4527abd736347"
+          "sha256": "e740cfc64bc97e4fc3230c8d6562a55b2acbeeb49d99520e0fec463b6e35e47d"
         },
         {
           "bytes": 10883,
@@ -1696,38 +1696,38 @@
           "sha256": "bf4b0844a4752aa339c234913a921ff80c5fb28657309eb3f8d4e0647bff4fc9"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dbghelp-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dbghelp-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "dbghelp.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dinput8-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dinput8-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": false,
       "files": [
         {
           "bytes": 5736576,
           "name": "dinput8.dll",
-          "sha256": "2d2145f0a4c283cc1e450e55eefcef0fc5c5ed465dcc32007a3f703134e13758"
+          "sha256": "aa53e6f108d134585ac462375e33044a77aba663325ce935fc6321c8b7dc3a73"
         },
         {
           "bytes": 10883,
@@ -1735,32 +1735,32 @@
           "sha256": "bf4b0844a4752aa339c234913a921ff80c5fb28657309eb3f8d4e0647bff4fc9"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dinput8-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dinput8-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "dinput8.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dxgi-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dxgi-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": false,
       "files": [
         {
@@ -1771,41 +1771,41 @@
         {
           "bytes": 5738152,
           "name": "dxgi.dll",
-          "sha256": "f698e920e03c6dcd07305b5e4e6d1ee5d10d2565e80cd66552aeee73634917d7"
+          "sha256": "bf4ff346fb1a25dfd611a914f38b39f2994fe3e7b8bd0c64c52cbe32ba6c2313"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dxgi-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dxgi-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "dxgi.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-d3d12-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-d3d12-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": false,
       "files": [
         {
           "bytes": 5738152,
           "name": "d3d12.dll",
-          "sha256": "2adff623c2ce22b11570c3567f204454761704d66bae7138106d4060bee7110f"
+          "sha256": "c4b8f8f3f690707828df4d85be6dc260b1b62542ab18d5195bf0ed9dcd576386"
         },
         {
           "bytes": 10883,
@@ -1813,32 +1813,32 @@
           "sha256": "bf4b0844a4752aa339c234913a921ff80c5fb28657309eb3f8d4e0647bff4fc9"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-d3d12-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-d3d12-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "d3d12.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-backend-sm86_backend-7d197846fdc1-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-backend-sm86_backend-7d197846fdc1-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": true,
       "files": [
         {
@@ -1847,32 +1847,32 @@
           "sha256": "4e445fb822e8af37212933fb9b1ace01eb82db0f64896359a7711b3fe5db7349"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-backend-sm86_backend-7d197846fdc1-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-backend-sm86_backend-7d197846fdc1-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-kernels-fg_kernels-17a73896d03e-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-kernels-fg_kernels-17a73896d03e-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": true,
       "files": [
         {
@@ -1881,32 +1881,32 @@
           "sha256": "1ebd50b74ac8583299fd902208487e7f71b6bfb8d44ccee224cd2372a22c35a7"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-kernels-fg_kernels-17a73896d03e-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-kernels-fg_kernels-17a73896d03e-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-runtime-nvngx_dlssg-18c596ffc0da-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-runtime-nvngx_dlssg-18c596ffc0da-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": true,
       "files": [
         {
@@ -1915,32 +1915,32 @@
           "sha256": "cadee1aa6db3907babdc3285da2aebc4553d92b89c38ba3eae8abd8bba1bea72"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-runtime-nvngx_dlssg-18c596ffc0da-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-runtime-nvngx_dlssg-18c596ffc0da-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-xefg-xefg_kernels-55ce3841ceda-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-xefg-xefg_kernels-55ce3841ceda-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": true,
       "files": [
         {
@@ -1949,32 +1949,32 @@
           "sha256": "605f2bc5e7f3affe3136fd8b71555cfc1c189240ab3a35913bd7c5b5fecc162d"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-xefg-xefg_kernels-55ce3841ceda-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-xefg-xefg_kernels-55ce3841ceda-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-sr-nvngx_dlss-79af3944d8b4-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-sr-nvngx_dlss-79af3944d8b4-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": true,
       "files": [
         {
@@ -1983,32 +1983,32 @@
           "sha256": "858ccff96360c3098db9264cd6f13d04a027e09b6ce7ad5bbc297570e824b4f2"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-sr-nvngx_dlss-79af3944d8b4-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-sr-nvngx_dlss-79af3944d8b4-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-sr-sr_kernels-48ad972f0c93-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-sr-sr_kernels-48ad972f0c93-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": true,
       "files": [
         {
@@ -2017,32 +2017,32 @@
           "sha256": "b0b82c6e55b12cee49ff44257ee7121c45dedd6b2f78f6bacdcec6f724a8886c"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-sr-sr_kernels-48ad972f0c93-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-component-sr-sr_kernels-48ad972f0c93-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
     {
-      "archive": "rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-notices-1057b99a4210-r2",
+      "archive": "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+      "archive_prefix": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-notices-1057b99a4210-r3",
       "backends": [
         "upstream040"
       ],
-      "bytes": 103073143,
+      "bytes": 103072631,
       "component": true,
       "files": [
         {
@@ -2056,22 +2056,22 @@
           "sha256": "908f1bc3a6fe9a85b44e86bdc649e242b06e9ce85d81b88bb014191070d34c48"
         }
       ],
-      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-notices-1057b99a4210-r2",
-      "label": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan",
+      "id": "rtxfg-0.4.2-dx12-vulkan-dlssg-0.4.2-notices-1057b99a4210-r3",
+      "label": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
       "labels": {
-        "en": "Dlssg_for_sm86 · 0.4.2 HF1 · Delta Force support · DX12/Vulkan",
-        "ja": "Dlssg_for_sm86 · 0.4.2 HF1 · デルタフォース対応 · DX12/Vulkan",
-        "ko": "Dlssg_for_sm86 · 0.4.2 HF1 · 델타 포스 지원 · DX12/Vulkan",
-        "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
-        "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
+        "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+        "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+        "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+        "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+        "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
       },
       "proxy": "version.dll",
       "scheme_id": "rtxfg-0.4.1-dx12-vulkan",
-      "sha256": "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
-      "upstream_version": "0.4.2+rtxfg.2",
+      "sha256": "1663111a8681b1f143a0788d26e2658595efd66116433bd8d5bc11b61870dcbc",
+      "upstream_version": "0.4.2+rtxfg.3",
       "urls": {
-        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip",
-        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r2-hf1-complete-b2af64e2d614.zip"
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
       },
       "version": "0.4.2"
     },
@@ -2553,7 +2553,7 @@
       "version": "0.4.2"
     }
   ],
-  "revision": "bundles-641e4b682d9a7f3f3b49",
+  "revision": "bundles-331fa0797a23b5e1e2d2",
   "schema": 3,
   "scheme_policies": {
     "anr-fg": {

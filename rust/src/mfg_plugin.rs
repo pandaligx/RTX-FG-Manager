@@ -35,18 +35,25 @@ fn read_config(dir: &Path) -> Result<Vec<u8>> {
     Ok(fs::read(path)?)
 }
 
+pub(crate) fn host_names() -> impl Iterator<Item = &'static str> {
+    core::PROXIES
+        .iter()
+        .copied()
+        .filter(|n| n.ends_with(".dll") && !n.contains('/'))
+        .chain(["OptiScaler.dll", "OptiScaler.asi"])
+}
+
 pub fn validate_host(target: &core::DeploymentTarget) -> Result<()> {
+    host_file(target).map(drop)
+}
+
+pub(crate) fn host_file(target: &core::DeploymentTarget) -> Result<std::path::PathBuf> {
     ensure!(
         target.game_exe.parent() == Some(target.directory.as_path()),
         "MFG 插件模式请使用游戏 EXE 所在目录；配置和 OptiScaler 主文件必须在此目录"
     );
-    let mut found = false;
-    for name in core::PROXIES
-        .iter()
-        .copied()
-        .filter(|n| n.ends_with(".dll"))
-        .chain(["OptiScaler.dll", "OptiScaler.asi"])
-    {
+    let mut found = None;
+    for name in host_names() {
         let path = core::no_links(&target.directory.join(name))?;
         if path.is_file()
             && let Ok((version, internal)) = win::file_version(&path)
@@ -61,13 +68,14 @@ pub fn validate_host(target: &core::DeploymentTarget) -> Result<()> {
                 "检测到 OptiScaler {version}；MFG 插件需要 OptiScaler 10"
             );
             core::pe64(&path, true)?;
-            found = true;
+            ensure!(
+                found.is_none(),
+                "检测到多个 OptiScaler 主文件，请先保留一个加载入口"
+            );
+            found = Some(path);
         }
     }
-    ensure!(
-        found,
-        "未在游戏 EXE 旁识别到 OptiScaler 10；管理器不会自动安装 OptiScaler"
-    );
+    let found = found.context("未在游戏 EXE 旁找到 OptiScaler 10；可选择独立安装")?;
     let bytes = read_config(&target.directory)?;
     let (text, _) = diagnostics::decode_ini(&bytes)?;
     for (section, key, expected) in [
@@ -88,7 +96,7 @@ pub fn validate_host(target: &core::DeploymentTarget) -> Result<()> {
         }
     }
     diagnostics::edit_ini(&bytes, SECTION, KEY, "true")?;
-    Ok(())
+    Ok(found)
 }
 
 #[derive(Serialize, Deserialize)]

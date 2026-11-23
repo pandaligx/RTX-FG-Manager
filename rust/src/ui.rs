@@ -2225,6 +2225,8 @@ impl Manager {
                             && rtx_fg_manager::rtxmfg::is_170_key(param.key))
                             || (*v < semver::Version::new(1, 7, 1)
                                 && rtx_fg_manager::rtxmfg::is_171_key(param.key))
+                            || (*v < semver::Version::new(1, 7, 2)
+                                && param.key == "rtx_xemfg_route")
                     });
                 let disabled = self.c.busy
                     || self.c.read_only
@@ -2278,7 +2280,7 @@ impl Manager {
                             div()
                                 .text_xs()
                                 .text_color(cx.theme().muted_foreground)
-                                .child(self.t("需要先升级 MFG Unlocker 至 1.7.0。")),
+                                .child(self.t("请先升级 MFG Unlocker 再使用此选项")),
                         )
                     })
                     .when(
@@ -2350,7 +2352,7 @@ impl Manager {
             .flex_shrink_0()
             .child(title)
             .when(self.c.boolean("preset_help_open", false), |d| d.child(Alert::info("preset-inline-help", self.t(if context.profile == rtx_fg_manager::rtxmfg::PROFILE {
-                "独立 MFG 按 Backspace；OptiScaler 插件使用其菜单。NR 与独立 XeSS 多帧生成需另装运行库。1.7.1 插件支持配套 OptiScaler 的 XeMFG 提供器；帧生成输出在 OptiScaler 中选择。"
+                "独立安装按 Backspace 打开菜单。插件模式在 OptiScaler 中选择帧生成输出。"
             } else if context.profile == rtx_fg_manager::anr::PROFILE {
                 "ANR FG：Insert（Ins）打开菜单。游戏内开启帧生成；默认最高6X，实际倍率由游戏请求。修改参数后重启游戏。"
             } else if context.profile == rtx_fg_manager::transfusion::PROFILE {
@@ -2420,7 +2422,7 @@ impl Manager {
             );
         }
         let proxy_hint = if self.c.parameter_profile() == rtx_fg_manager::rtxmfg::PROFILE {
-            "Backspace 打开菜单。普通安装选一个 DLL；插件需已有 OptiScaler 10，1.7.1 会备份更新主文件并在卸载时还原。"
+            "独立安装选择一个 DLL。插件模式需要 OptiScaler 10，卸载时会还原其主文件。"
         } else if self.c.parameter_profile() == rtx_fg_manager::encore::PROFILE {
             "Insert 打开菜单。建议单选 DLL；ASI 不能与 DLL 同装。多选可能冲突，Bink 原件须保留为 Hooked 文件。"
         } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {

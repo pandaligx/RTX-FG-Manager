@@ -14,8 +14,10 @@ pub const CAPABILITY: &str = "delta_force_mfg_v1";
 pub const SIX_X_CAPABILITY: &str = "delta_force_mfg_6x_v1";
 pub const SIX_X_VERSION: &str = "0.4.2+rtxfg.1";
 pub const MILES_INI_VERSION: &str = "0.4.2+rtxfg.2";
+pub const MILES_R3: &str = "0.4.2+rtxfg.3";
 pub fn uses_miles_ini(scheme: Option<&str>, version: Option<&str>) -> bool {
-    scheme == Some(crate::cloud::DELTA_041_SCHEME) && version == Some(MILES_INI_VERSION)
+    scheme == Some(crate::cloud::DELTA_041_SCHEME)
+        && matches!(version, Some(MILES_INI_VERSION | MILES_R3))
 }
 pub const GAME: &str = "DeltaForceClient-Win64-Shipping.exe";
 pub const REVISION: &str = "Streamline-2.7.32-c39569d4a2a70434";
@@ -32,7 +34,10 @@ struct Manifest {
     upstream041_images: Vec<String>,
 }
 pub fn supports_six_x(version: &str) -> bool {
-    matches!(version, "0.4.1+rtxfg.2" | SIX_X_VERSION | MILES_INI_VERSION)
+    matches!(
+        version,
+        "0.4.1+rtxfg.2" | SIX_X_VERSION | MILES_INI_VERSION | MILES_R3
+    )
 }
 fn manifest() -> &'static Manifest {
     static VALUE: OnceLock<Manifest> = OnceLock::new();

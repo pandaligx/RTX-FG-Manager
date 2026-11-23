@@ -105,7 +105,7 @@ pub fn known_proxy(path: &Path) -> Result<bool> {
         return Ok(false);
     }
     let (a, b) = identity(path)?;
-    Ok(core::LEGACY.iter().any(|(h, _)| *h == a)
+    let recognized = core::LEGACY.iter().any(|(h, _)| *h == a)
         || listed("proxy_sha256", &a)
         || b.as_ref().is_some_and(|h| listed("proxy_image_sha256", h))
         || assets::EMBEDDED
@@ -115,7 +115,12 @@ pub fn known_proxy(path: &Path) -> Result<bool> {
             bundled_images().contains(&h)
                 || crate::cloud::known_image(&h)
                 || crate::delta::known_image(&h)
-        }))
+        });
+    // A paired OptiScaler host can also have been installed independently
+    // under a proxy name. Only a deployment receipt establishes ownership.
+    Ok(recognized
+        && !win::file_version(path)
+            .is_ok_and(|(_, internal)| internal.eq_ignore_ascii_case("OptiScaler")))
 }
 fn bundled_images() -> &'static BTreeSet<String> {
     static IMAGES: OnceLock<BTreeSet<String>> = OnceLock::new();

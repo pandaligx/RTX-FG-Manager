@@ -30,26 +30,38 @@ impl Component {
                 == self.versions.iter().map(|v| normalized(v)).collect()
     }
 
-    fn needs_install(&self, targets: &[core::DeploymentTarget]) -> bool {
+    fn managed_package(&self) -> &str {
+        match self.kind.as_str() {
+            "encorefg" | "streamline" => &self.kind,
+            _ => "xemfg",
+        }
+    }
+
+    fn matches_nr(&self, status: &neural_runtime::Status) -> bool {
+        status.present
+            && status.warning.is_none()
+            && status.version.as_ref().is_some_and(|v| {
+                self.versions
+                    .iter()
+                    .any(|want| normalized(v) == normalized(want))
+            })
+    }
+
+    fn needs_install(&self, target: &core::DeploymentTarget) -> bool {
         if self.source == "patch" || self.preserves_game_files() {
             return false;
         }
-        if self.kind == "streamline" {
-            return !targets.iter().all(|t| {
-                let status = runtime_files::inspect(t, "streamline");
-                !status.applicable
-                    || runtime_files::installed_package_version(t, "streamline")
-                        .ok()
-                        .flatten()
-                        .as_deref()
-                        == self.package_version.as_deref()
-            });
+        if self.kind == "nr" {
+            return !self.matches_nr(&neural_runtime::inspect(target));
         }
-        !(self.source == "game"
-            && self.kind != "nr"
-            && targets
-                .iter()
-                .all(|target| self.matches_native(&runtime_files::inspect(target, &self.kind))))
+        if self.source == "managed" {
+            if self.kind == "streamline" && !runtime_files::inspect(target, "streamline").applicable
+            {
+                return false;
+            }
+            return !matches!(runtime_files::installed_package_version(target, self.managed_package()), Ok(Some(version)) if Some(version.as_str()) == self.package_version.as_deref());
+        }
+        !self.matches_native(&runtime_files::inspect(target, &self.kind))
     }
     fn preflight_target(
         &self,
@@ -145,6 +157,12 @@ impl RuntimeStep {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct RuntimeChange {
+    pub step: RuntimeStep,
+    pub installed: BTreeSet<String>,
+}
+
 pub fn preview_action(
     source: &str,
     patch: bool,
@@ -212,6 +230,16 @@ pub fn preview(
     recipe: &crate::recommendations::Recipe,
     targets: &[core::DeploymentTarget],
 ) -> BTreeMap<(String, String), RuntimeStep> {
+    preview_changes(recipe, targets)
+        .into_iter()
+        .map(|(key, change)| (key, change.step))
+        .collect()
+}
+
+pub fn preview_changes(
+    recipe: &crate::recommendations::Recipe,
+    targets: &[core::DeploymentTarget],
+) -> BTreeMap<(String, String), RuntimeChange> {
     let mut result = BTreeMap::new();
     let targets = targets
         .iter()
@@ -222,8 +250,15 @@ pub fn preview(
             continue;
         }
         let key = (c.kind.clone(), c.source.clone());
+        let mut installed = BTreeSet::new();
         let Ok(targets) = &targets else {
-            result.insert(key, RuntimeStep::Unavailable);
+            result.insert(
+                key,
+                RuntimeChange {
+                    step: RuntimeStep::Unavailable,
+                    installed,
+                },
+            );
             continue;
         };
         let mut combined = None;
@@ -246,16 +281,40 @@ pub fn preview(
             }
             let step = if c.kind == "nr" {
                 let status = neural_runtime::inspect(target);
-                if status.present || status.warning.is_some() {
+                installed.extend(status.version.iter().cloned());
+                if status.warning.is_some() {
                     RuntimeStep::Verify
+                } else if c.matches_nr(&status) {
+                    RuntimeStep::Keep
+                } else if status.present {
+                    RuntimeStep::Replace
                 } else {
                     RuntimeStep::Install
                 }
             } else if c.source == "managed" {
-                // The SDK installer verifies the complete package and file ownership.
-                RuntimeStep::Verify
+                let kind = c.managed_package();
+                match runtime_files::installed_package_version(target, kind) {
+                    Ok(Some(version)) => {
+                        let matches = c.package_version.as_deref() == Some(version.as_str());
+                        installed.insert(version);
+                        if matches {
+                            RuntimeStep::Keep
+                        } else {
+                            RuntimeStep::Replace
+                        }
+                    }
+                    Ok(None) if kind == "streamline" => {
+                        if let Some(status) = checked {
+                            installed.extend(status.versions);
+                        }
+                        RuntimeStep::Replace
+                    }
+                    Ok(None) => RuntimeStep::Install,
+                    Err(_) => RuntimeStep::Verify,
+                }
             } else {
                 let status = checked.unwrap_or_else(|| runtime_files::inspect(target, &c.kind));
+                installed.extend(status.versions.iter().cloned());
                 if c.preserves_game_files() && !status.present {
                     RuntimeStep::Verify
                 } else if c.preserves_game_files() || c.matches_native(&status) {
@@ -273,7 +332,13 @@ pub fn preview(
                 _ => step,
             });
         }
-        result.insert(key, combined.unwrap_or(RuntimeStep::Unavailable));
+        result.insert(
+            key,
+            RuntimeChange {
+                step: combined.unwrap_or(RuntimeStep::Unavailable),
+                installed,
+            },
+        );
     }
     result
 }
@@ -331,22 +396,26 @@ impl Snapshot {
         targets: &[core::DeploymentTarget],
     ) -> Result<Vec<crate::transfer::DownloadFile>> {
         let mut files = Vec::new();
-        for c in self.components.iter().filter(|c| c.needs_install(targets)) {
+        for c in &self.components {
+            let needed: Vec<_> = targets
+                .iter()
+                .filter(|t| c.needs_install(t))
+                .cloned()
+                .collect();
+            if needed.is_empty() {
+                continue;
+            }
             if c.source == "managed" {
                 files.extend(runtime_files::download_files(
-                    targets,
-                    if matches!(c.kind.as_str(), "encorefg" | "streamline") {
-                        &c.kind
-                    } else {
-                        "xemfg"
-                    },
+                    &needed,
+                    c.managed_package(),
                     c.package_version.as_deref().context("运行库版本未知")?,
                 )?);
             } else if c.kind == "nr" {
                 files.push(neural_runtime::download_file("310.9.16")?);
             } else {
                 files.extend(runtime_files::download_files(
-                    targets,
+                    &needed,
                     &c.kind,
                     &normalized(c.versions.first().context("运行库版本未知")?),
                 )?);
@@ -604,7 +673,12 @@ impl Snapshot {
     ) -> Result<()> {
         let mut intel = false;
         for c in &self.components {
-            if !c.needs_install(targets) {
+            let needed: Vec<_> = targets
+                .iter()
+                .filter(|t| c.needs_install(t))
+                .cloned()
+                .collect();
+            if needed.is_empty() {
                 continue;
             }
             let mut report = |transfer| {
@@ -618,7 +692,7 @@ impl Snapshot {
             if c.source == "managed" {
                 if matches!(c.kind.as_str(), "encorefg" | "streamline") {
                     runtime_files::install_version(
-                        targets,
+                        &needed,
                         &c.kind,
                         c.package_version.as_deref().context("新增帧生成版本未知")?,
                         github,
@@ -627,7 +701,7 @@ impl Snapshot {
                     )?;
                 } else if !intel {
                     runtime_files::install_version(
-                        targets,
+                        &needed,
                         "xemfg",
                         c.package_version.as_deref().context("XeSS 版本未知")?,
                         github,
@@ -637,10 +711,10 @@ impl Snapshot {
                     intel = true;
                 }
             } else if c.kind == "nr" {
-                neural_runtime::install_many(targets, "310.9.16", github, cancel, &mut report)?;
+                neural_runtime::install_many(&needed, "310.9.16", github, cancel, &mut report)?;
             } else {
                 runtime_files::install_version(
-                    targets,
+                    &needed,
                     &c.kind,
                     &normalized(&c.versions[0]),
                     github,

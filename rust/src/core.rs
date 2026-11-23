@@ -1394,8 +1394,14 @@ fn deploy_prepared_files(
             cache_pending: false,
             cleanup_pending_reasons: Vec::new(),
         };
-        let message =
-            crate::rtxmfg_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides)?;
+        let message = crate::rtxmfg_upgrade::upgrade_locked(
+            &target,
+            old,
+            new,
+            data,
+            explicit_overrides,
+            mfg_host.as_deref().filter(|_| mfg_plugin),
+        )?;
         crate::rtxmfg_settings::apply_locked(&target, None, mfg_overrides)?;
         return Ok(message);
     }

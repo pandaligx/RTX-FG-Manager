@@ -781,7 +781,9 @@ pub fn contracts() -> Value {
                 } else if let Some((min, max)) = numeric_range(profile, p.key) {
                     rule = json!({"number":true,"min":min,"max":max});
                 }
-                if rtxmfg::is_171_key(p.key) {
+                if p.key == "rtx_xemfg_route" {
+                    rule["since"] = json!("1.7.2");
+                } else if rtxmfg::is_171_key(p.key) {
                     rule["since"] = json!("1.7.1");
                 } else if rtxmfg::is_170_key(p.key) {
                     rule["since"] = json!("1.7.0");

@@ -1,6 +1,6 @@
 //! Update an existing OptiScaler 10 host only when its MFG plugin is selected.
 //! The original host is retained until uninstall, independently of plugin files.
-use crate::{core, win};
+use crate::core;
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,7 +14,7 @@ pub const JOURNAL: &str = "mfg-optiscaler-host.json";
 pub const BACKUP: &str = "mfg-optiscaler-host.original";
 const LIMIT: u64 = 64 * 1024 * 1024;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Journal {
     schema: u8,
@@ -25,30 +25,11 @@ struct Journal {
 }
 
 fn valid_name(name: &str) -> bool {
-    name == PAYLOAD || name == "OptiScaler.asi" || crate::rtxmfg::PROXIES.contains(&name)
+    crate::mfg_plugin::host_names().any(|candidate| candidate == name)
 }
 
 pub fn host(target: &core::DeploymentTarget) -> Result<PathBuf> {
-    crate::mfg_plugin::validate_host(target)?;
-    let mut paths = Vec::new();
-    for name in crate::rtxmfg::PROXIES
-        .into_iter()
-        .chain([PAYLOAD, "OptiScaler.asi"])
-    {
-        let path = core::no_links(&target.directory.join(name))?;
-        if path.is_file()
-            && let Ok((version, internal)) = win::file_version(&path)
-            && internal.eq_ignore_ascii_case("OptiScaler")
-            && version.starts_with("10.")
-        {
-            paths.push(path);
-        }
-    }
-    ensure!(
-        paths.len() == 1,
-        "检测到多个 OptiScaler 主文件，请先保留一个加载入口"
-    );
-    Ok(paths.remove(0))
+    crate::mfg_plugin::host_file(target)
 }
 
 pub fn preflight(target: &core::DeploymentTarget, bytes: &[u8], upgrading: bool) -> Result<()> {
@@ -59,12 +40,185 @@ pub fn preflight(target: &core::DeploymentTarget, bytes: &[u8], upgrading: bool)
     let path = host(target)?;
     ensure!(path.metadata()?.len() <= LIMIT, "OptiScaler 原文件过大");
     if upgrading {
-        ensure!(
-            core::digest(&path)? == core::hash(bytes),
-            "插件升级还需更换配套 OptiScaler；请先卸载 MFG 插件，再选择插件模式安装。原 OptiScaler 会保留"
-        );
+        plan_upgrade(target, &path, bytes)?;
     }
     Ok(())
+}
+
+/// The enclosing MFG transaction owns the commit point. Keep the pre-install
+/// host backup independent from the copy used to roll back this one upgrade.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Upgrade {
+    previous: Option<Journal>,
+    next: Journal,
+    pub(crate) before: String,
+}
+
+pub(crate) fn plan_upgrade(
+    target: &core::DeploymentTarget,
+    path: &Path,
+    bytes: &[u8],
+) -> Result<Option<Upgrade>> {
+    let root = core::no_links(&target.directory.join(core::OWN))?;
+    let receipt = core::no_links(&root.join(JOURNAL))?;
+    let backup = core::no_links(&root.join(BACKUP))?;
+    let before = core::digest(path)?;
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .context("主文件名无效")?
+        .to_owned();
+    let previous: Option<Journal> = if receipt.try_exists()? {
+        let old: Journal = serde_json::from_value(core::read_json(&receipt, 16384)?)?;
+        ensure!(
+            old.schema == 1
+                && old.game_exe == target.game_exe.to_string_lossy()
+                && old.name == name
+                && old.applied == before
+                && backup.metadata()?.len() <= LIMIT
+                && core::digest(&backup)? == old.before,
+            "OptiScaler 主文件或原件备份已变化，请先检查"
+        );
+        Some(old)
+    } else {
+        ensure!(!backup.try_exists()?, "发现待恢复的 OptiScaler 备份");
+        None
+    };
+    let after = core::hash(bytes);
+    if before == after {
+        return Ok(None);
+    }
+    let next = Journal {
+        schema: 1,
+        game_exe: target.game_exe.to_string_lossy().into_owned(),
+        name,
+        before: previous
+            .as_ref()
+            .map_or_else(|| before.clone(), |old| old.before.clone()),
+        applied: after,
+    };
+    let plan = Upgrade {
+        previous,
+        next,
+        before,
+    };
+    plan.validate(target)?;
+    Ok(Some(plan))
+}
+
+impl Upgrade {
+    pub(crate) fn validate(&self, target: &core::DeploymentTarget) -> Result<()> {
+        let n = &self.next;
+        ensure!(
+            n.schema == 1
+                && n.game_exe == target.game_exe.to_string_lossy()
+                && valid_name(&n.name)
+                && core::valid_hash(&n.applied)
+                && core::valid_hash(&n.before)
+                && core::valid_hash(&self.before)
+                && self.before != n.applied
+                && self
+                    .previous
+                    .as_ref()
+                    .map_or(self.before == n.before, |old| old.schema == 1
+                        && old.game_exe == n.game_exe
+                        && old.name == n.name
+                        && old.before == n.before
+                        && old.applied == self.before),
+            "OptiScaler 升级记录无效"
+        );
+        Ok(())
+    }
+    pub(crate) fn path(&self, target: &core::DeploymentTarget) -> Result<PathBuf> {
+        self.validate(target)?;
+        core::no_links(&target.directory.join(&self.next.name))
+    }
+    fn state(&self, root: &Path) -> Result<Option<Journal>> {
+        let path = core::no_links(&root.join(JOURNAL))?;
+        let current = if path.try_exists()? {
+            Some(serde_json::from_value(core::read_json(&path, 16384)?)?)
+        } else {
+            None
+        };
+        ensure!(
+            current == self.previous || current.as_ref() == Some(&self.next),
+            "OptiScaler 恢复记录已变化"
+        );
+        Ok(current)
+    }
+    pub(crate) fn apply(&self, target: &core::DeploymentTarget, bytes: &[u8]) -> Result<()> {
+        let path = self.path(target)?;
+        let root = core::no_links(&target.directory.join(core::OWN))?;
+        ensure!(
+            core::hash(bytes) == self.next.applied
+                && core::digest(&path)? == self.before
+                && self.state(&root)? == self.previous,
+            "OptiScaler 升级前文件已改变"
+        );
+        let backup = core::no_links(&root.join(BACKUP))?;
+        if self.previous.is_none() {
+            core::write_new(&backup, &fs::read(&path)?)?;
+        }
+        ensure!(
+            core::digest(&backup)? == self.next.before,
+            "OptiScaler 原件备份不匹配"
+        );
+        core::atomic_json(&root.join(JOURNAL), &self.next)?;
+        core::assert_target_stopped(target)?;
+        replace(&path, &self.before, bytes)
+    }
+    pub(crate) fn recover(
+        &self,
+        target: &core::DeploymentTarget,
+        work: &Path,
+        committed: bool,
+    ) -> Result<()> {
+        let path = self.path(target)?;
+        let root = core::no_links(&target.directory.join(core::OWN))?;
+        let backup = core::no_links(&root.join(BACKUP))?;
+        let current = core::digest(&path)?;
+        let receipt = self.state(&root)?;
+        let has_backup = backup.try_exists()?;
+        if self.previous.is_some() || has_backup || committed {
+            ensure!(
+                has_backup
+                    && backup.metadata()?.len() <= LIMIT
+                    && core::digest(&backup)? == self.next.before,
+                "OptiScaler 原件备份已变化，已保留"
+            );
+        }
+        if committed {
+            ensure!(
+                current == self.next.applied && receipt.as_ref() == Some(&self.next),
+                "升级后 OptiScaler 已变化，恢复材料已保留"
+            );
+            return Ok(());
+        }
+        if current != self.before {
+            ensure!(
+                current == self.next.applied,
+                "OptiScaler 主文件已被其他程序修改"
+            );
+            let prior = core::no_links(&work.join("old.host"))?;
+            ensure!(
+                prior.metadata()?.len() <= LIMIT && core::digest(&prior)? == self.before,
+                "OptiScaler 升级前的文件副本已变化"
+            );
+            replace(&path, &current, &fs::read(prior)?)?;
+        }
+        if receipt != self.previous {
+            if let Some(old) = &self.previous {
+                core::atomic_json(&root.join(JOURNAL), old)?;
+            } else {
+                fs::remove_file(core::no_links(&root.join(JOURNAL))?)?;
+            }
+        }
+        if self.previous.is_none() && has_backup {
+            fs::remove_file(backup)?;
+        }
+        Ok(())
+    }
 }
 
 fn replace(path: &Path, before: &str, bytes: &[u8]) -> Result<()> {

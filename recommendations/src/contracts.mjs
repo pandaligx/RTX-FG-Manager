@@ -51,12 +51,45 @@ export const schemes = {
   'pipo-sm86-10': ['version.dll','winmm.dll','dbghelp.dll','dinput8.dll','dxgi.dll','d3d12.dll'],
 };
 export const NOTES_LIMIT = 5000;
+function creatorLinks(input) {
+  if (input === undefined) return {};
+  exact(input, ['douyin','bilibili','heybox','tutorial']);
+  const out = {};
+  for (const [kind, raw] of Object.entries(input)) {
+    need(typeof raw === 'string', 'invalid_creator_link');
+    const value = raw.trim();
+    if (!value) continue;
+    need(Buffer.byteLength(value) <= 2048 && /^https:\/\//i.test(value) && !/[\s\\\p{Cc}]/u.test(value), 'invalid_creator_link');
+    let url;
+    try { url = new URL(value); } catch { throw new ApiError('invalid_creator_link'); }
+    const host = url.hostname;
+    need(url.protocol === 'https:' && !url.username && !url.password && host.includes('.')
+      && !host.split('.').some(part => !part) && !/^[\d.]+$|:|\.(?:local|localhost|internal|lan|home|arpa)$/i.test(host),
+      'invalid_creator_link');
+    if (kind !== 'tutorial') {
+      const path = url.pathname.replace(/\/+$/, '');
+      const id = url.searchParams.getAll('user_id');
+      need(!url.port && (
+        kind === 'douyin' && ['www.douyin.com','douyin.com'].includes(host) && /^\/user\/[\w-]{1,160}$/.test(path)
+        || kind === 'bilibili' && host === 'space.bilibili.com' && /^\/[0-9]+$/.test(path)
+        || kind === 'heybox' && ['www.xiaoheihe.cn','xiaoheihe.cn'].includes(host)
+          && path === '/bbs/user_profile_share' && id.length === 1 && /^[\w-]{1,160}$/.test(id[0])
+      ), 'invalid_creator_link');
+      url.search = '';
+      url.hash = '';
+      if (kind === 'heybox') url.searchParams.set('user_id',id[0]);
+    }
+    out[kind] = url.href;
+  }
+  return out;
+}
 export function legacyNotes(notes) {
   const chars=[...notes], suffix='\n[完整备注请使用新版管理器查看]';
   return chars.length<=500 ? notes : chars.slice(0,500-[...suffix].length).join('')+suffix;
 }
 export function recipe(input) {
-  exact(input, ['schema','game','title','notes','scheme','patchVersion','entries','renderer','gpuModel','driver','gpuAlias','neuralRuntime','platform','edition','presets','runtimes']);
+  exact(input, ['schema','game','title','notes','scheme','patchVersion','entries','renderer','gpuModel','driver','gpuAlias','neuralRuntime','platform','edition','presets','runtimes','links']);
+  const links = creatorLinks(input.links);
   need(input.schema === 1, 'unsupported_schema');
   exact(input.game, ['id','name']);
   const game = { id: gameId(input.game.id), name: text(input.game.name, 120) };
@@ -82,6 +115,7 @@ export function recipe(input) {
     need(input.neuralRuntime==='none' && (!runtimes || runtimes.components.every(c=>c.kind!=='nr' && (c.source!=='managed' || c.kind==='streamline'))),'unsupported_runtime_for_scheme');
   }
   return { schema: 1, game, title: text(input.title, 80), notes: text(input.notes || '', NOTES_LIMIT, true),
+    ...(Object.keys(links).length ? {links} : {}),
     ...(input.presets===undefined?{}:{presets:presetSnapshot(input.presets,input.scheme,input.patchVersion)}),
     ...(runtimes===undefined?{}:{runtimes}),
     ...(input.platform?{platform:input.platform}:{}),...(input.edition?{edition:text(input.edition,80)}:{}),

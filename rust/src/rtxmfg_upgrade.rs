@@ -46,6 +46,8 @@ struct Journal {
     before: BTreeMap<String, String>,
     old_marker_hash: String,
     new_marker_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    host: Option<crate::mfg_host::Upgrade>,
 }
 
 pub fn has_pending(directory: &Path) -> Result<bool> {
@@ -76,6 +78,14 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
     );
     j.old.validate()?;
     j.new.validate()?;
+    if let Some(host) = &j.host {
+        ensure!(
+            j.old.selected() == [crate::mfg_plugin::ENTRY]
+                && j.new.selected() == [crate::mfg_plugin::ENTRY],
+            "OptiScaler 更新仅用于插件模式"
+        );
+        host.validate(target)?;
+    }
     target.validate_record(&j.old)?;
     target.validate_record(&j.new)?;
     ensure!(
@@ -130,6 +140,9 @@ fn validate_journal(target: &core::DeploymentTarget, j: &Journal) -> Result<()> 
 
 fn transaction_files(j: &Journal) -> BTreeMap<String, String> {
     let mut files = BTreeMap::from([("old.install.json".into(), j.old_marker_hash.clone())]);
+    if let Some(host) = &j.host {
+        files.insert("old.host".into(), host.before.clone());
+    }
     files.extend(
         j.before
             .iter()
@@ -192,6 +205,9 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
     validate_journal(target, &j)?;
     let marker = core::no_links(&root.join(core::MARKER))?;
     if matches(&marker, &j.new_marker_hash)? {
+        if let Some(host) = &j.host {
+            host.recover(target, &root.join(WORK), true)?;
+        }
         // The marker is the commit point. Never roll back a committed install
         // after a user or game has subsequently changed one of its files.
         for (name, hash) in &j.new.hashes {
@@ -240,6 +256,9 @@ pub fn recover_locked(target: &core::DeploymentTarget) -> Result<bool> {
             );
         }
     }
+    if let Some(host) = &j.host {
+        host.recover(target, &work, false)?;
+    }
     for (name, hash) in &j.new.hashes {
         let path = core::no_links(&target.directory.join(name))?;
         if path.exists()
@@ -274,6 +293,7 @@ pub fn upgrade_locked(
     mut new: core::Record,
     mut files: BTreeMap<String, Vec<u8>>,
     explicit_overrides: Option<&presets::Values>,
+    host_bytes: Option<&[u8]>,
 ) -> Result<String> {
     core::assert_target_stopped(target)?;
     old.validate()?;
@@ -322,7 +342,7 @@ pub fn upgrade_locked(
     ensure!(
         files.iter().all(|(name, bytes)| !bytes.is_empty()
             && bytes.len() as u64
-                <= if name.ends_with(".dll") {
+                <= if name.ends_with(".dll") || name == crate::mfg_plugin::ENTRY {
                     MAX_FILE
                 } else {
                     1024 * 1024
@@ -333,8 +353,18 @@ pub fn upgrade_locked(
         .iter()
         .map(|(n, b)| (n.clone(), core::hash(b)))
         .collect();
+    let plugin_host = if new.selected().iter().any(|n| n == crate::mfg_plugin::ENTRY) {
+        Some(crate::mfg_host::host(target)?)
+    } else {
+        None
+    };
     let j = Journal {
         schema: 1,
+        host: match (host_bytes, plugin_host.as_deref()) {
+            (Some(bytes), Some(path)) => crate::mfg_host::plan_upgrade(target, path, bytes)?,
+            (Some(_), None) => anyhow::bail!("配套 OptiScaler 仅用于插件模式"),
+            _ => None,
+        },
         game_exe: target.game_exe.to_string_lossy().into_owned(),
         old: old.clone(),
         new,
@@ -354,7 +384,9 @@ pub fn upgrade_locked(
         if !old.hashes.contains_key(*name) {
             let path = core::no_links(&dir.join(name))?;
             ensure!(
-                !path.is_file() || !crate::cleanup::known_proxy(&path)?,
+                plugin_host.as_deref() == Some(path.as_path())
+                    || !path.is_file()
+                    || !crate::cleanup::known_proxy(&path)?,
                 "已有其他补丁入口，请先处理冲突"
             );
         }
@@ -379,6 +411,14 @@ pub fn upgrade_locked(
         fs::create_dir(&work)?;
         core::write_new(&work.join("old.install.json"), &marker_bytes)?;
         checkpoint("marker-backup")?;
+        if let Some(host) = &j.host {
+            let original = checked_bytes(&host.path(target)?, MAX_FILE)?;
+            ensure!(
+                core::hash(&original) == host.before,
+                "OptiScaler 主文件在升级期间改变"
+            );
+            core::write_new(&work.join("old.host"), &original)?;
+        }
         for (name, bytes) in &originals {
             core::write_new(
                 &work.join(format!("old.{}", name.replace('/', "__"))),
@@ -420,6 +460,10 @@ pub fn upgrade_locked(
         }
         // The DLL is exposed last so an accidental launch cannot observe the
         // new runtime with an absent configuration.
+        if let Some(host) = &j.host {
+            host.apply(target, host_bytes.context("缺少配套 OptiScaler")?)?;
+            checkpoint("paired-host")?;
+        }
         let mut names = files.keys().collect::<Vec<_>>();
         names.sort_by_key(|n| j.new.selected().contains(n));
         for name in names {
@@ -528,6 +572,93 @@ mod tests {
         )?;
         fs::write(temp.path().join("unrelated-mod.json"), b"preserve")?;
         Ok((temp, target))
+    }
+
+    #[test]
+    #[ignore = "requires both signed MFG and OptiScaler releases in local staging"]
+    fn signed_171_to_172_restores_game_and_recovers_interrupted_host_update() -> Result<()> {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let catalog = crate::cloud::bundled();
+        let old: crate::cloud::Catalog = serde_json::from_slice(&fs::read(
+            root.join("development/v4340-miles-ngx-hf1/signed-resources/rust/cloud-catalog.json"),
+        )?)?;
+        let load = |catalog: &crate::cloud::Catalog, base: &str| -> Result<_> {
+            let package = catalog.selected(SCHEME);
+            crate::cloud::unpack(package, &fs::read(root.join(base).join(&package.archive))?)
+        };
+        let first = load(&old, "development/v4332-mfg171/resources/files")?;
+        let next = load(&catalog, "development/v4341/signed-resources/files")?;
+        let ini = b"[Plugins]\r\nLoadAsiPlugins=false\r\n[FrameGen]\r\nFGOutput=DLSSG\r\n";
+        for (plugin, interrupted) in [(false, false), (true, false), (true, true)] {
+            let directory = tempfile::tempdir()?;
+            let exe = directory.path().join("MfgUpgradeTest.exe");
+            fs::write(&exe, pe(false, 0))?;
+            let target = core::DeploymentTarget::for_game(&exe);
+            let host = directory.path().join("winmm.dll");
+            let original = first[crate::mfg_host::PAYLOAD].clone();
+            if plugin {
+                fs::write(&host, &original)?;
+                fs::write(directory.path().join("OptiScaler.ini"), ini)?;
+            }
+            let entry = if plugin {
+                crate::mfg_plugin::ENTRY
+            } else {
+                "version.dll"
+            };
+            let deploy = |mut files: BTreeMap<String, Vec<u8>>, version| {
+                if plugin {
+                    let dll = files.remove("version.dll").unwrap();
+                    files.insert(entry.to_owned(), dll);
+                }
+                core::deploy_prepared_context_at_with_overrides(
+                    &target,
+                    rtxmfg::BACKEND,
+                    &[entry.into()],
+                    None,
+                    files,
+                    Some(version),
+                    Some(&context()),
+                    None,
+                    Some(version),
+                )
+            };
+            deploy(first.clone(), "1.7.1")?;
+            let config = directory.path().join(rtxmfg::CONFIG);
+            fs::write(&config, ORIGINAL)?;
+            if interrupted {
+                FAULT.with(|slot| *slot.borrow_mut() = Some(("paired-host".into(), true)));
+                let result = std::panic::catch_unwind(|| deploy(next.clone(), "1.7.2"));
+                FAULT.with(|slot| *slot.borrow_mut() = None);
+                assert!(result.is_err());
+                let _lock = crate::win::game_lock(directory.path())?;
+                assert!(recover_locked(&target)?);
+                assert_eq!(fs::read(&host)?, first[crate::mfg_host::PAYLOAD]);
+                assert_eq!(
+                    fs::read(directory.path().join(entry))?,
+                    first["version.dll"]
+                );
+                assert_eq!(fs::read(&config)?, ORIGINAL);
+            }
+            deploy(next.clone(), "1.7.2")?;
+            assert_eq!(fs::read(directory.path().join(entry))?, next["version.dll"]);
+            assert_eq!(fs::read(config)?, ORIGINAL);
+            if plugin {
+                assert_eq!(fs::read(&host)?, next[crate::mfg_host::PAYLOAD]);
+            } else {
+                assert!(!host.exists());
+            }
+            crate::cleanup::clean(&exe)?;
+            assert!(!directory.path().join(entry).exists());
+            assert!(!directory.path().join(core::OWN).exists());
+            if plugin {
+                assert_eq!(fs::read(&host)?, original);
+                assert!(!crate::cleanup::known_proxy(&host)?);
+                crate::cleanup::clean(&exe)?;
+                assert_eq!(fs::read(&host)?, original);
+                assert_eq!(fs::read(directory.path().join("OptiScaler.ini"))?, ini);
+            }
+        }
+        Ok(())
     }
     fn install(target: &core::DeploymentTarget, edit: bool) -> Result<String> {
         let values = if edit {

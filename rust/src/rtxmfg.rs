@@ -168,6 +168,14 @@ pub fn parameters() -> Vec<Parameter> {
     ];
     fields.extend(parameters_170());
     fields.extend(parameters_171());
+    fields.push(Parameter {
+        key: "rtx_xemfg_route",
+        section: "",
+        ini_key: "xemfgStreamline",
+        label: "XeSS 帧生成方式",
+        default: "auto",
+        choices: vec![("auto", "自动"), ("2", "兼容模式")],
+    });
     fields
 }
 
@@ -450,7 +458,7 @@ pub fn configure(bytes: &[u8], values: &Values) -> Result<Vec<u8>> {
         .filter(|p| p.section.is_empty())
     {
         if let Some(value) = values.get(p.key) {
-            if p.key == "rtx_opti_ui" && value == "auto" {
+            if matches!(p.key, "rtx_opti_ui" | "rtx_xemfg_route") && value == "auto" {
                 data.as_object_mut()
                     .expect("checked object")
                     .remove(p.ini_key);
@@ -549,6 +557,9 @@ pub fn help(key: &str) -> Option<&'static str> {
         "rtx_xemfg" => Some(
             "需要右侧安装 XeSS 3.0.2 运行库，重启游戏生效。独立模式不需要 OptiScaler；插件模式请在 OptiScaler 中选择 XeFG。",
         ),
+        "rtx_xemfg_route" => Some(
+            "RTX 20–50 系列在支持 DLSS 帧生成的 DX12 游戏中可使用游戏自带的帧生成开关。此时使用固定倍率，动态倍率和限帧无效。遇到兼容问题可改用兼容模式。",
+        ),
         "rtx_xemfg_dynamic" => Some(
             "独立 XeMFG 支持 DX12/Vulkan；Vulkan 仅使用 DLSS 超分输入。游戏原生 FSR/XeSS 帧生成应关闭。",
         ),
@@ -570,6 +581,13 @@ pub fn help(key: &str) -> Option<&'static str> {
 }
 
 pub fn validate_version(version: Option<&str>, values: &Values) -> Result<()> {
+    ensure!(
+        !values.contains_key("rtx_xemfg_route")
+            || version
+                .and_then(|v| semver::Version::parse(v).ok())
+                .is_some_and(|v| v >= semver::Version::new(1, 7, 2)),
+        "此选项需要 MFG Unlocker 1.7.2 或更新版本"
+    );
     ensure!(
         version
             .and_then(|v| semver::Version::parse(v).ok())

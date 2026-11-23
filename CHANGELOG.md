@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.41 — 2026-11-23
+
+- Updated MFG-Unlocker to 1.7.2. Supported games can use their DLSS Frame Generation switch for fixed-multiplier XeMFG. Uninstalling restores the original host when the manager updated an existing OptiScaler installation.
+- For the Steam edition of Marvel’s Spider-Man: Miles Morales with the Delta R3 patch, applying a multiplier also updates the game’s NVIDIA profile. Selecting the default multiplier or uninstalling restores the original setting. DLSS supports up to 6X and XeSS up to 4X.
+- Players can add Douyin, Bilibili and HeyBox profiles beside a setup’s share date. When a setup includes a video tutorial, a play button beside the details button opens it from the card. Paste the full message copied from a mobile app, including Douyin and Bilibili short links. The runtime list shows only files that need installing or updating.
+- Fixed two cleanup and catalog issues that could remove an existing OptiScaler host or bring back a withdrawn scheme after a refresh.
+
 ## 4.3.40 — 2026-11-21
 
 - In Miles Morales on Steam, the Delta patch reads its multiplier from `dlssg_sm86.ini`. Select DLSS Frame Generation and native Streamline plugins for 4X or 6X DLSS. The manager backs up the original Streamline entry point and restores it on uninstall. DLSS defaults to 4X. XeSS supports up to 4X.

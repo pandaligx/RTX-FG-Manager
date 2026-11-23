@@ -2,12 +2,26 @@
 use gpui::{AssetSource, SharedString};
 use std::borrow::Cow;
 // The default component bundle excludes catalog-only icons.
-gpui::assets::icon_assets!(RecommendationAssets, [UsersRound, Download, Flag]);
+gpui::assets::icon_assets!(
+    RecommendationAssets,
+    [UsersRound, Download, Flag, CirclePlay]
+);
 pub struct Assets;
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
         if let Some(bytes) = RecommendationAssets.load(path)? {
             return Ok(Some(bytes));
+        }
+        let profile_icon: Option<&'static [u8]> = match path {
+            "app/profile-douyin.jpg" => Some(include_bytes!("../../app/assets/profile-douyin.jpg")),
+            "app/profile-bilibili.jpg" => {
+                Some(include_bytes!("../../app/assets/profile-bilibili.jpg"))
+            }
+            "app/profile-heybox.jpg" => Some(include_bytes!("../../app/assets/profile-heybox.jpg")),
+            _ => None,
+        };
+        if let Some(bytes) = profile_icon {
+            return Ok(Some(Cow::Borrowed(bytes)));
         }
         if path == "app/manager-backplate.svg" {
             return Ok(Some(Cow::Borrowed(include_bytes!(
@@ -46,6 +60,9 @@ impl AssetSource for Assets {
         files.extend(RecommendationAssets.list(path)?);
         for name in [
             "app/manager.png",
+            "app/profile-douyin.jpg",
+            "app/profile-bilibili.jpg",
+            "app/profile-heybox.jpg",
             "app/manager-backplate.svg",
             "app/refresh.svg",
             "app/trash.svg",
@@ -80,6 +97,7 @@ mod tests {
             "icons/cpu.svg",
             "icons/users-round.svg",
             "icons/flag.svg",
+            "icons/circle-play.svg",
             "icons/thumbs-up.svg",
             "icons/thumbs-down.svg",
             "app/trash.svg",

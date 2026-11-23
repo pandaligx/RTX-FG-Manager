@@ -42,7 +42,7 @@ fn source_and_title_both_have_to_match() -> Result<()> {
         "\"appid\" \"42\"\n\"installdir\" \"Miles\"",
     )?;
     assert!(!is_game(&exe));
-    for revision in ["0.4.2", crate::delta::SIX_X_VERSION] {
+    for revision in ["0.4.2", crate::delta::SIX_X_VERSION, crate::delta::MILES_R3] {
         assert!(needs_driver_profile(
             Some(cloud::DELTA_041_SCHEME),
             Some(revision)
@@ -66,6 +66,10 @@ fn counts_follow_the_actual_engine_contract() -> Result<()> {
         format!("[FrameGeneration]\nEngine={engine}\nMaxGeneratedFrames={count}\n")
     };
     assert_eq!(requested(b"[FrameGeneration]\nEngine=DLSS\n")?, Some(3));
+    assert_eq!(
+        requested(b"[General]\nEnabled=0\n[FrameGeneration]\nEngine=XeSS\nMaxGeneratedFrames=3\n")?,
+        None
+    );
     for count in 0..=5 {
         assert_eq!(
             requested(ini("DLSS", count).as_bytes())?,

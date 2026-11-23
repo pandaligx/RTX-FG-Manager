@@ -154,6 +154,8 @@ pub struct CompactScheme {
     #[serde(default)]
     pub release: Option<CompactRelease>,
     #[serde(default)]
+    pub releases: Vec<CompactRelease>,
+    #[serde(default)]
     pub capabilities: BTreeSet<String>,
 }
 /// Pre-4.3.37 clients read the base archive list. A newer file layout is
@@ -213,9 +215,16 @@ impl CompactCatalog {
                 skipped_schemes.insert(s.id, "此方案需要更新管理器".into());
                 continue;
             }
-            if let Some(release) = s.release.take()
-                && manager_version >= crate::updater::version(&release.min_manager_version)?
-            {
+            let mut selected = None;
+            for release in s.release.take().into_iter().chain(s.releases.drain(..)) {
+                let minimum = crate::updater::version(&release.min_manager_version)?;
+                if minimum <= manager_version
+                    && selected.as_ref().is_none_or(|(other, _)| minimum > *other)
+                {
+                    selected = Some((minimum, release));
+                }
+            }
+            if let Some((_, release)) = selected {
                 s.archives = release.archives;
                 s.name = release.name;
                 s.names = release.names;
@@ -314,36 +323,7 @@ impl Catalog {
     /// A stale mirror/cache must not replace the newer resources shipped with
     /// this manager. Explicitly removed/unsupported schemes remain removed.
     pub fn retain_bundled_versions(&mut self) {
-        let baseline = bundled();
-        retain_newly_introduced(self, &baseline);
-        for (scheme, policy) in &baseline.scheme_policies {
-            let current = self.packages.iter().find(|p| &p.scheme_id == scheme);
-            let fresh = baseline.packages.iter().find(|p| &p.scheme_id == scheme);
-            if let (Some(current), Some(fresh)) = (current, fresh)
-                && let (Ok(a), Ok(b)) = (
-                    semver::Version::parse(
-                        current
-                            .upstream_version
-                            .as_deref()
-                            .unwrap_or(&current.version),
-                    ),
-                    semver::Version::parse(
-                        fresh.upstream_version.as_deref().unwrap_or(&fresh.version),
-                    ),
-                )
-                && a < b
-            {
-                self.packages.retain(|p| &p.scheme_id != scheme);
-                self.packages.extend(
-                    baseline
-                        .packages
-                        .iter()
-                        .filter(|p| &p.scheme_id == scheme)
-                        .cloned(),
-                );
-                self.scheme_policies.insert(scheme.clone(), policy.clone());
-            }
-        }
+        retain_newer_baseline(self, &bundled());
     }
     pub fn validate(&self) -> Result<()> {
         ensure!(
@@ -956,7 +936,27 @@ fn retain_newer_baseline(catalog: &mut Catalog, baseline: &Catalog) {
                 })
                 .max()
         };
-        if latest(baseline) > latest(catalog) {
+        let Some(current) = latest(catalog) else {
+            // A mirror can withdraw a package while retaining its policy for old installs.
+            continue;
+        };
+        // The original R2 archive and HF1 accidentally shared one version.
+        // Correct that one known ordering without blocking future cloud-only fixes.
+        let old_r2 = |c: &Catalog, digest: &str| {
+            c.packages
+                .iter()
+                .any(|p| &p.scheme_id == scheme && p.sha256 == digest)
+        };
+        let known_hotfix = scheme == DELTA_041_SCHEME
+            && old_r2(
+                catalog,
+                "f32e1450b5440ad4e6111244fe8eb665b30d1a5c2f3e30ff2ab896004550c3cf",
+            )
+            && old_r2(
+                baseline,
+                "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d",
+            );
+        if latest(baseline).is_some_and(|version| version > current) || known_hotfix {
             let position = catalog
                 .packages
                 .iter()
@@ -1565,7 +1565,7 @@ fn remember_images(files: &BTreeMap<String, Vec<u8>>) -> Result<()> {
         BTreeSet::new()
     };
     for (n, b) in files {
-        if n.ends_with(".dll") || n.ends_with(".asi") {
+        if n != crate::mfg_host::PAYLOAD && (n.ends_with(".dll") || n.ends_with(".asi")) {
             hashes.insert(crate::cleanup::image_digest(b).context("Invalid DLL image identity")?);
         }
     }
@@ -1628,6 +1628,20 @@ mod tests {
         let old = parse()?.expand_for_manager_version(&index, "4.3.36")?;
         let current = parse()?.expand(&index)?;
         let pre_miles = parse()?.expand_for_manager_version(&index, "4.3.39")?;
+        let hf1 = parse()?.expand_for_manager_version(&index, "4.3.40")?;
+        assert_eq!(
+            hf1.selected(DELTA_041_SCHEME).upstream_version.as_deref(),
+            Some(crate::delta::MILES_INI_VERSION)
+        );
+        assert_eq!(
+            hf1.selected(DELTA_041_SCHEME).sha256,
+            "b2af64e2d6142d0226e77a9317c038bdf89e0b531e7642f58a1e6450dc821c8d"
+        );
+        assert_eq!(hf1.selected(crate::rtxmfg_upgrade::SCHEME).version, "1.7.1");
+        assert_eq!(
+            current.selected(crate::rtxmfg_upgrade::SCHEME).version,
+            "1.7.2"
+        );
         assert_eq!(
             pre_miles
                 .selected(DELTA_041_SCHEME)
@@ -1640,7 +1654,7 @@ mod tests {
                 .selected(DELTA_041_SCHEME)
                 .upstream_version
                 .as_deref(),
-            Some(crate::delta::MILES_INI_VERSION)
+            Some(crate::delta::MILES_R3)
         );
         assert_eq!(
             old.selected(crate::anr::SCHEME).upstream_version.as_deref(),
@@ -1744,7 +1758,7 @@ mod tests {
                 .packages
                 .iter()
                 .filter(|p| p.scheme_id == DELTA_041_SCHEME)
-                .all(|p| p.upstream_version.as_deref() == Some(crate::delta::MILES_INI_VERSION))
+                .all(|p| p.upstream_version.as_deref() == Some(crate::delta::MILES_R3))
         );
     }
 

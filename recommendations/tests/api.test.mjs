@@ -14,6 +14,47 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('creator homepages and the 1.7.2 route survive a legacy edit; the author can remove them', async t => {
+  const f = fixture(t), user = await f.login();
+  const modern = {'x-rtxfg-mfg172':'1', 'x-rtxfg-creator-links':'1'};
+  const presets = {schema:1, profile:'rtxmfg_universal_133', values:{rtx_xemfg_route:'2'}, defaults:{rtx_xemfg_route:'auto'}};
+  const setup = {...content(), scheme:'rtx40mfg-1.3.3-hf2', patchVersion:'1.7.2', entries:['version.dll'], presets,
+    links:{bilibili:'https://space.bilibili.com/42?from=share', tutorial:'https://www.bilibili.com/video/BV123'}};
+  const posted = await f.call('POST','/v1/recipes',{submission:randomUUID(),content:setup},user.token,'test-ip',16,modern);
+  assert.equal(posted.content.links.bilibili,'https://space.bilibili.com/42');
+  assert.deepEqual(posted.content.presets,presets);
+  const path = '/v1/recipes/'+posted.id;
+  const old = await f.call('GET',path,null,user.token,'test-ip',16);
+  assert.equal(old.content.presets,undefined);
+  assert.equal(old.content.links,undefined);
+  await f.call('PUT',path,{revision:1,content:{...old.content, notes:'Changed on older client'}},user.token,'test-ip',16);
+  const fresh = await f.call('GET',path,null,user.token,'test-ip',16,modern);
+  assert.deepEqual(fresh.content.links,posted.content.links);
+  assert.deepEqual(fresh.content.presets,presets);
+  const {links, presets:removed, ...without} = fresh.content;
+  const updated = await f.call('PUT',path,{revision:2,content:without},user.token,'test-ip',16,modern);
+  assert.equal(updated.content.links,undefined);
+  assert.equal(updated.content.presets,undefined);
+  assert.throws(()=>recipe({...setup,patchVersion:'1.7.1'}));
+  for (const links of [{bilibili:'https://space.bilibili.com.evil.com/1'},{tutorial:'file:///c:/secret'}, {tutorial:'https:video.example.com'}, {tutorial:'https://127.0.0.1/'}]) {
+    assert.throws(()=>recipe({...setup,links}));
+  }
+});
+
+test('mobile share profiles and a tutorial round-trip through new and edited cards', async t => {
+  const f = fixture(t), user = await f.login();
+  const headers = {'x-rtxfg-creator-links':'1'};
+  const links = {douyin:'https://www.douyin.com/user/MS4_example', bilibili:'https://space.bilibili.com/42',
+    tutorial:'https://v.douyin.com/ExampleVideo/'};
+  const created = await f.call('POST','/v1/recipes',{submission:randomUUID(), content:{...content(),links}},user.token,'test-ip',16,headers);
+  const path = '/v1/recipes/'+created.id;
+  const browse = () => f.call('GET',path,null,undefined,'visitor',16,headers);
+  assert.deepEqual((await browse()).content.links, links);
+  const edited = {...links, tutorial:'https://b23.tv/ExampleVideo'};
+  await f.call('PUT',path,{revision:created.revision,content:{...content(),links:edited}},user.token,'test-ip',16,headers);
+  assert.deepEqual((await browse()).content.links, edited);
+});
+
 test('NetEase official-client editions survive publishing, old readers and edits in the same game', async t => {
   const f = fixture(t);
   const user = await f.login();

@@ -357,6 +357,9 @@ fn public_text(value: &str, max: usize, empty: bool) -> Result<()> {
     );
     Ok(())
 }
+mod creator_links;
+pub use creator_links::{CreatorLinks, extract_share_url};
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[non_exhaustive]
@@ -365,6 +368,8 @@ pub struct Recipe {
     pub game: GameIdentity,
     pub title: String,
     pub notes: String,
+    #[serde(default, skip_serializing_if = "CreatorLinks::is_empty")]
+    pub links: CreatorLinks,
     pub scheme: String,
     pub patch_version: String,
     pub entries: Vec<String>,
@@ -474,6 +479,7 @@ impl Recipe {
     }
     /// Reading historical cards must not depend on the currently available downloads.
     fn validate_public(&self) -> Result<()> {
+        self.links.normalized()?;
         ensure!(self.schema == 1, "此推荐需要更新管理器");
         crate::recommendation_presets::validate_scheme_version(&self.scheme, &self.patch_version)?;
         if self.scheme == crate::recommendation_presets::MFG_161_COMPAT {
@@ -596,6 +602,7 @@ pub fn installed_recipe(
         let mut entries = record.selected();
         entries.sort();
         let current = Recipe {
+            links: CreatorLinks::default(),
             schema: 1,
             platform: platform(game).into(),
             edition: String::new(),
@@ -979,6 +986,31 @@ impl Client {
             .as_ref()
             .is_some_and(|s| s.expires_at > chrono::Utc::now().timestamp())
     }
+    fn profile_defaults_path(&self, author: &str) -> Option<PathBuf> {
+        let name = format!("author-links-{}.json", core::hash(author.as_bytes()));
+        core::no_links(&self.root.join(name)).ok()
+    }
+    pub fn profile_defaults(&self) -> CreatorLinks {
+        let read = || -> Option<CreatorLinks> {
+            let session = self.active_session().ok()??;
+            let value =
+                core::read_json(&self.profile_defaults_path(&session.user.id)?, 8192).ok()?;
+            let mut links: CreatorLinks = serde_json::from_value(value).ok()?;
+            links.tutorial.clear();
+            links.normalized().ok()
+        };
+        read().unwrap_or_default()
+    }
+    fn remember_profiles(&self, card: &Card) {
+        if card.mine
+            && let Some(path) = self.profile_defaults_path(&card.author)
+        {
+            let mut profiles = card.content.links.clone();
+            profiles.tutorial.clear();
+            // Failure of this optional local preference must not retry a successful POST.
+            let _ = core::atomic_json(&path, &profiles);
+        }
+    }
     pub fn login_expired(&self) -> bool {
         let auth = self.auth.lock().unwrap_or_else(|e| e.into_inner());
         auth.expired
@@ -1151,6 +1183,8 @@ impl Client {
             .header("X-RTXFG-Delta041", "1")
             .header("X-RTXFG-Delta6", "1")
             .header("X-RTXFG-MFG171", "1")
+            .header("X-RTXFG-MFG172", "1")
+            .header("X-RTXFG-Creator-Links", "1")
             .header("X-RTXFG-Encore240", "1")
             .header("X-RTXFG-Encore250", "1")
             .header("X-RTXFG-Pipo042", "1")
@@ -1361,6 +1395,7 @@ impl Client {
             true,
         )?;
         card.validate(&recipe.game.id, catalog)?;
+        self.remember_profiles(&card);
         Ok(card)
     }
     pub fn vote(&self, card: &Card, value: i8, catalog: &cloud::Catalog) -> Result<Card> {
@@ -1403,6 +1438,7 @@ impl Client {
             updated.id == card.id && updated.revision == card.revision.saturating_add(1),
             "推荐内容已更新，请刷新"
         );
+        self.remember_profiles(&updated);
         Ok(updated)
     }
     pub fn remove(&self, card: &Card) -> Result<()> {

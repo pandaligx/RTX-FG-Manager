@@ -1,12 +1,12 @@
 {
   "default_scheme": "upstream-0.3.5-310-9",
   "index": {
-    "bytes": 151311,
-    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-641e4b682d9a7f3f3b49.json",
-    "sha256": "e21a9c75b70c2841ee2825debfac5eb88c969a31fb5cde002059219aebc5d439",
-    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-641e4b682d9a7f3f3b49.json"
+    "bytes": 175888,
+    "fallback_url": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/bundles-331fa0797a23b5e1e2d2.json",
+    "sha256": "fa07574f36bd1bfc1e4e9ee5f66eff15a8e396b8592f91eafab776ec48e57635",
+    "url": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/bundles-331fa0797a23b5e1e2d2.json"
   },
-  "revision": "bundles-641e4b682d9a7f3f3b49",
+  "revision": "bundles-331fa0797a23b5e1e2d2",
   "schema": 3,
   "schemes": [
     {
@@ -71,7 +71,23 @@
           "ru": "Dlssg_for_sm86 · 0.4.2 HF1 · Поддержка Delta Force · DX12/Vulkan",
           "zh": "Dlssg_for_sm86 · 0.4.2 HF1 · 额外支持三角洲专用 · DX12/Vulkan"
         }
-      }
+      },
+      "releases": [
+        {
+          "archives": [
+            "rtxfg-0.4.2-dx12-vulkan-r3-complete-1663111a8681.zip"
+          ],
+          "min_manager_version": "4.3.41",
+          "name": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan",
+          "names": {
+            "en": "Dlssg_for_sm86 · 0.4.2 R3 · Delta Force support · DX12/Vulkan",
+            "ja": "Dlssg_for_sm86 · 0.4.2 R3 · デルタフォース対応 · DX12/Vulkan",
+            "ko": "Dlssg_for_sm86 · 0.4.2 R3 · 델타 포스 지원 · DX12/Vulkan",
+            "ru": "Dlssg_for_sm86 · 0.4.2 R3 · Поддержка Delta Force · DX12/Vulkan",
+            "zh": "Dlssg_for_sm86 · 0.4.2 R3 · 额外支持三角洲专用 · DX12/Vulkan"
+          }
+        }
+      ]
     },
     {
       "archives": [
@@ -129,6 +145,20 @@
         "zh": "MFG Unlocker · 1.7.1"
       },
       "profile": "rtxmfg_universal_133",
+      "release": {
+        "archives": [
+          "mfg-unlocker-1.7.2-complete-522358ba8834.zip"
+        ],
+        "min_manager_version": "4.3.41",
+        "name": "MFG Unlocker · 1.7.2",
+        "names": {
+          "en": "MFG Unlocker · 1.7.2",
+          "ja": "MFG Unlocker · 1.7.2",
+          "ko": "MFG Unlocker · 1.7.2",
+          "ru": "MFG Unlocker · 1.7.2",
+          "zh": "MFG Unlocker · 1.7.2"
+        }
+      },
       "source_url": "https://github.com/dashdogy/RTX40MFG-Unlock"
     },
     {
