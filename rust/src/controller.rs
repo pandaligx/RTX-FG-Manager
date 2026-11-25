@@ -208,7 +208,16 @@ fn defer_if_running(
     }));
     Ok(true)
 }
-pub type NativeSelections = BTreeMap<String, BTreeSet<runtime_files::NativeComponent>>;
+#[derive(Clone, Default)]
+pub struct NativeSelections {
+    pub runtimes: BTreeMap<String, BTreeSet<runtime_files::NativeComponent>>,
+    pub yanyun: BTreeSet<String>,
+}
+impl NativeSelections {
+    fn clear(&mut self) {
+        *self = Self::default();
+    }
+}
 fn dlssg_native_options(scheme: &str) -> bool {
     matches!(scheme, upstream040::SCHEME | cloud::DELTA_041_SCHEME)
 }
@@ -218,6 +227,8 @@ pub struct DlssgInstallOption {
     pub game: String,
     pub patch_label: String,
     pub miles_profile: bool,
+    /// Present for the supported game/package; the bool indicates a free DXGI entry.
+    pub yanyun: Option<bool>,
     pub unavailable: BTreeMap<runtime_files::NativeComponent, String>,
 }
 pub struct PatchInstallPlan {
@@ -676,7 +687,7 @@ impl Controller {
             pending_cleanup: None,
             pending_patch: None,
             patch_install_plan: None,
-            selected_native_components: NativeSelections::new(),
+            selected_native_components: NativeSelections::default(),
             encore_install_values: BTreeMap::new(),
             encore_components: BTreeMap::new(),
             resume_install: None,
@@ -2460,6 +2471,12 @@ impl Controller {
                         scheme,
                         self.cloud_label(package),
                         miles_patch,
+                        package
+                            .upstream_version
+                            .as_deref()
+                            .unwrap_or(&package.version)
+                            .to_owned(),
+                        self.proxies_for(Some(&g.exe)),
                         g.clone(),
                     )
                 })
@@ -2493,7 +2510,7 @@ impl Controller {
             let result = (|| -> Result<PatchInstallPlan> {
                 let mut choices = Vec::new();
                 let mut dlssg_options = Vec::new();
-                for (name, scheme, patch_label, miles_patch, game) in jobs {
+                for (name, scheme, patch_label, miles_patch, version, proxies, game) in jobs {
                     for target in game.deployment_targets() {
                         let exe = target.game_exe.display().to_string();
                         if !paths.contains(&exe) {
@@ -2504,6 +2521,8 @@ impl Controller {
                             let unavailable =
                                 runtime_files::NativeComponent::unavailable(&target, miles_patch);
                             dlssg_options.push(DlssgInstallOption {
+                                yanyun: runtime_files::yanyun::eligible(&target, &scheme, &version)
+                                    .then(|| runtime_files::yanyun::version_entry(&proxies)),
                                 miles_profile: miles_patch
                                     && scanner::is_steam_miles(&target.game_exe),
                                 exe,
@@ -2599,12 +2618,20 @@ impl Controller {
         anyhow::ensure!(choices.len() == plan.choices.len(), "安装选择不完整");
         anyhow::ensure!(
             selected_native
+                .runtimes
                 .iter()
                 .all(|(exe, checked)| !checked.is_empty()
                     && plan.dlssg_options.iter().any(|option| &option.exe == exe
                         && checked
                             .iter()
                             .all(|kind| !option.unavailable.contains_key(kind)))),
+            "安装计划已变化"
+        );
+        anyhow::ensure!(
+            selected_native.yanyun.iter().all(|exe| plan
+                .dlssg_options
+                .iter()
+                .any(|option| &option.exe == exe && option.yanyun == Some(true))),
             "安装计划已变化"
         );
         let mut values = BTreeMap::new();
@@ -3333,7 +3360,7 @@ impl Controller {
                         queue.extend(files);
                     }
                     if dlssg_native_options(scheme) {
-                        let kinds: BTreeSet<_> = targets.iter().filter_map(|exe| selected_native.get(exe)).flatten().collect();
+                        let kinds: BTreeSet<_> = targets.iter().filter_map(|exe| selected_native.runtimes.get(exe)).flatten().collect();
                         queue.extend(kinds.into_iter().filter_map(|kind| kind.download().ok()));
                     }
                     if scheme == rtx_fg_manager::encore::SCHEME && catalog.packages.iter().any(|p| &p.scheme_id == scheme && rtx_fg_manager::encore::supports_200(p.upstream_version.as_deref().or(Some(&p.version))))
@@ -3354,7 +3381,7 @@ impl Controller {
                 let mut native_groups = BTreeMap::<runtime_files::NativeComponent, Vec<core::DeploymentTarget>>::new();
                 if !clean && dlssg_native_options(&scheme) {
                     for exe in &targets {
-                        if let Some(checked) = selected_native.get(exe) {
+                        if let Some(checked) = selected_native.runtimes.get(exe) {
                             let target = game.deployment_target(std::path::Path::new(exe));
                             for kind in checked {
                                 native_groups.entry(*kind).or_default().push(target.clone());
@@ -3365,6 +3392,7 @@ impl Controller {
                 let mut runtime_progress = |transfer| c.send(Event::PayloadProgress(cloud::CloudProgress {
                     transfer, proxy: String::new(), package_index: 1, package_count: 1,
                 }));
+                let mut yanyun = None;
                 let prepared = if clean {
                     Ok(None)
                 } else {
@@ -3378,6 +3406,15 @@ impl Controller {
                                 &game.deployment_target(std::path::Path::new(exe)),
                                 &proxies,
                             )?;
+                            if selected_native.yanyun.contains(exe) {
+                                if yanyun.is_none() {
+                                    yanyun = Some(runtime_files::yanyun::Component::bundled()?);
+                                }
+                                let package = catalog.selected(&scheme);
+                                yanyun.as_ref().context("燕云组件缺失")?.preflight(
+                                    &game.deployment_target(std::path::Path::new(exe)), &scheme,
+                                    package.upstream_version.as_deref().unwrap_or(&package.version), &proxies)?;
+                            }
                         }
                         for (kind, group) in &native_groups {
                             let package = catalog.selected(&scheme);
@@ -3519,9 +3556,12 @@ impl Controller {
                                 Some(&overrides),
                                 payload.upstream_version.as_deref(),
                             ) };
-                            deployed.map(|message| cleanup::CleanOutcome {
-                                message, complete: true,
-                            })
+                            let message = deployed?;
+                            if selected_native.yanyun.contains(&exe) {
+                                yanyun.as_ref().context("燕云组件缺失")?.install(&game.deployment_target(&p))
+                                    .context("帧生成补丁已安装，燕云神经渲染组件安装未完成")?;
+                            }
+                            Ok::<_, anyhow::Error>(cleanup::CleanOutcome { message, complete: true })
                         })()
                     } else {
                         c.send(Event::Progress("正在恢复原件并清理补丁…".into()));
@@ -3532,7 +3572,7 @@ impl Controller {
                             let ok = outcome.complete;
                             let s = outcome.message;
                             all_ok &= ok;
-                            if ok && !clean && dlssg_native_options(&scheme) && selected_native.contains_key(&exe) {
+                            if ok && !clean && dlssg_native_options(&scheme) && selected_native.runtimes.contains_key(&exe) {
                                 awaiting_components.insert(exe.clone());
                             } else {
                                 c.send(Event::PatchResult(ok));
@@ -7460,7 +7500,7 @@ mod tests {
         });
         c.catalog.revision.push_str("-new");
         assert!(
-            c.confirm_patch_options(vec![], NativeSelections::new())
+            c.confirm_patch_options(vec![], NativeSelections::default())
                 .is_err()
         );
         assert!(!c.busy && c.encore_install_values.is_empty());

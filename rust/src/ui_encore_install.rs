@@ -11,7 +11,7 @@ impl Manager {
         };
         let choices = Rc::new(RefCell::new(plan.choices.clone()));
         let dlssg_options = plan.dlssg_options.clone();
-        let selected_native = Rc::new(RefCell::new(NativeSelections::new()));
+        let selected_native = Rc::new(RefCell::new(NativeSelections::default()));
         let title = match (plan.choices.is_empty(), dlssg_options.is_empty()) {
             (true, false) => "Dlssg_for_sm86 安装选项",
             (false, true) => "Encore 安装选项",
@@ -172,6 +172,7 @@ fn dlssg_components(
         let selection = selected.clone();
         let checked = selection
             .borrow()
+            .runtimes
             .get(&exe)
             .is_some_and(|set| set.contains(&kind));
         let reason = option.unavailable.get(&kind).map(|reason| tr.t(reason));
@@ -180,7 +181,7 @@ fn dlssg_components(
             .disabled(reason.is_some())
             .label(tr.t(runtime_label(kind.kind())))
             .on_click(move |checked, window, _| {
-                let mut all = selection.borrow_mut();
+                let all = &mut selection.borrow_mut().runtimes;
                 if *checked {
                     all.entry(exe.clone()).or_default().insert(kind);
                 } else if let Some(set) = all.get_mut(&exe) {
@@ -204,6 +205,29 @@ fn dlssg_components(
                     r.tooltip(move |w, cx| Tooltip::new(reason.clone()).build(w, cx))
                 }),
         );
+    }
+    if let Some(enabled) = option.yanyun {
+        let exe = option.exe.clone();
+        let checked = selected.borrow().yanyun.contains(&exe);
+        body = body.child(row(
+            Checkbox::new(("yanyun-nr", index))
+                .label(tr.t("燕云十六声专用 DLSS 神经渲染"))
+                .checked(checked)
+                .disabled(!enabled)
+                .on_click(move |on, window, _| {
+                    if *on {
+                        selected.borrow_mut().yanyun.insert(exe.clone());
+                    } else {
+                        selected.borrow_mut().yanyun.remove(&exe);
+                    }
+                    window.refresh();
+                }),
+            tr.t(if enabled {
+                "在游戏画面设置中开启"
+            } else {
+                "帧生成入口请只选 version.dll"
+            }),
+        ));
     }
     body.when(option.miles_profile, |view| view.child(
         div().text_xs().whitespace_normal().text_color(cx.theme().muted_foreground)

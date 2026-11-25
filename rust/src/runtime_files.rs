@@ -13,6 +13,7 @@ use std::{
 };
 
 const OWN: &str = ".rtx-fg-runtimes";
+pub mod yanyun;
 const LIMIT: u64 = 512 * 1024 * 1024;
 pub const KINDS: [&str; 6] = ["sr", "rr", "fg", "streamline", "xemfg", "encorefg"];
 pub const ENCORE_FG_FILES: [&str; 7] = [
@@ -1305,7 +1306,9 @@ pub(crate) fn validate_encore_features(
     Ok(())
 }
 fn root(target: &core::DeploymentTarget, kind: &str) -> Result<PathBuf> {
-    filename(kind)?;
+    if kind != yanyun::KIND {
+        filename(kind)?;
+    }
     core::no_links(&target.directory.join(OWN).join(kind))
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -1345,6 +1348,13 @@ fn record_path(path: &Path) -> Result<String> {
 }
 fn destination(target: &core::DeploymentTarget, kind: &str, entry: &Entry) -> Result<PathBuf> {
     let p = core::no_links(Path::new(&entry.path))?;
+    if kind == yanyun::KIND {
+        ensure!(
+            yanyun::valid_destination(target, &p),
+            "燕云组件恢复路径无效"
+        );
+        return Ok(p);
+    }
     let valid_name = p.file_name().is_some_and(|n| {
         if kind == "encorefg" {
             ENCORE_FG_FILES.iter().any(|s| n.eq_ignore_ascii_case(s))
