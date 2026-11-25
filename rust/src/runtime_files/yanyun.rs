@@ -90,13 +90,49 @@ pub fn download_file() -> Result<transfer::DownloadFile> {
     Ok(package()?.download_file())
 }
 
+fn portable_sources(
+    folder: &Path,
+    cancel: &AtomicBool,
+) -> Result<Option<BTreeMap<String, PathBuf>>> {
+    if !folder.is_dir() {
+        return Ok(None);
+    }
+    let mut sources = BTreeMap::new();
+    for (name, expected) in FILES {
+        ensure!(!cancel.load(Ordering::Relaxed), "下载已取消");
+        let source = core::no_links(&folder.join(name))?;
+        if !matches(&source, expected)? {
+            return Ok(None);
+        }
+        sources.insert(name.to_owned(), source);
+    }
+    Ok(Some(sources))
+}
+
 impl Component {
     pub fn prepare(
         github: bool,
         cancel: &AtomicBool,
         progress: &mut dyn FnMut(transfer::Progress),
     ) -> Result<Self> {
-        let sources = prepare_package(package()?, github, cancel, progress)?;
+        let package = package()?;
+        let folder = std::env::current_exe()?
+            .with_file_name("components")
+            .join(KIND);
+        if let Some(sources) = portable_sources(&folder, cancel)? {
+            let file = package.download_file();
+            progress(transfer::Progress {
+                completed: file.bytes,
+                total: file.bytes,
+                item: file.name.clone(),
+                file: Some(file),
+                source: "cache".into(),
+                phase: transfer::Phase::Complete,
+                ..Default::default()
+            });
+            return Ok(Self { sources });
+        }
+        let sources = prepare_package(package, github, cancel, progress)?;
         Ok(Self { sources })
     }
 
@@ -107,13 +143,12 @@ impl Component {
             .collect()
     }
 
-    pub fn preflight(
-        &self,
+    pub fn check_target(
         target: &core::DeploymentTarget,
         scheme: &str,
         version: &str,
         proxies: &[String],
-    ) -> Result<bool> {
+    ) -> Result<()> {
         ensure!(
             eligible(target, scheme, version) && version_entry(proxies),
             "请在燕云十六声中选择 0.4.2 原版或三角洲 R3，并只使用 version.dll 入口"
@@ -136,6 +171,10 @@ impl Component {
             !log.try_exists()? || log.is_file(),
             "OptiScaler.log 被目录占用"
         );
+        Ok(())
+    }
+
+    pub fn preflight(&self, target: &core::DeploymentTarget) -> Result<bool> {
         let already_installed = installed(target)?;
         if !already_installed {
             plan_entries(target, KIND, &self.paths(target), &self.sources)?;
@@ -149,7 +188,7 @@ impl Component {
         let record = core::record(&target.directory)?.context("请先安装帧生成补丁")?;
         target.validate_record(&record)?;
         ensure!(!record.cache_pending, "请先完成补丁卸载");
-        if self.preflight(
+        Self::check_target(
             &target,
             record.scheme_id.as_deref().unwrap_or_default(),
             record
@@ -158,7 +197,8 @@ impl Component {
                 .or(record.payload_version.as_deref())
                 .unwrap_or_default(),
             &record.selected(),
-        )? {
+        )?;
+        if self.preflight(&target)? {
             return Ok(());
         }
         install_locked_with(
@@ -435,10 +475,11 @@ mod tests {
                 .as_deref()
                 .unwrap_or(&payload.version);
             fs::write(game.path().join("dxgi.dll"), b"another mod")?;
-            assert!(addon.preflight(&target, scheme, version, &proxies).is_err());
+            assert!(Component::check_target(&target, scheme, version, &proxies).is_err());
             assert_eq!(fs::read(game.path().join("dxgi.dll"))?, b"another mod");
             fs::remove_file(game.path().join("dxgi.dll"))?;
-            addon.preflight(&target, scheme, version, &proxies)?;
+            Component::check_target(&target, scheme, version, &proxies)?;
+            addon.preflight(&target)?;
             let install_base = || {
                 core::deploy_prepared_context_at_with_overrides(
                     &target,

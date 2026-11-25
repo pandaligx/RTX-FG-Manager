@@ -3410,13 +3410,14 @@ impl Controller {
                                 &proxies,
                             )?;
                             if selected_native.yanyun.contains(exe) {
+                                let target = game.deployment_target(std::path::Path::new(exe));
+                                let package = catalog.selected(&scheme);
+                                runtime_files::yanyun::Component::check_target(&target, &scheme,
+                                    package.upstream_version.as_deref().unwrap_or(&package.version), &proxies)?;
                                 if yanyun.is_none() {
                                     yanyun = Some(runtime_files::yanyun::Component::prepare(catalog.prefer_github, &cancel, &mut runtime_progress)?);
                                 }
-                                let package = catalog.selected(&scheme);
-                                yanyun.as_ref().context("燕云组件缺失")?.preflight(
-                                    &game.deployment_target(std::path::Path::new(exe)), &scheme,
-                                    package.upstream_version.as_deref().unwrap_or(&package.version), &proxies)?;
+                                yanyun.as_ref().context("燕云组件缺失")?.preflight(&target)?;
                             }
                         }
                         for (kind, group) in &native_groups {
