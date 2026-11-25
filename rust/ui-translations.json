@@ -328,7 +328,7 @@
   "Encore 安装选项": ["Encore installation options", "Параметры установки Encore", "Encore のインストール設定", "Encore 설치 옵션"],
   "安装组件": ["Components", "Компоненты", "コンポーネント", "구성 요소"],
   "补丁与设置文件": ["Mod and settings", "Мод и настройки", "MOD と設定ファイル", "모드 및 설정 파일"],
-  "燕云十六声专用 DLSS 神经渲染": ["DLSS Neural Rendering for Where Winds Meet", "Нейронный рендеринг DLSS для Where Winds Meet", "燕雲十六声専用 DLSS ニューラルレンダリング", "연운 전용 DLSS 뉴럴 렌더링"],
+  "燕云十六声 DLSS5 神经渲染套件": ["Where Winds Meet DLSS5 Neural Rendering Kit", "Пакет нейронного рендеринга DLSS5 для Where Winds Meet", "燕雲十六声 DLSS5 ニューラルレンダリングキット", "연운 DLSS5 뉴럴 렌더링 키트"],
   "在游戏画面设置中开启": ["Enable in the game's graphics settings", "Включите в настройках графики игры", "ゲームの画面設定で有効にします", "게임 그래픽 설정에서 켜세요"],
   "帧生成入口请只选 version.dll": ["Select only version.dll for frame generation", "Для генерации кадров выберите только version.dll", "フレーム生成の入口は version.dll のみ選択してください", "프레임 생성용으로 version.dll만 선택하세요"],
   "更新已有 Streamline 插件至 2.14.16": ["Update native Streamline to 2.14.16", "Обновить плагины Streamline до 2.14.16", "既存の Streamline を 2.14.16 に更新", "기존 Streamline을 2.14.16으로 업데이트"],

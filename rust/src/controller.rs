@@ -3360,6 +3360,9 @@ impl Controller {
                         queue.extend(files);
                     }
                     if dlssg_native_options(scheme) {
+                        if targets.iter().any(|exe| selected_native.yanyun.contains(exe)) {
+                            queue.push(runtime_files::yanyun::download_file()?);
+                        }
                         let kinds: BTreeSet<_> = targets.iter().filter_map(|exe| selected_native.runtimes.get(exe)).flatten().collect();
                         queue.extend(kinds.into_iter().filter_map(|kind| kind.download().ok()));
                     }
@@ -3408,7 +3411,7 @@ impl Controller {
                             )?;
                             if selected_native.yanyun.contains(exe) {
                                 if yanyun.is_none() {
-                                    yanyun = Some(runtime_files::yanyun::Component::bundled()?);
+                                    yanyun = Some(runtime_files::yanyun::Component::prepare(catalog.prefer_github, &cancel, &mut runtime_progress)?);
                                 }
                                 let package = catalog.selected(&scheme);
                                 yanyun.as_ref().context("燕云组件缺失")?.preflight(

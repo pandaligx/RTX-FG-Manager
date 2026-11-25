@@ -80,22 +80,23 @@ pub struct Component {
     sources: BTreeMap<String, PathBuf>,
 }
 
-impl Component {
-    pub fn bundled() -> Result<Self> {
-        let app = std::env::current_exe()?;
-        Self::from_directory(&app.with_file_name("components").join(KIND))
-    }
+fn package() -> Result<Package> {
+    Ok(serde_json::from_str(include_str!(
+        "../../assets/yanyun-nr.json"
+    ))?)
+}
 
-    fn from_directory(folder: &Path) -> Result<Self> {
-        let mut sources = BTreeMap::new();
-        for (name, expected) in FILES {
-            let path = core::no_links(&folder.join(name))?;
-            ensure!(
-                matches(&path, expected)?,
-                "燕云神经渲染组件缺失或校验失败，请完整解压测试包：{name}"
-            );
-            sources.insert(name.to_owned(), path);
-        }
+pub fn download_file() -> Result<transfer::DownloadFile> {
+    Ok(package()?.download_file())
+}
+
+impl Component {
+    pub fn prepare(
+        github: bool,
+        cancel: &AtomicBool,
+        progress: &mut dyn FnMut(transfer::Progress),
+    ) -> Result<Self> {
+        let sources = prepare_package(package()?, github, cancel, progress)?;
         Ok(Self { sources })
     }
 
@@ -129,6 +130,11 @@ impl Component {
         ensure!(
             !dxgi.exists() || matches(&dxgi, FILES[0].1)?,
             "dxgi.dll 已被其他补丁占用，请先卸载该补丁"
+        );
+        let log = core::no_links(&target.directory.join(LOG))?;
+        ensure!(
+            !log.try_exists()? || log.is_file(),
+            "OptiScaler.log 被目录占用"
         );
         let already_installed = installed(target)?;
         if !already_installed {
@@ -178,6 +184,86 @@ impl Component {
             },
         )
     }
+}
+
+const LOG: &str = "OptiScaler.log";
+const LOG_STATE: &str = "log-before.json";
+const LOG_BACKUP: &str = "OptiScaler.log.bak";
+
+pub(super) fn snapshot_log(target: &core::DeploymentTarget, folder: &Path) -> Result<()> {
+    let path = core::no_links(&target.directory.join(LOG))?;
+    let before = if path.try_exists()? {
+        ensure!(path.is_file(), "OptiScaler.log 被目录占用");
+        let backup = core::no_links(&folder.join(LOG_BACKUP))?;
+        replace(&path, &backup)?;
+        Some(core::digest(&backup)?)
+    } else {
+        None
+    };
+    core::atomic_json(&core::no_links(&folder.join(LOG_STATE))?, &before)
+}
+
+fn generated_log(path: &Path) -> Result<bool> {
+    let mut header = Vec::new();
+    fs::File::open(path)?.take(8192).read_to_end(&mut header)?;
+    Ok(String::from_utf8_lossy(&header)
+        .lines()
+        .take(12)
+        .any(|s| s.contains("DLSS Unlocked - OptiScaler v0.9.96") && s.contains(" loaded")))
+}
+
+pub(super) fn restore_log(
+    target: &core::DeploymentTarget,
+    folder: &Path,
+    complete: bool,
+) -> Result<()> {
+    let state = core::no_links(&folder.join(LOG_STATE))?;
+    let path = core::no_links(&target.directory.join(LOG))?;
+    let owned = path.is_file() && generated_log(&path)?;
+    if !state.try_exists()? {
+        // The first local 4.3.44 test build did not record the previous log.
+        // Its own header and creation after installation identify a new log.
+        if complete
+            && owned
+            && let (Ok(created), Ok(installed)) =
+                (path.metadata()?.created(), folder.metadata()?.created())
+            && created > installed
+        {
+            fs::remove_file(path)?;
+        }
+        return Ok(());
+    }
+    let original: Option<String> = serde_json::from_value(core::read_json(&state, 256)?)?;
+    // A game crash can leave its freshly opened log empty.
+    let owned = owned || (path.is_file() && path.metadata()?.len() == 0);
+    if let Some(hash) = original {
+        let backup = core::no_links(&folder.join(LOG_BACKUP))?;
+        ensure!(
+            core::valid_hash(&hash) && core::digest(&backup)? == hash,
+            "原有 OptiScaler.log 备份校验失败"
+        );
+        if !path.try_exists()? || owned {
+            replace(&backup, &path)?;
+        } else {
+            ensure!(
+                path.is_file() && core::digest(&path)? == hash,
+                "OptiScaler.log 已被其他程序替换，原件备份已保留"
+            );
+        }
+    } else if owned {
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+pub(super) fn forget_log(folder: &Path) -> Result<()> {
+    for name in [LOG_STATE, LOG_BACKUP] {
+        let p = core::no_links(&folder.join(name))?;
+        if p.try_exists()? {
+            fs::remove_file(p)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn remove_locked(target: &core::DeploymentTarget) -> Result<()> {
@@ -242,10 +328,34 @@ mod tests {
     }
 
     #[test]
-    fn bad_bundle_is_rejected_before_any_game_write() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        fs::write(dir.path().join("dxgi.dll"), b"wrong file")?;
-        assert!(Component::from_directory(dir.path()).is_err());
+    fn download_manifest_matches_the_three_allowed_game_files() -> Result<()> {
+        let bundle = package()?;
+        for (name, hash) in FILES {
+            assert!(
+                bundle
+                    .files
+                    .iter()
+                    .any(|f| f.name == name && f.sha256 == hash)
+            );
+        }
+        assert_eq!(bundle.kind, KIND);
+        assert_eq!(bundle.urls.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn unrelated_replacement_log_is_preserved() -> Result<()> {
+        let game = tempfile::tempdir()?;
+        let record = tempfile::tempdir()?;
+        let target = core::DeploymentTarget::for_game(&game.path().join("yysls.exe"));
+        snapshot_log(&target, record.path())?;
+        let log = game.path().join(LOG);
+        fs::write(&log, b"other program")?;
+        restore_log(&target, record.path(), true)?;
+        assert_eq!(fs::read(&log)?, b"other program");
+        fs::write(&log, b"")?;
+        restore_log(&target, record.path(), true)?;
+        assert!(!log.exists());
         Ok(())
     }
 
@@ -276,18 +386,23 @@ mod tests {
         Ok(())
     }
 
-    // Uses the distribution archives and exact signed sidecar from the release
+    // Uses the signed distribution archives from the release
     // workspace. No game is started. The caller supplies an isolated cache.
     #[test]
-    #[ignore = "requires signed test bundle and both cached 0.4.2 packages"]
+    #[ignore = "requires all three locally cached signed distribution archives"]
     fn signed_packages_install_retry_and_full_uninstall() -> Result<()> {
         let cache = PathBuf::from(std::env::var("RTXFG_YANYUN_QA")?);
         ensure!(
             PathBuf::from(std::env::var("LOCALAPPDATA")?).starts_with(&cache),
             "use isolated cache"
         );
-        let addon =
-            Component::from_directory(&PathBuf::from(std::env::var("RTXFG_YANYUN_BUNDLE")?))?;
+        let addon = Component::prepare(false, &AtomicBool::new(false), &mut |p| {
+            assert_ne!(
+                p.phase,
+                transfer::Phase::Downloading,
+                "use isolated offline fixtures"
+            );
+        })?;
         let catalog = cloud::bundled();
         let proxies = vec![String::from("version.dll")];
         for scheme in [upstream040::SCHEME, cloud::DELTA_041_SCHEME] {
@@ -302,6 +417,8 @@ mod tests {
             let first_ini = b"old settings";
             let root_nr = game.path().join("nvngx_dlssnr.dll");
             let ini = game.path().join("OptiScaler.ini");
+            let log = game.path().join(LOG);
+            fs::write(&log, b"previous log")?;
             fs::write(&ini, first_ini)?;
             fs::write(&root_nr, b"preexisting runtime")?;
             let payload = cloud::prepare(
@@ -322,24 +439,39 @@ mod tests {
             assert_eq!(fs::read(game.path().join("dxgi.dll"))?, b"another mod");
             fs::remove_file(game.path().join("dxgi.dll"))?;
             addon.preflight(&target, scheme, version, &proxies)?;
-            core::deploy_prepared_context_at_with_overrides(
-                &target,
-                &payload.backend,
-                &proxies,
-                None,
-                payload.files,
-                Some(&payload.version),
-                Some(&ctx),
-                None,
-                payload.upstream_version.as_deref(),
-            )?;
+            let install_base = || {
+                core::deploy_prepared_context_at_with_overrides(
+                    &target,
+                    &payload.backend,
+                    &proxies,
+                    None,
+                    payload.files.clone(),
+                    Some(&payload.version),
+                    Some(&ctx),
+                    None,
+                    payload.upstream_version.as_deref(),
+                )
+            };
+            install_base()?;
             assert!(!game.path().join("dxgi.dll").exists());
             assert_eq!(fs::read(&ini)?, first_ini);
+            assert!(!root(&target, KIND)?.exists());
+            assert!(cleanup::clean_outcome_at(&target)?.complete);
+            assert_eq!(fs::read(&log)?, b"previous log");
+            if scheme == upstream040::SCHEME {
+                fs::remove_file(&log)?;
+            }
+            install_base()?;
             addon.install(&target)?;
             for (name, hash) in FILES {
                 assert!(matches(&game.path().join(name), hash)?);
             }
             fs::write(&ini, b"game changed the ini")?;
+            fs::write(
+                &log,
+                b"[23:53:09] [W] DLSS Unlocked - OptiScaler v0.9.96-pre3 (unknown) loaded\n",
+            )?;
+            fs::write(game.path().join("game.log"), b"keep game's log")?;
             addon.install(&target)?;
             assert_eq!(fs::read(&ini)?, b"game changed the ini");
             assert!(cleanup::clean_outcome_at(&target)?.complete);
@@ -348,6 +480,12 @@ mod tests {
             assert!(!root(&target, KIND)?.exists());
             assert_eq!(fs::read(&ini)?, first_ini);
             assert_eq!(fs::read(root_nr)?, b"preexisting runtime");
+            if scheme == upstream040::SCHEME {
+                assert!(!log.exists());
+            } else {
+                assert_eq!(fs::read(log)?, b"previous log");
+            }
+            assert_eq!(fs::read(game.path().join("game.log"))?, b"keep game's log");
             assert_eq!(fs::read(sl.join("sl.dlss_nr.dll"))?, b"game's plugin");
             assert_eq!(
                 fs::read(sl.join("nvngx_dlssnr.dll"))?,

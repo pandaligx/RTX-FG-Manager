@@ -236,6 +236,7 @@ pub(crate) struct Package {
 impl Package {
     fn download_file(&self) -> transfer::DownloadFile {
         let name = match self.kind.as_str() {
+            yanyun::KIND => "DLSS5 NR",
             "sr" => "DLSS SR",
             "rr" => "DLSS RR",
             "fg" => "DLSS FG",
@@ -1711,7 +1712,8 @@ fn install_locked_with(
     mut write_file: impl FnMut(&Path, &Path) -> Result<()>,
 ) -> Result<()> {
     let entries = plan_entries(target, kind, destinations, sources)?;
-    let previous_complete = read(target, kind)?.is_some_and(|r| r.complete);
+    let prior = read(target, kind)?;
+    let previous_complete = prior.as_ref().is_some_and(|r| r.complete);
     let folder = root(target, kind)?;
     fs::create_dir_all(&folder)?;
     for e in &entries {
@@ -1738,6 +1740,9 @@ fn install_locked_with(
     // originals; never delete its journal after only some files were written.
     temp.persist(folder.join("ownership.json"))?;
     let result = (|| -> Result<()> {
+        if kind == yanyun::KIND && prior.is_none() {
+            yanyun::snapshot_log(target, &folder)?;
+        }
         for p in destinations {
             core::assert_target_stopped(target)?;
             let e = record
@@ -1934,6 +1939,9 @@ fn remove_locked_impl(
     // Transfer the earliest verified original before deleting any owner's
     // journal. Other renderers keep their runtime until the last owner leaves.
     shared.persist(kind)?;
+    if kind == yanyun::KIND {
+        yanyun::restore_log(target, &folder, r.complete)?;
+    }
     for e in &r.entries {
         core::assert_target_stopped(target)?;
         let p = destination(target, kind, e)?;
@@ -1957,6 +1965,9 @@ fn remove_locked_impl(
         r.complete = complete;
     }
     if r.entries.is_empty() {
+        if kind == yanyun::KIND {
+            yanyun::forget_log(&folder)?;
+        }
         fs::remove_file(folder.join("ownership.json"))?;
     } else {
         core::atomic_json(&folder.join("ownership.json"), &r)?;

@@ -211,7 +211,7 @@ fn dlssg_components(
         let checked = selected.borrow().yanyun.contains(&exe);
         body = body.child(row(
             Checkbox::new(("yanyun-nr", index))
-                .label(tr.t("燕云十六声专用 DLSS 神经渲染"))
+                .label(tr.t("燕云十六声 DLSS5 神经渲染套件"))
                 .checked(checked)
                 .disabled(!enabled)
                 .on_click(move |on, window, _| {
