@@ -1,14 +1,11 @@
 {
   "schema": 2,
-  "version": "4.3.42",
+  "version": "4.3.43",
   "file": "RTXManager.exe",
-  "sha256": "42888d284b6fbaa786342db97fc957fb7e4899bf9be7a4a07bac881575d8621c",
-  "bytes": 51875240,
+  "sha256": "959d162757c90ff0239636adf65d8847f08006bfccc201274728c1e7f0225895",
+  "bytes": 51887120,
   "notes": {
-    "zh-CN": "## 本次更新\n- 分享方案时可以填写昵称，其他玩家在卡片头像旁就能看到。把鼠标移到主页图标上，可以看到对应的平台名称。\n- 玩家方案入口增加了向按钮内侧扩散的彩色光晕，四秒绕行一圈。修复人形图标缩放时左侧闪线的问题。\n- 补齐多处界面翻译，桌面界面更新至 GPUI Kit 0.11.0 和 GPUI Fast 0.1.19。",
-    "en": "## What's new\n- Add an optional display name when sharing a setup. It appears beside the avatar, and profile link tooltips now name the platform.\n- The player setups button has a four-second color sweep that glows inward. Fixed a flickering line beside the animated people icon.\n- Filled in missing interface translations and updated the desktop UI to GPUI Kit 0.11.0 and GPUI Fast 0.1.19.",
-    "ru": "## Обновление\n- При публикации настройки можно указать имя. Рядом с аватаром появится имя, а подсказки ссылок укажут платформу.\n- Обновлена подсветка кнопки настроек игроков, устранено мерцание возле значка. Дополнены переводы интерфейса.",
-    "ja": "## 更新内容\n- 設定の共有時に任意の表示名を指定できます。カードのアバター横に表示され、プロフィールのツールチップにはサービス名が表示されます。\n- プレイヤー設定ボタンの光が内側に広がるようになり、アイコン横のちらつきを修正しました。画面の翻訳も補いました。",
-    "ko": "## 업데이트\n- 설정을 공유할 때 표시 이름을 입력할 수 있습니다. 아바타 옆에 이름이 표시되며 프로필 링크에 마우스를 올리면 플랫폼 이름이 보입니다.\n- 플레이어 설정 버튼의 빛이 안쪽으로 퍼지도록 변경하고 아이콘 옆의 깜빡임을 수정했습니다. 누락된 화면 번역도 보완했습니다."
+    "zh-CN": "## 本次更新\n- 运行库窗口现在能识别《燕云十六声》等游戏自带的 DLSS 神经渲染组件。更新和还原 Streamline 时会保留游戏自带的神经渲染与 Late Warp 插件。\n- “其他玩家分享的方案”按钮的光带两端逐渐收细，内侧光晕随之收窄，保持四秒一圈。\n- 屏幕阅读器现在可以读出侧栏和高级参数的展开或收起状态。界面构建固定使用 GPUI Kit 0.11.0 的正式发布提交。",
+    "en": "## What's new\n- The runtime window now recognizes native DLSS Neural Rendering components in games such as Where Winds Meet. Updating or restoring Streamline preserves the game's Neural Rendering and Late Warp plugins.\n- Both ends of the player setups button's light sweep now taper, with a narrower inner glow. Each cycle takes four seconds.\n- Screen readers can now announce whether the sidebar and advanced preset controls are expanded or collapsed. The UI build is pinned to the official GPUI Kit 0.11.0 release commit."
   }
 }
