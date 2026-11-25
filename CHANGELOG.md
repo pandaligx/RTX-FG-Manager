@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.3.44 — 2026-11-26
+
+- An optional DLSS Neural Rendering kit is available for Where Winds Meet on Windows. Select yysls.exe, choose stock 0.4.2 or Delta R3, and select version.dll as the only entry. The kit is available in the install dialog.
+- Players can now include the kit in a shared setup. Installation checks the game's plugins and file conflicts, and uninstalling restores the original files.
+
 ## 4.3.43 — 2026-11-25
 
 - The runtime window now recognizes native DLSS Neural Rendering components in games such as Where Winds Meet. Updating or restoring Streamline preserves the game's Neural Rendering and Late Warp plugins.
