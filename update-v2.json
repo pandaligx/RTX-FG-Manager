@@ -1,11 +1,11 @@
 {
   "schema": 2,
-  "version": "4.3.43",
+  "version": "4.3.44",
   "file": "RTXManager.exe",
-  "sha256": "959d162757c90ff0239636adf65d8847f08006bfccc201274728c1e7f0225895",
-  "bytes": 51887120,
+  "sha256": "10bf8c1fcc39005e1c557a5676bca924a7e1ce7dcc4c084aa2a8f9cb5931b209",
+  "bytes": 51975464,
   "notes": {
-    "zh-CN": "## 本次更新\n- 运行库窗口现在能识别《燕云十六声》等游戏自带的 DLSS 神经渲染组件。更新和还原 Streamline 时会保留游戏自带的神经渲染与 Late Warp 插件。\n- “其他玩家分享的方案”按钮的光带两端逐渐收细，内侧光晕随之收窄，保持四秒一圈。\n- 屏幕阅读器现在可以读出侧栏和高级参数的展开或收起状态。界面构建固定使用 GPUI Kit 0.11.0 的正式发布提交。",
-    "en": "## What's new\n- The runtime window now recognizes native DLSS Neural Rendering components in games such as Where Winds Meet. Updating or restoring Streamline preserves the game's Neural Rendering and Late Warp plugins.\n- Both ends of the player setups button's light sweep now taper, with a narrower inner glow. Each cycle takes four seconds.\n- Screen readers can now announce whether the sidebar and advanced preset controls are expanded or collapsed. The UI build is pinned to the official GPUI Kit 0.11.0 release commit."
+    "zh-CN": "## 本次更新\n- Windows 版为《燕云十六声》增加可选的 DLSS 神经渲染套件。选中 yysls.exe，使用原版 0.4.2 或三角洲 R3，单选 version.dll 后，即可在安装窗口勾选。\n- 玩家分享的方案现在可以包含燕云套件。安装前会检查游戏自带的插件及文件冲突，卸载时还原原有文件。",
+    "en": "## What's new\n- An optional DLSS Neural Rendering kit is available for Where Winds Meet on Windows. Select yysls.exe, choose stock 0.4.2 or Delta R3, and select version.dll as the only entry. The kit is available in the install dialog.\n- Players can now include the kit in a shared setup. Installation checks the game's plugins and file conflicts, and uninstalling restores the original files."
   }
 }
