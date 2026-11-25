@@ -39,6 +39,9 @@ const STREAMLINE_PLUGINS: [&str; 10] = [
 pub const NATIVE_STREAMLINE_VERSION: &str = "2.14.16";
 const STREAMLINE_LICENSE: &str = "RTXFG-Streamline-LICENSE.txt";
 const INTERPOSER: &str = "sl.interposer.dll";
+// These game-supplied companions may coexist with the matching SDK. They are
+// never download targets and must not enter the install or restore journal.
+const GAME_STREAMLINE_PLUGINS: [&str; 2] = ["sl.dlss_nr.dll", "sl.latewarp.dll"];
 
 /// Update the native plugin locations, never add an interposer beside a different
 /// executable. This is independent from Encore's added-FG integration.
@@ -128,6 +131,16 @@ fn native_streamline_plan(
         for entry in fs::read_dir(&folder)? {
             let entry = entry?;
             let name = entry.file_name().to_string_lossy().to_lowercase();
+            if GAME_STREAMLINE_PLUGINS.contains(&name.as_str()) {
+                let path = core::no_links(&entry.path())?;
+                let existing = version(&path).with_context(|| path.display().to_string())?;
+                ensure!(
+                    version_numbers(&existing) == version_numbers(NATIVE_STREAMLINE_VERSION),
+                    "Streamline {existing} ≠ {NATIVE_STREAMLINE_VERSION} ({})",
+                    path.display()
+                );
+                continue;
+            }
             ensure!(
                 !name.starts_with("sl.")
                     || !name.ends_with(".dll")
@@ -159,7 +172,7 @@ fn native_streamline_plan(
                 if path.is_file() {
                     let v = version(&path)?;
                     ensure!(
-                        version_numbers(&v) <= version_numbers("2.14.16"),
+                        version_numbers(&v) <= version_numbers(NATIVE_STREAMLINE_VERSION),
                         "游戏已有更新的 Streamline 插件，保留现有文件：{}",
                         path.display()
                     );
@@ -2465,6 +2478,59 @@ mod tests {
             assert_eq!(fs::read(&dll)?, b"original FG");
             assert_eq!(fs::read(&fg_plugin)?, b"original FG plugin");
             assert_eq!(fs::read(nested.join(INTERPOSER))?, b"other entry");
+        }
+        Ok(())
+    }
+    #[test]
+    fn native_streamline_preserves_game_neural_and_latewarp_plugins() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let t = target(&tmp.path().join("Game"))?;
+        let folder = t.directory.join("Streamline");
+        fs::create_dir(&folder)?;
+        for name in [
+            "sl.dlss_nr.dll",
+            "sl.latewarp.dll",
+            "nvngx_dlssnr.dll",
+            "sl.common.dll",
+        ] {
+            fs::write(folder.join(name), format!("original {name}"))?;
+        }
+        let evidence = scanner::inspect(&t.game_exe);
+        let plan = |extra: &str| {
+            native_streamline_paths_from(&t, &evidence, |p| {
+                Ok(if p.ends_with("sl.common.dll") {
+                    "2.7.30"
+                } else {
+                    extra
+                }
+                .into())
+            })
+        };
+        assert!(plan("2.15.0.0").is_err());
+        assert!(plan("2.12.0.0").is_err());
+        let paths = plan("2.14.16.0")?;
+        let mut files = BTreeMap::new();
+        for name in ["sl.common.dll", STREAMLINE_LICENSE] {
+            let src = tmp.path().join(name);
+            fs::write(&src, format!("new {name}"))?;
+            files.insert(name.into(), src);
+        }
+        install_locked(&t, "fg", &paths, &files)?;
+        assert_eq!(
+            fs::read(folder.join("sl.common.dll"))?,
+            b"new sl.common.dll"
+        );
+        remove_many(std::slice::from_ref(&t), "streamline")?;
+        for name in [
+            "sl.dlss_nr.dll",
+            "sl.latewarp.dll",
+            "nvngx_dlssnr.dll",
+            "sl.common.dll",
+        ] {
+            assert_eq!(
+                fs::read(folder.join(name))?,
+                format!("original {name}").as_bytes()
+            );
         }
         Ok(())
     }

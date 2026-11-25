@@ -85,14 +85,43 @@ impl BorderTrack {
     }
 }
 
-// The lit half has a soft leading edge and a longer tail. Both ends reach zero
-// before the phase wraps, so the loop has no visible join.
-fn beam_strength(trail: f32) -> f32 {
+struct BeamProfile {
+    opacity: f32,
+    rim_width: f32,
+    // In units of button height, so all four sides have the same reach.
+    glow_depth: f32,
+}
+
+impl BeamProfile {
+    // Kit snaps each stroke to device pixels. Blend the two adjacent widths so
+    // a moving tip doesn't pop from one pixel to two at normal or fractional DPI.
+    fn rim_layers(&self, scale: f32) -> [(f32, f32); 2] {
+        let pixels = self.rim_width * scale;
+        let fringe_alpha = self.opacity * pixels.fract();
+        let core_alpha = (self.opacity - fringe_alpha) / (1. - fringe_alpha);
+        [
+            (pixels.ceil() / scale, fringe_alpha),
+            (pixels.floor() / scale, core_alpha),
+        ]
+    }
+}
+
+// The rim and its reflection taper together at either tip. Brightness trails
+// behind the moving front independently of the width of the band.
+fn beam_profile(trail: f32) -> Option<BeamProfile> {
+    if trail <= 0. || trail >= 0.5 {
+        return None;
+    }
     let smooth = |t: f32| {
         let t = t.clamp(0., 1.);
         t * t * (3. - 2. * t)
     };
-    smooth(trail / 0.05) * smooth((0.5 - trail) / 0.23)
+    let taper = smooth(trail.min(0.5 - trail) / 0.16);
+    Some(BeamProfile {
+        opacity: smooth(trail / 0.05) * smooth((0.5 - trail) / 0.23),
+        rim_width: 2. * taper,
+        glow_depth: 0.95 * taper,
+    })
 }
 
 /// Light from each edge fades into the face of the button. Opposing edges
@@ -126,15 +155,14 @@ fn paint_inner_glow(
             let edge = if far { across } else { 0. };
             let (x, y) = if horizontal { (mid, edge) } else { (edge, mid) };
             let trail = (phase - track.distance_at(x, y) / length).rem_euclid(1.);
-            let strength = beam_strength(trail);
-            if strength <= 0. {
+            let Some(profile) = beam_profile(trail) else {
                 continue;
-            }
+            };
             let tint = crate::ui_themes::flowing_accent(palette, phase - 1.75 * trail);
-            let depth = (track.height * (0.52 + 0.43 * strength) / across).min(1.);
+            let depth = (track.height * profile.glow_depth / across).min(1.);
             let fog = linear_gradient(
                 angle,
-                linear_color_stop(tint.opacity(0.46 * strength), 0.),
+                linear_color_stop(tint.opacity(0.46 * profile.opacity), 0.),
                 linear_color_stop(tint.opacity(0.), depth),
             );
             let from = px(start as f32 / scale);
@@ -274,8 +302,7 @@ impl RenderOnce for RecommendationEntry {
                         let ly = (y + bottom) as f32 / (2. * scale) - top;
                         let distance = track.distance_at(lx, ly) / length;
                         let trail = (phase - distance).rem_euclid(1.);
-                        let alpha = beam_strength(trail);
-                        if alpha > 0. {
+                        if let Some(profile) = beam_profile(trail) {
                             let color =
                                 crate::ui_themes::flowing_accent(&palette, phase - 1.75 * trail);
                             let clip = Bounds::new(
@@ -288,14 +315,18 @@ impl RenderOnce for RecommendationEntry {
                             window.with_content_mask(
                                 Some(ContentMask { bounds: clip }),
                                 |window| {
-                                    window.paint_quad(quad(
-                                        bounds,
-                                        px(track.radius),
-                                        transparent_black(),
-                                        px(2.),
-                                        color.opacity(alpha),
-                                        BorderStyle::Solid,
-                                    ));
+                                    for (width, opacity) in profile.rim_layers(scale) {
+                                        if width > 0. && opacity > 0. {
+                                            window.paint_quad(quad(
+                                                bounds,
+                                                px(track.radius),
+                                                transparent_black(),
+                                                px(width),
+                                                color.opacity(opacity),
+                                                BorderStyle::Solid,
+                                            ));
+                                        }
+                                    }
                                 },
                             );
                         }
@@ -335,8 +366,9 @@ mod tests {
     #[test]
     fn exactly_half_the_perimeter_lights_up_and_the_loop_wraps() {
         for phase in [0., 0.13, 0.51, 0.92] {
-            let strength =
-                |position: f32, phase: f32| beam_strength((phase - position).rem_euclid(1.));
+            let strength = |position: f32, phase: f32| {
+                beam_profile((phase - position).rem_euclid(1.)).map_or(0., |p| p.opacity)
+            };
             let lit = (0..1000)
                 .filter(|i| strength(*i as f32 / 1000., phase) > 0.)
                 .count();
@@ -346,6 +378,38 @@ mod tests {
                 assert!(
                     (strength(position, phase) - strength(position, phase + 1.)).abs() < 0.00001
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn both_tips_narrow_the_rim_and_the_inner_glow() {
+        let center = beam_profile(0.25).unwrap();
+        assert_eq!(center.rim_width, 2.);
+        assert_eq!(center.glow_depth, 0.95);
+        for tip in [|distance: f32| distance, |distance: f32| 0.5 - distance] {
+            assert!(beam_profile(tip(0.)).is_none());
+            let mut previous = (0., 0.);
+            for distance in [0.01, 0.04, 0.08, 0.12, 0.16] {
+                let p = beam_profile(tip(distance)).unwrap();
+                assert!(p.rim_width > previous.0 && p.glow_depth > previous.1);
+                if distance <= 0.04 {
+                    assert!(p.rim_width < 0.5 && p.glow_depth < 0.2);
+                }
+                previous = (p.rim_width, p.glow_depth);
+            }
+        }
+    }
+
+    #[test]
+    fn rim_coverage_survives_pixel_snapping_at_different_scales() {
+        for scale in [1., 1.25, 1.5, 2.] {
+            for i in 1..500 {
+                let profile = beam_profile(i as f32 / 1000.).unwrap();
+                let [(outer, fringe), (inner, core)] = profile.rim_layers(scale);
+                let overlap = fringe + core * (1. - fringe);
+                let coverage = inner * overlap + (outer - inner) * fringe;
+                assert!((coverage - profile.rim_width * profile.opacity).abs() < 1e-5);
             }
         }
     }

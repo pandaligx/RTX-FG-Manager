@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.43 — 2026-11-25
+
+- The runtime window now recognizes native DLSS Neural Rendering components in games such as Where Winds Meet. Updating or restoring Streamline preserves the game's Neural Rendering and Late Warp plugins.
+- Both ends of the player setups button's light sweep now taper, with a narrower inner glow. Each cycle takes four seconds.
+- Screen readers can now announce whether the sidebar and advanced preset controls are expanded or collapsed. The UI build is pinned to the official GPUI Kit 0.11.0 release commit.
+
 ## 4.3.42 — 2026-11-23
 
 - Add an optional display name when sharing a setup. It appears beside the avatar, and profile link tooltips now name the platform.

@@ -107,7 +107,7 @@ cargo build --locked --features native-probes,fixture-tests
 
 ## Source and CI boundaries
 
-Keep `Cargo.lock`, `.cargo/config.toml`, Rust sources/assets, current JSON language resources, and `vendor/gpui_fast_windows` together. The Kit integration is pinned to commit `e7b936759c070bf83ee7466783a9b3c16ab31171` for GPUI Fast 0.1.19 and GPUI Pre 0.3.14. The Windows patch starts from the published Fast 0.1.19 crate and carries the manager's opaque HWND presentation, first-frame, DPI and font compatibility changes.
+Keep `Cargo.lock`, `.cargo/config.toml`, Rust sources/assets, current JSON language resources, and `vendor/gpui_fast_windows` together. GPUI Kit is pinned to the v0.11.0 release commit `e97fe438129c5e4ccab504f2e6fafd9a4e396bba` with GPUI Fast 0.1.19 and GPUI Pre 0.3.14. The Windows patch starts from the published Fast 0.1.19 crate and carries the manager's opaque HWND presentation, first-frame, DPI and font compatibility changes.
 
 The GPUI Pre 0.3.9 sum-tree, ztracing and ztracing-macro packages are Apache-2.0. The former GPL-only tracing-chain workaround is therefore unnecessary. Preserve the actual upstream license files and local change notes.
 

@@ -728,6 +728,8 @@ pub struct Evidence {
     /// Streamline SR wrapper alone is a clue, not a complete SR runtime.
     pub super_resolution_plugin: bool,
     pub component_paths: Vec<PathBuf>,
+    /// Display-only: a game folder contains both the Streamline NR plugin and its runtime.
+    pub native_neural_runtimes: Vec<PathBuf>,
     /// Native FG/Streamline evidence, also used to keep added FG separate from
     /// a game's existing integration. Patch-private folders remain excluded.
     pub frame_integration_paths: Vec<PathBuf>,
@@ -831,6 +833,8 @@ fn inspect_with_limits(
             result.limited = true;
             continue;
         };
+        let mut has_nr_plugin = false;
+        let mut nr_runtime = None;
         for row in rows {
             entries += 1;
             if entries > max_entries || started.elapsed().as_millis() > max_millis {
@@ -854,6 +858,11 @@ fn inspect_with_limits(
                 result.anti_cheat_vendors.insert(vendor);
             }
             if meta.is_file() {
+                match name.as_str() {
+                    "sl.dlss_nr.dll" => has_nr_plugin = true,
+                    "nvngx_dlssnr.dll" => nr_runtime = Some(row.path()),
+                    _ => {}
+                }
                 if [
                     "nvngx_dlssg.dll",
                     "sl.interposer.dll",
@@ -931,6 +940,9 @@ fn inspect_with_limits(
                 }
             }
         }
+        if has_nr_plugin && let Some(path) = nr_runtime {
+            result.native_neural_runtimes.push(path);
+        }
     }
     result
 }
@@ -938,6 +950,36 @@ fn inspect_with_limits(
 #[cfg(test)]
 mod component_inventory_tests {
     use super::*;
+
+    #[test]
+    fn native_neural_inventory_requires_a_pair_outside_patch_and_backup_folders() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let exe = tmp.path().join("Game.exe");
+        fs::write(&exe, b"test")?;
+        for dir in [
+            "Streamline",
+            "plugin_only",
+            "runtime_only",
+            "backup",
+            "dlssg_sm86",
+        ] {
+            let path = tmp.path().join(dir);
+            fs::create_dir(&path)?;
+            if dir != "runtime_only" {
+                fs::write(path.join("sl.dlss_nr.dll"), b"plugin")?;
+            }
+            if dir != "plugin_only" {
+                fs::write(path.join("nvngx_dlssnr.dll"), b"runtime")?;
+            }
+        }
+        let evidence = inspect(&exe);
+        assert_eq!(
+            evidence.native_neural_runtimes,
+            [tmp.path().join("Streamline/nvngx_dlssnr.dll")]
+        );
+        assert!(!evidence.neural_input() && !evidence.native_frame_generation());
+        Ok(())
+    }
 
     #[test]
     fn installation_inventory_completes_a_truncated_preview_without_crossing_games() -> Result<()> {

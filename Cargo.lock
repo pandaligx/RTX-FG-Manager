@@ -2003,7 +2003,7 @@ dependencies = [
 [[package]]
 name = "gpui-base"
 version = "0.11.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=e7b936759c070bf83ee7466783a9b3c16ab31171#e7b936759c070bf83ee7466783a9b3c16ab31171"
+source = "git+https://github.com/longbridge/gpui-kit?rev=e97fe438129c5e4ccab504f2e6fafd9a4e396bba#e97fe438129c5e4ccab504f2e6fafd9a4e396bba"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2046,7 +2046,7 @@ dependencies = [
 [[package]]
 name = "gpui-component"
 version = "0.11.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=e7b936759c070bf83ee7466783a9b3c16ab31171#e7b936759c070bf83ee7466783a9b3c16ab31171"
+source = "git+https://github.com/longbridge/gpui-kit?rev=e97fe438129c5e4ccab504f2e6fafd9a4e396bba#e97fe438129c5e4ccab504f2e6fafd9a4e396bba"
 dependencies = [
  "anyhow",
  "core-text",
@@ -2093,7 +2093,7 @@ dependencies = [
 [[package]]
 name = "gpui-component-macros"
 version = "0.11.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=e7b936759c070bf83ee7466783a9b3c16ab31171#e7b936759c070bf83ee7466783a9b3c16ab31171"
+source = "git+https://github.com/longbridge/gpui-kit?rev=e97fe438129c5e4ccab504f2e6fafd9a4e396bba#e97fe438129c5e4ccab504f2e6fafd9a4e396bba"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2428,7 +2428,7 @@ dependencies = [
 [[package]]
 name = "gpui-kit"
 version = "0.11.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=e7b936759c070bf83ee7466783a9b3c16ab31171#e7b936759c070bf83ee7466783a9b3c16ab31171"
+source = "git+https://github.com/longbridge/gpui-kit?rev=e97fe438129c5e4ccab504f2e6fafd9a4e396bba#e97fe438129c5e4ccab504f2e6fafd9a4e396bba"
 dependencies = [
  "gpui-base",
  "gpui-component",
@@ -2445,7 +2445,7 @@ dependencies = [
 [[package]]
 name = "gpui-kit-assets"
 version = "0.11.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=e7b936759c070bf83ee7466783a9b3c16ab31171#e7b936759c070bf83ee7466783a9b3c16ab31171"
+source = "git+https://github.com/longbridge/gpui-kit?rev=e97fe438129c5e4ccab504f2e6fafd9a4e396bba#e97fe438129c5e4ccab504f2e6fafd9a4e396bba"
 dependencies = [
  "anyhow",
  "gpui-fast",
@@ -5779,7 +5779,7 @@ dependencies = [
 
 [[package]]
 name = "rtx-fg-manager"
-version = "4.3.42"
+version = "4.3.43"
 dependencies = [
  "anyhow",
  "base64",

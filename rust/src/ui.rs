@@ -2378,6 +2378,7 @@ impl Manager {
             .child(common)
             .child(
                 Button::new("preset-accordion")
+                    .aria_expanded(self.c.boolean("preset_expanded", false))
                     .label(self.t("高级参数"))
                     .icon(if self.c.boolean("preset_expanded", false) { IconName::ChevronDown } else { IconName::ChevronRight })
                     .ghost().small().w_full().justify_start().flex_shrink_0()
@@ -3023,6 +3024,9 @@ impl Manager {
             .copied()
             .unwrap_or(rtx_fg_manager::neural_runtime::RECOMMENDED);
         let evidence = self.c.evidence.get(exe).and_then(Option::as_ref);
+        let native_files = evidence
+            .map(|e| e.native_neural_runtimes.as_slice())
+            .unwrap_or_default();
         let added_nr = !statuses.is_empty()
             && statuses
                 .iter()
@@ -3033,7 +3037,11 @@ impl Manager {
             .iter()
             .any(|n| n.encore_version.is_none() && n.mfg_version.is_none())
         {
-            "请先在所有部署目录安装 Encore 或 MFG 1.7+。"
+            if native_files.is_empty() {
+                "请先在所有部署目录安装 Encore 或 MFG 1.7+。"
+            } else {
+                "原生开关由游戏和显卡决定。此处的安装按钮仅用于 Encore 或 MFG。"
+            }
         } else if statuses.iter().any(|n| !n.supports(version)) {
             "NR 需要 Encore 1.1.0+ 或 MFG 1.7.0+；MFG 使用 310.9.16 运行库"
         } else if added_nr {
@@ -3058,8 +3066,11 @@ impl Manager {
         let disabled = self.c.busy || self.c.read_only || !reason.is_empty();
         let label = if active { "安装中…" } else { "安装" };
         let present = statuses.iter().filter(|n| n.present).count();
+        let native_only = present == 0 && !native_files.is_empty();
         let mut status = if statuses.is_empty() {
             self.c.text("正在检测…")
+        } else if native_only {
+            self.c.text("已检测到游戏 NR 文件")
         } else if present == 0 {
             self.c.text("未安装")
         } else if present < statuses.len() {
@@ -3081,16 +3092,19 @@ impl Manager {
         if statuses.iter().any(|n| n.warning.is_some()) {
             status.push_str(&format!(" · {}", self.c.text("需检查")));
         }
-        let tip = format!(
-            "{}\n\n{}",
-            statuses
+        let tip = if native_only {
+            self.c.text("已检测到游戏 NR 文件")
+        } else {
+            let locations = statuses
                 .iter()
                 .map(|n| format!("{}\n{}", self.c.text(&n.label()), n.path.display()))
                 .collect::<Vec<_>>()
-                .join("\n\n"),
-            self.c
-                .text("仅安装运行库；游戏内开启 DLSS/DLAA 后，Encore 按 Insert，MFG 按 Backspace 设置 NR。")
-        );
+                .join("\n\n");
+            format!(
+                "{locations}\n\n{}",
+                self.c.text("仅安装运行库；游戏内开启 DLSS/DLAA 后，Encore 按 Insert，MFG 按 Backspace 设置 NR。")
+            )
+        };
         let runtime_items = [
             ("310.9.16", self.t("310.9.16 · 推荐 · A/B 模型")),
             ("310.8.0", self.t("310.8.0 · 旧版回退")),
@@ -3150,12 +3164,23 @@ impl Manager {
                         cx,
                     )),
             )
-            .children(self.runtime_locations(
-                "nr",
-                statuses.iter().map(|n| n.path.as_path()).collect(),
-                Default::default(),
-                cx,
-            ))
+            .children(
+                self.runtime_locations(
+                    "nr",
+                    native_files
+                        .iter()
+                        .map(|p| p.as_path())
+                        .chain(
+                            statuses
+                                .iter()
+                                .filter(|n| native_files.is_empty() || n.present || n.managed)
+                                .map(|n| n.path.as_path()),
+                        )
+                        .collect(),
+                    Default::default(),
+                    cx,
+                ),
+            )
             .child(
                 div()
                     .h_flex()
@@ -4546,14 +4571,15 @@ impl Render for Manager {
         if self.first_render_ms.is_none() {
             self.first_render_ms = Some(self.started.elapsed().as_secs_f64() * 1000.)
         }
+        let layout = self.layout(window);
         let content = match self.c.page {
-            3 if self.layout(window).compact => self.details(window, cx),
+            3 if layout.compact => self.details(window, cx),
             _ => self.home(window, cx),
         };
         let automatic_sidebar = f32::from(window.viewport_size().width) < 760. * self.scale();
         let toggle_label = self.t(if automatic_sidebar {
             "窗口较窄，侧栏已自动收起"
-        } else if self.c.boolean("sidebar_collapsed", true) {
+        } else if layout.collapsed {
             "展开侧边栏"
         } else {
             "收起侧边栏"
@@ -4576,6 +4602,7 @@ impl Render for Manager {
                         Button::new("titlebar-sidebar-toggle")
                             .focus_ring(crate::ui_focus::visible(cx))
                             .disabled(automatic_sidebar)
+                            .aria_expanded(!layout.collapsed)
                             .ghost()
                             .small()
                             .size(px(28.))
@@ -4599,7 +4626,7 @@ impl Render for Manager {
                                 this.act(Command::Themes, window, cx)
                             })),
                     )
-                    .when(self.layout(window).compact, |d| {
+                    .when(layout.compact, |d| {
                         d.child(
                             Button::new("titlebar-inspector")
                                 .focus_ring(crate::ui_focus::visible(cx))

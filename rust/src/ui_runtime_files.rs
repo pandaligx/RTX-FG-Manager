@@ -354,11 +354,14 @@ impl Manager {
                 .flat_map(|s| &s.versions)
                 .map(|version| self.c.text(version))
                 .collect::<std::collections::BTreeSet<_>>();
-            let current = if versions.is_empty() {
-                self.c.text("未检测到")
-            } else {
-                versions.into_iter().collect::<Vec<_>>().join(" / ")
-            };
+            let current =
+                if versions.is_empty() && statuses.iter().any(|s| !s.streamline.is_empty()) {
+                    self.c.text("已检测到")
+                } else if versions.is_empty() {
+                    self.c.text("未检测到")
+                } else {
+                    versions.into_iter().collect::<Vec<_>>().join(" / ")
+                };
             let available = if kind == "streamline" {
                 statuses.iter().any(|s| s.available)
                     && statuses.iter().all(|s| !s.applicable || s.available)
