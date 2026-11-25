@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { presetSnapshot } from './presets.mjs';
-import { runtimeSnapshot } from './runtimes.mjs';
+import { hasYanyunKit, runtimeSnapshot } from './runtimes.mjs';
 
 export class ApiError extends Error {
   constructor(code, status = 400) { super(code); this.status = status; }
@@ -111,6 +111,12 @@ export function recipe(input) {
   need(['none','310.9.16','unknown'].includes(input.neuralRuntime), 'invalid_neural_runtime');
   need(input.platform===undefined || ['unknown','steam','epic','ea','gog','ubisoft','xbox','battlenet','wegame','hoyo','cube','sonkwo','standalone'].includes(input.platform),'invalid_platform');
   const runtimes=input.runtimes===undefined?undefined:runtimeSnapshot(input.runtimes);
+  if (hasYanyunKit(runtimes)) {
+    const supported = (input.scheme==='upstream-0.3.5-310-9' && input.patchVersion==='0.4.2')
+      || (input.scheme==='rtxfg-0.4.1-dx12-vulkan' && input.patchVersion==='0.4.2+rtxfg.3');
+    need(supported && input.entries.length===1 && input.entries[0]==='version.dll' && input.neuralRuntime==='none',
+      'unsupported_runtime_for_scheme');
+  }
   if(runtimes?.components.some(c=>c.kind==='encorefg')) need(input.scheme==='dlssg-transfusion-1.4.5.3' && Number(input.patchVersion.split('.')[0])>=2,'unsupported_runtime_for_scheme');
   if(input.scheme==='mfg-unlocker-1.6.1-compat'){
     need(input.patchVersion==='1.6.1','invalid_patch_version');

@@ -70,11 +70,11 @@ function runtimeDetails(snapshot){
   if(!snapshot.components.length){s.append(element('p','未检测到可共享的运行库。','muted'));return s;}
   const wrap=element('div','','table-wrap'),table=element('table',''),head=element('thead',''),row=element('tr',''),body=element('tbody','');
   for(const label of ['组件','版本号','来源']){const th=element('th',label);th.scope='col';row.append(th);}head.append(row);
-  const names={sr:'DLSS SR',rr:'DLSS RR',fg:'DLSS FG',nr:'DLSSNR',xess:'XeSS SR',xess_fg:'XeSS FG',xell:'XeLL'};
+  const names={sr:'DLSS SR',rr:'DLSS RR',fg:'DLSS FG',nr:'DLSSNR',xess:'XeSS SR',xess_fg:'XeSS FG',xell:'XeLL','yanyun-nr':'燕云十六声 DLSS5 神经渲染套件'};
   for(const c of snapshot.components){
     const tr=element('tr',''),name=element('td',''),label=element('span','','runtime-name');label.append(icon('check'),document.createTextNode(names[c.kind]||c.kind));name.append(label);
     const version=element('td',c.versions.map(v=>v==='unknown'?'版本未知':v).join(' / '),'runtime-version');
-    if(c.packageVersion)version.append(element('div','SDK '+c.packageVersion,'muted'));
+    if(c.packageVersion)version.append(element('div',(c.kind==='yanyun-nr'?'套件 ':'SDK ')+c.packageVersion,'muted'));
     tr.append(name,version,element('td',({game:'游戏目录',patch:'随补丁提供',managed:'管理器安装'})[c.source]||c.source));body.append(tr);
   }
   table.append(head,body);wrap.append(table);s.append(wrap);return s;

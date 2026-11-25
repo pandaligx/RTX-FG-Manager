@@ -3,6 +3,8 @@ import { transaction } from './store.mjs';
 
 // Only bundled reviewed mappings or an administrator can associate identities.
 // Player names are suggestions, never automatic cross-title matching rules.
+import { kitVisibilitySql } from './runtimes.mjs';
+
 export function gameDirectory(db, entries = []) {
   const key = db.prepare('SELECT * FROM game_keys WHERE id=?');
   const resolve = id => key.get(gameId(id))?.canonical || id;
@@ -25,20 +27,20 @@ export function gameDirectory(db, entries = []) {
     return [...new Set([id,canonical,...db.prepare('SELECT id FROM game_keys WHERE canonical=?').all(canonical).map(r=>r.id)])];
   };
   const known = id => key.get(id) || db.prepare("SELECT game id,game canonical,json_extract(content,'$.game.name') name,'' original FROM recipes WHERE game=? AND status!='deleted' LIMIT 1").get(id);
-  const describe = (id,admin=false) => {
+  const describe = (id,admin=false,supportsKit=true) => {
     const canonical=resolve(id), data=known(canonical)||known(id);
     const group=ids(id);
-    const recipes=Number(db.prepare(`SELECT COUNT(*) n FROM recipes r JOIN users u ON u.id=r.author WHERE r.game IN (${group.map(()=>'?')}) AND r.status!='deleted' ${admin?'':"AND r.status='visible' AND u.blocked=0"}`).get(...group).n);
+    const recipes=Number(db.prepare(`SELECT COUNT(*) n FROM recipes r JOIN users u ON u.id=r.author WHERE r.game IN (${group.map(()=>'?')}) AND r.status!='deleted' ${admin?'':"AND r.status='visible' AND u.blocked=0"+kitVisibilitySql(supportsKit)}`).get(...group).n);
     return {id:canonical,name:data?.name || canonical,original:data?.original || '',keys:group,recipes};
   };
-  const search=(query,admin=false)=>{
+  const search=(query,admin=false,supportsKit=true)=>{
     const q=text(query,120,true), pattern='%'+q.replace(/[\\%_]/g,c=>'\\'+c)+'%';
     need(q.length>=2 || admin,'query_too_short');
     const records=db.prepare(`SELECT DISTINCT r.game id FROM recipes r JOIN users u ON u.id=r.author
-      WHERE r.status!='deleted' ${admin?'':"AND r.status='visible' AND u.blocked=0"}
+      WHERE r.status!='deleted' ${admin?'':"AND r.status='visible' AND u.blocked=0"+kitVisibilitySql(supportsKit)}
       AND (json_extract(r.content,'$.game.name') LIKE ? ESCAPE '\\' OR r.game=?) ORDER BY r.updated DESC LIMIT 40`).all(pattern,q);
     const catalog=db.prepare("SELECT id FROM game_keys WHERE name LIKE ? ESCAPE '\\' OR original LIKE ? ESCAPE '\\' OR id=? ORDER BY name LIMIT 100").all(pattern,pattern,q);
-    return [...new Set([...records,...catalog].map(r=>resolve(r.id)))].slice(0,20).map(id=>describe(id,admin));
+    return [...new Set([...records,...catalog].map(r=>resolve(r.id)))].slice(0,20).map(id=>describe(id,admin,supportsKit));
   };
   const preview=(source,target)=>{
     source=gameId(source);target=gameId(target);

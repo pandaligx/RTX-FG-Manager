@@ -156,6 +156,12 @@ pub fn execute_with_options(
     if action.runtimes()
         && let Some(runtimes) = &recipe.runtimes
     {
+        if runtimes.has_yanyun() {
+            ensure!(
+                crate::runtime_files::yanyun::supports_scheme(&recipe.scheme, &version),
+                "本机可用的补丁版本与分享中的燕云套件不兼容"
+            );
+        }
         runtimes.preflight(&targets, recipe)?;
         if !action.installs() {
             // Patch-private components cannot be replaced independently. Reject
@@ -265,6 +271,16 @@ pub fn execute_with_options(
             &recipe.entries,
         )?);
     }
+    let shared_nr = recipe.runtimes.as_ref().is_some_and(|r| {
+        r.components
+            .iter()
+            .any(|c| matches!(c.kind.as_str(), "nr" | crate::runtime_files::yanyun::KIND))
+    });
+    let shared_xess = recipe.runtimes.as_ref().is_some_and(|r| {
+        r.components
+            .iter()
+            .any(|c| c.source == "managed" && matches!(c.kind.as_str(), "xess_fg" | "xell"))
+    });
     if complete_encore {
         queue.extend(crate::runtime_files::encore_download_files(&targets)?);
     }
@@ -272,15 +288,6 @@ pub fn execute_with_options(
         if let Some(runtimes) = &recipe.runtimes {
             queue.extend(runtimes.download_files(&targets)?);
         }
-        let shared_nr = recipe
-            .runtimes
-            .as_ref()
-            .is_some_and(|r| r.components.iter().any(|c| c.kind == "nr"));
-        let shared_xess = recipe.runtimes.as_ref().is_some_and(|r| {
-            r.components
-                .iter()
-                .any(|c| c.source == "managed" && c.kind != "encorefg")
-        });
         if !shared_nr
             && (settings.is_some_and(|s| s.requires_nr()) || recipe.neural_runtime == "310.9.16")
         {
@@ -315,6 +322,20 @@ pub fn execute_with_options(
         package_index: 0,
         package_count: 0,
     });
+    // Resolve the optional kit before writing any patch files.
+    let yanyun = if action.runtimes()
+        && let Some(snapshot) = &recipe.runtimes
+    {
+        snapshot.prepare_yanyun(
+            &targets,
+            action.installs(),
+            catalog.prefer_github,
+            cancel,
+            &mut progress,
+        )?
+    } else {
+        None
+    };
     if action.installs() {
         if complete_encore {
             crate::runtime_files::prepare_encore_sources(
@@ -404,18 +425,15 @@ pub fn execute_with_options(
     if action.runtimes() {
         if let Some(runtimes) = &recipe.runtimes {
             runtimes
-                .install(&targets, catalog.prefer_github, cancel, &mut progress)
+                .install(
+                    &targets,
+                    catalog.prefer_github,
+                    cancel,
+                    &mut progress,
+                    yanyun.as_ref(),
+                )
                 .context("方案已安装，配套运行库未完成；参数尚未应用，可重试")?;
         }
-        let shared_nr = recipe
-            .runtimes
-            .as_ref()
-            .is_some_and(|r| r.components.iter().any(|c| c.kind == "nr"));
-        let shared_xess = recipe.runtimes.as_ref().is_some_and(|r| {
-            r.components
-                .iter()
-                .any(|c| c.source == "managed" && c.kind != "encorefg")
-        });
         if !shared_nr
             && (settings.is_some_and(|s| s.requires_nr()) || recipe.neural_runtime == "310.9.16")
         {

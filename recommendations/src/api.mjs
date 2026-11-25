@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {presetMetadata} from './presets.mjs';
 import { ApiError, exact, need, recipe, gameId, text, uuid, legacyNotes, NOTES_LIMIT } from './contracts.mjs';
+import { hasYanyunKit, kitVisibilitySql } from './runtimes.mjs';
 import { authService } from './auth.mjs';
 import { gameDirectory } from './games.mjs';
 import { cleanExpired, limit, transaction, selectRecipes, publicRecipe, deleteRecipe } from './store.mjs';
@@ -16,7 +17,7 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
-    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, mfg172:1, creatorLinks:1, authorName:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, nativeStreamline:1, anr:1, notesLimit:NOTES_LIMIT };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, mfg172:1, creatorLinks:1, authorName:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, nativeStreamline:1, yanyunNr:1, anr:1, notesLimit:NOTES_LIMIT };
     if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
@@ -27,6 +28,8 @@ export function createApi(db, options) {
     const user = auth.user(headers.authorization, method!=='GET');
     // Older test clients reject unknown JSON fields. Opt in to the feedback extension.
     const feedback=headers['x-rtxfg-feedback'];
+    const supportsKit = feedback === '16' && headers['x-rtxfg-yanyun-nr'] === '1';
+    const checkKit = content => need(supportsKit || !hasYanyunKit(content.runtimes),'client_update_required',409);
     const delta041=headers['x-rtxfg-delta041']==='1';
     const supportsDelta6=headers['x-rtxfg-delta6']==='1';
     const delta6=content=>content.scheme==='rtxfg-0.4.1-dx12-vulkan' && content.presets
@@ -105,19 +108,20 @@ export function createApi(db, options) {
       need(!(mine && reported),'invalid_filter');
       need(!(mine || reported) || user,'login_required',401);
       const group=crossStore?games.ids(game):[game],scope=` WHERE r.game IN (${group.map(()=>'?')})`;
-      const where = scope+(mine ? " AND r.author=? AND r.status!='deleted'" : reported ? " AND r.status!='deleted' AND EXISTS(SELECT 1 FROM reports p WHERE p.recipe=r.id AND p.user=? AND p.active=1)" : " AND r.status='visible' AND author.blocked=0");
+      // A legacy client would silently apply only the base patch. Filter before pagination.
+      const where = scope+kitVisibilitySql(supportsKit)+(mine ? " AND r.author=? AND r.status!='deleted'" : reported ? " AND r.status!='deleted' AND EXISTS(SELECT 1 FROM reports p WHERE p.recipe=r.id AND p.user=? AND p.active=1)" : " AND r.status='visible' AND author.blocked=0");
       const args = mine || reported ? [...group,user.id] : group;
       const rows = db.prepare('SELECT * FROM ('+selectRecipes+where+') ORDER BY likes DESC,updated DESC,id LIMIT 25 OFFSET ?').all(...args,offset);
       const count = db.prepare('SELECT COUNT(*) count FROM recipes r JOIN users author ON author.id=r.author'+where).get(...args).count;
       return { items: rows.slice(0,24).map(row=>card(row,game)), total:Number(count), nextOffset:rows.length>24?offset+24:null };
     }
     if (method === 'GET' && route === '/v1/games') {
-      if(crossStore)return {items:games.search(url.searchParams.get('q') || '')};
+      if(crossStore)return {items:games.search(url.searchParams.get('q') || '',false,supportsKit)};
       const q = text(url.searchParams.get('q') || '',120);
       need(q.length>=2,'query_too_short');
       const escaped = q.replace(/[\\%_]/g, c=>'\\'+c);
       const rows = db.prepare(`SELECT r.game id,json_extract(r.content,'$.game.name') name,COUNT(*) recipes
-        FROM recipes r JOIN users u ON u.id=r.author WHERE r.status='visible' AND u.blocked=0
+        FROM recipes r JOIN users u ON u.id=r.author WHERE r.status='visible' AND u.blocked=0 ${kitVisibilitySql(supportsKit)}
         AND json_extract(r.content,'$.game.name') LIKE ? ESCAPE '\\' GROUP BY r.game ORDER BY recipes DESC LIMIT 20`).all('%'+escaped+'%');
       return { items:rows };
     }
@@ -126,12 +130,14 @@ export function createApi(db, options) {
       const row=lookup(match[1]);
       need(row && row.status!=='deleted' && (row.status==='visible' || row.author===user?.id || user?.admin),'not_found',404);
       need(!db.prepare('SELECT blocked FROM users WHERE id=?').get(row.author).blocked || user?.admin,'not_found',404);
+      checkKit(JSON.parse(row.content));
       return card(row);
     }
     if (user && method!=='GET') limit(db,'write:'+user.id,t,60,30);
     if (method === 'POST' && route === '/v1/recipes') {
       exact(body,['submission','content']); need(uuid(body.submission),'invalid_submission');
       const content = recipe(body.content), encoded=JSON.stringify(content);
+      checkKit(content);
       return transaction(db,()=>{
         const old=db.prepare('SELECT id,content,status FROM recipes WHERE author=? AND submission=?').get(user.id,body.submission);
         if(old) { need(old.content===encoded && old.status!=='deleted','submission_conflict',409); return card(lookup(old.id)); }
@@ -145,6 +151,7 @@ export function createApi(db, options) {
     }
     if (match && method!=='GET') return transaction(db,()=>{
       const row=lookup(match[1]); need(row && row.status!=='deleted','not_found',404);
+      checkKit(JSON.parse(row.content));
       if (['like','vote'].includes(match[2]) && method==='PUT') {
         if(match[2]==='like') { exact(body,['revision','liked']); need(typeof body.liked==='boolean','invalid_like'); }
         else { exact(body,['revision','value']); need([-1,0,1].includes(body.value),'invalid_vote'); }
@@ -185,6 +192,7 @@ export function createApi(db, options) {
       need(method==='PUT','not_found',404); exact(body,['revision','content']);
       need(row.revision===body.revision,'revision_changed',409);
       const content=recipe(body.content); need(games.resolve(content.game.id)===games.resolve(row.game),'game_cannot_change');
+      checkKit(content);
       const original=JSON.parse(row.content);content.game=original.game;
       if (!creatorLinks && original.links) content.links = original.links;
       if (!supportsAuthorName && original.authorName) content.authorName = original.authorName;

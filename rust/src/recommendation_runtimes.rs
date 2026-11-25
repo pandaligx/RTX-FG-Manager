@@ -1,4 +1,5 @@
 //! Public runtime inventory: versions and provenance, never local paths or URLs.
+use crate::runtime_files::yanyun;
 use crate::{cloud, core, neural_runtime, runtime_files, win};
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
@@ -48,6 +49,9 @@ impl Component {
     }
 
     fn needs_install(&self, target: &core::DeploymentTarget) -> bool {
+        if self.kind == yanyun::KIND {
+            return !yanyun::shared_installation(target).unwrap_or(false);
+        }
         if self.source == "patch" || self.preserves_game_files() {
             return false;
         }
@@ -70,6 +74,15 @@ impl Component {
     ) -> Result<Option<runtime_files::Status>> {
         let added = recipe.scheme == crate::encore::SCHEME
             && crate::encore::supports_200(Some(&recipe.patch_version));
+        if self.kind == yanyun::KIND {
+            yanyun::Component::check_target(
+                target,
+                &recipe.scheme,
+                &recipe.patch_version,
+                &recipe.entries,
+            )?;
+            return Ok(None);
+        }
         if self.kind == "streamline" {
             let status = runtime_files::inspect(target, "streamline");
             if !status.applicable {
@@ -192,6 +205,7 @@ pub fn grouped(components: &[Component]) -> Vec<(&str, Vec<&Component>)> {
         "rr",
         "fg",
         "nr",
+        yanyun::KIND,
         "xess",
         "xess_fg",
         "xell",
@@ -279,7 +293,16 @@ pub fn preview_changes(
             if c.kind == "streamline" && checked.is_none() {
                 continue;
             }
-            let step = if c.kind == "nr" {
+            let step = if c.kind == yanyun::KIND {
+                match yanyun::shared_installation(target) {
+                    Ok(true) => {
+                        installed.insert(yanyun::KIT_VERSION.to_owned());
+                        RuntimeStep::Keep
+                    }
+                    Ok(false) => RuntimeStep::Install,
+                    Err(_) => RuntimeStep::Verify,
+                }
+            } else if c.kind == "nr" {
                 let status = neural_runtime::inspect(target);
                 installed.extend(status.version.iter().cloned());
                 if status.warning.is_some() {
@@ -348,6 +371,7 @@ pub fn label(kind: &str) -> &'static str {
         "rr" => "DLSS RR",
         "fg" => "DLSS FG",
         "nr" => "DLSSNR",
+        yanyun::KIND => "燕云十六声 DLSS5 神经渲染套件",
         "xess" => "XeSS SR",
         "xess_fg" => "XeSS FG",
         "xell" => "XeLL",
@@ -391,6 +415,9 @@ fn normalized(version: &str) -> String {
         .to_owned()
 }
 impl Snapshot {
+    pub(crate) fn has_yanyun(&self) -> bool {
+        self.components.iter().any(|c| c.kind == yanyun::KIND)
+    }
     pub(crate) fn download_files(
         &self,
         targets: &[core::DeploymentTarget],
@@ -405,7 +432,9 @@ impl Snapshot {
             if needed.is_empty() {
                 continue;
             }
-            if c.source == "managed" {
+            if c.kind == yanyun::KIND {
+                files.push(yanyun::download_file()?);
+            } else if c.source == "managed" {
                 files.extend(runtime_files::download_files(
                     &needed,
                     c.managed_package(),
@@ -436,6 +465,7 @@ impl Snapshot {
                     "rr",
                     "fg",
                     "nr",
+                    yanyun::KIND,
                     "xess",
                     "xess_fg",
                     "xell",
@@ -452,7 +482,7 @@ impl Snapshot {
                     && c.package_version
                         .as_ref()
                         .is_none_or(|v| c.source == "managed"
-                            && ["xess_fg", "xell", "encorefg", "streamline"]
+                            && ["xess_fg", "xell", "encorefg", "streamline", yanyun::KIND]
                                 .contains(&c.kind.as_str())
                             && valid_version(v)
                             && v != "unknown"),
@@ -460,9 +490,19 @@ impl Snapshot {
             );
             ensure!(
                 c.source != "managed"
-                    || ["xess_fg", "xell", "encorefg", "streamline"].contains(&c.kind.as_str()),
+                    || ["xess_fg", "xell", "encorefg", "streamline", yanyun::KIND]
+                        .contains(&c.kind.as_str()),
                 "运行库来源无效"
             );
+            if c.kind == yanyun::KIND {
+                ensure!(
+                    c.source == "managed"
+                        && c.package_version.as_deref() == Some(yanyun::KIT_VERSION)
+                        && c.versions == [yanyun::RUNTIME_VERSION]
+                        && !self.components.iter().any(|other| other.kind == "nr"),
+                    "燕云套件版本不匹配，或与单独的 DLSSNR 重复"
+                );
+            }
             ensure!(
                 c.kind != "streamline"
                     || c.source == "managed"
@@ -497,7 +537,7 @@ impl Snapshot {
                 continue;
             }
             if c.source == "managed" {
-                if c.kind == "streamline" {
+                if c.kind == "streamline" || c.kind == yanyun::KIND {
                     continue;
                 }
                 if c.kind == "encorefg" {
@@ -649,6 +689,8 @@ impl Snapshot {
                 ensure!(
                     actual.components.iter().any(|c| c.kind == expected.kind
                         && c.source == expected.source
+                        && (expected.kind != yanyun::KIND
+                            || c.package_version == expected.package_version)
                         && c.versions
                             .iter()
                             .map(|v| normalized(v))
@@ -664,12 +706,42 @@ impl Snapshot {
         );
         Ok(())
     }
+    pub(crate) fn prepare_yanyun(
+        &self,
+        targets: &[core::DeploymentTarget],
+        installing_patch: bool,
+        github: bool,
+        cancel: &AtomicBool,
+        progress: &mut dyn FnMut(cloud::CloudProgress),
+    ) -> Result<Option<yanyun::Component>> {
+        let needed = self.components.iter().any(|c| {
+            c.kind == yanyun::KIND
+                && (installing_patch || targets.iter().any(|t| c.needs_install(t)))
+        });
+        if !needed {
+            return Ok(None);
+        }
+        let kit = yanyun::Component::prepare(github, cancel, &mut |transfer| {
+            progress(cloud::CloudProgress {
+                transfer,
+                proxy: label(yanyun::KIND).into(),
+                package_index: 1,
+                package_count: 1,
+            })
+        })?;
+        for target in targets {
+            kit.preflight(target)?;
+        }
+        Ok(Some(kit))
+    }
+
     pub fn install(
         &self,
         targets: &[core::DeploymentTarget],
         github: bool,
         cancel: &AtomicBool,
         progress: &mut dyn FnMut(cloud::CloudProgress),
+        yanyun: Option<&yanyun::Component>,
     ) -> Result<()> {
         let mut intel = false;
         for c in &self.components {
@@ -689,7 +761,16 @@ impl Snapshot {
                     package_count: 1,
                 })
             };
-            if c.source == "managed" {
+            if c.kind == yanyun::KIND {
+                let kit = yanyun.context("燕云套件尚未准备完成")?;
+                for target in &needed {
+                    ensure!(
+                        !cancel.load(std::sync::atomic::Ordering::Relaxed),
+                        "操作已取消"
+                    );
+                    kit.install(target)?;
+                }
+            } else if c.source == "managed" {
                 if matches!(c.kind.as_str(), "encorefg" | "streamline") {
                     runtime_files::install_version(
                         &needed,
@@ -737,6 +818,7 @@ pub fn ensure_nr_scheme(scheme: &str) -> Result<()> {
 }
 
 pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
+    let has_kit = yanyun::shared_installation(target)?;
     let mut groups: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
     let mut add = |kind: &str, source: &str, path: &std::path::Path| -> Result<()> {
         let p = core::no_links(path)?;
@@ -749,7 +831,9 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
         Ok(())
     };
     for status in runtime_files::inspect_all(target) {
-        if matches!(status.kind.as_str(), "xemfg" | "encorefg" | "streamline") {
+        if (has_kit && status.kind == "nr")
+            || matches!(status.kind.as_str(), "xemfg" | "encorefg" | "streamline")
+        {
             continue;
         }
         for path in status.paths {
@@ -763,7 +847,7 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
         }
     }
     let nr = neural_runtime::inspect(target);
-    if nr.present {
+    if nr.present && !has_kit {
         add("nr", "game", &nr.path)?;
     }
     if let Some(record) = core::record(&target.directory)? {
@@ -798,6 +882,14 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
             versions: versions.into_iter().collect(),
         })
         .collect();
+    if has_kit {
+        components.push(Component {
+            kind: yanyun::KIND.into(),
+            source: "managed".into(),
+            versions: vec![yanyun::RUNTIME_VERSION.into()],
+            package_version: Some(yanyun::KIT_VERSION.into()),
+        });
+    }
     if let Some(version) = runtime_files::installed_package_version(target, "streamline")? {
         components.push(Component {
             kind: "streamline".into(),
@@ -939,9 +1031,15 @@ mod tests {
         s.components[0].versions.push("310.7.0".into());
         assert!(s.components[0].preserves_game_files());
         s.installable()?;
-        s.install(&[], false, &AtomicBool::new(false), &mut |_| {
-            panic!("native reference inventory must never start a download");
-        })?;
+        s.install(
+            &[],
+            false,
+            &AtomicBool::new(false),
+            &mut |_| {
+                panic!("native reference inventory must never start a download");
+            },
+            None,
+        )?;
         // Unlisted native versions are retained, never substituted with latest.
         assert!(snapshot("999.1.0").components[0].preserves_game_files());
         s.components[0].kind = "nr".into();

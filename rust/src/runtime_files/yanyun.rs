@@ -2,7 +2,10 @@
 //! package keeps version.dll; the companion owns a separate DXGI entry.
 use super::*;
 
-pub(super) const KIND: &str = "yanyun-nr";
+pub(crate) const KIND: &str = "yanyun-nr";
+pub(crate) const RUNTIME_VERSION: &str = "310.9.16";
+// Version of the whole three-file kit. The NR DLL can retain its version across kit updates.
+pub(crate) const KIT_VERSION: &str = "1.0.0";
 const FILES: [(&str, &str); 3] = [
     (
         "dxgi.dll",
@@ -26,14 +29,16 @@ fn game(target: &core::DeploymentTarget) -> bool {
             .is_some_and(|n| n.eq_ignore_ascii_case("yysls.exe"))
 }
 
+pub(crate) fn supports_scheme(scheme: &str, version: &str) -> bool {
+    matches!(
+        (scheme, version),
+        (crate::upstream040::SCHEME, "0.4.2")
+            | (crate::cloud::DELTA_041_SCHEME, crate::delta::MILES_R3)
+    )
+}
+
 pub fn eligible(target: &core::DeploymentTarget, scheme: &str, version: &str) -> bool {
-    cfg!(windows)
-        && game(target)
-        && matches!(
-            (scheme, version),
-            (crate::upstream040::SCHEME, "0.4.2")
-                | (crate::cloud::DELTA_041_SCHEME, crate::delta::MILES_R3)
-        )
+    cfg!(windows) && game(target) && supports_scheme(scheme, version)
 }
 
 pub fn version_entry(proxies: &[String]) -> bool {
@@ -78,6 +83,14 @@ fn installed(target: &core::DeploymentTarget) -> Result<bool> {
 
 pub struct Component {
     sources: BTreeMap<String, PathBuf>,
+}
+
+pub(crate) fn shared_installation(target: &core::DeploymentTarget) -> Result<bool> {
+    if !game(target) || read(target, KIND)?.is_none() {
+        return Ok(false);
+    }
+    ensure!(installed(target)?, "燕云套件不完整，请先修复或卸载后再分享");
+    Ok(true)
 }
 
 fn package() -> Result<Package> {
@@ -503,7 +516,87 @@ mod tests {
                 fs::remove_file(&log)?;
             }
             install_base()?;
-            addon.install(&target)?;
+            let snapshot = crate::recommendation_runtimes::Snapshot {
+                schema: 1,
+                components: vec![crate::recommendation_runtimes::Component {
+                    kind: KIND.into(),
+                    versions: vec![RUNTIME_VERSION.into()],
+                    source: "managed".into(),
+                    package_version: Some(KIT_VERSION.into()),
+                }],
+            };
+            let targets = std::slice::from_ref(&target);
+            let cancel = AtomicBool::new(false);
+            let kit = snapshot.prepare_yanyun(targets, false, false, &cancel, &mut |_| {})?;
+            assert!(kit.is_some());
+            snapshot.install(targets, false, &cancel, &mut |_| {}, kit.as_ref())?;
+            snapshot.verify_installed(targets)?;
+            let captured = crate::recommendation_runtimes::capture(&target)?;
+            captured.validate()?;
+            assert!(captured.has_yanyun());
+            assert!(!captured.components.iter().any(|c| c.kind == "nr"));
+            let as_game = |exe: &Path| crate::scanner::Game {
+                exe: exe.to_string_lossy().into_owned(),
+                ..Default::default()
+            };
+            let identity = crate::recommendations::GameIdentity::new(
+                "steam:3564740".into(),
+                "燕云十六声".into(),
+            )?;
+            let author = crate::recommendations::installed_recipe(
+                &as_game(&exe),
+                identity,
+                &catalog,
+                "RTX 3060".into(),
+                String::new(),
+            )?;
+            let recipe: crate::recommendations::Recipe =
+                serde_json::from_value(serde_json::to_value(&author)?)?;
+            assert_eq!(recipe.neural_runtime, "none");
+            recipe.validate(&catalog)?;
+            recipe.check_runtime_selection()?;
+            let receive = tempfile::tempdir_in(&cache)?;
+            let receive_exe = receive.path().join("yysls.exe");
+            fs::copy(&exe, &receive_exe)?;
+            let receiver = as_game(&receive_exe);
+            let receive_target = core::DeploymentTarget::for_game(&receive_exe);
+            let apply = || {
+                crate::recommendation_presets::execute(
+                    &receiver,
+                    &catalog,
+                    &recipe,
+                    crate::recommendation_presets::Action::InstallAndApply,
+                    1,
+                    &cancel,
+                    |_| {},
+                )
+            };
+            assert!(apply().is_err());
+            assert!(!receive.path().join("version.dll").exists());
+            fs::create_dir(receive.path().join("Streamline"))?;
+            fs::write(
+                receive.path().join("Streamline/sl.dlss_nr.dll"),
+                b"game's plugin",
+            )?;
+            for _ in 0..2 {
+                apply()?;
+                assert!(shared_installation(&receive_target)?);
+                assert!(cleanup::clean_outcome_at(&receive_target)?.complete);
+                assert!(!shared_installation(&receive_target)?);
+                for (name, _) in FILES {
+                    assert!(!receive.path().join(name).exists());
+                }
+                assert!(!receive.path().join("version.dll").exists());
+                assert_eq!(
+                    fs::read(receive.path().join("Streamline/sl.dlss_nr.dll"))?,
+                    b"game's plugin"
+                );
+            }
+            assert!(
+                snapshot
+                    .prepare_yanyun(targets, false, false, &cancel, &mut |_| {})?
+                    .is_none()
+            );
             for (name, hash) in FILES {
                 assert!(matches(&game.path().join(name), hash)?);
             }
@@ -518,6 +611,7 @@ mod tests {
             assert!(cleanup::clean_outcome_at(&target)?.complete);
             assert!(!game.path().join("dxgi.dll").exists());
             assert!(!game.path().join("version.dll").exists());
+            assert!(!shared_installation(&target)?);
             assert!(!root(&target, KIND)?.exists());
             assert_eq!(fs::read(&ini)?, first_ini);
             assert_eq!(fs::read(root_nr)?, b"preexisting runtime");

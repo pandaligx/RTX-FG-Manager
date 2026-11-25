@@ -503,6 +503,17 @@ impl Recipe {
         }
         if let Some(runtimes) = &self.runtimes {
             runtimes.validate()?;
+            if runtimes.has_yanyun() {
+                ensure!(
+                    self.neural_runtime == "none"
+                        && crate::runtime_files::yanyun::supports_scheme(
+                            &self.scheme,
+                            &self.patch_version
+                        )
+                        && crate::runtime_files::yanyun::version_entry(&self.entries),
+                    "燕云套件需要匹配的补丁版本及 version.dll 入口"
+                );
+            }
         }
         self.game.validate()?;
         ensure!(
@@ -609,6 +620,7 @@ pub fn installed_recipe(
             .context("请先为当前游戏安装补丁，再分享已测试的方案")?;
         target.validate_record(&record)?;
         ensure!(!record.cache_pending, "请先处理当前游戏的残留文件");
+        let runtimes = crate::recommendation_runtimes::capture(&target)?;
         let nr = neural_runtime::inspect(&target);
         let mut entries = record.selected();
         entries.sort();
@@ -635,7 +647,7 @@ pub fn installed_recipe(
             gpu_model: gpu.clone(),
             driver: driver.clone(),
             gpu_alias: "unknown".into(),
-            neural_runtime: if nr.present {
+            neural_runtime: if nr.present && !runtimes.has_yanyun() {
                 nr.version
                     .filter(|v| v == "310.9.16")
                     .unwrap_or("unknown".into())
@@ -643,7 +655,7 @@ pub fn installed_recipe(
                 "none".into()
             },
             presets: None,
-            runtimes: Some(crate::recommendation_runtimes::capture(&target)?),
+            runtimes: Some(runtimes),
         };
         let mut current = current;
         current.title = current.suggested_title();
@@ -1202,6 +1214,7 @@ impl Client {
             .header("X-RTXFG-Encore250", "1")
             .header("X-RTXFG-Pipo042", "1")
             .header("X-RTXFG-Native-Streamline", "1")
+            .header("X-RTXFG-Yanyun-NR", "1")
             .header("X-RTXFG-ANR", "1")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
@@ -1394,6 +1407,17 @@ impl Client {
         }
         Ok(())
     }
+    fn check_share_service(&self, recipe: &Recipe) -> Result<()> {
+        if recipe.runtimes.as_ref().is_some_and(|r| r.has_yanyun()) {
+            let capabilities: Value = self.request(Method::GET, "/v1/capabilities", None, false)?;
+            ensure!(
+                capabilities["yanyunNr"].as_u64() == Some(1),
+                "推荐服务尚未支持燕云套件分享，请稍后再试"
+            );
+        }
+        Ok(())
+    }
+
     pub fn share(
         &self,
         submission: &str,
@@ -1401,6 +1425,7 @@ impl Client {
         catalog: &cloud::Catalog,
     ) -> Result<Card> {
         recipe.validate(catalog)?;
+        self.check_share_service(recipe)?;
         let card: Card = self.request(
             Method::POST,
             "/v1/recipes",
@@ -1440,6 +1465,7 @@ impl Client {
             recipe.game.id == card.content.game.id,
             "不能更换已分享方案的游戏"
         );
+        self.check_share_service(recipe)?;
         let updated: Card = self.request(
             Method::PUT,
             &recipe_route(card, "")?,
@@ -1555,6 +1581,7 @@ fn error_message(code: &str) -> &'static str {
         "mail_unavailable" => "验证码暂时无法发送，请稍后再试",
         "rate_limited" | "wait_before_resending" => "操作过于频繁，请稍后再试",
         "five_recipes_per_game" => "每款游戏最多分享 5 个方案，请先移除旧方案",
+        "client_update_required" => "请更新管理器后再使用此分享",
         "revision_changed" => "此方案已更新，请刷新后再操作",
         "game_mismatch" | "game_cannot_change" => "游戏关联已变化，请刷新后重新选择",
         "private_or_unsafe_text" => "备注不能包含路径、链接或敏感信息",
@@ -2326,6 +2353,39 @@ mod tests {
         serde_json::from_value(json!({"id":uuid::Uuid::new_v4().to_string(),"author":uuid::Uuid::new_v4().to_string(),"revision":1,"updatedAt":100,"likes":likes,"liked":false,"mine":false,"status":"visible",
           "content":{"schema":1,"game":{"id":"steam:292030","name":"The Witcher 3"},"title":"Working setup","notes":"DX12","scheme":crate::encore::SCHEME,"patchVersion":"1.1.4","entries":["dxgi.dll"],"renderer":"dx12","gpuModel":gpu,"driver":driver,"gpuAlias":"unchanged","neuralRuntime":"none"}})).unwrap()
     }
+    #[test]
+    fn yanyun_sharing_requires_a_capable_service_before_posting() -> Result<()> {
+        let mut recipe = card("RTX 3060", "", 0).content;
+        let data = tempfile::tempdir()?;
+        recipe.scheme = crate::upstream040::SCHEME.into();
+        recipe.patch_version = "0.4.2".into();
+        recipe.entries = vec!["version.dll".into()];
+        recipe.runtimes = Some(serde_json::from_value(json!({"schema":1,"components":[
+            {"kind":"yanyun-nr","source":"managed","packageVersion":"1.0.0","versions":["310.9.16"]}
+        ]}))?);
+        for capable in [false, true] {
+            let (origin, server) = mock_service(vec![(
+                200,
+                if capable {
+                    json!({"yanyunNr":1})
+                } else {
+                    json!({})
+                },
+            )]);
+            let client = online_test_client(data.path(), origin);
+            assert_eq!(client.check_share_service(&recipe).is_ok(), capable);
+            let requests = server.join().unwrap();
+            assert_eq!(requests.len(), 1);
+            assert!(requests[0].starts_with("GET /v1/capabilities "));
+            assert!(
+                requests[0]
+                    .to_ascii_lowercase()
+                    .contains("x-rtxfg-yanyun-nr: 1")
+            );
+        }
+        Ok(())
+    }
+
     #[test]
     fn long_notes_count_unicode_and_remain_bounded() {
         let mut c = card("RTX 3060", "581.80", 1);

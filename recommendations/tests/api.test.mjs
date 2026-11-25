@@ -114,6 +114,41 @@ test('MWSR and Pipo settings survive legacy reads and edits without mixing forks
   assert.throws(()=>recipe({...pipo,scheme:'pipotoufik-mfg-vulkan-sm86-7'}));
 });
 
+test('Where Winds Meet kit survives sharing and editing; older clients see only complete compatible cards',async t=>{
+  const f=fixture(t),user=await f.login(),headers={'x-rtxfg-yanyun-nr':'1'};
+  const modern=(method,path,body)=>f.call(method,path,body,user.token,'test-ip',16,headers);
+  const old=(method,path,body)=>f.call(method,path,body,user.token,'test-ip',16);
+  const component={kind:'yanyun-nr',source:'managed',packageVersion:'1.0.0',versions:['310.9.16']};
+  const draft={...content(),game:{id:'steam:3564740',name:'燕云十六声'},scheme:'upstream-0.3.5-310-9',
+    patchVersion:'0.4.2',entries:['version.dll'],runtimes:{schema:1,components:[component]}};
+  assert.equal((await modern('GET','/v1/capabilities')).yanyunNr,1);
+  assert.doesNotThrow(()=>recipe({...draft,scheme:'rtxfg-0.4.1-dx12-vulkan',patchVersion:'0.4.2+rtxfg.3'}));
+  for(const change of [{entries:['dxgi.dll']},{scheme:content().scheme},{patchVersion:'0.4.1'},{neuralRuntime:'310.9.16'},
+    {runtimes:{schema:1,components:[{...component,packageVersion:'1.0.1'}]}},
+    {runtimes:{schema:1,components:[component,{kind:'nr',source:'game',versions:['310.9.16']}]}}]) {
+    assert.throws(()=>recipe({...draft,...change}));
+  }
+  const plain={...draft,title:'仅安装基础补丁'};delete plain.runtimes;
+  const post=content=>({submission:randomUUID(),content});
+  await reject(old('POST','/v1/recipes',post(draft)),'client_update_required');
+  const card=await modern('POST','/v1/recipes',post(draft));
+  const path='/v1/recipes/'+card.id,list='/v1/recipes?game='+draft.game.id;
+  assert.deepEqual((await modern('GET',path)).content.runtimes,draft.runtimes);
+  const ordinary=await old('POST','/v1/recipes',post(plain));
+  assert.equal((await modern('GET',list)).total,2);
+  assert.deepEqual((await old('GET',list)).items.map(c=>c.id),[ordinary.id]);
+  assert.equal((await old('GET',list+'&mine=1')).total,1);
+  assert.equal((await old('GET','/v1/games?q='+draft.game.id)).items[0].recipes,1);
+  assert.equal((await modern('GET','/v1/games?q='+draft.game.id)).items[0].recipes,2);
+  assert.equal((await old('GET',list+'&offset=1')).items.length,0);
+  await reject(old('GET',path),'client_update_required');
+  await reject(old('PUT',path,{revision:1,content:plain}),'client_update_required');
+  const updated=await modern('PUT',path,{revision:1,content:{...draft,notes:'已复测'}});
+  assert.equal(updated.revision,2);assert.deepEqual(updated.content.runtimes,draft.runtimes);
+  await modern('PUT',path,{revision:2,content:plain});
+  assert.equal((await old('GET',list)).total,2);
+});
+
 test('native Streamline and multiple loaders round trip without losing the SDK on a legacy edit', async t=>{
   const f=fixture(t),u=await f.login();
   const modern={'x-rtxfg-native-streamline':'1','x-rtxfg-pipo042':'1'};
