@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-26T06:49:59+00:00",
-  "total": 7177099,
+  "updated_at": "2026-11-26T12:47:01+00:00",
+  "total": 7177457,
   "sources": [
     {
       "platform": "GitHub",
       "repository": "pandaligx/RTX-FG-Manager",
-      "downloads": 107241,
+      "downloads": 107599,
       "scope": "published_release_assets"
     },
     {
