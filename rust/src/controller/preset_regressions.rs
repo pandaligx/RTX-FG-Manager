@@ -232,6 +232,7 @@ fn native_runtime_choices_require_standard_or_delta_dlssg_042() {
             game: "Game".into(),
             patch_label: "Dlssg_for_sm86".into(),
             miles_profile: false,
+            yanyun: None,
             unavailable: BTreeMap::from([(
                 runtime_files::NativeComponent::Streamline,
                 "未检测到游戏自带的对应组件".into(),
@@ -241,14 +242,19 @@ fn native_runtime_choices_require_standard_or_delta_dlssg_042() {
     assert!(
         c.confirm_patch_options(
             vec![],
-            NativeSelections::from([(
-                path,
-                BTreeSet::from([runtime_files::NativeComponent::Streamline])
-            )])
+            NativeSelections {
+                runtimes: BTreeMap::from([(
+                    path,
+                    BTreeSet::from([runtime_files::NativeComponent::Streamline]),
+                )]),
+                ..Default::default()
+            }
         )
         .is_err()
     );
-    assert!(c.selected_native_components.is_empty() && !c.busy);
+    assert!(c.selected_native_components.runtimes.is_empty());
+    assert!(c.selected_native_components.yanyun.is_empty());
+    assert!(!c.busy);
     c.close();
     c.tick_close();
 }
@@ -354,16 +360,16 @@ fn native_runtime_round_trip(scheme: &str, miles: bool) -> Result<()> {
                 .iter()
                 .any(|o| o.exe == targets[1] && o.unavailable.len() == NativeComponent::ALL.len())
         );
-        assert!(c.selected_native_components.is_empty());
+        assert!(c.selected_native_components.runtimes.is_empty());
+        assert!(c.selected_native_components.yanyun.is_empty());
         // Launcher metadata may arrive between the probe and the click.
         c.games[0]
             .extra
             .insert("name_identity".into(), json!({"title": "Localized game"}));
-        let checked = if kinds.is_empty() {
-            NativeSelections::new()
-        } else {
-            NativeSelections::from([(targets[0].clone(), kinds.clone())])
-        };
+        let mut checked = NativeSelections::default();
+        if !kinds.is_empty() {
+            checked.runtimes.insert(targets[0].clone(), kinds.clone());
+        }
         c.confirm = None; // The native dialog consumes the pending prompt on opening.
         c.confirm_patch_options(vec![], checked)?;
         finish(&mut c)?;
@@ -421,7 +427,9 @@ fn native_runtime_round_trip(scheme: &str, miles: bool) -> Result<()> {
     }
     c.request_patch(false);
     finish(&mut c)?;
-    assert!(c.selected_native_components.is_empty() && c.patch_install_plan.is_some());
+    assert!(c.selected_native_components.runtimes.is_empty());
+    assert!(c.selected_native_components.yanyun.is_empty());
+    assert!(c.patch_install_plan.is_some());
     c.cancel_patch();
     assert!(c.patch_install_plan.is_none() && !native.join("version.dll").exists());
     c.close();

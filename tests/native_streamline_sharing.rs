@@ -85,7 +85,7 @@ fn pipo_two_entries_and_shared_sdk_restore_byte_for_byte() -> Result<()> {
     fs::copy(&recipient.game_exe, &other_exe)?;
     let other = core::DeploymentTarget::for_game(&other_exe);
     let targets = [recipient.clone(), other];
-    captured.install(&targets, false, &cancel, &mut |_| {})?;
+    captured.install(&targets, false, &cancel, &mut |_| {}, None)?;
     captured.verify_installed(&targets)?;
     assert!(!other_dir.join("sl.common.dll").exists());
     assert!(!other_dir.join(".rtx-fg-runtimes").exists());
