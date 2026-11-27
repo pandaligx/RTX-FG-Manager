@@ -211,9 +211,15 @@ GitCode 暂时不可用时，切换 GitHub 来源重试，或从上方发行页�
 
 感谢 [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86)、[pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version)、[dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker)、[SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore)、[apex-compute / ANR](https://github.com/apex-compute/ANR)、[GPUI](https://gpui.rs/)、[GPUI Kit](https://github.com/longbridge/gpui-kit)、[GPUI Fast](https://github.com/longbridge/gpui-fast) 与 [reqwest](https://github.com/seanmonstar/reqwest) / [Tokio](https://github.com/tokio-rs/tokio)。详见 [第三方说明](THIRD_PARTY_NOTICES.txt)。
 
-特别感谢 [大大大怪将军阁下](https://space.bilibili.com/608531525)、[云外逸声](https://space.bilibili.com/256887068)、[坏坏的帅帅啊](https://space.bilibili.com/296225145) 和提供兼容性反馈的用户。本项目与 NVIDIA、游戏厂商及上游项目无官方隶属关系。
+### 玩家致谢
 
-感谢小黑盒博主 [落日无序的米莉安](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp) 分享本软件并制作使用教程。
+| 平台 | 玩家 |
+| --- | --- |
+| <img src="rust/assets/profile-bilibili.svg" width="18" height="18" alt=""> 哔哩哔哩 | [大大大怪将军阁下](https://space.bilibili.com/608531525)、[云外逸声](https://space.bilibili.com/256887068)、[坏坏的帅帅啊](https://space.bilibili.com/296225145) |
+| <img src="rust/assets/profile-heybox.svg" width="18" height="18" alt=""> 小黑盒 | [落日无序的米莉安](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp)（分享与教程）、[ISHOW操作](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=da8a6b53a57b&h_src=heyboxapp) |
+| <img src="rust/assets/profile-douyin.svg" width="18" height="18" alt=""> 抖音 | [Tamako](https://v.douyin.com/6uPhwo0QQPg/) |
+
+感谢所有提供兼容性反馈的玩家。本项目与 NVIDIA、游戏厂商及上游项目无官方隶属关系。
 
 ---
 

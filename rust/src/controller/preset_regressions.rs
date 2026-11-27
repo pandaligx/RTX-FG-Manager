@@ -537,7 +537,7 @@ fn all_current_signed_schemes_share_uninstall_and_manual_reinstall() -> Result<(
         finish(&mut c)?;
         // Apply the same public-card pipeline as the UI, without publishing a fake card.
         eprintln!("{scheme}: shared patch, parameters and runtimes");
-        c.use_recommendation(recipe.clone(), shared::Action::InstallAndApply)?;
+        c.use_recommendation(recipe.clone(), None, shared::Action::InstallAndApply)?;
         finish(&mut c)?;
         for target in &targets {
             assert_eq!(

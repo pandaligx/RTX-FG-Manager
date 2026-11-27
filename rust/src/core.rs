@@ -1162,6 +1162,37 @@ pub fn deploy_prepared_context_at_with_overrides(
     explicit_overrides: Option<&crate::presets::Values>,
     upstream_version: Option<&str>,
 ) -> Result<String> {
+    deploy_with_outcome(
+        target,
+        backend,
+        proxies,
+        level,
+        data,
+        payload_version,
+        context,
+        explicit_overrides,
+        upstream_version,
+    )
+    .map(|outcome| outcome.message)
+}
+
+pub struct DeploymentOutcome {
+    pub message: String,
+    pub patch_written: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn deploy_with_outcome(
+    target: &DeploymentTarget,
+    backend: &str,
+    proxies: &[String],
+    level: Option<u8>,
+    data: BTreeMap<String, Vec<u8>>,
+    payload_version: Option<&str>,
+    context: Option<&crate::presets::Context>,
+    explicit_overrides: Option<&crate::presets::Values>,
+    upstream_version: Option<&str>,
+) -> Result<DeploymentOutcome> {
     let message = deploy_prepared_files(
         target,
         backend,
@@ -1189,7 +1220,7 @@ fn deploy_prepared_files(
     context: Option<&crate::presets::Context>,
     explicit_overrides: Option<&crate::presets::Values>,
     upstream_version: Option<&str>,
-) -> Result<String> {
+) -> Result<DeploymentOutcome> {
     let config = config_name(backend);
     let mut expected =
         deployment_names_for_version(backend, proxies, upstream_version.or(payload_version))?;
@@ -1361,7 +1392,11 @@ fn deploy_prepared_files(
             cache_pending: false,
             cleanup_pending_reasons: Vec::new(),
         };
-        return crate::encore_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides);
+        return crate::encore_upgrade::upgrade_locked(&target, old, new, data, explicit_overrides)
+            .map(|message| DeploymentOutcome {
+                message,
+                patch_written: true,
+            });
     }
     if backend == crate::rtxmfg::BACKEND
         && let Some(old) = existing.as_ref().filter(|record| {
@@ -1403,7 +1438,10 @@ fn deploy_prepared_files(
             mfg_host.as_deref().filter(|_| mfg_plugin),
         )?;
         crate::rtxmfg_settings::apply_locked(&target, None, mfg_overrides)?;
-        return Ok(message);
+        return Ok(DeploymentOutcome {
+            message,
+            patch_written: true,
+        });
     }
     if let Some(old) = existing.as_ref()
         && ((backend == crate::upstream040::BACKEND
@@ -1441,7 +1479,11 @@ fn deploy_prepared_files(
             new,
             data,
             explicit_overrides,
-        );
+        )
+        .map(|message| DeploymentOutcome {
+            message,
+            patch_written: true,
+        });
     }
     // Adopt only identical, recognized proxies. This changes no game binary,
     // while allowing an already-tested manual package to retain custom INI text.
@@ -1566,7 +1608,10 @@ fn deploy_prepared_files(
                         Some((&current, &updated)),
                         mfg_overrides,
                     )?;
-                    return Ok("参数已应用；下次启动游戏生效。".into());
+                    return Ok(DeploymentOutcome {
+                        message: "参数已应用；下次启动游戏生效。".into(),
+                        patch_written: false,
+                    });
                 }
                 if current != updated {
                     let stage = no_links(
@@ -1580,10 +1625,16 @@ fn deploy_prepared_files(
                         let _ = fs::remove_file(&stage);
                         return Err(error.context("配置更新失败，原文件未改变"));
                     }
-                    return Ok("配置已更新；完全退出并重新启动游戏后生效".into());
+                    return Ok(DeploymentOutcome {
+                        message: "配置已更新；完全退出并重新启动游戏后生效".into(),
+                        patch_written: false,
+                    });
                 }
             }
-            return Ok("已部署，无需重复操作".into());
+            return Ok(DeploymentOutcome {
+                message: "已部署，无需重复操作".into(),
+                patch_written: false,
+            });
         }
         bail!("已有部署或未完成操作，请先清理再重新部署")
     }
@@ -1713,5 +1764,8 @@ fn deploy_prepared_files(
         }
         return Err(e.context("部署未完成；恢复记录已保留，请先卸载补丁"));
     }
-    Ok("部署完成；关闭管理器后仍然生效".into())
+    Ok(DeploymentOutcome {
+        message: "部署完成；关闭管理器后仍然生效".into(),
+        patch_written: true,
+    })
 }

@@ -23,10 +23,11 @@ const FILES: [(&str, &str); 3] = [
 
 fn game(target: &core::DeploymentTarget) -> bool {
     !target.is_custom()
-        && target
-            .game_exe
-            .file_name()
-            .is_some_and(|n| n.eq_ignore_ascii_case("yysls.exe"))
+        && target.game_exe.file_name().is_some_and(|n| {
+            ["yysls.exe", "wwm.exe"]
+                .iter()
+                .any(|exe| n.eq_ignore_ascii_case(exe))
+        })
 }
 
 pub(crate) fn supports_scheme(scheme: &str, version: &str) -> bool {
@@ -372,6 +373,14 @@ mod tests {
             upstream040::SCHEME,
             "0.4.2"
         ));
+        let international = core::DeploymentTarget::for_game(Path::new(r"C:\Game\wwm.exe"));
+        assert!(eligible(&international, upstream040::SCHEME, "0.4.2"));
+        assert!(eligible(
+            &international,
+            cloud::DELTA_041_SCHEME,
+            delta::MILES_R3
+        ));
+        assert!(!eligible(&international, upstream040::PIPO_SCHEME, "0.4.2"));
         assert!(version_entry(&["version.dll".into()]));
         assert!(!version_entry(&["version.dll".into(), "dxgi.dll".into()]));
         assert!(!valid_destination(
@@ -458,174 +467,177 @@ mod tests {
         })?;
         let catalog = cloud::bundled();
         let proxies = vec![String::from("version.dll")];
-        for scheme in [upstream040::SCHEME, cloud::DELTA_041_SCHEME] {
-            let game = tempfile::tempdir_in(&cache)?;
-            let exe = game.path().join("yysls.exe");
-            fs::copy(std::env::current_exe()?, &exe)?;
-            let target = core::DeploymentTarget::for_game(&exe).validate(true)?;
-            let sl = game.path().join("Streamline");
-            fs::create_dir(&sl)?;
-            fs::write(sl.join("sl.dlss_nr.dll"), b"game's plugin")?;
-            fs::write(sl.join("nvngx_dlssnr.dll"), b"game's native runtime")?;
-            let first_ini = b"old settings";
-            let root_nr = game.path().join("nvngx_dlssnr.dll");
-            let ini = game.path().join("OptiScaler.ini");
-            let log = game.path().join(LOG);
-            fs::write(&log, b"previous log")?;
-            fs::write(&ini, first_ini)?;
-            fs::write(&root_nr, b"preexisting runtime")?;
-            let payload = cloud::prepare(
-                &catalog,
-                scheme,
-                1,
-                &proxies,
-                &AtomicBool::new(false),
-                |_| {},
-            )?;
-            let ctx = presets::Context::new(scheme, &payload.policy, &exe);
-            let version = payload
-                .upstream_version
-                .as_deref()
-                .unwrap_or(&payload.version);
-            fs::write(game.path().join("dxgi.dll"), b"another mod")?;
-            assert!(Component::check_target(&target, scheme, version, &proxies).is_err());
-            assert_eq!(fs::read(game.path().join("dxgi.dll"))?, b"another mod");
-            fs::remove_file(game.path().join("dxgi.dll"))?;
-            Component::check_target(&target, scheme, version, &proxies)?;
-            addon.preflight(&target)?;
-            let install_base = || {
-                core::deploy_prepared_context_at_with_overrides(
-                    &target,
-                    &payload.backend,
-                    &proxies,
-                    None,
-                    payload.files.clone(),
-                    Some(&payload.version),
-                    Some(&ctx),
-                    None,
-                    payload.upstream_version.as_deref(),
-                )
-            };
-            install_base()?;
-            assert!(!game.path().join("dxgi.dll").exists());
-            assert_eq!(fs::read(&ini)?, first_ini);
-            assert!(!root(&target, KIND)?.exists());
-            assert!(cleanup::clean_outcome_at(&target)?.complete);
-            assert_eq!(fs::read(&log)?, b"previous log");
-            if scheme == upstream040::SCHEME {
-                fs::remove_file(&log)?;
-            }
-            install_base()?;
-            let snapshot = crate::recommendation_runtimes::Snapshot {
-                schema: 1,
-                components: vec![crate::recommendation_runtimes::Component {
-                    kind: KIND.into(),
-                    versions: vec![RUNTIME_VERSION.into()],
-                    source: "managed".into(),
-                    package_version: Some(KIT_VERSION.into()),
-                }],
-            };
-            let targets = std::slice::from_ref(&target);
-            let cancel = AtomicBool::new(false);
-            let kit = snapshot.prepare_yanyun(targets, false, false, &cancel, &mut |_| {})?;
-            assert!(kit.is_some());
-            snapshot.install(targets, false, &cancel, &mut |_| {}, kit.as_ref())?;
-            snapshot.verify_installed(targets)?;
-            let captured = crate::recommendation_runtimes::capture(&target)?;
-            captured.validate()?;
-            assert!(captured.has_yanyun());
-            assert!(!captured.components.iter().any(|c| c.kind == "nr"));
-            let as_game = |exe: &Path| crate::scanner::Game {
-                exe: exe.to_string_lossy().into_owned(),
-                ..Default::default()
-            };
-            let identity = crate::recommendations::GameIdentity::new(
-                "steam:3564740".into(),
-                "燕云十六声".into(),
-            )?;
-            let author = crate::recommendations::installed_recipe(
-                &as_game(&exe),
-                identity,
-                &catalog,
-                "RTX 3060".into(),
-                String::new(),
-            )?;
-            let recipe: crate::recommendations::Recipe =
-                serde_json::from_value(serde_json::to_value(&author)?)?;
-            assert_eq!(recipe.neural_runtime, "none");
-            recipe.validate(&catalog)?;
-            recipe.check_runtime_selection()?;
-            let receive = tempfile::tempdir_in(&cache)?;
-            let receive_exe = receive.path().join("yysls.exe");
-            fs::copy(&exe, &receive_exe)?;
-            let receiver = as_game(&receive_exe);
-            let receive_target = core::DeploymentTarget::for_game(&receive_exe);
-            let apply = || {
-                crate::recommendation_presets::execute(
-                    &receiver,
+        for exe_name in ["yysls.exe", "WWM.EXE"] {
+            for scheme in [upstream040::SCHEME, cloud::DELTA_041_SCHEME] {
+                let game = tempfile::tempdir_in(&cache)?;
+                let exe = game.path().join(exe_name);
+                fs::copy(std::env::current_exe()?, &exe)?;
+                let target = core::DeploymentTarget::for_game(&exe).validate(true)?;
+                let sl = game.path().join("Streamline");
+                fs::create_dir(&sl)?;
+                fs::write(sl.join("sl.dlss_nr.dll"), b"game's plugin")?;
+                fs::write(sl.join("nvngx_dlssnr.dll"), b"game's native runtime")?;
+                let first_ini = b"old settings";
+                let root_nr = game.path().join("nvngx_dlssnr.dll");
+                let ini = game.path().join("OptiScaler.ini");
+                let log = game.path().join(LOG);
+                fs::write(&log, b"previous log")?;
+                fs::write(&ini, first_ini)?;
+                fs::write(&root_nr, b"preexisting runtime")?;
+                let payload = cloud::prepare(
                     &catalog,
-                    &recipe,
-                    crate::recommendation_presets::Action::InstallAndApply,
+                    scheme,
                     1,
-                    &cancel,
+                    &proxies,
+                    &AtomicBool::new(false),
                     |_| {},
-                )
-            };
-            assert!(apply().is_err());
-            assert!(!receive.path().join("version.dll").exists());
-            fs::create_dir(receive.path().join("Streamline"))?;
-            fs::write(
-                receive.path().join("Streamline/sl.dlss_nr.dll"),
-                b"game's plugin",
-            )?;
-            for _ in 0..2 {
-                apply()?;
-                assert!(shared_installation(&receive_target)?);
-                assert!(cleanup::clean_outcome_at(&receive_target)?.complete);
-                assert!(!shared_installation(&receive_target)?);
-                for (name, _) in FILES {
-                    assert!(!receive.path().join(name).exists());
+                )?;
+                let ctx = presets::Context::new(scheme, &payload.policy, &exe);
+                let version = payload
+                    .upstream_version
+                    .as_deref()
+                    .unwrap_or(&payload.version);
+                fs::write(game.path().join("dxgi.dll"), b"another mod")?;
+                assert!(Component::check_target(&target, scheme, version, &proxies).is_err());
+                assert_eq!(fs::read(game.path().join("dxgi.dll"))?, b"another mod");
+                fs::remove_file(game.path().join("dxgi.dll"))?;
+                Component::check_target(&target, scheme, version, &proxies)?;
+                addon.preflight(&target)?;
+                let install_base = || {
+                    core::deploy_with_outcome(
+                        &target,
+                        &payload.backend,
+                        &proxies,
+                        None,
+                        payload.files.clone(),
+                        Some(&payload.version),
+                        Some(&ctx),
+                        None,
+                        payload.upstream_version.as_deref(),
+                    )
+                };
+                assert!(install_base()?.patch_written);
+                assert!(!install_base()?.patch_written);
+                assert!(!game.path().join("dxgi.dll").exists());
+                assert_eq!(fs::read(&ini)?, first_ini);
+                assert!(!root(&target, KIND)?.exists());
+                assert!(cleanup::clean_outcome_at(&target)?.complete);
+                assert_eq!(fs::read(&log)?, b"previous log");
+                if scheme == upstream040::SCHEME {
+                    fs::remove_file(&log)?;
                 }
+                assert!(install_base()?.patch_written);
+                let snapshot = crate::recommendation_runtimes::Snapshot {
+                    schema: 1,
+                    components: vec![crate::recommendation_runtimes::Component {
+                        kind: KIND.into(),
+                        versions: vec![RUNTIME_VERSION.into()],
+                        source: "managed".into(),
+                        package_version: Some(KIT_VERSION.into()),
+                    }],
+                };
+                let targets = std::slice::from_ref(&target);
+                let cancel = AtomicBool::new(false);
+                let kit = snapshot.prepare_yanyun(targets, false, false, &cancel, &mut |_| {})?;
+                assert!(kit.is_some());
+                snapshot.install(targets, false, &cancel, &mut |_| {}, kit.as_ref())?;
+                snapshot.verify_installed(targets)?;
+                let captured = crate::recommendation_runtimes::capture(&target)?;
+                captured.validate()?;
+                assert!(captured.has_yanyun());
+                assert!(!captured.components.iter().any(|c| c.kind == "nr"));
+                let as_game = |exe: &Path| crate::scanner::Game {
+                    exe: exe.to_string_lossy().into_owned(),
+                    ..Default::default()
+                };
+                let identity = crate::recommendations::GameIdentity::new(
+                    "steam:3564740".into(),
+                    "燕云十六声".into(),
+                )?;
+                let author = crate::recommendations::installed_recipe(
+                    &as_game(&exe),
+                    identity,
+                    &catalog,
+                    "RTX 3060".into(),
+                    String::new(),
+                )?;
+                let recipe: crate::recommendations::Recipe =
+                    serde_json::from_value(serde_json::to_value(&author)?)?;
+                assert_eq!(recipe.neural_runtime, "none");
+                recipe.validate(&catalog)?;
+                recipe.check_runtime_selection()?;
+                let receive = tempfile::tempdir_in(&cache)?;
+                let receive_exe = receive.path().join(exe_name);
+                fs::copy(&exe, &receive_exe)?;
+                let receiver = as_game(&receive_exe);
+                let receive_target = core::DeploymentTarget::for_game(&receive_exe);
+                let apply = || {
+                    crate::recommendation_presets::execute(
+                        &receiver,
+                        &catalog,
+                        &recipe,
+                        crate::recommendation_presets::Action::InstallAndApply,
+                        1,
+                        &cancel,
+                        |_| {},
+                    )
+                };
+                assert!(apply().is_err());
                 assert!(!receive.path().join("version.dll").exists());
+                fs::create_dir(receive.path().join("Streamline"))?;
+                fs::write(
+                    receive.path().join("Streamline/sl.dlss_nr.dll"),
+                    b"game's plugin",
+                )?;
+                for _ in 0..2 {
+                    apply()?;
+                    assert!(shared_installation(&receive_target)?);
+                    assert!(cleanup::clean_outcome_at(&receive_target)?.complete);
+                    assert!(!shared_installation(&receive_target)?);
+                    for (name, _) in FILES {
+                        assert!(!receive.path().join(name).exists());
+                    }
+                    assert!(!receive.path().join("version.dll").exists());
+                    assert_eq!(
+                        fs::read(receive.path().join("Streamline/sl.dlss_nr.dll"))?,
+                        b"game's plugin"
+                    );
+                }
+                assert!(
+                    snapshot
+                        .prepare_yanyun(targets, false, false, &cancel, &mut |_| {})?
+                        .is_none()
+                );
+                for (name, hash) in FILES {
+                    assert!(matches(&game.path().join(name), hash)?);
+                }
+                fs::write(&ini, b"game changed the ini")?;
+                fs::write(
+                    &log,
+                    b"[23:53:09] [W] DLSS Unlocked - OptiScaler v0.9.96-pre3 (unknown) loaded\n",
+                )?;
+                fs::write(game.path().join("game.log"), b"keep game's log")?;
+                addon.install(&target)?;
+                assert_eq!(fs::read(&ini)?, b"game changed the ini");
+                assert!(cleanup::clean_outcome_at(&target)?.complete);
+                assert!(!game.path().join("dxgi.dll").exists());
+                assert!(!game.path().join("version.dll").exists());
+                assert!(!shared_installation(&target)?);
+                assert!(!root(&target, KIND)?.exists());
+                assert_eq!(fs::read(&ini)?, first_ini);
+                assert_eq!(fs::read(root_nr)?, b"preexisting runtime");
+                if scheme == upstream040::SCHEME {
+                    assert!(!log.exists());
+                } else {
+                    assert_eq!(fs::read(log)?, b"previous log");
+                }
+                assert_eq!(fs::read(game.path().join("game.log"))?, b"keep game's log");
+                assert_eq!(fs::read(sl.join("sl.dlss_nr.dll"))?, b"game's plugin");
                 assert_eq!(
-                    fs::read(receive.path().join("Streamline/sl.dlss_nr.dll"))?,
-                    b"game's plugin"
+                    fs::read(sl.join("nvngx_dlssnr.dll"))?,
+                    b"game's native runtime"
                 );
             }
-            assert!(
-                snapshot
-                    .prepare_yanyun(targets, false, false, &cancel, &mut |_| {})?
-                    .is_none()
-            );
-            for (name, hash) in FILES {
-                assert!(matches(&game.path().join(name), hash)?);
-            }
-            fs::write(&ini, b"game changed the ini")?;
-            fs::write(
-                &log,
-                b"[23:53:09] [W] DLSS Unlocked - OptiScaler v0.9.96-pre3 (unknown) loaded\n",
-            )?;
-            fs::write(game.path().join("game.log"), b"keep game's log")?;
-            addon.install(&target)?;
-            assert_eq!(fs::read(&ini)?, b"game changed the ini");
-            assert!(cleanup::clean_outcome_at(&target)?.complete);
-            assert!(!game.path().join("dxgi.dll").exists());
-            assert!(!game.path().join("version.dll").exists());
-            assert!(!shared_installation(&target)?);
-            assert!(!root(&target, KIND)?.exists());
-            assert_eq!(fs::read(&ini)?, first_ini);
-            assert_eq!(fs::read(root_nr)?, b"preexisting runtime");
-            if scheme == upstream040::SCHEME {
-                assert!(!log.exists());
-            } else {
-                assert_eq!(fs::read(log)?, b"previous log");
-            }
-            assert_eq!(fs::read(game.path().join("game.log"))?, b"keep game's log");
-            assert_eq!(fs::read(sl.join("sl.dlss_nr.dll"))?, b"game's plugin");
-            assert_eq!(
-                fs::read(sl.join("nvngx_dlssnr.dll"))?,
-                b"game's native runtime"
-            );
         }
         Ok(())
     }

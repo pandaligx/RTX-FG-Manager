@@ -135,6 +135,7 @@ impl Client {
         catalog: &cloud::Catalog,
         filter: FeedFilter,
         more: Option<FeedCursor>,
+        sort: CardSort,
     ) -> Result<FeedPage> {
         let first = more.is_none();
         let routes = more.unwrap_or_else(|| {
@@ -150,16 +151,17 @@ impl Client {
         let mut notice = None;
         let mut failed = None;
         for (group, offset) in routes.0 {
-            let page = match self.browse(
+            let page = match self.browse_sorted(
                 &group,
                 catalog,
                 offset,
                 filter == FeedFilter::Mine,
                 filter == FeedFilter::Reported,
+                sort,
             ) {
                 Ok(page) => page,
                 Err(e) if allows_offline_cache(&e) && first && filter == FeedFilter::Public => {
-                    if let Some(page) = self.cached(&group, catalog) {
+                    if let Some(page) = self.cached_sorted(&group, catalog, sort) {
                         notice = Some(offline_cache_notice(&e));
                         page
                     } else {
@@ -177,15 +179,15 @@ impl Client {
             }
             notice = Some("部分推荐未能加载，请刷新重试");
         }
-        let mut result = merge_pages(pages);
+        let mut result = merge_pages(pages, sort);
         result.notice = notice;
         Ok(result)
     }
 }
 
-// Each source is already ordered by votes, update time and ID. Advance only
+// Each source uses the selected order and the same stable tie breakers. Advance only
 // past the prefix actually displayed so the next global page cannot skip cards.
-fn merge_pages(pages: Vec<(GameIdentity, u32, Page)>) -> FeedPage {
+fn merge_pages(pages: Vec<(GameIdentity, u32, Page)>, sort: CardSort) -> FeedPage {
     const PAGE_SIZE: usize = 24;
     let mut streams = Vec::new();
     let mut rows = Vec::new();
@@ -204,7 +206,7 @@ fn merge_pages(pages: Vec<(GameIdentity, u32, Page)>) -> FeedPage {
         streams.push((game, offset, page.items.len(), page.next_offset));
         rows.extend(page.items.into_iter().map(|card| (stream, card)));
     }
-    rows.sort_by(|(_, a), (_, b)| card_order(a, b));
+    rows.sort_by(|(_, a), (_, b)| sort.compare(a, b));
     let mut consumed = vec![0; streams.len()];
     let mut seen = HashSet::new();
     let mut items = Vec::new();
@@ -247,6 +249,39 @@ mod tests {
     const EPIC: &str = "epic_slug:arknightsendfield-f0f167";
     const TITLE: &str = "明日方舟：终末地";
 
+    #[test]
+    fn download_order_pages_across_store_groups_and_breaks_ties_by_update() {
+        let make_page = |id: &str, start: u64| {
+            let items = (0..20)
+                .map(|i| {
+                    let mut c = card("RTX 3060", "", i);
+                    c.downloads = Some(100 - i);
+                    c.updated_at = start;
+                    c
+                })
+                .collect();
+            (
+                identity(id),
+                0,
+                Page {
+                    items,
+                    total: 20,
+                    next_offset: None,
+                },
+            )
+        };
+        let page = merge_pages(
+            vec![make_page(STEAM, 2), make_page(LEGACY, 1)],
+            CardSort::Downloads,
+        );
+        assert_eq!(page.total, 40);
+        assert_eq!(page.items.len(), 24);
+        assert_eq!(page.items[0].updated_at, 2);
+        assert_eq!(page.items[1].updated_at, 1);
+        assert_eq!(page.items[23].downloads, Some(89));
+        assert!(page.next.unwrap().0.iter().all(|(_, offset)| *offset == 12));
+    }
+
     fn identity(id: &str) -> GameIdentity {
         GameIdentity::new(id.into(), TITLE.into()).unwrap()
     }
@@ -286,8 +321,14 @@ mod tests {
         ]);
         let data = tempfile::tempdir()?;
         let client = online_test_client(data.path(), origin);
-        let result =
-            client.browse_feeds(&id, &names, &cloud::bundled(), FeedFilter::Public, None)?;
+        let result = client.browse_feeds(
+            &id,
+            &names,
+            &cloud::bundled(),
+            FeedFilter::Public,
+            None,
+            CardSort::Likes,
+        )?;
         assert_eq!((result.total, result.items.len()), (9, 9));
         assert!(result.next.is_none() && result.notice.is_none());
         assert!(result.items.windows(2).all(|p| p[0].likes >= p[1].likes));
@@ -392,16 +433,16 @@ mod tests {
                     (g, offset, part)
                 })
                 .collect();
-            let loaded = merge_pages(pages);
+            let loaded = merge_pages(pages, CardSort::Likes);
             votes.extend(loaded.items.iter().map(|c| c.likes));
             let Some(next) = loaded.next else { break };
             cursor = next;
         }
         assert_eq!(votes, (0..62).rev().collect::<Vec<_>>());
-        let merged = merge_pages(vec![
-            (identity(STEAM), 0, b.clone()),
-            (identity(LEGACY), 0, b),
-        ]);
+        let merged = merge_pages(
+            vec![(identity(STEAM), 0, b.clone()), (identity(LEGACY), 0, b)],
+            CardSort::Likes,
+        );
         assert_eq!(merged.total, 31);
         assert_eq!(merged.items.len(), 24);
     }
@@ -438,6 +479,7 @@ mod tests {
                 &catalog,
                 FeedFilter::Public,
                 more,
+                CardSort::Likes,
             )?;
             assert!(page.notice.is_none());
             loaded.extend(page.items.into_iter().map(|c| c.id));

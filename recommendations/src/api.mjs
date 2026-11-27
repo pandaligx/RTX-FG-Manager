@@ -17,7 +17,7 @@ export function createApi(db, options) {
     if (t-lastCleanup>3600) { cleanExpired(db,t); lastCleanup=t; }
     limit(db,'read:' + auth.fingerprint(ip),t,60,180);
     if (method === 'GET' && route === '/v1/health') return { ok:true, protocol:1 };
-    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, mfg172:1, creatorLinks:1, authorName:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, nativeStreamline:1, yanyunNr:1, anr:1, notesLimit:NOTES_LIMIT };
+    if (method === 'GET' && route === '/v1/capabilities') return { presets:1, runtimes:1, dlssg041:1, delta041:1, delta6:1, mfg161:1, mfg171:1, mfg172:1, creatorLinks:1, authorName:1, encore150:1, encore153:1, encore200:1, encore210:1, encore220:1, encore230:1, encore240:1, encore250:1, pipo042:1, nativeStreamline:1, yanyunNr:1, recipeInstalls:1, anr:1, notesLimit:NOTES_LIMIT };
     if (method === 'GET' && route === '/v1/preset-metadata') return presetMetadata();
     if (method === 'GET' && route === '/v1/health/mail') {
       need(options.mailHealth?.().ok,'mail_unavailable',503);
@@ -25,8 +25,19 @@ export function createApi(db, options) {
     }
     if (method === 'POST' && route === '/v1/auth/code') return auth.request(body,ip);
     if (method === 'POST' && route === '/v1/auth/verify') return auth.verify(body,ip);
+    const install = /^\/v1\/recipes\/([a-f0-9-]{36})\/installs$/.exec(route);
+    if (method === 'POST' && install) {
+      exact(body,['operation']);
+      need(uuid(body.operation),'invalid_operation');
+      const id = install[1], row = lookup(id);
+      need(row && row.status==='visible' && !db.prepare('SELECT blocked FROM users WHERE id=?').get(row.author).blocked,'install_target_gone',410);
+      limit(db,'install:'+auth.fingerprint(ip),t,60,30);
+      db.prepare('INSERT OR IGNORE INTO recipe_installs(recipe,operation) VALUES(?,?)').run(id,body.operation);
+      return {ok:true};
+    }
     const user = auth.user(headers.authorization, method!=='GET');
     // Older test clients reject unknown JSON fields. Opt in to the feedback extension.
+    const supportsInstalls = headers['x-rtxfg-recipe-installs'] === '1';
     const feedback=headers['x-rtxfg-feedback'];
     const supportsKit = feedback === '16' && headers['x-rtxfg-yanyun-nr'] === '1';
     const checkKit = content => need(supportsKit || !hasYanyunKit(content.runtimes),'client_update_required',409);
@@ -60,6 +71,7 @@ export function createApi(db, options) {
     const context=url.searchParams.get('game');
     const card = (row,requested=context) => {
       const result=publicRecipe(db,row,user,['2','3','4','5','6','7','8','9','10','11','12','13','14','15','16'].includes(feedback),['3','4','5','6','7','8','9','10','11','12','13','14','15','16'].includes(feedback),['5','6','7','8','9','10','11','12','13','14','15','16'].includes(feedback));
+      if (supportsInstalls) result.downloads = Number(row.downloads);
       if(!['6','7','8','9','10','11','12','13','14','15','16'].includes(feedback)) delete result.content.presets;
       if(!['7','8','9','10','11','12','13','14','15','16'].includes(feedback)) delete result.content.runtimes;
       if(!nativeSL && result.content.runtimes){
@@ -111,7 +123,10 @@ export function createApi(db, options) {
       // A legacy client would silently apply only the base patch. Filter before pagination.
       const where = scope+kitVisibilitySql(supportsKit)+(mine ? " AND r.author=? AND r.status!='deleted'" : reported ? " AND r.status!='deleted' AND EXISTS(SELECT 1 FROM reports p WHERE p.recipe=r.id AND p.user=? AND p.active=1)" : " AND r.status='visible' AND author.blocked=0");
       const args = mine || reported ? [...group,user.id] : group;
-      const rows = db.prepare('SELECT * FROM ('+selectRecipes+where+') ORDER BY likes DESC,updated DESC,id LIMIT 25 OFFSET ?').all(...args,offset);
+      const sort = url.searchParams.get('sort') || 'likes';
+      const orders = { likes:'likes DESC,updated DESC,id', updated:'updated DESC,id', downloads:'downloads DESC,updated DESC,id' };
+      need(Object.hasOwn(orders,sort),'invalid_sort');
+      const rows = db.prepare('SELECT * FROM ('+selectRecipes+where+') ORDER BY '+orders[sort]+' LIMIT 25 OFFSET ?').all(...args,offset);
       const count = db.prepare('SELECT COUNT(*) count FROM recipes r JOIN users author ON author.id=r.author'+where).get(...args).count;
       return { items: rows.slice(0,24).map(row=>card(row,game)), total:Number(count), nextOffset:rows.length>24?offset+24:null };
     }

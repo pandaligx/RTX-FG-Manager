@@ -47,6 +47,7 @@ struct Recommendations {
     client: Option<rec::Client>,
     mode: Mode,
     cards: Vec<rec::Card>,
+    sort: rec::CardSort,
     scroll_handles: HashMap<String, ScrollHandle>,
     candidates: Vec<rec::GameCandidate>,
     next: Option<rec::FeedCursor>,
@@ -81,8 +82,9 @@ struct Recommendations {
     link_fields: [Entity<InputState>; 4],
     gpu_input: Entity<InputState>,
     email: Entity<InputState>,
-    email_domain: String,
-    code: Entity<InputState>,
+    show_suffixes: bool,
+    suffix_index: usize,
+    code: Entity<gpui::base::OtpState>,
     query: Entity<InputState>,
     challenge: Option<(rec::Challenge, String)>,
     resend: Instant,
@@ -137,26 +139,32 @@ impl Recommendations {
             .detach();
         let email = input("", window, cx);
         cx.subscribe_in(&email, window, |this, _, event, window, cx| {
-            if matches!(event, InputEvent::Blur) {
-                let value = this.email.read(cx).value().to_string();
-                let complete = rec::complete_email(&value, &this.email_domain);
-                if complete != value {
-                    this.email
-                        .update(cx, |s, cx| s.set_value(complete, window, cx));
+            match event {
+                InputEvent::Change => {
+                    this.show_suffixes = true;
+                    this.suffix_index = 0;
+                    if this.challenge.as_ref().is_some_and(|(_, email)| {
+                        !this
+                            .email
+                            .read(cx)
+                            .value()
+                            .trim()
+                            .eq_ignore_ascii_case(email)
+                    }) {
+                        this.challenge = None;
+                        this.code.update(cx, |s, cx| s.set_value("", window, cx));
+                    }
                 }
+                InputEvent::Focus => this.show_suffixes = true,
+                InputEvent::Blur => this.show_suffixes = false,
+                _ => return,
             }
-            if matches!(event, InputEvent::Change | InputEvent::Blur) {
-                cx.notify();
-            }
+            cx.notify();
         })
         .detach();
-        let code = input("", window, cx);
-        cx.subscribe(&code, |_, _, event, cx| {
-            if matches!(event, InputEvent::Change) {
-                cx.notify();
-            }
-        })
-        .detach();
+        let code = cx.new(|cx| gpui::base::OtpState::new(6, window, cx).masked(false));
+        cx.subscribe(&code, |_, _, _: &gpui::base::OtpEvent, cx| cx.notify())
+            .detach();
         let (tx, rx) = mpsc::channel();
         let gpu = c
             .devices
@@ -191,6 +199,7 @@ impl Recommendations {
                 Mode::Identity
             },
             cards: vec![],
+            sort: rec::CardSort::Likes,
             scroll_handles: HashMap::new(),
             candidates: vec![],
             next: None,
@@ -223,7 +232,8 @@ impl Recommendations {
             link_fields,
             gpu_input,
             email,
-            email_domain: "qq.com".into(),
+            show_suffixes: false,
+            suffix_index: 0,
             code,
             query,
             challenge: None,
@@ -243,7 +253,13 @@ impl Recommendations {
             && let Ok(card) = serde_json::from_slice::<rec::Card>(&bytes)
             && card.content.validate(&view.catalog).is_ok()
         {
-            if std::env::var("RTXFG_RECIPE_PREVIEW_MODE").as_deref() == Ok("share") {
+            let mode = std::env::var("RTXFG_RECIPE_PREVIEW_MODE");
+            if mode.as_deref() == Ok("browse") {
+                view.cards = vec![card];
+                view.total = 1;
+                view.loaded = true;
+                view.mode = Mode::Browse;
+            } else if mode.as_deref() == Ok("share") {
                 view.title.update(cx, |s, cx| {
                     s.set_value(card.content.title.clone(), window, cx)
                 });
@@ -367,7 +383,7 @@ impl Recommendations {
                             self.cards.push(card);
                         }
                     }
-                    rec::rank(&mut self.cards);
+                    self.sort.rank(&mut self.cards);
                     self.next = page.next;
                     self.loaded = true;
                     self.cached = page.notice.is_some();
@@ -420,8 +436,22 @@ impl Recommendations {
                 Ok(Update::Code(code, email)) => {
                     self.cooldown = true;
                     self.resend = Instant::now() + Duration::from_secs(u64::from(code.retry_after));
-                    self.challenge = Some((code, email));
-                    self.message = self.t("验证码已发送，请查看邮箱（含垃圾箱）");
+                    if self.mode == Mode::Login
+                        && self
+                            .email
+                            .read(cx)
+                            .value()
+                            .trim()
+                            .eq_ignore_ascii_case(&email)
+                    {
+                        self.challenge = Some((code, email));
+                        self.show_suffixes = false;
+                        self.code.update(cx, |s, cx| {
+                            s.set_value("", window, cx);
+                            s.focus(window, cx)
+                        });
+                        self.message = self.t("验证码已发送，请查看邮箱（含垃圾箱）");
+                    }
                 }
                 Ok(Update::Login(client)) => {
                     self.client = Some(client);
@@ -465,7 +495,7 @@ impl Recommendations {
                         self.cards.insert(0, card);
                         self.total += 1;
                     }
-                    rec::rank(&mut self.cards);
+                    self.sort.rank(&mut self.cards);
                     self.cached = false;
                     self.message = self.t("已更新");
                 }
@@ -475,7 +505,7 @@ impl Recommendations {
                     }
                     if let Some(existing) = self.cards.iter_mut().find(|c| c.id == card.id) {
                         *existing = card;
-                        rec::rank(&mut self.cards);
+                        self.sort.rank(&mut self.cards);
                     }
                     self.message.clear();
                 }
@@ -528,6 +558,8 @@ impl Recommendations {
         let catalog = self.catalog.clone();
         let names = self.names.clone();
         let more = if append { self.next.clone() } else { None };
+        let sort = self.sort;
+        client.retry_installs();
         let filter = if self.mine {
             rec::FeedFilter::Mine
         } else if self.reported {
@@ -538,7 +570,7 @@ impl Recommendations {
         self.refresh_at = Instant::now() + Duration::from_secs(45);
         self.job(move || {
             Ok(Update::Page(
-                client.browse_feeds(&id, &names, &catalog, filter, more)?,
+                client.browse_feeds(&id, &names, &catalog, filter, more, sort)?,
                 append,
             ))
         });
@@ -669,7 +701,7 @@ impl Recommendations {
             dialog
                 .centered()
                 .width(
-                    (window.rem_size() * 26.)
+                    (window.rem_size() * 22.)
                         .min(window.viewport_size().width - window.rem_size() * 2.),
                 )
                 .title(crate::ui_focus::dialog_title(title.clone(), cx))
@@ -901,7 +933,11 @@ impl Recommendations {
             card.content.available_version(&owner.c.catalog)?;
             owner.c.focus = Some(exe.clone());
             owner.feedback_window = Some(window.window_handle());
-            owner.c.use_recommendation(card.content.clone(), action)?;
+            owner.c.use_recommendation(
+                card.content.clone(),
+                Some(uuid::Uuid::parse_str(&card.id)?),
+                action,
+            )?;
             cx.notify();
             Ok::<_, anyhow::Error>(())
         });
@@ -1460,49 +1496,11 @@ impl Recommendations {
             cx.notify();
         }))
     }
-    fn email_suffix(&self, cx: &Context<Self>) -> AnyElement {
-        let owner = cx.entity().downgrade();
-        let tr = i18n::Translator::new(&self.tr.language);
-        let label = if self.email_domain.is_empty() {
-            self.t("其他邮箱")
-        } else {
-            format!("@{}", self.email_domain)
-        };
-        self.button("recipe-email-domain", "", cx)
-            .label(label)
-            .icon(IconName::ChevronDown)
-            .flex_shrink_0()
-            .dropdown_menu(move |mut menu, _, _| {
-                for domain in [
-                    "qq.com",
-                    "163.com",
-                    "126.com",
-                    "outlook.com",
-                    "gmail.com",
-                    "",
-                ] {
-                    let owner = owner.clone();
-                    let label = if domain.is_empty() {
-                        tr.t("其他邮箱")
-                    } else {
-                        format!("@{domain}")
-                    };
-                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
-                        let _ = owner.update(cx, |this, cx| {
-                            this.email_domain = domain.into();
-                            let value = this.email.read(cx).value().to_string();
-                            if !domain.is_empty() {
-                                let local = value.split('@').next().unwrap_or_default();
-                                let next = rec::complete_email(local, domain);
-                                this.email.update(cx, |s, cx| s.set_value(next, window, cx));
-                            }
-                            cx.notify();
-                        });
-                    }));
-                }
-                menu
-            })
-            .into_any_element()
+    fn pick_email(&mut self, value: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.email
+            .update(cx, |s, cx| s.set_value(value, window, cx));
+        self.show_suffixes = false;
+        cx.notify();
     }
     fn browse(&self, cx: &Context<Self>) -> Div {
         let mut body = div()
@@ -1558,17 +1556,17 @@ impl Recommendations {
                     [
                         (
                             "访问他的抖音",
-                            "app/profile-douyin.jpg",
+                            "app/profile-douyin.svg",
                             &card.content.links.douyin,
                         ),
                         (
                             "访问他的哔哩哔哩",
-                            "app/profile-bilibili.jpg",
+                            "app/profile-bilibili.svg",
                             &card.content.links.bilibili,
                         ),
                         (
                             "访问他的小黑盒",
-                            "app/profile-heybox.jpg",
+                            "app/profile-heybox.svg",
                             &card.content.links.heybox,
                         ),
                     ]
@@ -1582,7 +1580,7 @@ impl Recommendations {
                             .p_0()
                             .w(rems(1.45))
                             .h(rems(1.45))
-                            .child(gpui::img(icon).size(rems(1.15)).rounded_sm())
+                            .child(Icon::default().path(icon).size(rems(1.15)))
                             .accessibility_label(hint.clone())
                             .tooltip(hint)
                             .on_click(move |_, _, cx| cx.open_url(&url))
@@ -1626,12 +1624,32 @@ impl Recommendations {
                 );
             }
             let mut actions = div().h_flex().gap_2().flex_wrap().child(view_actions);
-            let mut feedback = div()
-                .h_flex()
-                .gap_1()
-                .items_start()
-                .child(self.vote_button(card, true, cx))
-                .child(self.vote_button(card, false, cx));
+            let mut feedback =
+                div()
+                    .h_flex()
+                    .gap_1()
+                    .items_start()
+                    .child(self.vote_button(card, true, cx))
+                    .child(self.vote_button(card, false, cx))
+                    .child(
+                        div()
+                            .id(SharedString::from(format!("recipe-downloads-{}", card.id)))
+                            .v_flex()
+                            .items_center()
+                            .justify_center()
+                            .gap(px(1.))
+                            .min_w(rems(2.2))
+                            .h(rems(2.4))
+                            .text_color(cx.theme().muted_foreground)
+                            .child(Icon::new(gpui::assets::IconName::Download).size(rems(1.05)))
+                            .child(div().text_xs().line_height(rems(1.)).child(
+                                card.downloads.map_or_else(|| "—".into(), |n| n.to_string()),
+                            ))
+                            .tooltip({
+                                let hint = self.t("下载量");
+                                move |window, cx| Tooltip::new(hint.clone()).build(window, cx)
+                            }),
+                    );
             if card.mine {
                 actions = actions
                     .child(
@@ -2046,9 +2064,9 @@ struct InstallFooter {
 struct LoginForm(WeakEntity<Recommendations>);
 
 impl Render for LoginForm {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.0
-            .update(cx, |view, cx| view.login_form(cx))
+            .update(cx, |view, cx| view.login_form(window, cx))
             .unwrap_or_else(|_| div())
     }
 }
@@ -2064,86 +2082,70 @@ impl Recommendations {
             );
         }
         if matches!(self.mode, Mode::Browse | Mode::Login) {
-            let game_title = game_names::display(&self.game, &self.names, true);
-            if let Some(group) = self.browse_identity().filter(|id| id.name != game_title) {
-                top = top.child(div().text_sm().child(group.name));
-            }
-            if let Some(active) = self.identity.as_ref()
-                && rec::GameLink::saved(&self.game, active).is_some()
-            {
-                let historical = self.show_history;
-                top = top.child(
-                    div().h_flex().gap_2().child(
-                        self.button(
-                            "recipe-switch-history",
-                            if historical {
-                                "返回平台条目"
-                            } else {
-                                "查看历史条目的分享"
-                            },
-                            cx,
-                        )
-                        .disabled(self.busy || self.operation_busy)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.use_group(!historical);
-                            cx.notify();
-                        })),
-                    ),
-                );
-            } else if let Some(pair) = self.link_suggestion.clone()
-                && self.game.extra.get("recommendation_link_ignored")
-                    != Some(&serde_json::json!(pair))
-            {
-                let dismissed = serde_json::json!(pair);
-                top = top.child(
+            let list_controls = if self.loaded || self.busy {
+                let summary = if self.loaded {
+                    self.t("{0} 个方案").replace("{0}", &self.total.to_string())
+                } else {
+                    self.t("正在加载推荐…")
+                };
+                let owner = cx.weak_entity();
+                let current = self.sort;
+                let options = [
+                    rec::CardSort::Likes,
+                    rec::CardSort::Updated,
+                    rec::CardSort::Downloads,
+                ]
+                .map(|sort| (sort, self.t(sort.label())));
+                let sorting = self
+                    .button("recipe-sort", current.label(), cx)
+                    .icon(IconName::ChevronDown)
+                    .disabled(self.busy)
+                    .dropdown_menu(move |mut menu, _, _| {
+                        for (sort, label) in options.clone() {
+                            let owner = owner.clone();
+                            menu = menu.item(
+                                PopupMenuItem::new(label).checked(sort == current).on_click(
+                                    move |_, _, cx| {
+                                        let _ = owner.update(cx, |this, cx| {
+                                            if this.sort != sort && !this.busy {
+                                                this.sort = sort;
+                                                this.clear_page();
+                                                this.refresh(false);
+                                                cx.notify();
+                                            }
+                                        });
+                                    },
+                                ),
+                            );
+                        }
+                        menu
+                    });
+                Some(
                     div()
-                        .v_flex()
-                        .gap_1()
-                        .child(
-                            div().text_sm().whitespace_normal().child(
-                                self.t("这两个条目是同一款游戏吗？{0} / {1}")
-                                    .replace("{0}", &pair.platform.name)
-                                    .replace("{1}", &pair.historical.name),
-                            ),
-                        )
+                        .h_flex()
+                        .items_center()
+                        .gap_2()
                         .child(
                             div()
-                                .h_flex()
-                                .gap_2()
-                                .flex_wrap()
-                                .child(
-                                    self.button("recipe-confirm-link", "关联并保留历史分享", cx)
-                                        .disabled(self.busy || self.operation_busy)
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.set_game_choice(
-                                                Some(pair.platform.clone()),
-                                                Some(pair.clone()),
-                                                cx,
-                                            );
-                                        })),
-                                )
-                                .child(
-                                    self.button("recipe-ignore-link", "忽略此关联", cx)
-                                        .ghost()
-                                        .disabled(self.busy || self.operation_busy)
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.save_game_choice(cx, |game| {
-                                                game.extra.insert(
-                                                    "recommendation_link_ignored".into(),
-                                                    dismissed.clone(),
-                                                );
-                                            });
-                                            cx.notify();
-                                        })),
-                                ),
-                        ),
-                );
-            }
+                                .text_xs()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(summary),
+                        )
+                        .child(sorting)
+                        .pr_2()
+                        .border_r_1()
+                        .border_color(cx.theme().border),
+                )
+            } else {
+                None
+            };
             top = top.child(
                 div()
                     .h_flex()
                     .gap_2()
+                    .items_center()
                     .flex_wrap()
+                    .children(list_controls)
                     .child(
                         self.button("recipe-refresh", "刷新", cx)
                             .icon(IconName::RefreshCw)
@@ -2227,18 +2229,79 @@ impl Recommendations {
                         })),
                     ),
             );
-            if self.loaded || self.busy {
-                let summary = if self.loaded {
-                    self.t("{0} 个方案，按有用数排序")
-                        .replace("{0}", &self.total.to_string())
-                } else {
-                    self.t("正在加载推荐…")
-                };
+            let game_title = game_names::display(&self.game, &self.names, true);
+            if let Some(group) = self.browse_identity().filter(|id| id.name != game_title) {
+                top = top.child(div().text_sm().child(group.name));
+            }
+            if let Some(active) = self.identity.as_ref()
+                && rec::GameLink::saved(&self.game, active).is_some()
+            {
+                let historical = self.show_history;
+                top = top.child(
+                    div().h_flex().gap_2().child(
+                        self.button(
+                            "recipe-switch-history",
+                            if historical {
+                                "返回平台条目"
+                            } else {
+                                "查看历史条目的分享"
+                            },
+                            cx,
+                        )
+                        .disabled(self.busy || self.operation_busy)
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.use_group(!historical);
+                            cx.notify();
+                        })),
+                    ),
+                );
+            } else if let Some(pair) = self.link_suggestion.clone()
+                && self.game.extra.get("recommendation_link_ignored")
+                    != Some(&serde_json::json!(pair))
+            {
+                let dismissed = serde_json::json!(pair);
                 top = top.child(
                     div()
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(summary),
+                        .v_flex()
+                        .gap_1()
+                        .child(
+                            div().text_sm().whitespace_normal().child(
+                                self.t("这两个条目是同一款游戏吗？{0} / {1}")
+                                    .replace("{0}", &pair.platform.name)
+                                    .replace("{1}", &pair.historical.name),
+                            ),
+                        )
+                        .child(
+                            div()
+                                .h_flex()
+                                .gap_2()
+                                .flex_wrap()
+                                .child(
+                                    self.button("recipe-confirm-link", "关联并保留历史分享", cx)
+                                        .disabled(self.busy || self.operation_busy)
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            this.set_game_choice(
+                                                Some(pair.platform.clone()),
+                                                Some(pair.clone()),
+                                                cx,
+                                            );
+                                        })),
+                                )
+                                .child(
+                                    self.button("recipe-ignore-link", "忽略此关联", cx)
+                                        .ghost()
+                                        .disabled(self.busy || self.operation_busy)
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            this.save_game_choice(cx, |game| {
+                                                game.extra.insert(
+                                                    "recommendation_link_ignored".into(),
+                                                    dismissed.clone(),
+                                                );
+                                            });
+                                            cx.notify();
+                                        })),
+                                ),
+                        ),
                 );
             }
         }
@@ -2346,10 +2409,10 @@ impl Recommendations {
         )
     }
 
-    fn login_form(&self, cx: &Context<Self>) -> Div {
+    fn login_form(&self, window: &Window, cx: &Context<Self>) -> Div {
         let ring = crate::ui_focus::visible(cx);
         let code = self.code.read(cx).value();
-        let address = rec::complete_email(&self.email.read(cx).value(), &self.email_domain);
+        let address = self.email.read(cx).value().trim().to_owned();
         let matches_address = self
             .challenge
             .as_ref()
@@ -2357,6 +2420,8 @@ impl Recommendations {
         let login = self
             .button("recipe-login", "登录", cx)
             .primary()
+            .w_full()
+            .h(rems(2.15))
             .disabled(
                 self.busy
                     || !matches_address
@@ -2377,17 +2442,42 @@ impl Recommendations {
             }));
         let send = self
             .button("recipe-send-code", "发送验证码", cx)
-            .disabled(self.busy || self.cooldown || self.email.read(cx).value().trim().is_empty())
-            .on_click(cx.listener(|this, _, window, cx| {
+            .flex_shrink_0()
+            .h(rems(2.))
+            .disabled(self.busy || self.cooldown || !rec::valid_email(&address))
+            .on_click(cx.listener(|this, _, _, cx| {
                 if let Some(client) = this.client.clone() {
-                    let email =
-                        rec::complete_email(&this.email.read(cx).value(), &this.email_domain);
-                    this.email
-                        .update(cx, |s, cx| s.set_value(email.clone(), window, cx));
+                    let email = this.email.read(cx).value().trim().to_owned();
+                    this.show_suffixes = false;
                     this.job(move || Ok(Update::Code(client.send_code(&email)?, email)));
                 }
                 cx.notify();
             }));
+        let suggestions = if self.show_suffixes {
+            rec::email_suggestions(&address)
+        } else {
+            Vec::new()
+        };
+        let rows = suggestions.iter().enumerate().map(|(index, email)| {
+            let email = email.clone();
+            div()
+                .id(("recipe-email-suggestion", index))
+                .text_sm()
+                .px_2()
+                .py_0p5()
+                .cursor_pointer()
+                .when(index == self.suffix_index, |r| r.bg(cx.theme().muted))
+                .hover(|r| r.bg(cx.theme().muted))
+                .child(email.clone())
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, _, window, cx| {
+                        window.prevent_default();
+                        cx.stop_propagation();
+                        this.pick_email(email.clone(), window, cx);
+                    }),
+                )
+        });
         div()
             .v_flex()
             .w_full()
@@ -2397,35 +2487,100 @@ impl Recommendations {
                 div()
                     .v_flex()
                     .gap_1()
-                    .child(self.t("邮箱账号或完整邮箱"))
+                    .child(self.t("邮箱"))
                     .child(
                         div()
                             .h_flex()
+                            .items_center()
                             .gap_2()
                             .child(
                                 div()
                                     .flex_1()
                                     .min_w_0()
-                                    .child(Input::new(&self.email).small().focus_ring(ring)),
+                                    .child(Input::new(&self.email).focus_ring(ring)),
                             )
-                            .child(self.email_suffix(cx)),
-                    ),
+                            .child(send),
+                    )
+                    .when(!suggestions.is_empty(), |d| {
+                        d.child(
+                            div()
+                                .v_flex()
+                                .border_1()
+                                .border_color(cx.theme().border)
+                                .rounded_sm()
+                                .children(rows),
+                        )
+                    })
+                    .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                        if !this.show_suffixes {
+                            return;
+                        }
+                        let list = rec::email_suggestions(this.email.read(cx).value().as_str());
+                        if list.is_empty() {
+                            return;
+                        }
+                        match e.keystroke.key.as_str() {
+                            "down" => this.suffix_index = (this.suffix_index + 1) % list.len(),
+                            "up" => {
+                                this.suffix_index =
+                                    (this.suffix_index + list.len() - 1) % list.len()
+                            }
+                            "escape" => this.show_suffixes = false,
+                            "enter" => this.pick_email(
+                                list[this.suffix_index.min(list.len() - 1)].clone(),
+                                window,
+                                cx,
+                            ),
+                            _ => return,
+                        }
+                        window.prevent_default();
+                        cx.stop_propagation();
+                        cx.notify();
+                    })),
             )
             .child(
                 div().v_flex().gap_1().child(self.t("验证码")).child(
                     div()
                         .h_flex()
-                        .gap_2()
+                        .items_center()
+                        .justify_center()
+                        .w_full()
                         .child(
                             div()
-                                .flex_1()
-                                .min_w_0()
-                                .child(Input::new(&self.code).small().focus_ring(ring)),
-                        )
-                        .child(send),
+                                .child(
+                                    gpui_component::input::OtpInput::new(&self.code)
+                                        .groups(1)
+                                        .with_size(
+                                            (window.rem_size() * 2.85)
+                                                .min(window.viewport_size().width / 8.),
+                                        )
+                                        .focus_ring(ring),
+                                )
+                                .capture_key_down(cx.listener(
+                                    |this, e: &KeyDownEvent, window, cx| {
+                                        if (e.keystroke.modifiers.control
+                                            || e.keystroke.modifiers.platform)
+                                            && e.keystroke.key == "v"
+                                        {
+                                            window.prevent_default();
+                                            cx.stop_propagation();
+                                            if let Some(text) = cx
+                                                .read_from_clipboard()
+                                                .and_then(|item| item.text())
+                                                && let Some(code) = rec::pasted_otp(&text)
+                                            {
+                                                this.code.update(cx, |s, cx| {
+                                                    s.set_value(code, window, cx)
+                                                });
+                                                cx.notify();
+                                            }
+                                        }
+                                    },
+                                )),
+                        ),
                 ),
             )
-            .child(div().h_flex().justify_end().child(login))
+            .child(login)
     }
 
     fn share_page(&self, window: &Window, primary: &mut Option<Button>, cx: &Context<Self>) -> Div {

@@ -14,6 +14,8 @@ export function openStore(path) {
       revision INTEGER NOT NULL DEFAULT 1,status TEXT NOT NULL DEFAULT 'visible',content TEXT NOT NULL,updated INTEGER NOT NULL,
       submission TEXT NOT NULL,UNIQUE(author,submission));
     CREATE INDEX IF NOT EXISTS recipes_game ON recipes(game,status,updated);
+    CREATE TABLE IF NOT EXISTS recipe_installs(recipe TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+      operation TEXT NOT NULL, PRIMARY KEY(recipe,operation)) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS likes(recipe TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
       revision INTEGER NOT NULL,user TEXT NOT NULL REFERENCES users(id),PRIMARY KEY(recipe,revision,user));
     CREATE TABLE IF NOT EXISTS dislikes(recipe TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
@@ -61,7 +63,7 @@ export function cleanExpired(db, now) {
     db.prepare('DELETE FROM limits WHERE bucket<?').run(now-2*86400);
   });
 }
-export const selectRecipes = `SELECT r.*,(SELECT COUNT(*) FROM likes l JOIN users u ON l.user=u.id
+export const selectRecipes = `SELECT r.*,(SELECT COUNT(*) FROM recipe_installs i WHERE i.recipe=r.id) downloads,(SELECT COUNT(*) FROM likes l JOIN users u ON l.user=u.id
   WHERE l.recipe=r.id AND l.revision=r.revision AND u.blocked=0) likes,
   (SELECT COUNT(*) FROM dislikes l JOIN users u ON l.user=u.id
   WHERE l.recipe=r.id AND l.revision=r.revision AND u.blocked=0) dislikes
@@ -76,5 +78,5 @@ export function publicRecipe(db,row,user,feedback=false,reporting=false,dates=fa
 }
 export function deleteRecipe(db,id,now) {
   db.prepare("UPDATE recipes SET status='deleted',content='{}',revision=revision+1,updated=? WHERE id=?").run(now,id);
-  for(const table of ['likes','dislikes','reports']) db.prepare(`DELETE FROM ${table} WHERE recipe=?`).run(id);
+  for(const table of ['likes','dislikes','reports','recipe_installs']) db.prepare(`DELETE FROM ${table} WHERE recipe=?`).run(id);
 }

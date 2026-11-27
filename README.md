@@ -211,9 +211,15 @@ Bug reports: [GitHub Issues](https://github.com/pandaligx/RTX-FG-Manager/issues)
 
 Thanks to [sdli1995 / dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), [pipotoufikxyz-lgtm / MFG](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version), [dashdogy / MFG-Unlocker](https://github.com/dashdogy/MFG-Unlocker), [SilyNoMeta / RTX Encore](https://github.com/SilyNoMeta/rtx-encore), [apex-compute / ANR](https://github.com/apex-compute/ANR), [GPUI](https://gpui.rs/), [GPUI Kit](https://github.com/longbridge/gpui-kit), [GPUI Fast](https://github.com/longbridge/gpui-fast) and [reqwest](https://github.com/seanmonstar/reqwest) / [Tokio](https://github.com/tokio-rs/tokio). See [Third-party notices](THIRD_PARTY_NOTICES.txt).
 
-Special thanks to [大大大怪将军阁下](https://space.bilibili.com/608531525), [云外逸声](https://space.bilibili.com/256887068), [坏坏的帅帅啊](https://space.bilibili.com/296225145) and everyone contributing compatibility feedback. This project is not affiliated with NVIDIA, game publishers or the upstream projects.
+### Community credits
 
-Thanks to [落日无序的米莉安](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp) on HeyBox for sharing the manager and creating tutorials.
+| Platform | Contributors |
+| --- | --- |
+| <img src="rust/assets/profile-bilibili.svg" width="18" height="18" alt=""> Bilibili | [大大大怪将军阁下](https://space.bilibili.com/608531525), [云外逸声](https://space.bilibili.com/256887068), [坏坏的帅帅啊](https://space.bilibili.com/296225145) |
+| <img src="rust/assets/profile-heybox.svg" width="18" height="18" alt=""> HeyBox | [落日无序的米莉安](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp) (tutorials), [ISHOW操作](https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=da8a6b53a57b&h_src=heyboxapp) |
+| <img src="rust/assets/profile-douyin.svg" width="18" height="18" alt=""> Douyin | [Tamako](https://v.douyin.com/6uPhwo0QQPg/) |
+
+Thanks to everyone who contributes compatibility feedback. This project is not affiliated with NVIDIA, game publishers or the upstream projects.
 
 ---
 

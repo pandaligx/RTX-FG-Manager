@@ -750,3 +750,36 @@ test('Encore 2.2 NIS and Auto settings are versioned and hidden from legacy read
   assert.throws(()=>recipe({...c,patchVersion:'2.1.0'}));
   assert.equal((await f.call('GET','/v1/capabilities')).encore220,1);
 });
+
+test('installation receipts are anonymous and idempotent and old clients keep their response shape', async t => {
+  const f = fixture(t), owner = await f.login();
+  const headers = {'x-rtxfg-recipe-installs':'1'};
+  const create = title => f.call('POST', '/v1/recipes', {submission:randomUUID(), content:{...content(), title}}, owner.token);
+  const first = await create('First');
+  f.tick(3600);
+  const second = await create('Second');
+  const path = '/v1/recipes/'+first.id;
+  const guest = (route, extra=headers) => f.call('GET', route, null, undefined, 'visitor', 16, extra);
+  const list = sort => guest('/v1/recipes?game=steam:292030&sort='+sort);
+  const report = operation => f.call('POST', path+'/installs', {operation});
+  assert.equal((await guest('/v1/capabilities')).recipeInstalls,1);
+  assert.equal((await guest(path)).downloads,0);
+  assert.equal(Object.hasOwn(await guest(path,{}),'downloads'),false);
+  const operation = randomUUID();
+  await Promise.all([report(operation),report(operation)]);
+  assert.equal((await guest(path)).downloads,1);
+  await report(randomUUID());
+  const counted = await guest(path);
+  assert.equal(counted.downloads,2);
+  assert.equal(counted.updatedAt,second.updatedAt-3600);
+  assert.equal(counted.likes,0);
+  assert.equal((await list('downloads')).items[0].id,first.id);
+  assert.equal((await list('updated')).items[0].id,second.id);
+  assert.equal((await list('likes')).items[0].id,second.id);
+  await reject(list('unknown'),'invalid_sort');
+  await reject(report('invalid'),'invalid_operation');
+  await f.call('PUT',path,{revision:1,content:{...content(),title:'First revised'}},owner.token);
+  assert.equal((await guest(path)).downloads,2);
+  await f.call('DELETE',path,{revision:2},owner.token);
+  await reject(report(randomUUID()),'install_target_gone');
+});

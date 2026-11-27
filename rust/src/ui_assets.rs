@@ -4,7 +4,7 @@ use std::borrow::Cow;
 // The default component bundle excludes catalog-only icons.
 gpui::assets::icon_assets!(
     RecommendationAssets,
-    [UsersRound, Download, Flag, CirclePlay]
+    [UsersRound, Download, Flag, CirclePlay, SquarePen]
 );
 pub struct Assets;
 impl AssetSource for Assets {
@@ -13,11 +13,11 @@ impl AssetSource for Assets {
             return Ok(Some(bytes));
         }
         let profile_icon: Option<&'static [u8]> = match path {
-            "app/profile-douyin.jpg" => Some(include_bytes!("../../app/assets/profile-douyin.jpg")),
-            "app/profile-bilibili.jpg" => {
-                Some(include_bytes!("../../app/assets/profile-bilibili.jpg"))
-            }
-            "app/profile-heybox.jpg" => Some(include_bytes!("../../app/assets/profile-heybox.jpg")),
+            "app/lgxnglogo.png" => Some(include_bytes!("../assets/lgxnglogo.png")),
+            "app/gitcode.svg" => Some(include_bytes!("../assets/gitcode.svg")),
+            "app/profile-douyin.svg" => Some(include_bytes!("../assets/profile-douyin.svg")),
+            "app/profile-bilibili.svg" => Some(include_bytes!("../assets/profile-bilibili.svg")),
+            "app/profile-heybox.svg" => Some(include_bytes!("../assets/profile-heybox.svg")),
             _ => None,
         };
         if let Some(bytes) = profile_icon {
@@ -60,9 +60,11 @@ impl AssetSource for Assets {
         files.extend(RecommendationAssets.list(path)?);
         for name in [
             "app/manager.png",
-            "app/profile-douyin.jpg",
-            "app/profile-bilibili.jpg",
-            "app/profile-heybox.jpg",
+            "app/lgxnglogo.png",
+            "app/gitcode.svg",
+            "app/profile-douyin.svg",
+            "app/profile-bilibili.svg",
+            "app/profile-heybox.svg",
             "app/manager-backplate.svg",
             "app/refresh.svg",
             "app/trash.svg",
@@ -102,6 +104,9 @@ mod tests {
             "icons/thumbs-down.svg",
             "app/trash.svg",
             "icons/github.svg",
+            "app/gitcode.svg",
+            "app/profile-bilibili.svg",
+            "app/lgxnglogo.png",
             "icons/layout-dashboard.svg",
             "icons/triangle-alert.svg",
             "icons/check.svg",

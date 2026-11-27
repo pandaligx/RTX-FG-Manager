@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.45 — 2026-11-27
+
+- Shared setups show successful installs and can be sorted by likes, last update or downloads. Retrying the same install counts once.
+- Email sign-in supports domain suggestions and pasting a six-digit code. The setup count and sort menu are now at the left of the toolbar, and About groups the author's links into one row of icons.
+- On Windows, the international edition of Where Winds Meet (wwm.exe) can use the same optional Neural Rendering kit as the Chinese edition.
+
 ## 4.3.44 — 2026-11-26
 
 - An optional DLSS Neural Rendering kit is available for Where Winds Meet on Windows. Select yysls.exe, choose stock 0.4.2 or Delta R3, and select version.dll as the only entry. The kit is available in the install dialog.

@@ -17,7 +17,9 @@ use std::{
 use zeroize::{Zeroize, Zeroizing};
 
 mod feeds;
+mod installs;
 pub use feeds::{FeedCursor, FeedFilter, FeedPage, game_choices};
+pub use installs::queue_install;
 
 const ORIGIN: &str = "https://recommend.lgxng.cn";
 // Existing service origin, used only after normal read routes fail. Keep the
@@ -729,6 +731,8 @@ pub struct Card {
     #[serde(default)]
     pub created_at: Option<u64>,
     pub likes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub downloads: Option<u64>,
     pub liked: bool,
     #[serde(default)]
     pub dislikes: u64,
@@ -811,6 +815,38 @@ impl Page {
         Ok(())
     }
 }
+pub fn valid_email(value: &str) -> bool {
+    let Some((local, domain)) = value.split_once('@') else {
+        return false;
+    };
+    !local.is_empty()
+        && !value.chars().any(char::is_whitespace)
+        && value.len() <= 254
+        && domain.contains('.')
+        && !domain.contains('@')
+        && domain.split('.').all(|part| !part.is_empty())
+}
+pub fn email_suggestions(value: &str) -> Vec<String> {
+    let value = value.trim();
+    if value.is_empty() || value.chars().any(char::is_whitespace) {
+        return vec![];
+    }
+    let (local, prefix) = value.split_once('@').unwrap_or((value, ""));
+    const DOMAINS: [&str; 5] = ["qq.com", "163.com", "126.com", "outlook.com", "gmail.com"];
+    let prefix = prefix.to_ascii_lowercase();
+    if local.is_empty() || prefix.contains('@') {
+        return vec![];
+    }
+    DOMAINS
+        .iter()
+        .filter(|domain| domain.starts_with(&prefix) && **domain != prefix)
+        .map(|d| format!("{local}@{d}"))
+        .collect()
+}
+pub fn pasted_otp(text: &str) -> Option<String> {
+    let text = text.trim();
+    (text.len() == 6 && text.bytes().all(|b| b.is_ascii_digit())).then(|| text.to_owned())
+}
 /// A full address takes precedence; a selected suffix only completes an account name.
 pub fn complete_email(value: &str, domain: &str) -> String {
     let value = value.trim();
@@ -820,15 +856,43 @@ pub fn complete_email(value: &str, domain: &str) -> String {
         format!("{value}@{domain}")
     }
 }
-pub fn rank(items: &mut [Card]) {
-    // Match the server's global pagination order, including ties.
-    items.sort_by(card_order);
+#[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
+pub enum CardSort {
+    #[default]
+    Likes,
+    Updated,
+    Downloads,
 }
-fn card_order(a: &Card, b: &Card) -> std::cmp::Ordering {
-    b.likes
-        .cmp(&a.likes)
+impl CardSort {
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Likes => "likes",
+            Self::Updated => "updated",
+            Self::Downloads => "downloads",
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Likes => "点赞最多",
+            Self::Updated => "最近更新",
+            Self::Downloads => "下载最多",
+        }
+    }
+    fn compare(self, a: &Card, b: &Card) -> std::cmp::Ordering {
+        match self {
+            Self::Likes => b.likes.cmp(&a.likes),
+            Self::Updated => std::cmp::Ordering::Equal,
+            Self::Downloads => b.downloads.cmp(&a.downloads),
+        }
         .then(b.updated_at.cmp(&a.updated_at))
         .then(a.id.cmp(&b.id))
+    }
+    pub fn rank(self, items: &mut [Card]) {
+        items.sort_by(|a, b| self.compare(a, b));
+    }
+}
+pub fn rank(items: &mut [Card]) {
+    CardSort::Likes.rank(items);
 }
 pub fn date(timestamp: u64) -> Option<String> {
     chrono::DateTime::from_timestamp(i64::try_from(timestamp).ok()?, 0).map(|v| {
@@ -1215,6 +1279,7 @@ impl Client {
             .header("X-RTXFG-Pipo042", "1")
             .header("X-RTXFG-Native-Streamline", "1")
             .header("X-RTXFG-Yanyun-NR", "1")
+            .header("X-RTXFG-Recipe-Installs", "1")
             .header("X-RTXFG-ANR", "1")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
@@ -1292,11 +1357,23 @@ impl Client {
         mine: bool,
         reported: bool,
     ) -> Result<Page> {
+        self.browse_sorted(game, catalog, offset, mine, reported, CardSort::Likes)
+    }
+    fn browse_sorted(
+        &self,
+        game: &GameIdentity,
+        catalog: &cloud::Catalog,
+        offset: u32,
+        mine: bool,
+        reported: bool,
+        sort: CardSort,
+    ) -> Result<Page> {
         game.validate()?;
         let query = reqwest::Url::parse_with_params(
             &format!("{ORIGIN}/v1/recipes"),
             &[
                 ("game", game.id.clone()),
+                ("sort", sort.key().to_owned()),
                 ("offset", offset.to_string()),
                 ("mine", if mine { "1" } else { "0" }.into()),
                 ("reported", if reported { "1" } else { "0" }.into()),
@@ -1320,20 +1397,38 @@ impl Client {
             result => result?,
         };
         page.validate(&game.id, catalog)?;
+        ensure!(
+            sort == CardSort::Likes || page.items.iter().all(|c| c.downloads.is_some()),
+            "推荐服务暂不支持此排序"
+        );
         if offset == 0 && !mine && !reported {
-            let _ = core::atomic_json(&self.cache_path(&game.id), &page);
+            let _ = core::atomic_json(&self.sorted_cache_path(&game.id, sort), &page);
         }
         Ok(page)
     }
+    #[cfg(test)]
     fn cache_path(&self, id: &str) -> PathBuf {
+        self.sorted_cache_path(id, CardSort::Likes)
+    }
+    fn sorted_cache_path(&self, id: &str, sort: CardSort) -> PathBuf {
         self.root.join(format!(
-            "{:x}.setup-v12.json",
-            Sha256::digest(id.as_bytes())
+            "{:x}.setup-v13-{}.json",
+            Sha256::digest(id.as_bytes()),
+            sort.key()
         ))
     }
     pub fn cached(&self, game: &GameIdentity, catalog: &cloud::Catalog) -> Option<Page> {
+        self.cached_sorted(game, catalog, CardSort::Likes)
+    }
+    fn cached_sorted(
+        &self,
+        game: &GameIdentity,
+        catalog: &cloud::Catalog,
+        sort: CardSort,
+    ) -> Option<Page> {
         let digest = format!("{:x}", Sha256::digest(game.id.as_bytes()));
-        let mut p = [
+        let latest = self.sorted_cache_path(&game.id, sort);
+        let p = [
             "setup-v12.json",
             "setup-v11.json",
             "setup-v10.json",
@@ -1348,10 +1443,11 @@ impl Client {
             "json",
         ]
         .iter()
-        .find_map(|suffix| {
+        .filter(|_| sort == CardSort::Likes)
+        .map(|suffix| self.root.join(format!("{digest}.{suffix}")));
+        let mut p = std::iter::once(latest).chain(p).find_map(|path| {
             // Bound reads before allocating and try a previous complete cache
             // when the newest file is truncated, oversized or incompatible.
-            let path = self.root.join(format!("{digest}.{suffix}"));
             let value = core::read_json(&path, RESPONSE_LIMIT).ok()?;
             let page: Page = serde_json::from_value(value).ok()?;
             page.validate(&game.id, catalog).ok()?;
@@ -1591,6 +1687,7 @@ fn error_message(code: &str) -> &'static str {
         "invalid_preset_snapshot" | "invalid_preset_value" | "invalid_preset_combination" => {
             "分享参数不完整或数值无效，请检查当前游戏设置"
         }
+        "install_target_gone" => "统计目标已移除",
         "not_found" => "此方案已被移除或隐藏，请刷新",
         "own_recipe_like" => "不能评价自己的方案",
         "own_recipe_report" => "不能举报自己的方案",
@@ -1703,6 +1800,8 @@ mod tests {
                 }
                 let mut body_bytes = vec![0; length];
                 reader.read_exact(&mut body_bytes).unwrap();
+                request.push_str("\r\n");
+                request.push_str(&String::from_utf8_lossy(&body_bytes));
                 requests.push(request);
                 if status == 0 {
                     // Server received the request but the response was lost.
@@ -2644,6 +2743,23 @@ mod tests {
         assert!(!sealed.windows(input.len()).any(|w| w == input));
         assert_eq!(&*unseal(&sealed, false).unwrap(), input);
     }
+    #[test]
+    fn login_suggests_only_missing_suffixes_and_accepts_six_digit_paste() {
+        assert_eq!(email_suggestions("player")[0], "player@qq.com");
+        assert_eq!(email_suggestions("player@Q"), ["player@qq.com"]);
+        for input in ["player@qq.com", "player@example.com", "@qq", "a@@q"] {
+            assert!(email_suggestions(input).is_empty());
+        }
+        assert!(valid_email("player@example.com"));
+        for invalid in ["player", "player@", "player@a..cn", "player@qq.com@qq.com"] {
+            assert!(!valid_email(invalid));
+        }
+        assert_eq!(pasted_otp(" 012345\n").as_deref(), Some("012345"));
+        for invalid in ["12345", "1234567", "12 345", "12345a"] {
+            assert_eq!(pasted_otp(invalid), None);
+        }
+    }
+
     #[test]
     fn email_suffix_never_overwrites_a_full_address() {
         assert_eq!(complete_email(" 12345678 ", "qq.com"), "12345678@qq.com");

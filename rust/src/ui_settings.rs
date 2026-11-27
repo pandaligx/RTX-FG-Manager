@@ -211,21 +211,6 @@ impl Manager {
 
     fn settings_links(&self, cx: &Context<Self>) -> AnyElement {
         let groups: &[(&str, &[(&str, &str)])] = &[
-            ("作者", &[("小南瓜", "https://lgxng.cn/")]),
-            (
-                "项目主页",
-                &[
-                    ("GitHub", "https://github.com/pandaligx/RTX-FG-Manager"),
-                    ("GitCode", "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager"),
-                ],
-            ),
-            (
-                "作者主页",
-                &[
-                    ("GitHub", "https://github.com/pandaligx"),
-                    ("哔哩哔哩", "https://b23.tv/5mHCHFn"),
-                ],
-            ),
             (
                 "补丁项目",
                 &[
@@ -242,7 +227,7 @@ impl Manager {
                 &[("GPUI Kit", "https://github.com/longbridge/gpui-kit")],
             ),
             (
-                "鸣谢",
+                "哔哩哔哩",
                 &[
                     (
                         "大大大怪将军阁下（测试支持）",
@@ -250,12 +235,22 @@ impl Manager {
                     ),
                     ("云外逸声", "https://space.bilibili.com/256887068"),
                     ("坏坏的帅帅啊", "https://space.bilibili.com/296225145"),
+                ],
+            ),
+            (
+                "小黑盒",
+                &[
+                    (
+                        "ISHOW操作",
+                        "https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=da8a6b53a57b&h_src=heyboxapp",
+                    ),
                     (
                         "落日无序的米莉安（小黑盒分享与教程）",
                         "https://www.xiaoheihe.cn/bbs/user_profile_share?user_id=c7cf681e8605&h_src=heyboxapp",
                     ),
                 ],
             ),
+            ("抖音", &[("Tamako", "https://v.douyin.com/6uPhwo0QQPg/")]),
         ];
         div()
             .v_flex()
@@ -264,8 +259,80 @@ impl Manager {
             .pt_3()
             .border_t_1()
             .border_color(cx.theme().border)
-            .children(groups.iter().map(|(label, links)| {
+            .child(
                 div()
+                    .h_flex()
+                    .items_center()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(self.t("小南瓜")),
+                    )
+                    .children(
+                        [
+                            (
+                                "author-blog",
+                                "个人博客",
+                                "https://lgxng.cn/",
+                                img("app/lgxnglogo.png")
+                                    .object_fit(ObjectFit::Contain)
+                                    .size(rems(1.45))
+                                    .into_any_element(),
+                            ),
+                            (
+                                "author-github",
+                                "GitHub",
+                                "https://github.com/pandaligx",
+                                Icon::new(IconName::Github)
+                                    .size(rems(1.2))
+                                    .into_any_element(),
+                            ),
+                            (
+                                "author-gitcode",
+                                "GitCode",
+                                "https://gitcode.com/gcw_qWIjmve7",
+                                Icon::default()
+                                    .path("app/gitcode.svg")
+                                    .size(rems(1.2))
+                                    .into_any_element(),
+                            ),
+                            (
+                                "author-bilibili",
+                                "哔哩哔哩",
+                                "https://space.bilibili.com/436753594",
+                                Icon::default()
+                                    .path("app/profile-bilibili.svg")
+                                    .size(rems(1.25))
+                                    .into_any_element(),
+                            ),
+                        ]
+                        .into_iter()
+                        .map(|(id, label, url, icon)| {
+                            let hint = self.t(label);
+                            Button::new(id)
+                                .small()
+                                .ghost()
+                                .size(rems(2.))
+                                .p_0()
+                                .focus_ring(crate::ui_focus::visible(cx))
+                                .accessibility_label(hint.clone())
+                                .tooltip(hint)
+                                .child(icon)
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.act(Command::Open(url.into()), window, cx);
+                                }))
+                        }),
+                    ),
+            )
+            .children(groups.iter().flat_map(|(label, links)| {
+                let heading = match *label {
+                    "补丁项目" => Some("技术项目"),
+                    "哔哩哔哩" => Some("玩家致谢"),
+                    _ => None,
+                };
+                let row = div()
                     .h_flex()
                     .items_start()
                     .gap_4()
@@ -276,6 +343,18 @@ impl Manager {
                             .flex_shrink_0()
                             .text_sm()
                             .text_color(cx.theme().muted_foreground)
+                            .h_flex()
+                            .items_center()
+                            .gap_1p5()
+                            .when_some(
+                                match *label {
+                                    "哔哩哔哩" => Some("app/profile-bilibili.svg"),
+                                    "抖音" => Some("app/profile-douyin.svg"),
+                                    "小黑盒" => Some("app/profile-heybox.svg"),
+                                    _ => None,
+                                },
+                                |row, icon| row.child(Icon::default().path(icon).size(rems(1.1))),
+                            )
                             .child(self.t(label)),
                     )
                     .child(
@@ -291,7 +370,20 @@ impl Manager {
                                     .iter()
                                     .map(|(label, url)| self.about_link(label, url, cx)),
                             ),
-                    )
+                    );
+                heading
+                    .into_iter()
+                    .map(|title| {
+                        div()
+                            .pt_2()
+                            .border_t_1()
+                            .border_color(cx.theme().border)
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(self.t(title))
+                            .into_any_element()
+                    })
+                    .chain(std::iter::once(row.into_any_element()))
             }))
             .into_any_element()
     }

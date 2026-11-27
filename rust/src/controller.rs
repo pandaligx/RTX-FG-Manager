@@ -146,6 +146,7 @@ impl Channel {
 pub enum RetryAction {
     Recommendation(
         Box<rtx_fg_manager::recommendations::Recipe>,
+        Option<uuid::Uuid>,
         rtx_fg_manager::recommendation_presets::Action,
     ),
     Patch(bool, BTreeSet<String>),
@@ -2769,8 +2770,8 @@ impl Controller {
         }
         self.blocked = None;
         match request.action {
-            RetryAction::Recommendation(recipe, action) => {
-                if let Err(e) = self.use_recommendation(*recipe, action) {
+            RetryAction::Recommendation(recipe, card_id, action) => {
+                if let Err(e) = self.use_recommendation(*recipe, card_id, action) {
                     self.warning = Some(e.to_string());
                 }
             }
@@ -2873,6 +2874,7 @@ impl Controller {
     pub fn use_recommendation(
         &mut self,
         recipe: rtx_fg_manager::recommendations::Recipe,
+        card_id: Option<uuid::Uuid>,
         action: rtx_fg_manager::recommendation_presets::Action,
     ) -> Result<()> {
         anyhow::ensure!(
@@ -2936,6 +2938,7 @@ impl Controller {
         let language = self.tr.language.clone();
         let retry = self.retry_request(RetryAction::Recommendation(
             Box::new(recipe.clone()),
+            card_id,
             action,
         ));
         self.channel.operation(move |c| {
@@ -2946,7 +2949,7 @@ impl Controller {
             for t in &targets {
                 ensure_directory_outside_data(&t.directory, &data)?;
             }
-            rtx_fg_manager::recommendation_presets::execute_with_options(
+            let patch_written = rtx_fg_manager::recommendation_presets::execute_with_options(
                 &game,
                 &catalog,
                 &recipe,
@@ -2968,6 +2971,12 @@ impl Controller {
                     snapshot.0,
                     snapshot.1,
                 ));
+            }
+            if patch_written
+                && let Some(card_id) = card_id
+                && let Err(error) = rtx_fg_manager::recommendations::queue_install(&data, card_id)
+            {
+                c.send(Event::Notice(format!("下载量暂未记录: {error}")));
             }
             c.send(Event::Notice(
                 match action {

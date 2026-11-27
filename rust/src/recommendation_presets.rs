@@ -113,6 +113,7 @@ pub fn execute(
         cancel,
         progress,
     )
+    .map(|_| ())
 }
 
 pub struct InstallOptions<'a> {
@@ -129,7 +130,8 @@ pub fn execute_with_options(
     options: InstallOptions<'_>,
     cancel: &std::sync::atomic::AtomicBool,
     mut progress: impl FnMut(cloud::CloudProgress),
-) -> Result<()> {
+) -> Result<bool> {
+    let mut patch_written = false;
     use std::sync::atomic::Ordering;
     let series = options.series;
     ensure!(!action.is_empty(), "请至少选择一项安装内容");
@@ -386,7 +388,7 @@ pub fn execute_with_options(
                 )?;
                 files.insert(encore::CONFIG.into(), config);
             }
-            core::deploy_prepared_context_at_with_overrides(
+            patch_written |= core::deploy_with_outcome(
                 target,
                 &prepared.backend,
                 &recipe.entries,
@@ -396,7 +398,8 @@ pub fn execute_with_options(
                 Some(&context),
                 None,
                 prepared.upstream_version.as_deref(),
-            )?;
+            )?
+            .patch_written;
         }
     }
     if complete_encore
@@ -516,7 +519,7 @@ pub fn execute_with_options(
             })?;
         }
     }
-    Ok(())
+    Ok(patch_written)
 }
 
 pub fn shareable(profile: &str, key: &str) -> bool {

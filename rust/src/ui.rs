@@ -308,6 +308,12 @@ impl Manager {
         cx.observe_window_activation(window, |_, _, cx| cx.notify())
             .detach();
         gpui::base::set_reduce_motion_preference(motion_preference(&state), cx);
+        if smoke.is_none()
+            && data.join("recommendations/pending-installs").is_dir()
+            && let Ok(client) = rtx_fg_manager::recommendations::Client::new(&data)
+        {
+            client.retry_installs();
+        }
         let mut c = Controller::new(data, state, error, smoke);
         window.set_window_title(&c.text("RTX 帧生成管理器"));
         if !c.boolean("sidebar_compact_default_v3", false) {
@@ -2900,11 +2906,15 @@ impl Manager {
                                         .child(self.t("伪装")),
                                 )
                             })
+                            .child(
+                                self.action_button("gpu-editor", Command::GpuEditor, cx)
+                                    .ghost()
+                                    .flex_shrink_0()
+                                    .icon(gpui::assets::IconName::SquarePen)
+                                    .accessibility_label(self.t("修改显卡型号"))
+                                    .tooltip(self.t("修改显卡型号")),
+                            )
                     })),
-            )
-            .child(
-                self.button("gpu-editor", "修改显卡型号", Command::GpuEditor, cx)
-                    .w_full(),
             )
             .when_some(self.recommended_gpu_name(), |d, name| {
                 d.child(
