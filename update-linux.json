@@ -1,11 +1,11 @@
 {
   "schema": 3,
-  "version": "4.3.44",
-  "file": "RTXManager-4.3.44-x86_64.AppImage",
-  "bytes": 23398904,
-  "sha256": "10998c7bd43754634134a927b3c07c91f5a32e64ea2f6ae6bb7eaaf401cf636e",
+  "version": "4.3.45",
+  "file": "RTXManager-4.3.45-x86_64.AppImage",
+  "bytes": 23489016,
+  "sha256": "9806aa573f4716a7e6940d1024801e49301762529cf00667f63ce553493eef96",
   "notes": {
-    "zh-CN": "## 本次更新\n- Windows 版为《燕云十六声》增加可选的 DLSS 神经渲染套件。选中 yysls.exe，使用原版 0.4.2 或三角洲 R3，单选 version.dll 后，即可在安装窗口勾选。\n- 玩家分享的方案现在可以包含燕云套件。安装前会检查游戏自带的插件及文件冲突，卸载时还原原有文件。",
-    "en": "## What's new\n- An optional DLSS Neural Rendering kit is available for Where Winds Meet on Windows. Select yysls.exe, choose stock 0.4.2 or Delta R3, and select version.dll as the only entry. The kit is available in the install dialog.\n- Players can now include the kit in a shared setup. Installation checks the game's plugins and file conflicts, and uninstalling restores the original files."
+    "zh-CN": "## 本次更新\n- 玩家方案现在显示成功安装次数，可按点赞、更新时间或下载量排序。同一次安装重试只计一次。\n- 邮箱登录支持后缀补全和六位验证码粘贴。方案数量和排序移到了工具栏左侧，关于页的个人主页入口合并为一行图标。\n- Windows 版支持为国际服《燕云十六声》（wwm.exe）选择与国服相同的可选神经渲染套件。",
+    "en": "## What's new\n- Shared setups show successful installs and can be sorted by likes, last update or downloads. Retrying the same install counts once.\n- Email sign-in supports domain suggestions and pasting a six-digit code. The setup count and sort menu are now at the left of the toolbar, and About groups the author's links into one row of icons.\n- On Windows, the international edition of Where Winds Meet (wwm.exe) can use the same optional Neural Rendering kit as the Chinese edition."
   }
 }
