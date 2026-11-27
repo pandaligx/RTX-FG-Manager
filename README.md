@@ -19,14 +19,14 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.45/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.45/RTXManager-4.3.45-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.46/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
 
 </div>
 
 ---
 
-> **4.3.45 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
+> **4.3.46 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager game library](docs/screenshot-home.png)
 
@@ -46,35 +46,34 @@
 
 ## Download
 
-**Version 4.3.45** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
+**Version 4.3.46** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.45 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.45) | Default domestic source |
-| **GitHub** | [Open 4.3.45 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.45) | Primary project and fallback |
-| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.45/RTXManager-4.3.45-x86_64.AppImage) | Linux x86_64 domestic mirror |
-| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.45/RTXManager-4.3.45-x86_64.AppImage) | Linux x86_64 download |
+| **GitCode** | [Open 4.3.46 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.46) | Default domestic source |
+| **GitHub** | [Open 4.3.46 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.46) | Primary project and fallback |
+| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage) | Linux x86_64 domestic mirror |
+| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage) | Linux x86_64 download |
 
 On Windows, download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 ### Linux (experimental)
 
-Download **`RTXManager-4.3.45-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
+Download **`RTXManager-4.3.46-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
 
 ```sh
-chmod +x RTXManager-4.3.45-x86_64.AppImage
-./RTXManager-4.3.45-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.46-x86_64.AppImage
+./RTXManager-4.3.46-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 Replace the prefix with the game's actual Wine directory; Steam Proton normally uses `steamapps/compatdata/<AppID>/pfx`. Add the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope. Releases include a separate `SHA256SUMS-linux.txt`; see the [Linux instructions](BUILDING.md#linux-appimage-experimental--实验性) for dependencies, running without FUSE and source builds.
 
 AppImage has its own automatic update channel. Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 
-## 4.3.45 highlights
+## 4.3.46 highlights
 
-- Shared setups show successful installs and can be sorted by likes, last update or downloads. Retrying the same install counts once.
-- Email sign-in supports domain suggestions and pasting a six-digit code. The setup count and sort menu are now at the left of the toolbar, and About groups the author's links into one row of icons.
-- On Windows, the international edition of Where Winds Meet (wwm.exe) can use the same optional Neural Rendering kit as the Chinese edition.
+- Where Winds Meet now gets the Neural Rendering kit configuration for its edition on Windows. To repair a previous global installation, exit the game and reinstall with the kit selected. Your graphics settings are preserved.
+- When sharing or editing a setup, the optional author, profile and video fields now appear above the patch details.
 
 [Full changelog →](CHANGELOG.md)
 

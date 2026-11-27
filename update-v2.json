@@ -1,11 +1,14 @@
 {
   "schema": 2,
-  "version": "4.3.45",
+  "version": "4.3.46",
   "file": "RTXManager.exe",
-  "sha256": "ca3a3c2f511f80a11c8f5eae105a5ee2f2fff1f0e5746d01dc02e10f21003598",
-  "bytes": 52280208,
+  "sha256": "e8884a40e0e8006442cc0d1a25ccb0f32dce0fca52aa91bbf7e3c30b44de3bbc",
+  "bytes": 52262624,
   "notes": {
-    "zh-CN": "## 本次更新\n- 玩家方案现在显示成功安装次数，可按点赞、更新时间或下载量排序。同一次安装重试只计一次。\n- 邮箱登录支持后缀补全和六位验证码粘贴。方案数量和排序移到了工具栏左侧，关于页的个人主页入口合并为一行图标。\n- Windows 版支持为国际服《燕云十六声》（wwm.exe）选择与国服相同的可选神经渲染套件。",
-    "en": "## What's new\n- Shared setups show successful installs and can be sorted by likes, last update or downloads. Retrying the same install counts once.\n- Email sign-in supports domain suggestions and pasting a six-digit code. The setup count and sort menu are now at the left of the toolbar, and About groups the author's links into one row of icons.\n- On Windows, the international edition of Where Winds Meet (wwm.exe) can use the same optional Neural Rendering kit as the Chinese edition."
+    "zh-CN": "## 本次更新\n- 修复 Windows 版《燕云十六声》国际服勾选 DLSS5 神经渲染套件后仍只启用帧生成的问题。现按国服 yysls.exe、国际服 wwm.exe 分别配置。已安装国际服套件的玩家，退出游戏后重新勾选并安装一次即可保留原画质设置。\n- 分享或编辑玩家方案时，分享者名字、主页和视频教程等选填信息移到了适配方案上方。\n\n## 致谢\n- 感谢小黑盒玩家 ISHOW操作、抖音玩家 Tamako 对项目的支持。两位的主页可在「设置 → 关于」打开。",
+    "en": "## What's new\n- Fixed a Windows issue where installing the optional DLSS Neural Rendering kit for the global edition of Where Winds Meet enabled only frame generation. The manager now configures yysls.exe for the Chinese edition and wwm.exe for the global edition. To repair an existing global installation, exit the game, select the kit again and install it. Your graphics settings are preserved.\n- When sharing or editing a setup, optional fields such as the author name, profile links and video tutorial now appear above the patch details.\n\n## Acknowledgments\n- Thanks to ISHOW操作 on HeyBox and Tamako on Douyin for supporting the project. You can open both profiles from Settings → About.",
+    "ru": "## Что нового\n- В Windows исправлена настройка комплекта нейронного рендеринга DLSS для международной версии Where Winds Meet (wwm.exe). Для китайской версии используется yysls.exe. Чтобы исправить уже установленный комплект, выйдите из игры и снова выберите и установите его. Настройки графики сохранятся.\n- Имя автора, ссылки на профили и видеоинструкцию теперь можно заполнить над сведениями о патче.\n\n## Благодарности\n- Спасибо ISHOW操作 из HeyBox и Tamako из Douyin за поддержку проекта. Ссылки на их профили есть в настройках, в разделе «О программе».",
+    "ja": "## 更新内容\n- Windows 版で『燕雲十六声』グローバル版に DLSS ニューラルレンダリングキットを導入しても、フレーム生成しか有効にならない問題を修正しました。中国版には yysls.exe、グローバル版には wwm.exe を設定します。導入済みの場合はゲームを終了し、キットを選び直してインストールしてください。画質設定は引き継がれます。\n- 共有時や編集時に、投稿者名、プロフィール、解説動画などの任意項目がパッチ情報の上に表示されます。\n\n## 謝辞\n- 小黒盒（HeyBox）の ISHOW操作 さんと抖音（Douyin）の Tamako さん、ご支援ありがとうございます。プロフィールは設定の「このアプリについて」から開けます。",
+    "ko": "## 업데이트 내용\n- Windows에서 연운 글로벌판에 DLSS 신경 렌더링 키트를 설치해도 프레임 생성만 작동하던 문제를 수정했습니다. 중국판은 yysls.exe, 글로벌판은 wwm.exe에 맞춰 설정합니다. 이미 설치했다면 게임을 종료하고 키트를 다시 선택해 설치하세요. 그래픽 설정은 유지됩니다.\n- 설정 공유 및 편집 화면에서 작성자 이름, 프로필 링크, 영상 가이드 등 선택 입력 항목을 패치 정보 위로 옮겼습니다.\n\n## 감사의 말\n- 프로젝트를 응원해 주신 HeyBox의 ISHOW操作 님과 Douyin의 Tamako 님께 감사드립니다. 설정의 앱 정보에서 두 분의 프로필을 열 수 있습니다."
   }
 }
