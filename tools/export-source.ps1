@@ -138,8 +138,9 @@ if (-not $ExcludeCloudMetadata) {
 }
 foreach ($name in @('.github/workflows/mirror-gitee.yml', '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml')) { Add-File $name $false }
 foreach ($name in @('docs/brand-banner.svg', 'docs/brand-banner.png', 'docs/download-en.svg', 'docs/download-zh.svg', 'docs/download-linux-en.svg', 'docs/download-linux-zh.svg', 'docs/download-buttons-LICENSE.txt', 'docs/screenshot-home.png', 'docs/screenshot-home-zh.png')) { Add-File $name $false }
+Add-File 'docs/player-plan-install.gif' $false
 
-$binaryExtensions = @('.png', '.ico', '.jpg')
+$binaryExtensions = @('.png', '.ico', '.jpg', '.gif')
 $findings = [Collections.Generic.List[string]]::new()
 $rules = [ordered]@{
     'private-key material' = '-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'

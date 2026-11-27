@@ -32,6 +32,8 @@
 
 <p align="center"><sub>User-provided English interface screenshot</sub></p>
 
+![Installing a player-shared setup from the game library](docs/player-plan-install.gif)
+
 ## One library. Multiple patch choices.
 
 **RTX-FG-Manager** is a portable Windows utility by **小南瓜** for installing, configuring, upgrading and removing supported frame-generation patches. A native Rust / GPUI interface keeps the game library in the center and the selected game's hardware, patch and actions together on the right. Windows is the supported release platform; the experimental Linux port manages Windows games running under Wine / Proton.

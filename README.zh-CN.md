@@ -32,6 +32,8 @@
 
 <p align="center"><sub>用户提供的中文界面截图</sub></p>
 
+![从游戏库安装其他玩家分享的方案](docs/player-plan-install.gif)
+
 ## 一个游戏库，多种补丁方案
 
 **RTX-FG-Manager** 是由 **小南瓜** 维护的 Windows 便携工具，集中管理受支持插帧补丁的安装、配置、升级与卸载。原生 Rust / GPUI 界面以游戏库为中心，在右侧集中展示所选游戏、硬件、补丁和操作。 Windows 为正式支持平台；Linux 为实验性移植，用于 Wine / Proton 下的 Windows 游戏。
