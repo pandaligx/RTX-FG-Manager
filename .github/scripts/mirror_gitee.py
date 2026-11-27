@@ -69,7 +69,7 @@ ALLOWED = {
     'tools/cloud_release.py', 'docs/cloud-publishing.md', '.github/scripts/mirror_gitee.py',
     '.github/workflows/build.yml', '.github/workflows/mirror-gitee.yml',
     '.github/workflows/payloads.yml', '.github/workflows/cloud-probe.yml',
-    'docs/screenshot-home.png', 'docs/screenshot-home-themes.png',
+    'docs/screenshot-home.png', 'docs/screenshot-home-themes.png', 'docs/player-plan-install.gif',
     'docs/brand-banner.svg', 'docs/brand-banner.png', 'docs/download-en.svg', 'docs/download-zh.svg',
     'docs/download-linux-en.svg', 'docs/download-linux-zh.svg', 'docs/download-buttons-LICENSE.txt',
     # Existing public history has this screenshot; retaining its history is safe.
@@ -127,6 +127,10 @@ def allowed_source(path):
 def validate_content(path, data):
     if len(data) > 20 * 1024 * 1024:
         raise RuntimeError('Oversized source input: ' + path)
+    if Path(path).suffix.lower() == '.gif':
+        if path not in ALLOWED or len(data) < 14 or not data.startswith((b'GIF87a', b'GIF89a')) or not data.endswith(b';'):
+            raise RuntimeError('Invalid GIF source asset: ' + path)
+        return
     if Path(path).suffix.lower() == '.jpg':
         if path not in ALLOWED or not data.startswith(b'\xff\xd8\xff') or not data.endswith(b'\xff\xd9'):
             raise RuntimeError('Invalid JPEG source asset: ' + path)
