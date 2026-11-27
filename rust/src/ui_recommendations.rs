@@ -1276,7 +1276,7 @@ impl Recommendations {
         ];
         let rows = fields
             .into_iter()
-            // Editable fields appear once in the confirmation table below.
+            // The share form already displays these editable fields.
             .filter(|(label, _)| {
                 self.mode != Mode::Share || !matches!(*label, "显卡改名" | "游戏版本" | "玩家硬件")
             })
@@ -2744,10 +2744,10 @@ impl Recommendations {
                 ));
             }
             body = body
+                .child(self.recipe_table("recipe-share-fields", &["项目", "分享内容"], fields, cx))
                 .child(self.recipe_summary(draft, cx))
                 .child(self.parameter_comparison(draft, cx))
                 .child(self.runtime_inventory(draft, None, true, cx))
-                .child(self.recipe_table("recipe-share-fields", &["项目", "分享内容"], fields, cx))
                 .child(div().text_xs().text_color(cx.theme().muted_foreground)
                     .child(self.t("以上内容将公开。仅分享你在这款游戏中测试可用的方案；不上传路径、日志、邮箱或原始配置文件。")));
             *primary = Some(

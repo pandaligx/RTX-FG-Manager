@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.3.46 — 2026-11-27
+
+- Where Winds Meet now gets the Neural Rendering kit configuration for its edition on Windows. To repair a previous global installation, exit the game and reinstall with the kit selected. Your graphics settings are preserved.
+- When sharing or editing a setup, the optional author, profile and video fields now appear above the patch details.
+
+### Acknowledgments
+
+- Thanks to ISHOW操作 on HeyBox and Tamako on Douyin for supporting the project. Both profiles are available in Settings → About.
+
 ## 4.3.45 — 2026-11-27
 
 - Shared setups show successful installs and can be sorted by likes, last update or downloads. Retrying the same install counts once.

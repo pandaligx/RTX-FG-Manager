@@ -6,6 +6,9 @@ pub(crate) const KIND: &str = "yanyun-nr";
 pub(crate) const RUNTIME_VERSION: &str = "310.9.16";
 // Version of the whole three-file kit. The NR DLL can retain its version across kit updates.
 pub(crate) const KIT_VERSION: &str = "1.0.0";
+const INI: &str = "OptiScaler.ini";
+// Same verified template, with only [ProcessFilter] TargetProcessName set to wwm.exe.
+const GLOBAL_INI_HASH: &str = "98ee80d75b85b42244b67f1fc661a00e969c21892bf5f9620281065400007853";
 const FILES: [(&str, &str); 3] = [
     (
         "dxgi.dll",
@@ -16,7 +19,7 @@ const FILES: [(&str, &str); 3] = [
         "0cfba6ea095929eed6c61832e617282e5c438314971cbe9af15629489225a4a7",
     ),
     (
-        "OptiScaler.ini",
+        INI,
         "2925e7d5a11a6e45977b58ad39e67ce3d4d63b0dd9f8a76f8b6b205dce88aadf",
     ),
 ];
@@ -56,30 +59,64 @@ pub(super) fn valid_destination(target: &core::DeploymentTarget, path: &Path) ->
             .is_some_and(|n| FILES.iter().any(|(name, _)| n.eq_ignore_ascii_case(name)))
 }
 
-fn installed(target: &core::DeploymentTarget) -> Result<bool> {
+fn international(target: &core::DeploymentTarget) -> bool {
+    target
+        .game_exe
+        .file_name()
+        .is_some_and(|n| n.eq_ignore_ascii_case("wwm.exe"))
+}
+
+fn international_ini(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
+    use crate::diagnostics::{decode_ini, edit_ini, ini_value};
+    let (text, _) = decode_ini(bytes)?;
+    let section = "ProcessFilter";
+    let key = "TargetProcessName";
+    let value = ini_value(&text, section, key)?.unwrap_or_default();
+    if value.eq_ignore_ascii_case("wwm.exe") {
+        return Ok(None);
+    }
+    // Migrate only the known 4.3.45 template. Leave other explicitly customized filters alone.
+    ensure!(
+        value.eq_ignore_ascii_case("yysls.exe"),
+        "请检查 OptiScaler.ini 的 TargetProcessName，国际服应为 wwm.exe"
+    );
+    Ok(Some(edit_ini(bytes, section, key, "wwm.exe")?))
+}
+
+fn owned_installation(target: &core::DeploymentTarget) -> Result<Option<Record>> {
     let Some(record) = read(target, KIND)?.filter(|r| r.complete && r.entries.len() == FILES.len())
     else {
-        return Ok(false);
+        return Ok(None);
     };
     for (name, hash) in FILES {
         let path = core::no_links(&target.directory.join(name))?;
-        if !record
-            .entries
-            .iter()
-            .any(|e| core::key(Path::new(&e.path)) == core::key(&path) && e.installed == hash)
-        {
-            return Ok(false);
+        if !record.entries.iter().any(|e| {
+            core::key(Path::new(&e.path)) == core::key(&path)
+                && (e.installed == hash
+                    || (name == INI && international(target) && e.installed == GLOBAL_INI_HASH))
+        }) {
+            return Ok(None);
         }
         // The mod may rewrite its INI. Preserve it on reinstallation.
-        if name == "OptiScaler.ini" {
+        if name == INI {
             if !path.is_file() || path.metadata()?.len() > 1024 * 1024 {
-                return Ok(false);
+                return Ok(None);
             }
         } else if !matches(&path, hash)? {
-            return Ok(false);
+            return Ok(None);
         }
     }
-    Ok(true)
+    Ok(Some(record))
+}
+
+fn ini_repair(target: &core::DeploymentTarget) -> Result<Option<(String, Vec<u8>)>> {
+    if international(target) {
+        let path = core::no_links(&target.directory.join(INI))?;
+        let current = fs::read(path)?;
+        Ok(international_ini(&current)?.map(|update| (core::hash(&current), update)))
+    } else {
+        Ok(None)
+    }
 }
 
 pub struct Component {
@@ -90,7 +127,14 @@ pub(crate) fn shared_installation(target: &core::DeploymentTarget) -> Result<boo
     if !game(target) || read(target, KIND)?.is_none() {
         return Ok(false);
     }
-    ensure!(installed(target)?, "燕云套件不完整，请先修复或卸载后再分享");
+    ensure!(
+        owned_installation(target)?.is_some(),
+        "燕云套件不完整，请先修复或卸载后再分享"
+    );
+    ensure!(
+        ini_repair(target)?.is_none(),
+        "请重新勾选燕云神经渲染套件并安装，再分享方案"
+    );
     Ok(true)
 }
 
@@ -189,11 +233,11 @@ impl Component {
     }
 
     pub fn preflight(&self, target: &core::DeploymentTarget) -> Result<bool> {
-        let already_installed = installed(target)?;
-        if !already_installed {
-            plan_entries(target, KIND, &self.paths(target), &self.sources)?;
+        if owned_installation(target)?.is_some() {
+            return Ok(ini_repair(target)?.is_none());
         }
-        Ok(already_installed)
+        plan_entries(target, KIND, &self.paths(target), &self.sources)?;
+        Ok(false)
     }
 
     pub fn install(&self, target: &core::DeploymentTarget) -> Result<()> {
@@ -212,23 +256,65 @@ impl Component {
                 .unwrap_or_default(),
             &record.selected(),
         )?;
-        if self.preflight(&target)? {
+        if let Some(mut ownership) = owned_installation(&target)? {
+            if let Some((before, bytes)) = ini_repair(&target)? {
+                core::assert_target_stopped(&target)?;
+                let mut temp = tempfile::NamedTempFile::new_in(&target.directory)?;
+                temp.write_all(&bytes)?;
+                temp.as_file().sync_all()?;
+                let dest = core::no_links(&target.directory.join(INI))?;
+                ensure!(matches(&dest, &before)?, "OptiScaler.ini 已变更，请重试");
+                temp.persist(dest)?;
+            }
+            // Also finish a migration after an interruption, or a manual repair.
+            if international(&target)
+                && let Some(entry) = ownership.entries.iter_mut().find(|e| {
+                    Path::new(&e.path)
+                        .file_name()
+                        .is_some_and(|n| n.eq_ignore_ascii_case(INI))
+                })
+                && entry.installed != GLOBAL_INI_HASH
+            {
+                entry.installed = GLOBAL_INI_HASH.into();
+                core::atomic_json(&root(&target, KIND)?.join("ownership.json"), &ownership)?;
+            }
             return Ok(());
+        }
+        // Stage the regional INI before the transaction so ownership and rollback
+        // describe the exact installed bytes. The shared download stays immutable.
+        let mut sources = self.sources.clone();
+        let mut regional_ini;
+        if international(&target) {
+            let template = sources.get(INI).context("运行库包缺少文件")?;
+            let bytes = international_ini(&fs::read(core::no_links(template)?)?)?
+                .context("燕云组件暂存校验失败")?;
+            ensure!(
+                core::hash(&bytes) == GLOBAL_INI_HASH,
+                "燕云组件暂存校验失败"
+            );
+            regional_ini = tempfile::NamedTempFile::new()?;
+            regional_ini.write_all(&bytes)?;
+            regional_ini.as_file().sync_all()?;
+            sources.insert(INI.to_owned(), regional_ini.path().to_owned());
         }
         install_locked_with(
             &target,
             KIND,
             &self.paths(&target),
-            &self.sources,
+            &sources,
             |source, dest| {
-                let expected = FILES
+                let (name, hash) = FILES
                     .iter()
                     .find(|(name, _)| {
                         dest.file_name()
                             .is_some_and(|n| n.eq_ignore_ascii_case(name))
                     })
-                    .context("组件文件名无效")?
-                    .1;
+                    .context("组件文件名无效")?;
+                let expected = if *name == INI && international(&target) {
+                    GLOBAL_INI_HASH
+                } else {
+                    hash
+                };
                 let mut temp = tempfile::NamedTempFile::new_in(&target.directory)?;
                 std::io::copy(&mut fs::File::open(core::no_links(source)?)?, &mut temp)?;
                 temp.as_file().sync_all()?;
@@ -356,6 +442,18 @@ pub fn remove_locked(target: &core::DeploymentTarget) -> Result<()> {
 mod tests {
     use super::*;
     use crate::{cleanup, cloud, delta, presets, upstream040};
+
+    #[test]
+    fn international_filter_changes_only_the_active_game_name() -> Result<()> {
+        let ini = b"\xef\xbb\xbf[Other]\r\nTargetProcessName=yysls.exe\r\n[ProcessFilter]\r\n;TargetProcessName=yysls.exe\r\nTargetProcessName=yysls.exe ; game\r\n[Video]\r\nQuality=3";
+        let expected =
+            String::from_utf8(ini.to_vec())?.replace("=yysls.exe ; game", "=wwm.exe ; game");
+        let fixed = international_ini(ini)?.unwrap();
+        assert_eq!(fixed, expected.as_bytes());
+        assert!(international_ini(&fixed)?.is_none());
+        assert!(international_ini(b"[ProcessFilter]\nTargetProcessName=OTHER.exe").is_err());
+        Ok(())
+    }
 
     #[test]
     fn scope_requires_game_revision_and_separate_entries() {
@@ -542,6 +640,35 @@ mod tests {
                 assert!(kit.is_some());
                 snapshot.install(targets, false, &cancel, &mut |_| {}, kit.as_ref())?;
                 snapshot.verify_installed(targets)?;
+                let template = fs::read(&addon.sources[INI])?;
+                let regional = if international(&target) {
+                    international_ini(&template)?.unwrap()
+                } else {
+                    template.clone()
+                };
+                assert_eq!(fs::read(&ini)?, regional);
+                if international(&target) {
+                    // Reproduce the 4.3.45 journal and edited, still domestic-only INI.
+                    let mut old = read(&target, KIND)?.unwrap();
+                    let entry = old
+                        .entries
+                        .iter_mut()
+                        .find(|e| Path::new(&e.path).ends_with(INI))
+                        .unwrap();
+                    entry.installed = FILES[2].1.into();
+                    core::atomic_json(&root(&target, KIND)?.join("ownership.json"), &old)?;
+                    let mut edited = template.clone();
+                    edited.extend_from_slice(b"\r\n; my settings\r\n");
+                    fs::write(&ini, &edited)?;
+                    assert!(!addon.preflight(&target)?);
+                    assert!(crate::recommendation_runtimes::capture(&target).is_err());
+                    let kit =
+                        snapshot.prepare_yanyun(targets, false, false, &cancel, &mut |_| {})?;
+                    snapshot.install(targets, false, &cancel, &mut |_| {}, kit.as_ref())?;
+                    snapshot.verify_installed(targets)?;
+                    assert_eq!(fs::read(&ini)?, international_ini(&edited)?.unwrap());
+                    assert_eq!(fs::read(&addon.sources[INI])?, template);
+                }
                 let captured = crate::recommendation_runtimes::capture(&target)?;
                 captured.validate()?;
                 assert!(captured.has_yanyun());
@@ -567,7 +694,14 @@ mod tests {
                 recipe.validate(&catalog)?;
                 recipe.check_runtime_selection()?;
                 let receive = tempfile::tempdir_in(&cache)?;
-                let receive_exe = receive.path().join(exe_name);
+                // Both editions are installed side by side and share one download cache.
+                let other_edition = if international(&target) {
+                    "yysls.exe"
+                } else {
+                    "WWM.EXE"
+                };
+                let receive_exe = receive.path().join(other_edition);
+                let author_ini = fs::read(&ini)?;
                 fs::copy(&exe, &receive_exe)?;
                 let receiver = as_game(&receive_exe);
                 let receive_target = core::DeploymentTarget::for_game(&receive_exe);
@@ -592,7 +726,15 @@ mod tests {
                 for _ in 0..2 {
                     apply()?;
                     assert!(shared_installation(&receive_target)?);
+                    let received = fs::read(receive.path().join(INI))?;
+                    let expected = if international(&receive_target) {
+                        GLOBAL_INI_HASH
+                    } else {
+                        FILES[2].1
+                    };
+                    assert_eq!(core::hash(&received), expected);
                     assert!(cleanup::clean_outcome_at(&receive_target)?.complete);
+                    assert_eq!(fs::read(&ini)?, author_ini);
                     assert!(!shared_installation(&receive_target)?);
                     for (name, _) in FILES {
                         assert!(!receive.path().join(name).exists());
@@ -608,17 +750,19 @@ mod tests {
                         .prepare_yanyun(targets, false, false, &cancel, &mut |_| {})?
                         .is_none()
                 );
-                for (name, hash) in FILES {
+                for (name, hash) in FILES.iter().filter(|(name, _)| *name != INI) {
                     assert!(matches(&game.path().join(name), hash)?);
                 }
-                fs::write(&ini, b"game changed the ini")?;
+                let mut game_settings = regional;
+                game_settings.extend_from_slice(b"\r\n; game changed the ini\r\n");
+                fs::write(&ini, &game_settings)?;
                 fs::write(
                     &log,
                     b"[23:53:09] [W] DLSS Unlocked - OptiScaler v0.9.96-pre3 (unknown) loaded\n",
                 )?;
                 fs::write(game.path().join("game.log"), b"keep game's log")?;
                 addon.install(&target)?;
-                assert_eq!(fs::read(&ini)?, b"game changed the ini");
+                assert_eq!(fs::read(&ini)?, game_settings);
                 assert!(cleanup::clean_outcome_at(&target)?.complete);
                 assert!(!game.path().join("dxgi.dll").exists());
                 assert!(!game.path().join("version.dll").exists());
