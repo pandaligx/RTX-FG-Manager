@@ -1,0 +1,234 @@
+--- a/OptiScaler/dllmain.cpp
++++ b/OptiScaler/dllmain.cpp
+@@ -1,4 +1,5 @@
+ ﻿#include "pch.h"
++#include <hooks/Amdxc64_Hooks.h>
+ #include "dllmain.h"
+ 
+ #include "Util.h"
+@@ -38,9 +39,6 @@
+ #include <hooks/Ntdll_Hooks.h>
+ #include <hooks/Kernel_Hooks.h>
+ #include <hooks/Gdi32_Hooks.h>
+-#include <hooks/Wintrust_Hooks.h>
+-#include <hooks/Crypt32_Hooks.h>
+-#include <hooks/Advapi32_Hooks.h>
+ #include <hooks/Streamline_Hooks.h>
+ 
+ #include <nvapi/NvApiHooks.h>
+@@ -964,18 +962,7 @@
+     // GDI32
+     hookGdi32();
+ 
+-    // Wintrust
+-    hookWintrust();
+-
+-    // Crypt32
+-    hookCrypt32();
+-
+-    // Advapi32
+-    if (Config::Instance()->DxgiSpoofing.value_or_default() ||
+-        Config::Instance()->StreamlineSpoofing.value_or_default())
+-    {
+-        hookAdvapi32();
+-    }
++    // Leave Windows signature validation, certificate lookup and driver trust policy intact.
+ 
+     // User32
+     if (Config::Instance()->SpoofUser32.value_or_default())
+@@ -2422,9 +2409,6 @@
+         // UnhookApis();
+         // unhookStreamline();
+         // unhookGdi32();
+-        // unhookWintrust();
+-        // unhookCrypt32();
+-        // unhookAdvapi32();
+         // DetachHooks();
+ 
+         if (skModule != nullptr)
+--- a/OptiScaler/dlssnr/DlssNr_MenuControls.cpp
++++ b/OptiScaler/dlssnr/DlssNr_MenuControls.cpp
+@@ -322,12 +322,12 @@
+     }
+ 
+     static unsigned selectedPass = 0;
+-    const auto selectedLabel = std::format("Pass {}", selectedPass + 1);
++    const auto selectedLabel = std::format("第 {} 轮", selectedPass + 1);
+     if (ImGui::BeginCombo("Edit pass", selectedLabel.c_str()))
+     {
+         for (unsigned pass = 0; pass <= std::size(config->DlssNrPassOverrides); ++pass)
+         {
+-            const auto label = std::format("Pass {}", pass + 1);
++            const auto label = std::format("第 {} 轮", pass + 1);
+             if (ImGui::Selectable(label.c_str(), selectedPass == pass))
+                 selectedPass = pass;
+             if (selectedPass == pass)
+--- a/OptiScaler/dlssnr/DlssNr_MenuOverlay.cpp
++++ b/OptiScaler/dlssnr/DlssNr_MenuOverlay.cpp
+@@ -64,8 +64,8 @@
+ 
+     // The left side is the untouched frame unless swapped -- matching the shader's
+     // showOriginal = (uv.x < split) != swap.
+-    const char* leftText = swap ? "DLSS NR : ON" : "DLSS NR : OFF";
+-    const char* rightText = swap ? "DLSS NR : OFF" : "DLSS NR : ON";
++    const char* leftText = swap ? "神经渲染：开启" : "神经渲染：关闭";
++    const char* rightText = swap ? "神经渲染：关闭" : "神经渲染：开启";
+ 
+     ImDrawList* dl = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
+     ImFont* font = ImGui::GetFont();
+--- a/OptiScaler/dlssnr/DlssNr_PipelineUi.h
++++ b/OptiScaler/dlssnr/DlssNr_PipelineUi.h
+@@ -1,6 +1,7 @@
+-#pragma once
++﻿#pragma once
+ 
+ #include <imgui/imgui.h>
++#include <menu/MenuZh.h>
+ #include <algorithm>
+ #include <string>
+ #include <vector>
+@@ -118,10 +119,10 @@
+         { view.rayReconstruction ? "RR + Super Resolution" : "Super Resolution",
+           split ? "Clean game image" : "Game upscaler" },
+         { "Game effects + HUD", "Game rendering" },
+-        { "Prepare NR input", "HDR / paper white / " + std::to_string(view.scalePercent) + "%", (int) Section::Input },
+-        { "NR model", std::to_string(view.passes) + (view.passes == 1 ? " pass" : " passes"), (int) Section::Model },
++        { "Prepare NR input", "HDR / 纸白亮度 / " + std::to_string(view.scalePercent) + "%", (int) Section::Input },
++        { "NR model", std::to_string(view.passes) + " 轮", (int) Section::Model },
+         { "Apply NR edit", view.applyModel ? "Strength / skin" : "Edit hidden; model runs", (int) Section::Blend },
+-        { "Upscale NR edit", std::string("Separate ") + view.privateUpscaler + " pass (no RR)" },
++        { "Upscale NR edit", std::string("独立 ") + view.privateUpscaler + " 超分（无光线重建）" },
+         { "Game output", "FG / presentation" }
+     };
+     // Parents encode the two branches directly; ordinary routes are simple ordered stages.
+@@ -228,9 +229,9 @@
+         const auto detailSize = ImGui::CalcTextSize(label.detail.c_str(), nullptr, false, wrapWidth);
+         const float y = at.y + (height - titleSize.y - detailSize.y) * 0.5f;
+         draw->AddText(nullptr, 0.0f, ImVec2(at.x + (nodeWidth - titleSize.x) * 0.5f, y),
+-                      ImGui::GetColorU32(ImGuiCol_Text), label.title, nullptr, wrapWidth);
++                      ImGui::GetColorU32(ImGuiCol_Text), MenuZh::Format(label.title), nullptr, wrapWidth);
+         draw->AddText(nullptr, 0.0f, ImVec2(at.x + (nodeWidth - detailSize.x) * 0.5f, y + titleSize.y),
+-                      ImGui::GetColorU32(editable ? ImGuiCol_Text : ImGuiCol_TextDisabled), label.detail.c_str(),
++                      ImGui::GetColorU32(editable ? ImGuiCol_Text : ImGuiCol_TextDisabled), MenuZh::Format(label.detail.c_str()),
+                       nullptr, wrapWidth);
+         ImGui::PopID();
+     }
+--- a/OptiScaler/include/imgui/imgui.cpp
++++ b/OptiScaler/include/imgui/imgui.cpp
+@@ -1,4 +1,4 @@
+-// dear imgui, v1.92.0 WIP
++﻿// dear imgui, v1.92.0 WIP
+ // (main code and documentation)
+ 
+ // Help:
+@@ -1116,6 +1116,7 @@
+ #endif
+ 
+ #include "imgui.h"
++#include "../../menu/MenuZh.h"
+ #ifndef IMGUI_DISABLE
+ #include "imgui_internal.h"
+ 
+@@ -2246,6 +2247,7 @@
+ //  ImFormatStringToTempBuffer(token, ...);
+ void ImFormatStringToTempBufferV(const char** out_buf, const char** out_buf_end, const char* fmt, va_list args)
+ {
++    fmt = MenuZh::Format(fmt);
+     ImGuiContext& g = *GImGui;
+     if (fmt[0] == '%' && fmt[1] == 's' && fmt[2] == 0)
+     {
+@@ -3698,6 +3700,7 @@
+ // RenderText***() functions calls ImDrawList::AddText() calls ImBitmapFont::RenderText()
+ void ImGui::RenderText(ImVec2 pos, const char* text, const char* text_end, bool hide_text_after_hash)
+ {
++    MenuZh::Visible(text, text_end, hide_text_after_hash);
+     ImGuiContext& g = *GImGui;
+     ImGuiWindow* window = g.CurrentWindow;
+ 
+@@ -3724,6 +3727,7 @@
+ 
+ void ImGui::RenderTextWrapped(ImVec2 pos, const char* text, const char* text_end, float wrap_width)
+ {
++    MenuZh::Visible(text, text_end);
+     ImGuiContext& g = *GImGui;
+     ImGuiWindow* window = g.CurrentWindow;
+ 
+@@ -3745,6 +3749,7 @@
+ // better advantage of the render function taking size into account for coarse clipping.
+ void ImGui::RenderTextClippedEx(ImDrawList* draw_list, const ImVec2& pos_min, const ImVec2& pos_max, const char* text, const char* text_display_end, const ImVec2* text_size_if_known, const ImVec2& align, const ImRect* clip_rect)
+ {
++    MenuZh::Visible(text, text_display_end);
+     // Perform CPU side clipping for single clipped element to avoid using scissor state
+     ImVec2 pos = pos_min;
+     const ImVec2 text_size = text_size_if_known ? *text_size_if_known : CalcTextSize(text, text_display_end, false, 0.0f);
+@@ -3773,6 +3778,7 @@
+ 
+ void ImGui::RenderTextClipped(const ImVec2& pos_min, const ImVec2& pos_max, const char* text, const char* text_end, const ImVec2* text_size_if_known, const ImVec2& align, const ImRect* clip_rect)
+ {
++    MenuZh::Visible(text, text_end, true);
+     // Hide anything after a '##' string
+     const char* text_display_end = FindRenderedTextEnd(text, text_end);
+     const int text_len = (int)(text_display_end - text);
+@@ -3791,6 +3797,7 @@
+ // This is because in the context of tabs we selectively hide part of the text when the Close Button appears, but we don't want the ellipsis to move.
+ void ImGui::RenderTextEllipsis(ImDrawList* draw_list, const ImVec2& pos_min, const ImVec2& pos_max, float ellipsis_max_x, const char* text, const char* text_end_full, const ImVec2* text_size_if_known)
+ {
++    MenuZh::Visible(text, text_end_full, true);
+     ImGuiContext& g = *GImGui;
+     if (text_end_full == NULL)
+         text_end_full = FindRenderedTextEnd(text);
+@@ -6150,6 +6157,7 @@
+ // CalcTextSize("") should return ImVec2(0.0f, g.FontSize)
+ ImVec2 ImGui::CalcTextSize(const char* text, const char* text_end, bool hide_text_after_double_hash, float wrap_width)
+ {
++    MenuZh::Visible(text, text_end, hide_text_after_double_hash);
+     ImGuiContext& g = *GImGui;
+ 
+     const char* text_display_end;
+--- a/OptiScaler/menu/menu_common.cpp
++++ b/OptiScaler/menu/menu_common.cpp
+@@ -23,6 +23,7 @@
+ #include "input/input_system.h"
+ 
+ #include "font/Hack_Compressed.h"
++#include "MenuZhFont.h"
+ 
+ #include <proxies/XeSS_Proxy.h>
+ #include <proxies/XeFG_Proxy.h>
+@@ -9405,7 +9406,7 @@
+         }
+     }
+ 
+-    if (io.Fonts->Fonts.empty() && Config::Instance()->UseHQFont.value_or_default())
++    if (io.Fonts->Fonts.empty())
+     {
+         ImFontAtlas* atlas = io.Fonts;
+         atlas->Clear();
+@@ -9422,11 +9423,22 @@
+                 atlas->AddFontFromFileTTF(wstring_to_string(Config::Instance()->TTFFontPath.value()).c_str(), fontSize,
+                                           &fontConfig, io.Fonts->GetGlyphRangesDefault());
+         }
+-        else
+-        {
+-            io.FontDefault = atlas->AddFontFromMemoryCompressedBase85TTF(hack_compressed_compressed_data_base85,
+-                                                                         fontSize, &fontConfig);
+-        }
++        if (!io.FontDefault)
++        {
++            if (Config::Instance()->UseHQFont.value_or_default())
++                io.FontDefault = atlas->AddFontFromMemoryCompressedBase85TTF(hack_compressed_compressed_data_base85,
++                                                                             fontSize, &fontConfig);
++            else
++            {
++                fontConfig.SizePixels = fontSize;
++                io.FontDefault = atlas->AddFontDefault(&fontConfig);
++            }
++        }
++
++        ImFontConfig cjk;
++        cjk.MergeMode = true;
++        cjk.FontDataOwnedByAtlas = false;
++        atlas->AddFontFromMemoryTTF(const_cast<unsigned char*>(kMenuFont), sizeof(kMenuFont), fontSize, &cjk, kMenuGlyphs);
+     }
+ 
+     if (!Config::Instance()->OverlayMenu.value_or_default())

@@ -1,0 +1,268 @@
+Enable NR processing.	开启 DLSS 神经渲染。
+Apply model	应用模型效果
+Show or hide the NR effect. The model still runs when hidden.\nDisable Enable Neural Rendering to stop its GPU cost.	显示或隐藏神经渲染效果。隐藏时模型仍在运行。\n如需释放 GPU 资源，请关闭「启用神经渲染」。
+Generate model before upscale	在超分辨率前运行模型
+The separate-edit path always generates before upscale.	使用独立超分时，模型始终在超分辨率前运行。
+Denoise first decides the placement while it is on.	开启「先降噪」时，由该设置决定模型的运行顺序。
+Run NR before the game's upscaler, including RR.	在游戏进行超分辨率或光线重建前运行神经渲染。
+Apply NR to the finished picture	对最终画面应用神经渲染
+Apply NR after game effects and HUD. Early generation carries the edit through a separate upscaler.	在游戏特效和界面绘制完成后应用效果。提前生成时，改动部分会单独放大。
+Generate before upscale, apply after upscale	超分前生成，超分后应用
+Keep the game's SR/RR input clean and upscale only the NR edit with a separate non-RR backend.\nApply after upscale, or at presentation when finished-picture mode is enabled.	保留超分辨率和光线重建的原始输入，用独立的超分器只放大神经渲染产生的改动。\n改动在超分后应用；开启最终画面模式时，在显示前应用。
+Preload NR (restart)	预加载神经渲染（重启生效）
+Loads the Neural Rendering runtime (nvngx_dlssnr.dll) while the game starts, so turning NR on the first time does not freeze the game for several seconds.\nCosts some start-up time and memory even if NR is never used. Takes effect after a restart.	启动游戏时加载神经渲染运行库，减少第一次开启效果时的卡顿。\n即使未使用也会占用内存并延长启动时间。重启游戏后生效。
+Denoise at native, then NR, then upscale	先按渲染分辨率降噪，再进行神经渲染和超分
+Turn off the separate-edit and finished-picture options first.	请先关闭独立超分和最终画面选项。
+Runs the game's own upscaler once more at the render resolution (Ray Reconstruction if the game uses it, otherwise DLSS) so NR is shown a clean, denoised, steady image instead of the noisy jittered one.\nNR edits that image; the second step below decides how the edit reaches the screen.\nNative DirectX 12 only. Costs one extra upscaler pass per frame.	游戏先按渲染分辨率额外运行一次光线重建或 DLSS，对画面降噪并稳定采样，再交给神经渲染。\n下方的第二步决定如何将改动呈现在画面上。\n仅限原生 DirectX 12，每帧会额外运行一次超分器。
+Second step	第二步
+Game upscaler again, jitter zeroed	再次运行游戏超分器，清除采样抖动
+Private DLSS SR, jitter zeroed	使用独立 DLSS 超分，清除采样抖动
+Edit onto the raw render, then the game upscaler	先将效果应用于原始画面，再运行游戏超分器
+Edit as	改动合成方式
+Difference (added)	差值相加
+Ratio (multiplied)	比例相乘
+Do not multiply fireflies	抑制异常亮点
+Shift the edit by the frame's jitter	按当前帧的采样偏移对齐效果
+Flip the jitter direction	反转采样偏移方向
+Edit resampling	效果重采样
+Bilinear	双线性
+Lanczos 2	Lanczos 2
+Clamp the edit to its neighbours	限制在相邻像素范围内
+Denoise first: %s	先降噪：%s
+Private NR upscaler	神经渲染专用超分器
+Upscales only the NR edit, with or without game RR. FSR (FidelityFX) and XeSS need their runtimes.	只放大神经渲染产生的改动，游戏可开启或关闭光线重建。FSR 和 XeSS 需要各自的运行库。
+Inspect NR	检查神经渲染效果
+This option needs DirectX 12 or a DirectX 11 upscaler marked w/Dx12.	此选项需要 DirectX 12，或标有 w/Dx12 的 DirectX 11 超分器。
+Private upscale: %s	独立超分：%s
+The game processes clean input through SR/RR and its effects. The separately upscaled NR edit is applied to the finished picture.	游戏按原始输入进行超分、光线重建和特效处理，神经渲染的改动单独放大后应用到最终画面。
+The game processes clean input through SR/RR. The separately upscaled NR edit is applied after upscale.	游戏按原始输入进行超分或光线重建，神经渲染的改动单独放大后应用。
+NR off.	神经渲染已关闭。
+Restart the game to retry native Vulkan NR.	请重启游戏，再试原生 Vulkan 神经渲染。
+display resolution	显示分辨率
+Switch to Pre-SR (Generate model before upscale)	改为在超分辨率前运行模型
+NR needs the D3D12 bridge on D3D11. Choose an upscaler marked w/Dx12 and restart.	在 D3D11 中使用神经渲染需要 D3D12 桥接。请选标有 w/Dx12 的超分器并重启游戏。
+The private edit-upscale path requires DirectX 12 or its bridge. Disable separate edit upscaling to use native Vulkan NR.	独立超分需要 DirectX 12 或 D3D12 桥接。要使用原生 Vulkan 神经渲染，请关闭独立超分。
+  (not applied: finished picture blocked by frame generation)	（未应用：帧生成阻止了最终画面合成）
+  (model running, edit hidden)	（模型运行中，效果已隐藏）
+Running%s - %.2f ms elapsed%s	运行中%s，耗时 %.2f 毫秒%s
+ natively on Vulkan	（原生 Vulkan）
+Time between the start and end of NR on the GPU, including delays while other work runs.\nCompare FPS to check the effect on game performance.	从 GPU 开始到结束神经渲染的用时，包含等待其他任务的时间。\n可对比开启和关闭后的帧率，判断对游戏性能的影响。
+Peripheral compression	画面边缘压缩
+Keep more model detail in the centre and compress the edges. Model resolution still scales the whole image.	保留中心区域细节，压缩画面边缘。模型分辨率仍作用于整幅画面。
+Preview	预览
+Show the packed model input before spatial unpacking, scaled to fill the screen. This is the same as the Compressed model input debug view. Without active compression, shows the ordinary model input. Apply model must be enabled.	将压缩后的模型输入放大到全屏，效果等同于调试视图中的「压缩后的模型输入」。未开启压缩时显示普通模型输入。需开启「应用模型效果」。
+Centre width	中心区域宽度
+Centre height	中心区域高度
+Working width	处理区域宽度
+Working height	处理区域高度
+Centre horizontal offset	中心区域水平偏移
+Centre vertical offset	中心区域垂直偏移
+Working region horizontal shift	处理区域水平偏移
+Working region vertical shift	处理区域垂直偏移
+Extreme shifts can leave an edge with less than one working pixel. Compression then falls back to ordinary NR; the status above explains why.	偏移太大可能导致边缘不足一个像素。此时会改用普通神经渲染，原因见上方状态。
+Reset compression layout	重置压缩区域
+Show centre outline	显示中心区域边框
+Show working region outline	显示处理区域边框
+Centre detail follows Model resolution. Strong edge compression can soften detail or shimmer during movement.	中心细节取决于模型分辨率。过度压缩边缘可能使其变模糊或在移动时闪烁。
+50% halves width and height. 100% uses the full input size.	50% 表示宽高各减半，100% 表示使用完整输入尺寸。
+Downsampling filter for resolutions above 100%.	分辨率超过 100% 时使用的缩小滤镜。
+Matched residual + DLSS	匹配残差 + DLSS
+Lighting + colour	光照与颜色
+Lighting + colour + DLSS	光照与颜色 + DLSS
+Edge-aware	保留边缘
+HDR mapping (experimental)	HDR 映射（实验性）
+HDR mapping curve. Replace bypasses strength and highlight controls.	HDR 映射曲线。选择「替换」时，强度和高光设置不生效。
+Restore sharpness	恢复锐度
+Manual	手动
+Game exposure	游戏曝光
+Automatic HDR exposure	自动 HDR 曝光
+White point source	白点来源
+Exposure trim	曝光微调
+Highlight protection	高光保护
+Trim anchors	微调控制点
+Up to eight base-white-point:trim pairs, e.g. 1:5 100:2. Trim interpolates logarithmically. Clear for a fixed trim.	最多可填 8 组「白点:微调值」，例如 1:5 100:2。组间按对数插值，留空使用固定值。
+Higher values darken the NR input; lower values brighten it.	数值越大，输入模型的画面越暗；数值越小，画面越亮。
+Intensity	强度
+Enhancement strength. 1 = default.	增强效果的强度，默认值为 1。
+Fine detail and local contrast. 1 = default.	精细纹理和局部对比度，默认值为 1。
+Broad lighting changes. Later passes default to 0.	大范围光照变化。后续处理轮次默认值为 0。
+Skin detail. -1 follows Local structure.	皮肤细节。设为 -1 时跟随「局部结构」。
+NR model	神经渲染模型
+Automatic: use the installed NR runtime's default model.\nOriginal: use the original model (preset 1).\nOptimized: use the smaller FP8 model (preset 2), included in NR 310.9.16.0.\nOlder runtimes fall back to their default when a model is unavailable.\nChanging the model rebuilds this pass and resets its history.	自动：使用已安装运行库的默认模型。\n原始：使用原始模型（预设 1）。\n优化：使用较小的 FP8 模型（预设 2），包含在 NR 310.9.16.0 中。\n旧运行库缺少所选模型时会改用默认模型。\n切换模型会重建这一轮处理并清除其历史数据。
+Model passes	模型运行次数
+Unlock up to 10 passes	允许最多运行 10 次
+Pass {}	第 {} 轮
+Edit pass	选择要调整的轮次
+Inactive pass. Settings apply when this pass is enabled.	当前轮次尚未启用，启用后设置才会生效。
+Model-based skin selection.	使用模型识别皮肤区域。
+Standard	标准
+Reject stale history	丢弃过时的历史数据
+RR residual path: reject old edits when the input changes and limit them to nearby current edits. Can reduce trails. Off keeps the original history filter.	光线重建残差模式下，输入变化时舍弃过时效果，并参照相邻像素限制变化，可减少拖影。关闭时使用原有的历史滤镜。
+History confidence threshold	历史数据置信度阈值
+Halo suppression (experimental)	光晕抑制（实验性）
+Dark rims near bright objects	亮物体周围的暗边
+Dark rims near dark objects	暗物体周围的暗边
+Halo radius (NR pixels)	光晕半径（模型像素）
+Lifts fine dark rims while keeping broad lighting. Both strengths at zero disable the pass. May lighten real shadows; compare the result before keeping it on.	提亮细暗边并保留大范围光照。两项强度均为 0 时关闭。真实阴影也可能变亮，可对比后决定是否保留。
+Match HDR brightness response (experimental)	匹配 HDR 亮度响应（实验性）
+Match early NR brightness changes to the finished HDR image. Adds GPU work; unreliable fits fall back.	让前期神经渲染的亮度变化与最终 HDR 画面一致。会增加 GPU 开销，无法可靠匹配时自动回退。
+0 = no detail change. 1 = normal.	0 保留原始细节，1 使用标准效果。
+0 = game colours. 1 = model colours. Above 1 boosts saturation.	0 使用游戏原色，1 使用模型颜色，大于 1 会提高饱和度。
+Skin and environment (final edit)	皮肤与环境（最终效果）
+Separate skin / environment controls	分别调整皮肤和环境
+0 = unchanged. 1 = full effect.	0 保留原画面，1 应用完整效果。
+Skin detail / lighting	皮肤细节与光照
+Skin colour	皮肤颜色
+Environment detail / lighting	环境细节与光照
+Environment colour	环境颜色
+Preview colour-based mask	预览颜色遮罩
+Limit pixel brightening and darkening.	限制像素变亮或变暗的幅度。
+Compare, debug view and skin-mask inspection suspend the separate edit-upscale path.	对比、调试视图和皮肤遮罩检查会暂停独立超分。
+Freeze a frame for NR tuning. Later game effects may update; temporal behaviour is not representative.	冻结当前帧以调整神经渲染。后续游戏特效仍可能变化，请在运动中单独检查时序效果。
+Compare the original and NR output.	对比游戏原画面和神经渲染输出。
+1 = fit. 2 = crop and enlarge.	1 适应画面，2 裁剪并放大。
+Move the comparison boundary.	移动对比分界线。
+Compressed model input	压缩后的模型输入
+Difference is amplified 20x. Grey means unchanged. Proxy and raw model output use unpacked geometry. Compressed model input shows the input before unpacking, scaled to fill the screen.	差异放大 20 倍，灰色表示没有变化。代理和原始模型输出使用解压后的几何布局；压缩输入以全屏显示解压前的画面。
+Placement	处理顺序
+Apply NR edit	应用神经渲染效果
+Game input	游戏输入
+Placement / routing	处理顺序与路径
+RR + Super Resolution	光线重建与超分辨率
+Clean game image	游戏原始画面
+Game upscaler	游戏超分器
+Game effects + HUD	游戏特效和界面
+Game rendering	游戏渲染
+Prepare NR input	准备神经渲染输入
+Strength / skin	强度与皮肤
+Edit hidden; model runs	效果已隐藏，模型运行中
+Upscale NR edit	放大神经渲染改动
+Game output	游戏输出
+FG / presentation	帧生成与画面显示
+Prepare input	准备输入
+Apply edit	应用效果
+Waiting for frame timing.	等待帧耗时数据。
+NR %.2f ms  |  Rest of frame ~%.2f ms	神经渲染 %.2f 毫秒  |  其余约 %.2f 毫秒
+NR GPU time versus frame interval. Work can overlap.	神经渲染 GPU 耗时与帧间隔对比。不同任务可能并行执行。
+Rendered frame: %.2f ms%s	渲染帧耗时：%.2f 毫秒%s
+ (NR overlaps/exceeds this interval)	（神经渲染与其他任务重叠或超过该帧间隔）
+DLSS Multi-Frame Generation (MFG)	DLSS 多帧生成（MFG）
+Intel Xe Multi-Frame Generation (XeMFG)	英特尔 Xe 多帧生成（XeMFG）
+Low Latency	低延迟
+Upscalers	超分辨率
+DLSSD Settings	DLSS 光线重建设置
+Upscale Ratio Override	自定义超分比例
+Init Flags	初始化选项
+DRS (Dynamic Resolution Scaling)	动态分辨率（DRS）
+Accent Colour	强调色
+Background Colour	背景色
+%s is active, but not currently used by the game\nPlease enter the game	%s 已启用。进入游戏后才能查看实际状态。
+Ampere MFG Mode	Ampere 多帧生成模式
+Can't find nvngx.dll and libxess.dll and FSR inputs\nUpscaling support will NOT work.	未找到 DLSS、XeSS 或 FSR 输入，无法使用超分辨率。
+Checking the swapchain...	正在检查交换链…
+DLSS Unlocked - %s for menu	DLSS Unlocked · 按 %s 打开菜单
+Debug Markers (Corners)	显示四角调试标记
+Disabled in config	已在配置中关闭
+Display VBlank Sync (Extra Pacing)	与显示器垂直消隐同步（额外调整帧间隔）
+Dynamic Multi-Frame Generation	动态多帧生成
+Enable DLSS FG / MFG unlocker (restart)	启用 DLSS 帧生成与多帧生成扩展（重启生效）
+Enable NVSmooth30 Unlocker (RTX 30)	启用 RTX 30 系列平滑动态（NVSmooth30）
+Enable XeMFG Unlocker (Multi-Frame Generation; restart)	启用 Xe 多帧生成（重启生效）
+External frame generation / MFG unlocker	外部帧生成与多帧生成扩展
+FG Preset	帧生成预设
+Fallback Pipeline	备用处理方式
+Force Borderless Window (restart)	强制使用无边框窗口（重启生效）
+Game Arch Spoofing	向游戏报告的显卡架构
+In-Game Multiplier: Default / Unset	游戏内倍率：默认 / 未设置
+In-Game Multiplier: Off (Disabled in-game)	游戏内倍率：已在游戏中关闭
+Inactive (Smooth Motion disabled)	未运行（平滑动态已关闭）
+Input Source (restart)	输入来源（重启生效）
+Keep game XeSS FG off the swapchain	阻止游戏的 XeSS 帧生成接管交换链
+Kernel Image	计算内核
+Let the game use its FSR FG swapchain (restart)	允许游戏使用自己的 FSR 帧生成交换链（重启生效）
+Linux FG Fallback Mode	Linux 帧生成备用模式
+Magnifier	放大镜
+Max Interpolated Frames	最多插入帧数
+Max Multiplier Ceiling	倍率上限
+Mod Logging Level	补丁日志级别
+NVIDIA Smooth Motion (Driver-level FG)	NVIDIA 平滑动态（驱动级帧生成）
+NVSmooth30 Status:	NVSmooth30 状态：
+Neural Rendering (elapsed)	神经渲染耗时
+Not loaded	尚未加载
+Only Interpolated Frames	仅显示插入帧
+Optimized Kernels	优化内核
+Output Scaling is %s, Target Res: %dx%d (%.2f)\nJitter Count: %d	输出缩放：%s，目标分辨率：%dx%d（%.2f）\n抖动采样数：%d
+Please select %s as upscaler from game\noptions and load a save game 	请在游戏画面设置中选择 %s 作为超分器，然后载入存档。
+Please select DLSS Frame Generation in the game options\n	请在游戏画面设置中选择 DLSS 帧生成。\n
+Please select FSR Frame Generation in the game options\n	请在游戏画面设置中选择 FSR 帧生成。\n
+Retarget Blackwell kernels (faster 3X+ MFG, restart)	转换 Blackwell 内核（加快三倍及以上帧生成，重启生效）
+Router Architecture	路由架构
+Selecting setting below will disable that external override\n	选择下方设置将停用外部覆盖。\n
+UI Recomposition Preset	界面重新合成预设
+Unlocker	扩展模式
+Waiting for OptiScaler's DXGI hooks	正在等待 OptiScaler 的 DXGI 接口就绪
+[Checking Smooth Motion...]	[正在检测平滑动态…]
+Ratio multiplies each raw pixel by NR / clean, so every noisy sample keeps its own hue and only its brightness and tint move. Recommended.\nDifference adds NR - clean as an absolute amount. On samples that came back dark that amount outweighs the sample, which recolours them and roughly doubles the colour noise the upscaler receives.	推荐用比例相乘，按处理前后的比例调整每个像素，能较好保留含噪样本的色相。\n差值相加会将变化量直接叠到原始像素上，较暗的样本更容易变色，可能加重超分输入的彩色噪点。
+Limits the interpolated edit to the range of the four nearest source pixels. Removes ringing from the sharper kernels at the cost of a little sharpness.	将插值结果限制在最近四个源像素的范围内。能抑制锐利滤镜带来的边缘振铃，但锐度会略有降低。
+Engines disagree on which way the jitter value points. The wrong direction doubles the misalignment instead of removing it. If edges look worse with the shift on than off, flip this.	不同引擎的采样偏移方向可能相反。如果开启对齐后边缘反而更差，可反转方向。
+How the edit is interpolated at the shifted position. Bilinear is soft and never overshoots. Catmull-Rom is sharp with little overshoot. Lanczos 2 is the sharpest and can ring around hard edges.	设置对齐后的插值方式。双线性较柔和；Catmull-Rom 较锐利；Lanczos 2 最锐利，但硬边周围可能出现振铃。
+The clean image sits on a steady pixel grid; the raw render is offset by a sub-pixel jitter that changes every frame. Shifting the edit by that jitter lines the two up. Turn off only to compare.	降噪画面的像素位置固定，原始画面每帧有亚像素偏移。按相同偏移移动效果即可对齐，建议仅在对比时关闭。
+A raw sample far brighter than the clean value is a path-tracing firefly, not a lit pixel. Multiplying it by the ratio makes it brighter, and when the camera is still the game's Ray Reconstruction can keep such sparkles in shadows. With this on, those samples get the absolute change their pixel would have had instead. Turn off to compare.	路径追踪有时会产生远亮于周边的异常采样。开启后，对这些采样采用差值调整，避免成倍放大亮点，尤其能减少静止画面阴影中的闪点。
+Below 100%: Lighting + colour resizes lighting gain and colour changes separately, then applies them at full resolution. This can reduce resize halos; fully black pixels remain black. Edge-aware uses the original picture's brightness to keep edits on the correct side of edges. DLSS modes require post-upscale DX12 processing.	低于 100% 时，「光照与颜色」会分别缩放两类变化，再按原分辨率应用，可减少光晕并保留纯黑像素。「保留边缘」会按原图亮度限制效果范围。DLSS 模式需要在 DX12 超分后进行处理。
+Game upscaler again: the game's upscaler receives the NR'd clean image. Simple, but the second pass gets no real sub-pixel samples, so it can look softer than native.\n\nPrivate DLSS SR: the same, but a separate plain DLSS pass does the upscale and replaces the output. Avoids running Ray Reconstruction twice.\n\nEdit onto the raw render: only NR's change is taken from the clean image, lined up with the raw render's jitter and added onto it. The game's upscaler then sees real samples carrying the edit. Sharpest in theory; Ray Reconstruction may soften part of the edit.	再次运行游戏超分器：将已降噪并完成神经渲染的画面交给游戏超分器。第二次处理缺少真实的亚像素样本，可能偏柔和。\n\n独立 DLSS 超分：单独运行 DLSS 来放大画面，避免重复执行光线重建。\n\n应用到原始画面：仅将神经渲染产生的变化对齐到原始采样，再交给游戏超分器。细节可能更清晰，但光线重建也可能柔化部分效果。
+Locked to disabled: AmpereMfgMode=Internal drives OptiScaler's own FG route (startup-only; change DLSSG.AmpereMfgMode).	已锁定为关闭。内部模式会使用 OptiScaler 自己的帧生成，修改模式后要重启游戏。
+Automatically locked to enabled because the RTX 20 / 30 MFG unlocker is active.\nTo disable External FG, turn off the DLSS MFG unlocker below first.	RTX 20 / 30 的多帧生成已启用，因此外部帧生成会保持开启。要关闭它，请先关闭下方的 DLSS 多帧生成扩展。
+Leaves Streamline, Reflex and FG control to the game/external mod.\nNR and NGX upscaling remain available. Save Settings and restart.\nDoes not install an unlocker or enable FG in unsupported games.	由游戏或外部补丁控制 Streamline、Reflex 和帧生成。神经渲染和 NGX 超分仍可使用。保存设置并重启后生效；此项本身不会为游戏新增帧生成。
+Auto picks the unlocker for the GPU found at startup: RTX 40 -> RTX 40 unlock,\nRTX 20 / 30 -> RTX 20 / 30 unlocker. Choose one by hand only if the GPU was not\nidentified. Entries for another GPU family are greyed out.\nSave Settings and restart to apply.	自动模式会根据启动时检测到的显卡选用 RTX 40 或 RTX 20 / 30 路径。仅当识别失败时才需手选，其他系列的选项会变灰。保存后重启生效。
+Startup reads the PCI ids of the installed GPUs; the driver reports the GPU the game uses.\nThe log line "DLSS FG unlocker:" lists what was found.	启动时读取显卡 PCI ID，并由驱动报告游戏实际使用的显卡。可在日志中搜索「DLSS FG unlocker:」查看检测结果。
+RTX 40 (Ada)	RTX 40（Ada）
+Retargets optimized Blackwell PTX interpolation kernels in nvngx_dlssg.dll to Ada (sm_89).\nRecommended for smooth 3X-6X frame pacing on high-refresh VRR/FreeSync/G-Sync monitors.\nSave Settings and restart after changing.	适用于 Ada 显卡。在支持可变刷新率的高刷屏上，有助于改善三至六倍帧生成的帧间隔。保存后重启生效。
+Highest multiplier offered to the game (1=2X, 2=3X, 3=4X, 4=5X, 5=6X).\nThe game's frame generation setting (or Override DLSSG Ratio) still picks the active multiplier;\nthis only hides the options above the ceiling.\n\nSetting it to 1 (up to 2X only) tells the game Multi Frame Generation is unsupported, so its 3X+ options disappear.\nSave Settings and restart to apply.	设置游戏可见的最高倍率：1 至 5 分别对应 2X 至 6X。实际倍率仍由游戏或 DLSSG 倍率设置决定。设为 1 会隐藏三倍及以上选项。保存后重启生效。
+DLSS Frame Generation preset for this game only (the saved NVIDIA profile is not changed).\nAuto: the game / NVIDIA app decides.\nA, B: NVIDIA's original frame generation models.\nC: NVIDIA's performance mode, lighter on the GPU (DLSS-G 310.9.16 and newer).\nSave Settings and restart to apply.	仅对本游戏生效。自动由游戏或 NVIDIA App 决定；A、B 为原始模型；C 为性能模式，需要 DLSS-G 310.9.16 或更高版本。保存后重启生效。
+RTX 20 / 30 (Turing / Ampere)	RTX 20 / 30（Turing / Ampere）
+On Linux/Proton, native dlssg_sm86 driver hooks are replaced by OptiScaler's\ninternal FG pipeline (DLSSG -> FSR FG / XeFG) for crash-free, flicker-free presentation.\nUse the settings below to adjust fallback behavior or pipeline target.	Linux / Proton 可使用 OptiScaler 内部帧生成，将 DLSS-G 输入交给 FSR FG 或 XeFG。在下方设置何时使用备用路径和输出方式。
+The game's own XeSS-FG library can run on GeForce cards (for example after a DLSS Swapper upgrade) and would take the swapchain, leaving DLSS-G without frames.\nOptiScaler answers its context request with 'unsupported device', as the Intel-only builds do on GeForce.	游戏自带的跨品牌 XeSS-FG 可能先接管交换链，使 DLSS-G 无法获得画面。此项让 DLSS-G 保持控制。
+External mode only. Stops the game's own XeSS Frame Generation from taking the swapchain from DLSS-G (it happens with a cross-vendor libxess_fg.dll, e.g. after a DLSS Swapper upgrade). Turn off only if you want the game's XeSS FG instead of DLSS-G.\nSave Settings and restart to apply.	仅适用于外部模式。要改用游戏自己的 XeSS 帧生成，可关闭此项。保存后重启生效。
+External: forces External FG mode; the game or unlocker controls MFG (historic default).\nInternal: keeps OptiScaler's own FG route active and serves DLSS-G through the sideloaded dlssg_sm86 runtime on SM86/SM75. Requires FGOutput=dlssg; the FG Nvngx replacement stays None. Experimental and startup-only.\nSave Settings and restart to apply.	外部模式由游戏或补丁控制多帧生成，为原有默认值。内部模式由 OptiScaler 调用 SM75 / SM86 对应运行库，需要 FGOutput=dlssg，帧生成的 Nvngx 替换保持 None。内部模式为实验功能，保存后重启生效。
+Locked to Dynamic (Up to 6X) while Dynamic Multi-Frame Generation is enabled.\nThe NVIDIA runtime dynamically scales generated frames to meet the FPS Target.	启用动态多帧生成时，此项锁定为动态模式，最高 6X。运行库会根据目标帧率调整插入帧数。
+Maximum multiplier capability advertised to the game engine (1=2X, 2=3X, 3=4X, 4=5X, 5=6X).\nThe game's graphics settings menu chooses the actual active multiplier.\n\nImportant: Setting this to 1 (up to 2X only) tells the game engine that Multi-Frame Generation (3X/4X) is not supported. Games with in-engine multiplier selectors (e.g. Where Winds Meet, Black Myth: Wukong, Final Fantasy) will hide their 2x/3x selection dropdowns and lock to standard 2X.\nKeep this at Factory default (4X) or higher so in-game menus remain accessible.\n\nSave Settings and restart to apply.	游戏可见的最高倍率：1 至 5 对应 2X 至 6X。选择 1 时，有些游戏会隐藏倍率菜单并固定为 2X。要保留游戏内的倍率选择，可使用默认 4X 或更高。保存后重启生效。
+Optimization consistency tier for generated frames:\n0 - Stock: Original stock numerics, no kernel acceleration (conservative).\n1 - Bit-identical: Recommended default. Fastest kernel pipeline with 0 dB deviation (~19-32% GPU latency reduction).\n2 - Fast lossy: Faster image-processing kernels with PSNR > 50 dB against stock output (310.9 runtime only).\n3 - Fastest lossy: All lossy accelerations enabled, including texture-unit bilinear sampling.\nSave Settings and restart to apply.	0：原版计算。1：结果与原版一致，为推荐默认值。2：更快的有损计算，仅适用于 310.9 运行库。3：最快的有损模式，包含纹理单元双线性采样。保存后重启生效。
+Preset for UI / HUD recomposition / FG Lite:\nAuto: Let the game or driver profile decide (default). sdli1995 0.4.1 and newer run Auto as A.\nA: Force UI recomposition off.\nB: Force UI recomposition on for cleaner HUD inside generated frames (only takes effect if game provides HUD-less plane).\nC: FG Lite: 30-50% faster kernel execution with lighter candidate blending.\nSave Settings and restart to apply.	自动由游戏或驱动决定，sdli1995 0.4.1 起按 A 处理。A 关闭界面重组；B 在游戏提供不含界面的画面时改善插入帧里的界面；C 使用负载较低的 FG Lite。保存后重启生效。
+Auto: resolves to optimal format (PTX on Linux/Proton, RTX 3080 Ti, or Turing).\nPTX: JIT-compiled driver path, recommended for Linux/Proton, RTX 3080 Ti, and RTX 20 series.\nCubin: precompiled binary, requires exact physical SM match on Windows.\nSave Settings and restart to apply.	自动根据环境选择。PTX 由驱动即时编译，适合 Linux / Proton、RTX 3080 Ti 和 RTX 20；Cubin 为预编译内核，在 Windows 上需匹配实际 SM 架构。保存后重启生效。
+Auto: automatically selects SM75 for Turing or SM86 for Ampere.\nSM86: Ampere route (RTX 30 series).\nSM75: Turing route (RTX 20 / GTX 16 series, or SM75 forward-PTX testing on RTX 3080 Ti).\nSave Settings and restart to apply.	自动为 Turing 选择 SM75，为 Ampere 选择 SM86。SM86 适用 RTX 30；SM75 适用 RTX 20、GTX 16，也可用于 RTX 3080 Ti 的 PTX 测试。保存后重启生效。
+Disabled: requires SilyNoMeta's fork of dlssg_sm86 (or a build supporting DynamicMFG).\nUpstream sdli1995 does not support dynamic mode yet.	需要支持 DynamicMFG 的 dlssg_sm86 版本。原版 sdli1995 目前不支持，因此这里不可选。
+Requests dynamic multi-frame generation pacing in SilyNoMeta's dlssg_sm86.\nDynamically adjusts generated frames to match display refresh rate or target FPS.\nApplies live to running mod engine and updates companion configuration.	自动调整每帧插入的帧数，以接近显示器刷新率或设定的目标帧率。修改会立即生效并同步到配套配置。
+An active limit of 0 means auto-detect the display refresh rate.\nNon-zero values (e.g. 120) set a fixed dynamic framerate ceiling.\nApplies live to running mod engine and updates companion configuration.	0 表示自动检测显示器刷新率；其他值为固定目标帧率，例如 120。修改会立即生效并同步到配套配置。
+Controls architecture reporting to the game and Streamline 2.8+ at startup:\nAuto: Installs an early NVAPI trampoline so Turing (RTX 20) and Ampere (RTX 30) report\n      Blackwell (RTX 50, 0x1b0), preventing games like FF7 Rebirth from dropping the DLSS-G plugin.\nEnabled: Explicitly forces early Blackwell architecture spoofing across all GPUs.\nDisabled: Keeps the real GPU architecture (SpoofArchToGame=0).\nSave Settings and restart to apply.	选择报告给游戏和 Streamline 的显卡架构。自动按显卡选择，启用会报告 Blackwell，关闭则保留真实架构。保存后重启生效。
+Controls dlssg_sm86 logging level written to dlssg_sm86.ini [Logging] Level:\n0: Off (minimal logging)\n1: Default (info and error logging)\n2: Debug\n3: Trace / Verbose (detailed per-frame kernel execution and evaluate logs for troubleshooting)\nSave Settings and restart to apply.	日志写入 dlssg_sm86.ini 的 Logging / Level。0 最少，1 记录常规信息和错误，2 为调试，3 逐帧记录详细信息。保存后重启生效。
+Control fallback to OptiScaler's internal FG pipeline on Linux/Proton:\nAuto: Falls back to internal FG only when configured for 2X FG (MaxFrames=1).\nForce Enabled: Always uses internal FG, bypassing native dlssg_sm86 for smooth pacing.\nForce Disabled: Always uses external dlssg_sm86 mod.\nSave Settings and restart to apply.	Linux / Proton 备用方式：自动仅在 2X 时启用；强制开启始终使用内部帧生成；强制关闭始终使用外部 dlssg_sm86。保存后重启生效。
+Select internal FG pipeline used during Linux fallback:\nXeFG: Intel XeSS FG (default). Its files ship with OptiScaler.\nFSR FG: AMD FSR FG. Use it for games with 16-bit float HDR output, which XeFG does not support.\nSave Settings and restart to apply.	Linux 备用输出默认使用 Intel XeFG。游戏使用 16 位浮点 HDR 输出时，可选支持该格式的 AMD FSR FG。保存后重启生效。
+Disabled because the game is running under the Vulkan API.\nIntel XeSS Frame Generation (XeFG) strictly requires DirectX 12.\nIf the game supports DirectX 12, switch the Graphics API to DirectX 12 in the game settings and restart.	当前使用 Vulkan。Intel XeFG 需要 DirectX 12；如果游戏支持，请在画面设置中切换至 DirectX 12 并重启。
+Disabled because the RTX 40 MFG unlock is active.\nTurn off the DLSS MFG unlocker first, Save Settings and restart.	RTX 40 的 DLSS 多帧生成已开启。要使用此项，请先关闭 DLSS 多帧生成，保存并重启。
+Natively unlocks Intel Xe Multi-Frame Generation (XeMFG) in libxess_fg.dll.\nAllows 3X, 4X, 5X, and 6X frame generation across Intel, AMD, and NVIDIA GPUs.\nSupports both native DLSS-G / Streamline titles and OptiScaler pipeline injection.\nProvides native Multi-Frame Generation on Linux (Proton/VKD3D) without 2X fallbacks.\nSave Settings and restart after changing.	启用 Intel Xe 多帧生成，可提供 3X 至 6X。可使用游戏原生 DLSS-G / Streamline 输入，也可用 OptiScaler 提供的输入。支持的显卡和效果取决于驱动及游戏。保存后重启生效。
+Determines how frame generation inputs (depth, motion vectors, HUD) are fed into XeFG:\n• Game: For titles with native DLSS Frame Generation / Streamline support. Unlocks in-game settings.\n• OptiScaler: For games with DLSS Super Resolution lacking native DLSS-FG (e.g. Helldivers 2).\n  Injects XeFG directly using vectors and depth from the upscaler pass.\nSave Settings and restart after changing.	「游戏」适用于原生支持 DLSS 帧生成或 Streamline 的游戏。「OptiScaler」适用于有 DLSS 超分、缺少原生帧生成的游戏，使用超分阶段的深度和运动矢量。保存后重启生效。
+Real-time presentation status from xefgSwapChainGetLastPresentStatus.\nIndicates whether Intel XeSS-FG is actively producing neural interpolated frames\nor silently falling back to native frames.	显示 Intel XeFG 最近一次提交画面的状态，可判断是否实际生成了插入帧，或已回退到游戏原始帧。
+Multiplier selected by the game engine, Streamline options call, or OptiScaler injection.	由游戏、Streamline 或 OptiScaler 选择的实际倍率。
+Frame generation is currently set to Off in the game's display settings.	游戏画面设置中的帧生成当前已关闭。
+In-game multiplier will be reported once the game's Streamline DLSS-G option is set.	游戏设置好 Streamline DLSS-G 选项后，将显示实际倍率。
+Number of interpolated frames generated per real rendered frame (allowed in XeFG and advertised to Streamline).\n1 = 2X FG (1 interpolated frame)\n2 = 3X FG (2 interpolated frames)\n3 = 4X FG (3 interpolated frames, default)\n4 = 5X FG (4 interpolated frames)\n5 = 6X FG (5 interpolated frames)	每个真实渲染帧可插入的帧数。1 至 5 分别对应 2X 至 6X，默认 3 表示 4X。
+Renders marker quads in the corners of real interpolated frames.\nIf you do not see marker quads, frames are not being interpolated.	在实际生成的插入帧四角显示标记，便于检查插帧是否生效。
+Renders ONLY generated frames and blanks native frames.\nIf interpolation is active, motion will remain visible.\nIf interpolation has failed, the screen will turn black.	仅显示生成帧，原始帧显示为黑色。插帧正常时仍能看到运动画面，失败时画面为黑色。
+Forces SyncInterval=1 and disables tearing on generated frames.\nRecommended: OFF (Default) — allows XeSS-FG to pace presentations natively.\nEnable only if your display exhibits severe tear-lines without V-Sync.	开启后强制同步并禁止撕裂。默认关闭，由 XeFG 自行控制帧间隔。仅在未启用垂直同步且画面严重撕裂时考虑开启。
+Forces borderless windowed mode on swapchains.\nRequired for games that use DXGI exclusive fullscreen (e.g. Helldivers 2),\nas Intel XeFG disables frame interpolation in exclusive fullscreen.	强制使用无边框窗口。XeFG 在独占全屏下会停止插帧，部分游戏需要开启此项。
+Disabled because Frame Generation (DLSS-G / MFG) is active.\nNVIDIA Smooth Motion is driver-level frame generation for games lacking native DLSS-G.\nDisable MFG / Frame Generation first, Save Settings and restart to use Smooth Motion.	DLSS 帧生成或多帧生成正在运行。驱动级平滑动态适用于缺少原生 DLSS-G 的游戏。要切换，请先关闭帧生成，保存后重启。
+Disabled because the active OS is not Windows (10/11).\nNVIDIA Smooth Motion is a Windows-only driver display pipeline feature (requires driver 571.86+ on Windows).	平滑动态需要 Windows 10 / 11 和 571.86 或更高版本驱动。当前系统不支持。
+Disabled because the active GPU is not NVIDIA.\nNVIDIA Smooth Motion requires an NVIDIA GPU and driver 571.86+ on Windows.	平滑动态需要 NVIDIA 显卡和 Windows 版 571.86 或更高版本驱动。当前使用的是其他品牌显卡。
+Disabled because the active GPU is not NVIDIA Ampere (RTX 30), Ada Lovelace (RTX 40), or Blackwell (RTX 50).\nNVIDIA driver-level Smooth Motion requires driver 571.86+ on Windows with RTX 40/50 natively, or RTX 30 via NVSmooth30.\nTuring (RTX 20 / GTX 16) and older architectures lack hardware support for driver-level frame generation.	平滑动态原生支持 RTX 40 / 50，RTX 30 可用 NVSmooth30。RTX 20、GTX 16 及更早架构不支持。需要 Windows 版 571.86 或更高版本驱动。
+NVIDIA Driver-Level Smooth Motion (requires driver 571.86+ on Windows):\nEnables driver-level optical-flow frame interpolation directly via NVIDIA Driver Settings (DRS).\nStrictly opt-in: intended for games that lack native DLSS Frame Generation support.\nOn GeForce RTX 30 (Ampere), this feature is unlocked via OptiScaler/nvsmooth30.dll.\nNote: A game restart is required for NvPresent64 to attach to the DXGI swapchain.	在 NVIDIA 驱动中启用光流插帧，适用于缺少原生 DLSS 帧生成的游戏。RTX 30 还需要 NVSmooth30。要求 Windows 版 571.86 或更高版本驱动，保存后重启游戏。
+NVIDIA Driver-Level Smooth Motion (requires driver 571.86+ on Windows):\nEnables driver-level optical-flow frame interpolation directly via NVIDIA Driver Settings (DRS).\nStrictly opt-in: intended for games that lack native DLSS Frame Generation support.\nSupported natively on GeForce RTX 40 (Ada) and RTX 50 (Blackwell) series GPUs.\nNote: A game restart may be required for the driver to attach to the DXGI swapchain.	在 NVIDIA 驱动中启用光流插帧，适用于缺少原生 DLSS 帧生成的游戏。RTX 40 / 50 原生支持。要求 Windows 版 571.86 或更高版本驱动，可能需要重启游戏。
+NVSmooth30 Unlocker (placed in OptiScaler/nvsmooth30.dll):\nPatches NvPresent64 architecture gates and redirects CUDA kernels to SM86,\nallowing RTX 30 (Ampere) cards to run NVIDIA driver-level Smooth Motion.\nRequires driver 571.86+ on Windows.\nNote: A game restart is required for the unlocker to hook the DXGI presentation layer.\nWhile NVSmooth30 is active, OptiScaler leaves Smooth Motion's swapchain unwrapped, so this\nmenu won't open from the next launch. Turn it back off in OptiScaler.ini ([DLSSG]\nSmoothMotion or [SmoothMotion] EnableNVSmooth30).	供 RTX 30 使用的驱动级平滑动态，需要 Windows 版 571.86 或更高版本驱动。重启生效。启用后菜单可能无法打开，可在 OptiScaler.ini 的 SmoothMotion 或 EnableNVSmooth30 设置中关闭。
+Off (default): while NVSmooth30 is loaded, OptiScaler gives the game a normal swapchain in\nplace of AMD's FSR Frame Generation swapchain (FSR FG can't run then). NVIDIA Smooth Motion\ncrashed on the FSR swapchain's presenter thread (e.g. Neverness to Everness, even with\nFSR FG off).\nOn: leave the game's FSR FG swapchain alone.	默认关闭，以避免平滑动态与 FSR 帧生成交换链发生冲突。打开后保留游戏自己的 FSR 帧生成交换链。
+OptiScaler did not find NVIDIA's Smooth Motion (NvPresent64.dll) on the game's swapchain.\nThe detection is a heuristic and can miss it: check the frame rate with an external\noverlay (PresentMon or the NVIDIA App). If it does not double, please report it with\nOptiScaler.log and nvsmooth30.log (both next to the game's exe).	未检测到 NVIDIA 平滑动态。可用 PresentMon 或 NVIDIA App 查看实际帧率；如未翻倍，可将游戏目录中的 OptiScaler.log 和 nvsmooth30.log 随反馈提供。
+Disabled: requires Streamline 2.11+ (sl.dlss_g.dll) and supporting driver runtime.	需要 Streamline 2.11 或更高版本的 sl.dlss_g.dll，以及支持的驱动。
+Display only XeFG generated frames (blanks native frames).\nUseful to visually verify if neural frame interpolation is working.	仅显示 XeFG 生成的帧，用于检查插帧是否真正生效。
+Framerate	帧率
+DLSS NR : ON	神经渲染：开启
+DLSS NR : OFF	神经渲染：关闭
+HDR / paper white / 	HDR / 纸白亮度 / 
+ pass (no RR)	 超分（无光线重建）

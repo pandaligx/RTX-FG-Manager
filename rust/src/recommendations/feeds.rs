@@ -303,6 +303,62 @@ mod tests {
     }
 
     #[test]
+    fn first_open_manual_game_recovers_exact_public_cards_without_sending_its_title() -> Result<()>
+    {
+        let names = game_names::bundled();
+        let mut game = Game {
+            exe: r"D:\Games\AzurPromilia\AzurPromilia.exe".into(),
+            title: "AzurPromilia.exe".into(),
+            ..Default::default()
+        };
+        assert!(identify(&game, &names).is_none());
+        let group = manual_public_group(&game, &names).unwrap();
+        assert_eq!(
+            group.id,
+            "custom:79f17237b601b4d74fc54801e308dc52ae558d180dad50352bb08392e4f9ceb8"
+        );
+        let mut cards = page(STEAM, [3, 1]);
+        for card in &mut cards.items {
+            card.content.game = group.clone();
+        }
+        let (origin, server) = mock_service(vec![(200, json!(cards))]);
+        let dir = tempfile::tempdir()?;
+        let client = online_test_client(dir.path(), origin);
+        let found = client.browse_feeds(
+            &group,
+            &names,
+            &cloud::bundled(),
+            FeedFilter::Public,
+            None,
+            CardSort::Likes,
+        )?;
+        assert_eq!((found.total, found.items.len()), (2, 2));
+        assert!(
+            found
+                .items
+                .iter()
+                .all(|c| GameLink::accepts(&game, &names, &c.content.game.id))
+        );
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(!requests[0].contains("AzurPromilia"));
+        assert!(!GameLink::accepts(
+            &game,
+            &names,
+            &GameIdentity::custom("AzurPromilia 2")?.id
+        ));
+        game.extra
+            .insert("title_override".into(), json!("My private nickname"));
+        assert!(manual_public_group(&game, &names).is_none());
+        game.extra.clear();
+        game.exe = "D:/Games/Client-Win64-Shipping.exe".into();
+        assert_eq!(manual_public_group(&game, &names), Some(group));
+        game.title = "Client-Win64-Shipping".into();
+        assert!(manual_public_group(&game, &names).is_none());
+        Ok(())
+    }
+
+    #[test]
     fn first_open_collects_both_verified_groups_and_keeps_each_card_route() -> Result<()> {
         let names = game_names::bundled();
         let game: Game =

@@ -247,6 +247,7 @@ fn legacy_identity(journal: &Path) -> Result<Option<String>> {
 /// recognition, never a whitelist for installing a newly signed proxy.
 pub fn private_components(record: &Record) -> &'static [&'static str] {
     match record.backend.as_str() {
+        crate::optiscaler_nr::BACKEND => crate::optiscaler_nr::components(),
         crate::anr::BACKEND => crate::anr::components(
             record
                 .upstream_version
@@ -413,7 +414,7 @@ fn manual_record(exe: &Path, dir: &Path, legacy: Option<String>) -> Result<Optio
         cleanup_pending_reasons: Vec::new(),
     }))
 }
-fn is_log(name: &str) -> bool {
+pub(crate) fn is_log(name: &str) -> bool {
     if matches!(name, "dlssg_sm86.log" | "frame_timing.txt") {
         return true;
     }
@@ -731,6 +732,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
         #[cfg(windows)]
         crate::miles_profile::restore_locked(&target)?;
         crate::runtime_files::yanyun::remove_locked(&target)?;
+        crate::runtime_files::remove_locked(&target, crate::runtime_files::opti_streamline::KIND)?;
         crate::neural_runtime::remove_locked(&target)?;
         crate::runtime_files::remove_locked(&target, "xemfg")?;
         crate::runtime_files::remove_locked(&target, "encorefg")?;
@@ -780,6 +782,7 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
     let config = core::config_name(&record.backend);
     let ini = core::no_links(&dir.join(config))?;
     let mut roots = if [
+        crate::optiscaler_nr::BACKEND,
         crate::anr::BACKEND,
         crate::rtxmfg::BACKEND,
         crate::transfusion::BACKEND,
@@ -815,7 +818,9 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
         }
         if q.is_file() {
             let h = core::digest(&q)?;
-            if record.hashes.get(name) == Some(&h) || known_proxy(&q)? {
+            if record.hashes.get(name) == Some(&h)
+                || (record.backend != crate::optiscaler_nr::BACKEND && known_proxy(&q)?)
+            {
                 targets.insert(q, h);
                 continue;
             }
@@ -838,6 +843,8 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
                     .hashes
                     .get(name)
                     .is_some_and(|h| core::digest(&path).is_ok_and(|actual| &actual == h))
+                || (record.backend == crate::optiscaler_nr::BACKEND
+                    && crate::optiscaler_nr::owned_sm86_ini(name, &path)?)
                 || known_component(&path, name)?
             {
                 targets.insert(path.clone(), core::digest(&path)?);
@@ -870,12 +877,15 @@ fn clean_outcome(target: &core::DeploymentTarget, pending_only: bool) -> Result<
                 kept.insert(helper);
             }
         }
+        if record.backend == crate::optiscaler_nr::BACKEND {
+            crate::optiscaler_nr::cleanup(dir, &mut targets, &mut dirs)?;
+        }
         if record.backend == crate::anr::BACKEND {
             crate::anr::cleanup_targets(dir, &mut targets, &mut dirs)?;
         }
         let logs: Vec<&str> = if matches!(
             record.backend.as_str(),
-            crate::encore::BACKEND | crate::anr::BACKEND
+            crate::encore::BACKEND | crate::anr::BACKEND | crate::optiscaler_nr::BACKEND
         ) {
             Vec::new()
         } else if record.backend == crate::rtxmfg::BACKEND {

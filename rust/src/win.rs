@@ -480,8 +480,8 @@ pub fn language() -> String {
 pub fn region() -> String {
     let mut buf = [0; 16]; // SAFETY: The API receives a sized, mutable UTF-16 slice.
     let count = unsafe { windows::Win32::Globalization::GetUserDefaultGeoName(&mut buf) };
-    if count > 0 && from_wide(&buf) == "CN" {
-        "gitee"
+    if count <= 0 || from_wide(&buf).eq_ignore_ascii_case("CN") {
+        "domestic"
     } else {
         "github"
     }
@@ -638,7 +638,7 @@ pub fn file_version(path: &Path) -> Result<(String, String)> {
         Ok((version, name))
     }
 }
-pub fn verify_signature(path: &Path) -> Result<Signature> {
+pub(crate) fn authenticode_thumbprint(path: &Path) -> Result<String> {
     let wpath = wide(path);
     // SAFETY: Trust structures use exact ABI sizes, the file-name buffer lives until
     // WTD_STATEACTION_CLOSE, and provider pointers are read only after success.
@@ -691,19 +691,22 @@ pub fn verify_signature(path: &Path) -> Result<Signature> {
             &mut action,
             (&mut data as *mut WINTRUST_DATA).cast(),
         );
-        let thumbprint = outcome?;
-        let (version, name) = file_version(path)?;
-        ensure!(
-            thumbprint == crate::updater::PUBLISHER && name == "RTXManager",
-            "更新文件的发布者签名无效"
-        );
-        Ok(Signature {
-            status: "Valid".into(),
-            thumbprint,
-            version,
-            name,
-        })
+        outcome
     }
+}
+pub fn verify_signature(path: &Path) -> Result<Signature> {
+    let thumbprint = authenticode_thumbprint(path)?;
+    let (version, name) = file_version(path)?;
+    ensure!(
+        thumbprint == crate::updater::PUBLISHER && name == "RTXManager",
+        "更新文件的发布者签名无效"
+    );
+    Ok(Signature {
+        status: "Valid".into(),
+        thumbprint,
+        version,
+        name,
+    })
 }
 pub fn wait_process(pid: u32, timeout: u32) -> Result<()> {
     // SAFETY: This only opens a synchronization handle; it never terminates a process.

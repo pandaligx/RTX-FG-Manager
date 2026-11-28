@@ -33,6 +33,7 @@ pub const PROFILES: &[(&str, &str)] = &[
         crate::upstream040::PROFILE_041,
     ),
     (crate::anr::SCHEME, crate::anr::PROFILE),
+    (crate::optiscaler_nr::SCHEME, crate::optiscaler_nr::PROFILE),
 ];
 
 pub const MFG_161_COMPAT: &str = "mfg-unlocker-1.6.1-compat";
@@ -136,9 +137,10 @@ pub fn execute_with_options(
     let series = options.series;
     ensure!(!action.is_empty(), "请至少选择一项安装内容");
     let version = recipe.available_version(catalog)?;
-    // Encore's manual-install dependencies are part of the patch installation.
-    // The optional runtimes selection only controls the player's version overrides.
-    let complete_encore = recipe.completes_encore(&version, action);
+    let installing_encore = recipe.completes_encore(&version, action);
+    // Older cards had no inventory. New cards replay the actual selected components.
+    let explicit_encore = installing_encore && recipe.runtimes.is_some();
+    let complete_encore = installing_encore && !explicit_encore;
     let converted;
     let settings = if action.parameters() {
         let settings = recipe
@@ -283,16 +285,21 @@ pub fn execute_with_options(
             .iter()
             .any(|c| c.source == "managed" && matches!(c.kind.as_str(), "xess_fg" | "xell"))
     });
+    // For a standalone OptiScaler snapshot the runtime inventory is authoritative.
+    // An author's saved menu preference can be on even without an installed NR DLL.
+    let implicit_nr = recipe.neural_runtime == "310.9.16"
+        || (settings.is_some_and(|s| s.requires_nr())
+            && (recipe.scheme != crate::optiscaler_nr::SCHEME || recipe.runtimes.is_none()));
     if complete_encore {
         queue.extend(crate::runtime_files::encore_download_files(&targets)?);
     }
     if action.runtimes() {
         if let Some(runtimes) = &recipe.runtimes {
-            queue.extend(runtimes.download_files(&targets)?);
+            let installs_optiscaler_bundle =
+                action.installs() && recipe.scheme == crate::optiscaler_nr::SCHEME;
+            queue.extend(runtimes.download_files(&targets, installs_optiscaler_bundle)?);
         }
-        if !shared_nr
-            && (settings.is_some_and(|s| s.requires_nr()) || recipe.neural_runtime == "310.9.16")
-        {
+        if !shared_nr && implicit_nr {
             queue.push(crate::neural_runtime::download_file("310.9.16")?);
         }
         if settings.is_some_and(|s| s.requires_xemfg()) && !shared_xess {
@@ -373,7 +380,7 @@ pub fn execute_with_options(
             // No shared overrides in this phase. Existing user configuration is
             // retained until dependencies are ready and all values validated.
             let mut files = prepared.files.clone();
-            if complete_encore && core::record(&target.directory)?.is_none() {
+            if installing_encore && core::record(&target.directory)?.is_none() {
                 let mut defaults = presets::Values::from([
                     ("dlssWithoutGameDlss".into(), "0".into()),
                     ("frameGenerationWithoutGameFg".into(), "0".into()),
@@ -387,6 +394,20 @@ pub fn execute_with_options(
                     Some(&version),
                 )?;
                 files.insert(encore::CONFIG.into(), config);
+            }
+            let include_intel = action.runtimes()
+                && recipe.runtimes.as_ref().is_some_and(|s| {
+                    s.components.iter().any(|c| {
+                        c.source == "patch"
+                            && matches!(c.kind.as_str(), "xess" | "xess_fg" | "xell")
+                    })
+                });
+            if explicit_encore && !include_intel {
+                crate::encore_components::keep_existing_intel(
+                    target,
+                    core::record(&target.directory)?.as_ref(),
+                    &mut files,
+                )?;
             }
             patch_written |= core::deploy_with_outcome(
                 target,
@@ -437,9 +458,7 @@ pub fn execute_with_options(
                 )
                 .context("方案已安装，配套运行库未完成；参数尚未应用，可重试")?;
         }
-        if !shared_nr
-            && (settings.is_some_and(|s| s.requires_nr()) || recipe.neural_runtime == "310.9.16")
-        {
+        if !shared_nr && implicit_nr {
             crate::neural_runtime::install_many(
                 &targets,
                 "310.9.16",
@@ -660,9 +679,11 @@ impl Snapshot {
     }
 
     pub fn requires_nr(&self) -> bool {
-        ["nrEnabled", "nrWithoutGameDlss", "rtx_nr"]
-            .iter()
-            .any(|key| self.values.get(*key).is_some_and(|v| v == "1"))
+        self.profile == crate::optiscaler_nr::PROFILE
+            && self.values.get("nr_enabled").is_some_and(|v| v == "true")
+            || ["nrEnabled", "nrWithoutGameDlss", "rtx_nr"]
+                .iter()
+                .any(|key| self.values.get(*key).is_some_and(|v| v == "1"))
     }
     pub fn requires_xemfg(&self) -> bool {
         self.values.get("rtx_xemfg").is_some_and(|v| v == "1")

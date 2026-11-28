@@ -203,6 +203,71 @@ fn finish(c: &mut Controller) -> Result<()> {
 }
 
 #[test]
+#[ignore = "requires the signed standalone OptiScaler ZIP and both mirrored runtimes"]
+fn optiscaler_manual_options_follow_each_game_directory() -> Result<()> {
+    let (_data, mut c) = controller();
+    let root = tempfile::tempdir()?;
+    let mut paths = Vec::new();
+    for name in ["Base", "SL", "NR", "Both"] {
+        let dir = root.path().join(name);
+        std::fs::create_dir(&dir)?;
+        let exe = dir.join("Game.exe");
+        std::fs::copy(std::env::current_exe()?, &exe)?;
+        std::fs::write(dir.join("sl.interposer.dll"), b"game-owned")?;
+        paths.push(exe.display().to_string());
+    }
+    let game = Game {
+        exe: paths[0].clone(),
+        targets: paths.clone(),
+        ..Default::default()
+    };
+    c.games = vec![game.clone()];
+    c.focus = Some(game.exe.clone());
+    c.set_selection(
+        rtx_fg_manager::optiscaler_nr::SCHEME.into(),
+        1,
+        vec!["version.dll".into()],
+    );
+    c.request_patch(false);
+    finish(&mut c)?;
+    let plan = c
+        .patch_install_plan
+        .as_ref()
+        .context("missing OptiScaler dialog")?;
+    assert_eq!(plan.opti_options.len(), paths.len());
+    assert!(plan.choices.is_empty() && plan.dlssg_options.is_empty());
+    assert!(c.selected_native_components.opti_nr.is_empty());
+    c.confirm = None;
+    c.confirm_patch_options(
+        vec![],
+        NativeSelections {
+            opti_nr: BTreeSet::from([paths[2].clone(), paths[3].clone()]),
+            ..Default::default()
+        },
+    )?;
+    finish(&mut c)?;
+    for (index, exe) in paths.iter().enumerate() {
+        let t = game.deployment_target(std::path::Path::new(exe));
+        assert!(t.directory.join("version.dll").is_file());
+        assert!(runtime_files::opti_streamline::installed(&t)?);
+        assert_eq!(t.directory.join("nvngx_dlssnr.dll").exists(), index >= 2);
+    }
+    c.request_patch(true);
+    finish(&mut c)?;
+    for t in game.deployment_targets() {
+        assert!(
+            !t.directory.join("OptiScaler").exists()
+                && !t.directory.join("nvngx_dlssnr.dll").exists()
+        );
+        assert_eq!(
+            std::fs::read(t.directory.join("sl.interposer.dll"))?,
+            b"game-owned"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn native_runtime_choices_require_standard_or_delta_dlssg_042() {
     let (_data, mut c) = controller();
     assert!(c.has_patch_options(upstream040::SCHEME));
@@ -227,6 +292,7 @@ fn native_runtime_choices_require_standard_or_delta_dlssg_042() {
         fingerprint: c.patch_options_fingerprint(&paths),
         paths,
         choices: vec![],
+        opti_options: vec![],
         dlssg_options: vec![DlssgInstallOption {
             exe: path.clone(),
             game: "Game".into(),

@@ -661,9 +661,23 @@ pub fn language() -> String {
     }
 }
 
-/// Download mirror preference. Linux builds publish through GitHub releases.
+/// Use the configured territory on first launch. Explicit mirror choices take precedence.
 pub fn region() -> String {
-    "github".into()
+    let locale = ["LC_ALL", "LC_ADDRESS", "LANG"]
+        .into_iter()
+        .filter_map(|key| std::env::var(key).ok())
+        .find(|value| !value.is_empty())
+        .unwrap_or_default();
+    let base = locale.split(['.', '@']).next().unwrap_or_default();
+    if base
+        .split(['_', '-'])
+        .skip(1)
+        .any(|part| part.eq_ignore_ascii_case("CN"))
+    {
+        "domestic".into()
+    } else {
+        "github".into()
+    }
 }
 
 /// Dark mode preference, read from the prefix's user registry. Wine stores the

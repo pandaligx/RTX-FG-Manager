@@ -1,4 +1,5 @@
 //! Public runtime inventory: versions and provenance, never local paths or URLs.
+use crate::runtime_files::opti_streamline;
 use crate::runtime_files::yanyun;
 use crate::{cloud, core, neural_runtime, runtime_files, win};
 use anyhow::{Context, Result, ensure};
@@ -49,6 +50,9 @@ impl Component {
     }
 
     fn needs_install(&self, target: &core::DeploymentTarget) -> bool {
+        if self.kind == opti_streamline::KIND {
+            return !opti_streamline::installed(target).unwrap_or(false);
+        }
         if self.kind == yanyun::KIND {
             return !yanyun::shared_installation(target).unwrap_or(false);
         }
@@ -74,6 +78,13 @@ impl Component {
     ) -> Result<Option<runtime_files::Status>> {
         let added = recipe.scheme == crate::encore::SCHEME
             && crate::encore::supports_200(Some(&recipe.patch_version));
+        if self.kind == opti_streamline::KIND {
+            opti_streamline::installed(target)?;
+            return Ok(None);
+        }
+        if self.kind == "nr" && recipe.scheme == crate::optiscaler_nr::SCHEME {
+            neural_runtime::OptiScalerCompanion::needs_file(target)?;
+        }
         if self.kind == yanyun::KIND {
             yanyun::Component::check_target(
                 target,
@@ -105,7 +116,9 @@ impl Component {
         } else if self.source == "game" {
             if self.kind == "nr" {
                 ensure!(
-                    added || crate::scanner::inspect(&target.game_exe).neural_input(),
+                    added
+                        || recipe.scheme == crate::optiscaler_nr::SCHEME
+                        || crate::scanner::inspect(&target.game_exe).neural_input(),
                     "未发现游戏的 DLSS 超分或光线重建组件；不会添加 NR 运行库"
                 );
             } else {
@@ -211,6 +224,7 @@ pub fn grouped(components: &[Component]) -> Vec<(&str, Vec<&Component>)> {
         "xell",
         "encorefg",
         "streamline",
+        opti_streamline::KIND,
     ]
     .into_iter()
     .filter_map(|kind| {
@@ -293,7 +307,14 @@ pub fn preview_changes(
             if c.kind == "streamline" && checked.is_none() {
                 continue;
             }
-            let step = if c.kind == yanyun::KIND {
+            let step = if c.kind == opti_streamline::KIND {
+                if opti_streamline::installed(target).unwrap_or(false) {
+                    installed.insert(opti_streamline::VERSION.into());
+                    RuntimeStep::Keep
+                } else {
+                    RuntimeStep::Install
+                }
+            } else if c.kind == yanyun::KIND {
                 match yanyun::shared_installation(target) {
                     Ok(true) => {
                         installed.insert(yanyun::KIT_VERSION.to_owned());
@@ -377,6 +398,7 @@ pub fn label(kind: &str) -> &'static str {
         "xell" => "XeLL",
         "encorefg" => "新增 DLSS 帧生成组件",
         "streamline" => "Streamline 原生插件",
+        opti_streamline::KIND => "OptiScaler 专用 Streamline",
         _ => "运行库",
     }
 }
@@ -421,9 +443,14 @@ impl Snapshot {
     pub(crate) fn download_files(
         &self,
         targets: &[core::DeploymentTarget],
+        installs_optiscaler_bundle: bool,
     ) -> Result<Vec<crate::transfer::DownloadFile>> {
         let mut files = Vec::new();
         for c in &self.components {
+            // Patch preparation already queues this same runtime ZIP.
+            if installs_optiscaler_bundle && c.kind == opti_streamline::KIND {
+                continue;
+            }
             let needed: Vec<_> = targets
                 .iter()
                 .filter(|t| c.needs_install(t))
@@ -432,7 +459,9 @@ impl Snapshot {
             if needed.is_empty() {
                 continue;
             }
-            if c.kind == yanyun::KIND {
+            if c.kind == opti_streamline::KIND {
+                files.push(opti_streamline::download_file()?);
+            } else if c.kind == yanyun::KIND {
                 files.push(yanyun::download_file()?);
             } else if c.source == "managed" {
                 files.extend(runtime_files::download_files(
@@ -470,7 +499,8 @@ impl Snapshot {
                     "xess_fg",
                     "xell",
                     "encorefg",
-                    "streamline"
+                    "streamline",
+                    opti_streamline::KIND
                 ]
                 .contains(&c.kind.as_str())
                     && ["game", "patch", "managed"].contains(&c.source.as_str())
@@ -482,16 +512,30 @@ impl Snapshot {
                     && c.package_version
                         .as_ref()
                         .is_none_or(|v| c.source == "managed"
-                            && ["xess_fg", "xell", "encorefg", "streamline", yanyun::KIND]
-                                .contains(&c.kind.as_str())
+                            && [
+                                "xess_fg",
+                                "xell",
+                                "encorefg",
+                                "streamline",
+                                yanyun::KIND,
+                                opti_streamline::KIND
+                            ]
+                            .contains(&c.kind.as_str())
                             && valid_version(v)
                             && v != "unknown"),
                 "运行库分享信息无效"
             );
             ensure!(
                 c.source != "managed"
-                    || ["xess_fg", "xell", "encorefg", "streamline", yanyun::KIND]
-                        .contains(&c.kind.as_str()),
+                    || [
+                        "xess_fg",
+                        "xell",
+                        "encorefg",
+                        "streamline",
+                        yanyun::KIND,
+                        opti_streamline::KIND
+                    ]
+                    .contains(&c.kind.as_str()),
                 "运行库来源无效"
             );
             if c.kind == yanyun::KIND {
@@ -501,6 +545,14 @@ impl Snapshot {
                         && c.versions == [yanyun::RUNTIME_VERSION]
                         && !self.components.iter().any(|other| other.kind == "nr"),
                     "燕云套件版本不匹配，或与单独的 DLSSNR 重复"
+                );
+            }
+            if c.kind == opti_streamline::KIND {
+                ensure!(
+                    c.source == "managed"
+                        && c.package_version.as_deref() == Some(opti_streamline::VERSION)
+                        && c.versions == [opti_streamline::VERSION],
+                    "OptiScaler Streamline 版本不匹配"
                 );
             }
             ensure!(
@@ -537,7 +589,10 @@ impl Snapshot {
                 continue;
             }
             if c.source == "managed" {
-                if c.kind == "streamline" || c.kind == yanyun::KIND {
+                if matches!(
+                    c.kind.as_str(),
+                    "streamline" | yanyun::KIND | opti_streamline::KIND
+                ) {
                     continue;
                 }
                 if c.kind == "encorefg" {
@@ -643,6 +698,14 @@ impl Snapshot {
     /// Check the shared components before downloads or filesystem inspection.
     pub fn compatible_with(&self, scheme: &str, entries: &[String]) -> Result<()> {
         self.installable()?;
+        ensure!(
+            !self
+                .components
+                .iter()
+                .any(|c| c.kind == opti_streamline::KIND)
+                || scheme == crate::optiscaler_nr::SCHEME,
+            "此方案不支持 OptiScaler 专用 Streamline"
+        );
         if self
             .components
             .iter()
@@ -744,7 +807,10 @@ impl Snapshot {
         yanyun: Option<&yanyun::Component>,
     ) -> Result<()> {
         let mut intel = false;
-        for c in &self.components {
+        // A newly installed RR file alone would look like native DLSS input and mask the empty SR destination.
+        let mut ordered: Vec<_> = self.components.iter().collect();
+        ordered.sort_by_key(|c| c.kind != "sr");
+        for c in ordered {
             let needed: Vec<_> = targets
                 .iter()
                 .filter(|t| c.needs_install(t))
@@ -761,7 +827,16 @@ impl Snapshot {
                     package_count: 1,
                 })
             };
-            if c.kind == yanyun::KIND {
+            if c.kind == opti_streamline::KIND {
+                let sl = opti_streamline::Component::prepare(github, cancel, &mut report)?;
+                for target in &needed {
+                    ensure!(
+                        !cancel.load(std::sync::atomic::Ordering::Relaxed),
+                        "操作已取消"
+                    );
+                    sl.install(target)?;
+                }
+            } else if c.kind == yanyun::KIND {
                 let kit = yanyun.context("燕云套件尚未准备完成")?;
                 for target in &needed {
                     ensure!(
@@ -792,7 +867,22 @@ impl Snapshot {
                     intel = true;
                 }
             } else if c.kind == "nr" {
-                neural_runtime::install_many(&needed, "310.9.16", github, cancel, &mut report)?;
+                if let Some(first) = needed.first()
+                    && core::record(&first.directory)?
+                        .is_some_and(|r| r.backend == crate::optiscaler_nr::BACKEND)
+                {
+                    let nr = neural_runtime::OptiScalerCompanion::prepare(
+                        &needed,
+                        github,
+                        cancel,
+                        &mut report,
+                    )?;
+                    for target in &needed {
+                        nr.install(target, cancel)?;
+                    }
+                } else {
+                    neural_runtime::install_many(&needed, "310.9.16", github, cancel, &mut report)?;
+                }
             } else {
                 runtime_files::install_version(
                     &needed,
@@ -811,7 +901,12 @@ impl Snapshot {
 /// A copied inventory may include NR left over from a different patch.
 pub fn ensure_nr_scheme(scheme: &str) -> Result<()> {
     ensure!(
-        [crate::encore::SCHEME, "rtx40mfg-1.3.3-hf2"].contains(&scheme),
+        [
+            crate::encore::SCHEME,
+            crate::optiscaler_nr::SCHEME,
+            "rtx40mfg-1.3.3-hf2"
+        ]
+        .contains(&scheme),
         "此方案不支持分享中的 DLSSNR 运行库"
     );
     Ok(())
@@ -853,6 +948,11 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
     if let Some(record) = core::record(&target.directory)? {
         target.validate_record(&record)?;
         for name in record.hashes.keys() {
+            if record.backend == crate::optiscaler_nr::BACKEND
+                && name.starts_with("OptiScaler/streamline/")
+            {
+                continue;
+            }
             if let Some(k) = kind(name.rsplit('/').next().unwrap_or(name)) {
                 add(k, "patch", &target.directory.join(name))?;
             }
@@ -888,6 +988,14 @@ pub fn capture(target: &core::DeploymentTarget) -> Result<Snapshot> {
             source: "managed".into(),
             versions: vec![yanyun::RUNTIME_VERSION.into()],
             package_version: Some(yanyun::KIT_VERSION.into()),
+        });
+    }
+    if opti_streamline::installed(target)? {
+        components.push(Component {
+            kind: opti_streamline::KIND.into(),
+            source: "managed".into(),
+            versions: vec![opti_streamline::VERSION.into()],
+            package_version: Some(opti_streamline::VERSION.into()),
         });
     }
     if let Some(version) = runtime_files::installed_package_version(target, "streamline")? {

@@ -11,10 +11,15 @@ impl Manager {
         };
         let choices = Rc::new(RefCell::new(plan.choices.clone()));
         let dlssg_options = plan.dlssg_options.clone();
+        let opti_options = plan.opti_options.clone();
         let selected_native = Rc::new(RefCell::new(NativeSelections::default()));
-        let title = match (plan.choices.is_empty(), dlssg_options.is_empty()) {
-            (true, false) => "Dlssg_for_sm86 安装选项",
-            (false, true) => "Encore 安装选项",
+        let title = match (
+            plan.choices.is_empty(),
+            dlssg_options.is_empty(),
+            opti_options.is_empty(),
+        ) {
+            (true, false, true) => "Dlssg_for_sm86 安装选项",
+            (false, true, true) => "Encore 安装选项",
             _ => "补丁安装选项",
         };
         let owner = cx.entity().downgrade();
@@ -86,7 +91,25 @@ impl Manager {
             for (index, option) in dlssg_options.iter().enumerate() {
                 body = body.child(dlssg_components(option, index, selected_native.clone(), &tr, cx));
             }
-            let footer_hint = if dlssg_options.is_empty() {
+            for (index, (exe, game)) in opti_options.iter().enumerate() {
+                let mut row = div().v_flex().gap_2()
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child(game.clone()))
+                    .child(div().text_xs().text_color(cx.theme().muted_foreground).child(exe.clone()));
+                let state = selected_native.clone();
+                let exe = exe.clone();
+                let checked = state.borrow().opti_nr.contains(&exe);
+                row = row.child(Checkbox::new(("opti-nr", index))
+                    .checked(checked).label(format!("{}  310.9.16", tr.t("DLSS 神经渲染")))
+                    .on_click(move |on, window, _| {
+                        let mut selected = state.borrow_mut();
+                        if *on { selected.opti_nr.insert(exe.clone()); } else { selected.opti_nr.remove(&exe); }
+                        window.refresh();
+                    }));
+                body = body.child(row);
+            }
+            let footer_hint = if !opti_options.is_empty() && dlssg_options.is_empty() && choices.borrow().is_empty() {
+                tr.t("已包含 OptiScaler 专用 Streamline 2.14.16。")
+            } else if dlssg_options.is_empty() {
                 tr.t("未勾选的现有文件保持不变。恢复原版请使用运行库的恢复按钮。")
             } else {
                 let tip = tr.t("默认不勾选，如部分老游戏不生效，有需要时再勾选以上组件。");

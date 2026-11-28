@@ -1,0 +1,1406 @@
+; ============================================================================
+;  OptiScaler 简体中文语言文件
+;
+;  放置位置（任选其一，优先上面的）：
+;    <游戏目录>\zh-CN.txt                      -- 与 OptiScaler.ini 同级
+;    <游戏目录>\OptiScaler\language\zh-CN.txt
+;    <游戏目录>\OptiScaler\zh-CN.txt
+;
+;  格式：  English=译文
+;    - 以 ; 或 # 开头的行是注释，整行忽略
+;    - 分隔符是「第一个未被转义的 =」，等号后面的内容全部属于译文。
+;      键里本身含等号时（如 "1080 / 1.5 = 720"）写成 \= ，
+;      否则会被从中间切断、永远匹配不上
+;    - 两侧空白会被去掉
+;    - 支持 \n \r \t \s \= \\ 转义，所以多行文本也能写在一行里
+;    - 少数条目的首尾空格是有意义的（如 " 在 Vulkan 上原生运行"），
+;      用 \s 表示一个空格，它不会被当作空白裁掉
+;    - 键名里的 "##xxx" 是 ImGui 的内部 ID，写不写都一样，
+;      本文件按显示文本填写即可
+;    - 带 % 的条目是 printf 格式串，译文里的 %s %d %.2f 等必须原样保留
+;
+;  改完保存即生效，不需要重新编译。删掉本文件就回到英文界面。
+; ============================================================================
+
+; ---------------------------------------------------------------------------
+;  神经渲染 (DLSS Neural Rendering)
+; ---------------------------------------------------------------------------
+Enable Neural Rendering=启用神经渲染
+Can be toggled with a key -- bind it under Keybinds, "Neural Rendering".=可以绑定按键来切换——在「按键绑定」里找「神经渲染」。
+Apply the model=应用模型
+Off. The model stays loaded, so turning this back on is immediate.=已关闭。模型仍驻留显存，重新打开会立即生效。
+Retry=重试
+Waiting for the upscaler to run.=等待超分器运行。
+The whole pass: the staging copies and the resolve as well as the\nmodel. Timing only the model would flatter the number.\n\nCompare it against the frame time at the bottom of this window to\nsee what it is costing you.=整个流程：暂存拷贝、合成以及模型本身都算在内。\n只给模型计时会让数字更好看。\n\n可以和窗口底部的帧时间对比，\n看看它到底花掉了多少。\n
+Model resolution=模型分辨率
+Supersampling %.2fx: the model runs ABOVE native, then\nis sampled back down. Experimental, and costly -- time grows with the area.=超采样 %.2fx：模型在高于原生的分辨率上运行，\n再降采样回来。实验性功能，开销很大——耗时随面积增长。
+Downscaler (NR)=降采样器 (NR)
+Enlargement=放大
+Detail strength=细节强度
+Colour strength=色彩强度
+Reversible proxy (experimental)=可逆代理（实验性）
+Read when the model is built, so a change rebuilds it after a moment.=在模型构建时读取，因此修改后会稍等片刻重建。
+Model preset=模型预设
+Style=风格
+Auto skin mask=自动皮肤遮罩
+The model was trained on finished, sRGB-encoded frames. The upscaler's\noutput is not one: it is linear and open-ended. These decide how it is\nmapped into something the model recognises. A frame the game reports as\nalready tone-mapped is passed over untouched and none of this applies.=该模型是在成品 sRGB 编码帧上训练的，\n而超分输出并不是：它是线性的且范围开放。以下选项\n决定如何把它映射成模型能识别的形式。游戏报告为\n已完成色调映射的帧会原样通过，这些设置都不适用。
+White point from=白点来源
+Waiting for a frame...=等待画面...
+Reading the exposure...=正在读取曝光...
+Trim (x the scan)=微调（×扫描值）
+Paper white=纸张白
+Highlight guard=高光保护
+Show the light meter on screen=在屏幕上显示测光表
+Anchor here=在此锚定
+(the scan is only watching -- the white point above comes from somewhere else)=（扫描仅作观察——上方的白点来自别处）
+Click a row to edit it with the slider above; click it again to control the live point. > is the point in use now.=点一行可用上方滑块编辑；再点一次则改为控制实时点。> 表示当前正在使用的点。
+The number runs the other way=数值方向相反
+Walk from shade into daylight. A real exposure moves.=从阴影走进日光。真实曝光是变化的。
+One that only ever climbs is a counter, not an exposure.=只涨不跌的那是计数器，不是曝光。
+Hold frame=定格
+Compare=对比
+Swap sides=交换左右
+Label the sides=标注两侧
+Label size=标签大小
+Zoom=缩放
+Split=分割
+Debug view=调试视图
+Press any key...=请按任意键...
+; ---------------------------------------------------------------------------
+;  按键绑定
+; ---------------------------------------------------------------------------
+Key combinations are currently NOT supported!=当前不支持组合键！
+Escape to cancel, Backspace to unbind=Esc 取消，Backspace 解除绑定
+; ---------------------------------------------------------------------------
+;  主窗口 / 状态栏
+; ---------------------------------------------------------------------------
+Splash=启动画面
+OptiScaler - %s for menu=OptiScaler - 按 %s 打开菜单
+Performance Overlay=性能叠加层
+FGId: %llu, RfxId: %llu=FGId: %llu, RfxId: %llu
+Low latency timings, whole frame: %.1fms=低延迟计时，整帧: %.1fms
+Reflex timings, whole frame: %.1fms=Reflex 计时，整帧: %.1fms
+Please select %s as upscaler from game\noptions and load a save game to enable Opti settings.\nUpscalers don't always work in menus.=请在游戏设置中选择 %s 作为超分方案，\n并读取一个存档，才能启用 OptiScaler 的设置。\n超分在菜单里不一定生效。
+nvngx_dlss : %s=nvngx_dlss : %s
+nvngx_dlssd : %s=nvngx_dlssd : %s
+nvngx.dll: %s=nvngx.dll: %s
+nvngx replacement: %s=nvngx 替换: %s
+libxess: %s=libxess: %s
+FSR Hooks: %s=FSR 钩子: %s
+FSR 3.1: %s=FSR 3.1: %s
+FSR 3.1 SR: %s=FSR 3.1 SR: %s
+FSR 3.1 FG: %s=FSR 3.1 FG: %s
+Can't find nvngx.dll and libxess.dll and FSR inputs\nUpscaling support will NOT work.=找不到 nvngx.dll、libxess.dll 以及 FSR 输入\n超分功能将无法工作。
+%s is active, but not currently used by the game\nPlease enter the game=%s 已启用，但游戏当前没有使用它\n请进入游戏
+D3D11 %s| %s %d.%d.%d%s=D3D11 %s| %s %d.%d.%d%s
+| Input: %s=| 输入: %s
+| Spoof: %s=| 伪装: %s
+D3D12 %s| %s %d.%d.%d=D3D12 %s| %s %d.%d.%d
+Vulkan %s| %s %d.%d.%d%s=Vulkan %s| %s %d.%d.%d%s
+Upscaler is not active=超分未启用
+If you are using an AMD/Intel GPU, then make sure you have fakenvapi=如果使用的是 AMD/Intel 显卡，请确认已安装 fakenvapi
+If you are using an AMD/Intel GPU, then make sure you have Fakenvapi=如果使用的是 AMD/Intel 显卡，请确认已安装 Fakenvapi
+Neural Rendering=神经渲染
+Debug View=调试视图
+; ---------------------------------------------------------------------------
+;  超分器
+; ---------------------------------------------------------------------------
+Change Upscaler=更换超分器
+Upscaler=超分
+Upscaler Quality=超分画质
+Upscaler Ratio=超分比例
+Upscaler Debug View=超分调试视图
+FFX Upscaler=FFX 超分器
+Input Color Space=输入色彩空间
+FSR4 Preset=FSR4 预设
+(Active: %d)=（当前: %d）
+(Failed to hook)=（钩子挂载失败）
+Watermark=水印
+FSR 3.1 Presets:=FSR 3.1 预设:
+Stability=稳定性
+Motion=运动
+Default=默认
+Velocity Factor=速度因子
+Reactive Scale=反应缩放
+Shading Scale=着色缩放
+Acc. Added Per Frame=每帧累积增量
+Min. Disocclusion Acc.=最小去遮挡累积
+; ---------------------------------------------------------------------------
+;  DLSS 帧生成倍率
+; ---------------------------------------------------------------------------
+Override DLSSG Ratio=覆盖 DLSSG 倍率
+Force Dynamic MFG=强制动态多帧生成
+DMFG FPS Target=DMFG 帧率目标
+Apply Target=应用目标
+Reset Target=重置目标
+Show Detected UI=显示检测到的 UI
+Draw UI over=UI 绘制于
+Only Generated=仅生成帧
+Res=分辨率
+Active=已启用
+Render Presets Override=渲染预设覆盖
+Current Preset: Default=当前预设: 默认
+Current Preset: %c=当前预设: %c
+Apply Changes=应用更改
+Use Generic App Id with DLSS=对 DLSS 使用通用 App Id
+Use Reactive Mask as Transparency Mask=将反应遮罩用作透明遮罩
+Use CopyResource for Inputs=输入使用 CopyResource
+Use CopyResource for Output=输出使用 CopyResource
+Network Models=网络模型
+Dump (Shift+Del)=转储 (Shift+Del)
+frames=帧
+Don't Use NTShared=不使用 NTShared
+; ---------------------------------------------------------------------------
+;  帧生成
+; ---------------------------------------------------------------------------
+FrameTime=帧时间
+Change FG=更换帧生成
+UI Composition=UI 合成
+Force Borderless=强制无边框
+Only Generated=仅生成帧
+Rectangle Settings=矩形设置
+Rect Left=矩形左
+Rect Top=矩形上
+Rect Width=矩形宽
+Rect Height=矩形高
+Reset FG Rect=重置帧生成矩形
+Current DLSSG state:=当前 DLSSG 状态:
+Current FSR-FG state:=当前 FSR-FG 状态:
+Current Streamline FG state:=当前 Streamline 帧生成状态:
+MFG=多帧生成
+UI Premult. alpha=UI 预乘 Alpha
+Disable UI texture=禁用 UI 纹理
+Disable HUDless=禁用无 HUD
+Depth as ValidNow=深度作为 ValidNow
+Velocity as ValidNow=速度作为 ValidNow
+HUDless as ValidNow=无 HUD 作为 ValidNow
+Accept First HUDless=接受首个无 HUD 帧
+Skip Reset=跳过重置
+Frame Ahead=提前帧数
+FT Input=FT 输入
+Hud Cutoff=HUD 截断
+FFX FG=FFX 帧生成
+Allow Async=允许异步
+Enable Watermark=启用水印
+FG Only Generated=帧生成仅生成帧
+Debug Reset Lines=调试: 重置线
+Debug Tear Lines=调试: 撕裂线
+Debug Pacing Lines=调试: 节奏线
+FG Rectangle Settings=帧生成矩形设置
+Frame Pacing Tuning=帧节奏调优
+Enable Tuning=启用调优
+Safety Margins in ms=安全余量 (ms)
+Variance Factor=方差因子
+Enable Hybrid Spin=启用混合自旋
+Hybrid Spin Time=混合自旋时间
+Enable WaitForSingleObjectOnFence=启用 WaitForSingleObjectOnFence
+Apply Timing Changes=应用时序更改
+Ignore Init Checks=忽略初始化检查
+Use Game's Reflex Markers=使用游戏的 Reflex 标记
+HUDFix=HUD 修复
+Limit=限制
+Extended=扩展
+Immediate Capture=立即捕获
+Scale Depth to fix DLSS RR=缩放深度以修复 DLSS RR
+Flip (Unity)=翻转 (Unity)
+Flip Use Offset=翻转使用偏移
+Resource Blocking=资源阻止
+Relaxed Resource Check=宽松资源检查
+FG Create List=帧生成创建列表
+FG Use List=帧生成使用列表
+Reset List=重置列表
+Tracking Settings=跟踪设置
+Always Track Heaps=始终跟踪堆
+Disable RTV Tracking=禁用 RTV 跟踪
+Disable SRV Tracking=禁用 SRV 跟踪
+Disable UAV Tracking=禁用 UAV 跟踪
+Disable OM Tracking=禁用 OM 跟踪
+Disable SCR Tracking=禁用 SCR 跟踪
+Disable SGR Tracking=禁用 SGR 跟踪
+Disable DI Tracking=禁用 DI 跟踪
+Disable DII Tracking=禁用 DII 跟踪
+Disable Dispatch Tracking=禁用调度跟踪
+Resource Settings=资源设置
+FG Make MV Copies=帧生成: 复制运动矢量
+FG Make Depth Copies=帧生成: 复制深度
+FG Scale Depth Max=帧生成: 深度缩放上限
+Syncing Settings=同步设置
+FG Use Mutex for Present=帧生成: Present 使用互斥锁
+Please select DLSS Frame Generation in the game options\nYou might need to select DLSS first=请在游戏设置中选择 DLSS 帧生成\n可能需要先选择 DLSS
+Please select FSR Frame Generation in the game options\nYou might need to select FSR first=请在游戏设置中选择 FSR 帧生成\n可能需要先选择 FSR
+Fix broken visuals=修复画面异常
+DE Ver: %d.%d.%d.%d   GB Ver: %d.%d=DE 版本: %d.%d.%d.%d   GB 版本: %d.%d
+Raw DispatchFlags:=原始 DispatchFlags:
+Interpolated frames only=仅插值帧
+Skip Config for HUDless=跳过无 HUD 的配置
+Skip Dispatch for HUDless=跳过无 HUD 的调度
+Use FSR Input Values=使用 FSR 输入值
+Use Vert. Fov=使用垂直 FOV
+Use Horz. Fov=使用水平 FOV
+Vert. FOV=垂直 FOV
+Horz. FOV=水平 FOV
+Camera Near=相机近平面
+Camera Far=相机远平面
+Reset Camera Values=重置相机参数
+Near: %.1f Far: %.1f=近: %.1f 远: %.1f
+; ---------------------------------------------------------------------------
+;  多帧生成解锁 (Ada)
+; ---------------------------------------------------------------------------
+Enable multi-frame unlock (Ada)=启用多帧生成解锁 (Ada)
+Inactive: Streamline reports architecture 0x%x, which does not need it.=未生效: Streamline 报告的架构为 0x%x，无需此功能。
+Inactive: device id 0x%x is not recognised as an RTX 40-series part.=未生效: 设备 ID 0x%x 未被识别为 RTX 40 系列。
+Force frame multiplier=强制帧倍数
+Game asked for %ux, forced to %u generated frame(s).=游戏请求 %ux，已强制为 %u 个生成帧。
+Declined to force: flip metering was still on when DLSS-G started.=未强制执行: DLSS-G 启动时翻转计量仍处于开启状态。
+Game requests %ux itself (sl::Result %u).=游戏自身请求 %ux (sl::Result %u)。
+slDLSSGSetOptions not seen yet -- turn the game's DLSS Frame Generation on.=尚未捕获 slDLSSGSetOptions——请开启游戏的 DLSS 帧生成。
+DLSS-G arch gates rewritten: %zu provider(s), %zu site(s).=DLSS-G 架构判断已改写: %zu 个提供者，%zu 处位置。
+DLSS-G snippet not patched yet (%u provider(s) seen) -- enable frame generation.=DLSS-G 代码片段尚未改写（已发现 %u 个提供者）——请启用帧生成。
+Temporal fix (frames land at their own time, not all at the midpoint)=时域修正（各帧落在各自时刻，而非全部落在中点）
+Temporal fix: %s.=时域修正: %s。
+Temporal fix not applied yet (attempt %d).=时域修正尚未应用（第 %d 次尝试）。
+Force legacy software flip pacing (compatibility)=强制旧式软件翻转节奏（兼容性）
+Flip-metering forced off: +0x%x pinned to %u, %zu site(s).=已强制关闭翻转计量: +0x%x 固定为 %u，%zu 处位置。
+DLSS-G plugin found, but flip metering could not be patched (see the log).=已找到 DLSS-G 插件，但无法改写翻转计量（详见日志）。
+DLSS-G plugin found; flip-metering patch pending (%d).=已找到 DLSS-G 插件；翻转计量改写待处理 (%d)。
+Streamline DLSS-G plugin not patched yet.=Streamline DLSS-G 插件尚未改写。
+Apply now=立即应用
+Streamline device-limit bypassed: compiled %ux, effective %ux.=已绕过 Streamline 设备上限: 编译值 %ux，实际值 %ux。
+Raise the plugin's compiled frame ceiling to 6x=将插件编译时的帧数上限提高到 6x
+Re-enable Streamline OTA plugins at slInit=在 slInit 时重新启用 Streamline OTA 插件
+Native menu maximum: runtime %ux, advertised %ux.=原生菜单上限: 运行时 %ux，对外报告 %ux。
+Streamline reports up to %ux to the game.=Streamline 向游戏报告最高 %ux。
+Actual presentations since last state query: %u (samples: %llu).=上次状态查询以来的实际呈现次数: %u（采样: %llu）。
+DLSS-G runtime status: failure flags 0x%x.=DLSS-G 运行时状态: 失败标志 0x%x。
+MFG validation: active; observed up to %u actual presentations.=多帧生成校验: 生效中；最多观察到 %u 次实际呈现。
+DLSS-G status is OK; generated output has not been confirmed yet.=DLSS-G 状态正常；尚未确认生成输出。
+No successful slDLSSGGetState telemetry sample yet (last result: %u).=尚无成功的 slDLSSGGetState 遥测采样（上次结果: %u）。
+slInit OTA flags were forced on (were 0x%llx).=slInit OTA 标志已被强制开启（原为 0x%llx）。
+; ---------------------------------------------------------------------------
+;  锐化 / 后期
+; ---------------------------------------------------------------------------
+Override=覆盖
+(Current sharpness: %.3f)=（当前锐化: %.3f）
+(Current sharpness: disabled)=（当前锐化: 已禁用）
+Sharpness=锐化
+Enable RCAS/DA=启用 RCAS/DA
+RCAS=RCAS
+Depth Aware (RCAS)=深度感知 (RCAS)
+Depth Aware (DAS)=深度感知 (DAS)
+Enable Motion Adaptive Sharpness=启用运动自适应锐化
+DA + MAS Debug=DA + MAS 调试
+Clamp Output=钳制输出
+Depth Bias=深度偏置
+Depth Scale=深度缩放
+Reset Depth Values=重置深度值
+Contrast Enabled=启用对比度
+Contrast=对比度
+MAS Debug=MAS 调试
+MotionSharpness=运动锐化
+MotionThreshod=运动阈值
+MotionRange=运动范围
+Auto Exposure=自动曝光
+Disable Reactive Mask=禁用反应遮罩
+Depth Inverted=深度反转
+HDR=HDR
+Display Res. MV=显示分辨率运动矢量
+Jitter Cancellation=抖动消除
+React. Mask Bias=反应遮罩偏置
+Use Binary Reactive Mask=使用二值反应遮罩
+; ---------------------------------------------------------------------------
+;  放大镜 / 输出缩放
+; ---------------------------------------------------------------------------
+Enable Magnifier=启用放大镜
+Size=大小
+Zoom Factor=缩放系数
+Border Size=边框大小
+Positioning=定位
+Static Pos X=固定 X 坐标
+Static Pos Y=固定 Y 坐标
+Reset Static Position (Follow Cursor)=重置固定位置（跟随光标）
+Set Static Position=设为固定位置
+(Currently following cursor)=（当前跟随光标）
+Cursor Offset X=光标偏移 X
+Cursor Offset Y=光标偏移 Y
+Output Scaling is %s, Target Res: %dx%d (%.2f)\nJitter Count: %d=输出缩放为 %s，目标分辨率: %dx%d (%.2f)\n抖动计数: %d
+Override all=覆盖全部
+Override per quality preset=按画质预设覆盖
+All Ratios=全部比例
+DLAA=DLAA
+Ultra Quality=极高画质
+Quality=画质
+Balanced=均衡
+Performance=性能
+Ultra Performance=极致性能
+Enable=启用
+Apply Change=应用更改
+Ratio=比例
+Use Value=使用数值
+; ---------------------------------------------------------------------------
+;  Mipmap / 各向异性过滤
+; ---------------------------------------------------------------------------
+Mipmap Bias=Mipmap 偏移
+MB Fixed Override=固定值覆盖
+MB Scale Override=缩放值覆盖
+MB Override All Textures=覆盖所有纹理
+Set=设置
+Reset=重置
+Calculate Mipmap Bias=计算 Mipmap 偏移
+Current : %.3f / %.3f, Target: %.3f=当前: %.3f / %.3f，目标: %.3f
+Current : %.3f / %.3f, Target: Base * %.3f=当前: %.3f / %.3f，目标: 基准 * %.3f
+Current : %.3f / %.3f, Target: Base + %.3f=当前: %.3f / %.3f，目标: 基准 + %.3f
+Current : %.3f / %.3f=当前: %.3f / %.3f
+Will be applied after RESOLUTION/PRESET change !!!=将在分辨率/预设更改后应用！！！
+Will might be applied after RESOLUTION/PRESET change !!!=可能需在分辨率/预设更改后应用！！！
+Force Anisotropic Filtering=强制各向异性过滤
+Modify Compare=修改比较模式
+Modify Min/Max=修改最小/最大值
+Skip Point Filters=跳过点采样过滤
+; ---------------------------------------------------------------------------
+;  帧率限制 / 垂直同步
+; ---------------------------------------------------------------------------
+FPS Limit=帧率限制
+Apply Limit=应用限制
+Reset Limit=重置限制
+Refresh Rate=刷新率
+Calculated Cap: %.1f=计算上限: %.1f
+Set as FPS Limit=设为帧率限制
+Force LatencyFlex=强制 LatencyFlex
+Force XeLL=强制 XeLL
+Active input: %s=当前输入: %s
+Active output: %s=当前输出: %s
+Current method: %s=当前方式: %s
+V-Sync On=垂直同步 开
+V-Sync Off=垂直同步 关
+Sync Int.=同步间隔
+; ---------------------------------------------------------------------------
+;  输入 / 钩子
+; ---------------------------------------------------------------------------
+Use Fsr2 Inputs=使用 Fsr2 输入
+Use Fsr2 Pattern Matching=使用 Fsr2 模式匹配
+Use Fsr3 Inputs=使用 Fsr3 输入
+Use Fsr3 Pattern Matching=使用 Fsr3 模式匹配
+Use Ffx Inputs=使用 Ffx 输入
+Enable Extended Limits=启用扩展限制
+Use Precompiled Shaders=使用预编译着色器
+Advanced=高级
+Auto=自动
+Extra shaders:=额外着色器:
+Per shader breakdown:=各着色器耗时明细:
+%zu. %s -- not read yet=%zu. %s -- 尚未读取
+Override Minimum=覆盖最小值
+Override Maximum=覆盖最大值
+Restore Compute Root Signature=恢复计算根签名
+Restore Graphic Root Signature=恢复图形根签名
+Show Debug=显示调试信息
+Common=常用
+Uncommon=不常用
+Debug=调试
+Enable Debug View=启用调试视图
+; ---------------------------------------------------------------------------
+;  日志 / 主题
+; ---------------------------------------------------------------------------
+To File=输出到文件
+To Console=输出到控制台
+Log Level=日志级别
+Light Theme=浅色主题
+Presets:=预设:
+Blue=蓝色
+Teal=青色
+Gray=灰色
+Yellow=黄色
+Green=绿色
+Red=红色
+Orange=橙色
+Purple=紫色
+Reset Accent Color=重置强调色
+Background Alpha=背景不透明度
+Reset BG Colour=重置背景色
+FPS Overlay Enabled=启用帧率叠加层
+Horizontal=水平
+Overlay Position=叠加层位置
+Overlay Type=叠加层类型
+Scale=缩放
+Use Theme Colors=使用主题颜色
+; ---------------------------------------------------------------------------
+;  菜单底部栏
+; ---------------------------------------------------------------------------
+Menu Scale=菜单缩放
+Save Settings=保存设置
+Close=关闭
+Open Wiki=打开 Wiki
+HUDless Resources=无 HUD 资源
+Clear=清除
+DlssNrExposureScan=神经渲染曝光扫描
+; ---------------------------------------------------------------------------
+;  下拉选项（ImGui::Combo 的条目）
+;  算法名如 Bicubic / Lanczos / Kaiser / MAGIC / FSR1 按惯例保留英文，
+;  需要中文的话在下面自行补条目即可。
+; ---------------------------------------------------------------------------
+Classic=经典
+Matched residual=匹配残差
+Off (soft knee)=关闭（软拐点）
+Neutwo proxy + composed=Neutwo 代理 + 合成
+Neutwo proxy + replace=Neutwo 代理 + 替换
+Hybrid proxy + composed=混合代理 + 合成
+Hybrid proxy + replace=混合代理 + 替换
+Preset 1=预设 1
+Preset 2=预设 2
+Preset 3=预设 3
+Default (standard)=默认（标准）
+Natural=自然
+Cinematic=电影感
+Paper white only=仅纸张白
+The game's own exposure=游戏自身曝光
+A buffer the scan found=扫描发现的缓冲区
+Off=关闭
+Side by side=并排
+Wipe=擦除
+Proxy (what the model sees)=代理（模型所见）
+Model output (raw)=模型输出（原始）
+Difference (amplified)=差异（放大）
+
+
+; ============================================================================
+;  补充翻译
+;  第一轮遗漏的两类：
+;    * 说明文字走的是自定义 helper HelpMarker()，不是 ImGui:: 调用
+;    * 分区标题走的是 ImGui::SeparatorText()，入口列表里没有它
+;  另外首尾有意义的空格用 \s 书写（解析器会保留 \s，不会把它当空白裁掉）。
+; ============================================================================
+
+; ---------------------------------------------------------------------------
+;  分区标题（SeparatorText）
+; ---------------------------------------------------------------------------
+DLSS Settings=DLSS 设置
+DLSSD Settings=DLSSD 设置
+FFX Settings=FFX 设置
+Frame Generation (DLSSG)=帧生成 (DLSSG)
+Frame Generation (FSR FG)=帧生成 (FSR FG)
+Frame Generation (XeFG)=帧生成 (XeFG)
+DRS (Dynamic Resolution Scaling)=DRS（动态分辨率缩放）
+Upscale Ratio Override=超分比例覆盖
+Output Scaling=输出缩放
+Low Latency=低延迟
+Init Flags=初始化标志
+Accent Colour=强调色
+Background Colour=背景色
+; ---------------------------------------------------------------------------
+;  神经渲染 —— 总开关与状态
+; ---------------------------------------------------------------------------
+Synthesises detail in the upscaler's output, before frame generation sees it.\n\nNeeds two similarly named files beside OptiScaler, one character apart:\n  nvngx_dlssnr.dll       NVIDIA's model (~165 MB) -- you supply it\n  nvngx.dll_dlssnr.dll   the forwarder (~13 KB) -- ships in this package\nUndocumented and driven directly, so none of this is officially supported.=在超分输出之后、帧生成看到它之前，为画面合成细节。\n\n需要在 OptiScaler 旁边放两个只差一个字符的文件：\n  nvngx_dlssnr.dll       NVIDIA 的模型（约 165 MB）——需要你自备\n  nvngx.dll_dlssnr.dll   转发器（约 13 KB）——本安装包自带\n未经官方公开、由程序直接驱动，因此这一切都不受官方支持。
+Whether the model's edit is applied. Off shows the clean upscaler frame while the\npass keeps running -- so with Hold frame (under Compare) you can freeze a\nframe and toggle this to see the same frozen frame with and without Neural\nRendering. Leave it on for normal use.=是否应用模型的修改。关闭时会显示干净的超分画面，\n而通道仍在运行——因此在「对比」下的「定格」冻住一帧后，\n切换这个开关就能看到同一帧在开启与关闭神经渲染时的\n差别。日常使用保持开启。
+Off for this session: %s.=本次会话已关闭: %s。
+Game exposure %.4f  ->  white point %.2f%s=游戏曝光 %.4f  ->  白点 %.2f%s
+This game supplies no exposure -- paper white is in use. Try the scan instead.=此游戏未提供曝光——正在使用纸张白。可以改用扫描。
+This game supplies an exposure and it is being read.=此游戏提供了曝光，正在读取。
+This game supplies an exposure -- the option above would use it.=此游戏提供了曝光——上面的选项会使用它。
+Nothing in this game is shaped like an exposure.=此游戏里没有任何东西的形状像曝光。
+Watching %u, none moving yet -- go between light and shade.=正在观察 %u 个候选，都还没变化——请在明暗之间走动。
+Found one. Set paper white below until the picture looks right, then press Anchor here.=找到一个。调整下方的纸张白直到画面看起来正确，然后点「在此锚定」。
+Scan %.5f  ->  white point %.2f   (%u point%s)=扫描 %.5f  ->  白点 %.2f   （%u 个点%s）
+nothing matched yet.=尚未匹配到任何候选。
+flat so far=目前无变化
+A multiplier on the exposure the game supplied. 1.00x takes its number\nexactly, and that is the right answer here.\n\nThis is not a fudge factor. If a game needs the trim far from 1 to look\nright, that is evidence the exposure being read is wrong for that game,\nnot that the game wants trimming. Somewhere around 0.8 to 1.25 is honest\ntuning; reaching for 4 means something upstream is broken and the trim is\nhiding it.\n\nYour manual paper white is kept separately and comes back untouched if\nyou switch the option above off.=对游戏提供的曝光施加的倍率。1.00x 表示完全采用它的数值，\n在这里这也是正确答案。\n\n这不是一个可随便调的补偿系数。如果某个游戏需要把微调拉到远离 1 的位置\n才好看，那说明读到的是错误的曝光，而不是游戏需要微调。\n0.8 到 1.25 附近属于诚实的调校；\n要拉到 4 说明上游已经坏了，而微调只是在掩盖问题。\n\n手动设置的纸张白会单独保留，把上方选项关掉后会原样恢复。
+The white point for the selected calibration point, or -- with no row\nselected -- the value the next Anchor press captures.\n\nSet it until the picture looks right here, then Anchor. Move to very\ndifferent light and do it again: two points fix the buffer's real\nrelationship and the white point holds between them. Click a row below\nto come back and adjust that point; click it again to let go.=所选标定点的白点；未选中行时，则表示下一次按下「锚定」\n将记录的值。\n\n调整它直到此处画面看起来正确，然后锚定。走到光照明显不同的地方\n再做一次：两个点就能确定缓冲区的真实关系，白点在其间也能保持准确。\n点下方某一行可以回来调整该点；再点一次则取消选中。
+A multiplier on the scan's white point, and the control you adjust between\nanchor points: dial it until the picture looks right in the current\nlight, then press Anchor here -- it captures the trimmed value as a new\npoint and resets the trim to 1.=对扫描白点的倍率，也是你在两个锚定点之间要调整的控件：\n在当前光照下把它调到画面正确，然后点「在此锚定」——\n它会把这个微调后的值记录为新点，并把微调重置为 1。
+What the frame is divided by before the model sees it. There is no other white\npoint; this is the whole of it.\n\nThe model was trained on finished frames where white sits at 1. The\nupscaler's output is linear and open-ended, so something has to say where\nwhite is -- and where the game's DLSS buffer is linear HDR, that number is\nrarely anywhere near 1. Measured in Monster Hunter Wilds it takes 16 or more\nbefore the model's detail reaches the frame at all, and the value that suits\na shaded camp is still too small for the same game out in daylight.\n\nToo low and almost every pixel trips the soft knee: the model is shown a\nflat near-white picture, its answer is scaled away, and only its hue\nsurvives -- which reads as a colour cast rather than as lost detail. Too\nhigh and it is shown an underexposed one, its answer degrades, and this same\nnumber multiplies that error on the way out.\n\nRaise it until the picture stops improving. Past that point it does not\nplateau, it gets worse in the other direction.\n\nThis was once a multiplier on a measured white point. The measurement is\ngone: it read scene brightness rather than where white belongs, handed the\nmodel a picture three times too dark, and left the highlight path nothing to\ngive back.\n\nAt strength zero the frame is still bit-identical whatever this says.=模型看到画面之前，用它来做除法归一。这里没有别的白点，\n它就是全部。\n\n模型是在成品帧上训练的，那种帧里白色位于 1。而超分输出是线性的、\n范围开放的，所以必须有东西来指明白色在哪——当游戏的 DLSS 缓冲区是\n线性 HDR 时，这个数往往离 1 很远。在《怪物猎人 荒野》上实测，要 16\n甚至更高，模型的细节才能进入画面，而适合阴影中营地的值，\n对同一个游戏在日光下又太小了。\n\n太低：几乎每个像素都会触发软拐点，模型看到的是一片接近全白的平坦画面，\n它的输出被缩放掉，只剩色相留下来——表现出来是偏色，而不是细节丢失。\n太高：模型看到的是欠曝画面，输出质量下降，而这个数还会在原路返回时\n把误差放大同样的倍数。\n\n往上调，直到画面不再变好为止。过了那个点不会走平，\n而是朝另一个方向变差。\n\n它以前是对实测白点的倍率。实测已经取消：它读的是场景亮度而不是\n白色应有的位置，交给模型的是暗了三倍的画面，高光通路也无从还原本该有的细节。\n\n强度为零时，无论这里显示什么，画面仍然逐位相同。
+A lamp in the corner: red for dark, green for full light, and the\nshades between, with the reading beside it.\n\nIt is how you see at a glance that the scan is TRACKING rather\nthan merely running. Walk into shade and it should slide toward\nred; step out and it should go green. If it moves the wrong way,\nthat is what the setting above is for.\n\nPurely a readout. It changes nothing.=角落里的一盏灯：暗处偏红，最亮处偏绿，中间是过渡色，\n旁边显示读数。\n\n用它一眼就能看出扫描是真的在跟踪，还是仅仅在运行。\n走进阴影它应该偏向红色；走出来应该变绿。\n如果方向反了，上面那个设置就是用来纠正的。\n\n纯粹是个指示器，不改变任何东西。
+Flip this if the picture gets worse in the direction it should be\ngetting better. Most engines store an exposure that falls as\nthe scene brightens; some store its reciprocal, and a buffer\nfound by shape does not say which. Add a second anchor point in\ndifferent light and this is decided for you, so it disappears.=如果画面在本应变好的方向上反而变差，就切换这个。\n大多数引擎存储的曝光值随场景变亮而下降；有些存的则是它的倒数，\n而靠形状找出的缓冲区不会告诉你属于哪种。\n在另一处光照下添加第二个锚定点，它会被自动判定，\n这个选项也就随之消失。
+Make the picture look right, then press this -- it captures the current look\nas a point. For the first point use the Paper white slider above; for\nevery point after, move to different light and use the Trim, which the\nAnchor then bakes into a new point.\n\nThe first press calibrates one point -- the white point then\nfollows the scan by ratio from there, as before. Walk into very\ndifferent light, set paper white again, and press it again: the\nsecond point pins down the buffer's real curve and everything\nbetween the two is right, not just near one anchor. Up to eight.\n\nThe table is per game and shareable: one person calibrates a game\nand the numbers are the same for everyone who takes the profile.=先让画面看起来正确，再按这个——它会把当前的效果记录为一个点。\n第一个点用上方的「纸张白」滑块；之后的每个点，走到不同光照下\n使用「微调」，「锚定」会把它固化成一个新点。\n\n第一次按下标定一个点——之后白点就像以前一样，按比例跟随扫描。\n走到光照差异很大的地方，重新设好纸张白，再按一次：\n第二个点就能确定缓冲区的真实曲线，两点之间都准确，\n而不只是在一个锚点附近准确。最多八个点。\n\n这张表是按游戏区分的，可以分享：一个人标定好某个游戏，\n之后拿到这份配置的人数值都一样。
+; ---------------------------------------------------------------------------
+;  神经渲染 —— 对比 / 定格
+; ---------------------------------------------------------------------------
+Freezes the frame the model works on. While held, change paper white, the\nstrengths, the reversible mode, the model preset -- anything below the\nupscaler -- and only that setting moves; the scene does not.\n\nWhat it CANNOT show: DLSS/FSR/XeSS upscaler presets or anything upstream\n(the upscaler is not re-run on a held frame), and the game's own HUD and\npost-processing, which run after this pass and keep updating. The white\npoint stops being measured and holds its value while frozen, so it cannot\ndrift and confound the comparison.\n\nHide the menu and it stays held. Untoggle to resume.=冻结模型所处理的那一帧。保持按住期间，修改纸张白、各项强度、\n可逆模式、模型预设——即超分器下游的任何设置——只有该项设置会变化，\n场景本身不动。\n\n它无法体现的：DLSS/FSR/XeSS 超分器预设及任何上游设置\n（冻结帧不会重新跑超分），以及游戏自身的 HUD 和后处理，\n它们在本通道之后运行，会持续更新。白点在冻结期间停止测量并保持数值，\n因此不会漂移而干扰对比。\n\n隐藏菜单后仍保持冻结。取消切换即可恢复。
+Shows the pass against itself, so the two can be seen at once rather than\ntoggled and remembered.\n\nSide by side puts the whole frame in each half, untouched on the left and\nedited on the right. Both halves are squeezed horizontally to fit, so it is\nfor looking at rather than playing in.\n\nWipe cuts a single frame at the split and resamples nothing, so the picture\nis the right shape and can be played normally. Drag the split below; it is a\nstored setting and stays put once the menu is closed.\n\nNeither needs the menu open to keep working. A hairline marks the join.=把本通道与自身对比，这样能同时看到两者，\n而不必来回切换再去回忆。\n\n并排：左右各放一整帧，左侧未处理、右侧已处理。\n两半都做了横向压缩以塞进屏幕，所以是用来观察的，不适合游玩。\n\n擦除：在分割线处切开同一帧，不做任何重采样，\n因此画面比例正常，可以正常游玩。拖动下方的分割线即可调整；\n它是持久设置，关闭菜单后依然保持。\n\n两种方式都不需要菜单保持打开。接缝处有一条细线标示。
+Writes which side is which onto the frame itself, so a screenshot still\nsays so after it has left this machine. Drawn into the picture's own\nplane: in the wipe the split reveals and hides the label exactly as it\ndoes the images, and there is nothing to drag. Swap sides moves the\nlabels with their pictures.=把哪边是哪边直接写到画面上，这样截图离开这台机器之后\n仍然能说明问题。它是画在画面自身的平面里的：\n在擦除模式下，分割线会像揭开图像那样揭开和遮住标签，\n而且没有任何可拖动的东西。「交换左右」会连同画面一起移动标签。
+Puts the edited frame on the other side.\n\nWorth doing once you have decided which you prefer: the eye is not\neven-handed about left and right, and a difference can read as an\nimprovement purely from where it sits. If the same side still wins after\nswapping, it is the pass you are seeing and not the placement.=把已处理的帧移到另一边。\n\n在你选定了偏好之后值得做一次：眼睛对左右并不一视同仁，\n同一处差异仅仅因为位置不同就可能被读成改进。\n如果交换之后仍然是同一边更好，那就确实是本通道的效果，\n而不是位置造成的错觉。
+How much of the frame each half shows.\n\nA half is half as wide as the frame and just as tall, so the frame\ncannot fill it and keep its shape.\n\nAt 1 the whole frame is there at its right proportions, with bars above\nand below. At 2 the half is filled and the sides are cropped away\ninstead. Anything between trades one for the other.=每一半显示多少画面。\n\n半个屏幕的宽度是整帧的一半，高度却相同，\n所以整帧无法既填满它又保持比例。\n\n取 1 时整帧以正确比例呈现，上下留黑边。\n取 2 时填满半屏，代价是两侧被裁掉。\n中间的值就是两者之间的取舍。
+Where the wipe cuts. Left of it is the frame as the upscaler produced it,\nright of it is the frame the model edited.=擦除的分界位置。左侧是超分器产出的画面，\n右侧是模型处理过的画面。
+Proxy is the picture handed to the model -- if that looks wrong, the white point\nis wrong and nothing downstream can be judged.\n\nDifference shows what the model actually changed, amplified twenty times and\ncentred on grey. A flat grey frame there means it is doing nothing.=代理图是交给模型的那张图——如果它看起来就不对，\n说明白点错了，下游的一切都无从判断。\n\n差异图显示模型实际改动了什么，放大二十倍并以灰色为中心。\n如果那里是一片平坦的灰色，说明模型什么都没做。
+; ---------------------------------------------------------------------------
+;  神经渲染 —— 模型参数
+; ---------------------------------------------------------------------------
+The filter that averages the model's above-native answer back to display size --\nthis is what turns supersampling into LESS noise rather than more. Sharper\nfilters (Lanczos3, Kaiser3) keep the most detail; softer ones (Bicubic,\nCatmull-Rom) are gentler on ringing. Independent of the Output Scaling\ndownscaler, so the two can differ and run at the same time.=把模型高于原生的结果平均回显示尺寸所用的滤波器——\n正是它让超采样变成更少而不是更多的噪点。\n较锐利的滤波器（Lanczos3、Kaiser3）保留最多细节；\n较柔和的（Bicubic、Catmull-Rom）对振铃更宽容。\n它与「输出缩放」里的降采样器相互独立，两者可以不同并同时生效。
+What fraction of the frame the model works at. Cost falls with the square of\nthis, so half resolution is roughly a quarter of the time.\n\nThe frame is never reduced. Only the model's contribution is computed small\nand enlarged, so the picture underneath is untouched whatever this says.\n\nWhat it trades: the shading the model adds is broad and survives enlargement;\nthe fine structure it synthesises does not, and softens. Worth having when the\npass costs more than you want to pay for the detail it returns.\n\nThe frame itself stays at full detail whatever this says -- only the\nmodel's own work is done small.=模型在画面的多大比例上工作。开销按它的平方下降，\n所以半分辨率大约只需四分之一的时间。\n\n画面本身从不缩小。只有模型的贡献以小尺寸计算再放大，\n因此无论这里怎么设，底下的画面都不受影响。\n\n代价是：模型加入的明暗层次是宽泛的，能挺过放大；\n它合成的精细结构挺不过去，会被柔化。\n当本通道的开销超过你愿意为换回的细节付出的代价时，它值得一用。\n\n无论这里怎么设，画面本身都保持完整细节——\n只有模型自身的工作以小尺寸进行。
+How the model's work is brought back up when it ran below the frame's size.\n\nClassic composes the model's small picture directly against the full-size\nframe. Those two disagree by the shrink's blur as well as by the model's edit,\nand the composition cannot tell them apart -- it reads the blur as brightness\nthe frame has and the model never saw. The lower the model resolution the\nlarger that error, and it is the colour shift that shows up at 50%.\n\nMatched residual carries up only the model's difference and lays it on the\nframe's own proxy, so both pictures being compared are full size and the only\nthing that came from the small raster is the edit itself.\n\nNo effect at 100% or above: there is no residual to carry and the two are\nidentical (supersampling brings its answer down to frame size before this).\n\nFrom hhkbble's multi-pass work on this fork.=当模型以低于画面的尺寸运行时，它的成果如何被放大回来。\n\n经典：直接把模型的小图与全尺寸画面对比合成。这两者的差异既来自\n缩放带来的模糊，也来自模型的修改，而合成过程无法区分它们——\n它把模糊读成了画面应有的亮度，而模型从未见过。\n模型分辨率越低误差越大，在 50% 时表现为颜色偏移。\n\n匹配残差：只把模型的差值带上来，叠加到画面自身的代理图上，\n因此被比较的两张图都是全尺寸，唯一来自小尺寸栅格的就是修改本身。\n\n在 100% 及以上无效：没有残差可带，两者完全相同\n（超采样会在这一步之前就把结果降到画面尺寸）。\n\n来自 hhkbble 在这个分支上的多通道工作。
+How much of it lands=有多少被应用
+How far the frame moves toward the model's picture.\n\nThe model's answer is not added to the frame -- it is a complete picture of its\nown, rescaled so its luminance sits where the original says it should. This\nblends between the two, so both ends are real pictures and everything between\nthem is one too.\n\n0 gives back exactly what the upscaler produced. 1 is the model's picture.\n\nAbove 1 carries on past it in the same direction, which is not something the\nmodel asked for -- use it to see what it is doing, then come back down. This\nis the control to push if you want more effect: Intensity belongs to the model\nand it decides what to do with it.=画面向模型结果靠拢的程度。\n\n模型的输出并不是叠加到画面上——它是一张完整的图，\n经过重新缩放使其亮度落在原图指示的位置。\n这里是在两者之间混合，所以两端都是真实画面，\n之间的任何取值同样是。\n\n0 完全还原超分器的产出。1 是模型的画面。\n\n大于 1 会沿同一方向继续越过它，这并不是模型所要求的——\n可以用它来看看模型在做什么，然后再调回来。\n想要更明显的效果就该推这个：强度属于模型，\n由它决定怎么处理。
+Whether the model's colour arrives with its light.\n\n0 keeps the game's own hue exactly -- every pixel is the original colour with\nonly its brightness carrying the model's verdict. Game-accurate colour, with\nthe detail. 1 brings the model's colour as well, in its own hue, clamped into\nAP1 so nothing unreachable is asked for.\n\nThis cannot shift hue on its own: it interpolates between two finished\npictures rather than adding a colour difference to one, which is what used to\nlet a warm subject come back green.\n\nAbove 1 it OVER-SATURATES: the colour keeps its hue but grows more vivid,\nand rolls off at the edge of what the display can show rather than clipping\ninto a flat blown patch. 1 is the model's own colour; push past it for punch.=模型的颜色是否随它的亮度一起带过来。\n\n0 精确保留游戏自身的色调——每个像素都是原始颜色，\n只有亮度承载模型的判断。颜色忠于游戏，同时保留细节。\n1 则连模型的颜色一并带入，用它自己的色相，\n并限制在 AP1 之内，以免要求显示不出的颜色。\n\n它本身不会造成色相偏移：它是在两张成品图之间插值，\n而不是把色差叠加到某一张上——过去正是后者让暖色主体变绿。\n\n大于 1 会过饱和：色相不变但更鲜艳，\n并在接近显示器能力边界时平滑滚降，而不是硬裁成一片死白。\n1 是模型自身的颜色；想要更冲就往上推。
+What the model is shown, and how its answer comes back.\n\nOff (soft knee): the default. It rolls highlights off so hard the model\ncannot resolve detail in them -- fine in soft-lit scenes, weak in bright ones.\n\nNeutwo composed: an unclipped curve so the model sees highlight detail, then\neverything above (Detail/Colour strength, highlight guard, palette). It wins in\nbright scenes, but the curve compresses MIDTONES too, so in soft-lit content it\ncan be worse than Off. It also shifts paper white -- re-check it when you switch.\n\nHybrid composed: the best of both, and the one to use. Identity in the\nmidtones -- as good as Off there -- and the unclipped roll only in the\nhighlights, so it recovers the detail Off crushes without giving up the\nmidtones Neutwo does. It barely shifts paper white.\n\nReplace: the raw model straight back through the exact inverse, none of the\ncomposition -- no guard, no palette, no strengths. Gorgeous where there are no\nbright lights, but they FLASH in motion. A reference, not a daily setting.\n\nHybrid replace: the raw model like Replace, but on the hybrid curve -- the\ndecode is identity in the midtones, so the flashing is confined to genuine\nbright highlights instead of everywhere. Most of Replace's detail, far more\nstable. If you love the Replace look but the flicker bothers you, use this.\n\nOff is byte-identical to before.=模型看到什么，以及它的输出如何返回。\n\n关闭（软拐点）：默认值。它对高光的滚降过于强烈，\n模型无法分辨其中的细节——在柔光场景里没问题，在明亮场景里偏弱。\n\nNeutwo 合成：不截断的曲线，模型能看到高光细节，\n之后才应用上面那些（细节/色彩强度、高光保护、调色板）。\n它在明亮场景中胜出，但曲线也会压缩中间调，\n所以在柔光内容里可能不如「关闭」。它还会改变纸张白——切换时需重新核对。\n\n混合合成：兼顾两者，也是推荐使用的那个。中间调保持恒等——\n在那里和「关闭」一样好——只在真正的高光上做不截断的滚降，\n因此既能还原「关闭」压掉的细节，又不必像 Neutwo 那样牺牲中间调。\n它几乎不改变纸张白。\n\n替换：原始模型经精确逆变换直接回来，不做任何合成——\n没有保护、没有调色板、没有强度。在没有强光源的地方非常漂亮，\n但在运动中会闪烁。适合做参照，不适合日常使用。\n\n混合替换：和「替换」一样用原始模型，但走混合曲线——\n解码在中间调是恒等的，所以闪烁只限于真正的高光，而不是到处都是。\n保留了「替换」的大部分细节，稳定性好得多。\n如果你喜欢「替换」的观感又受不了闪烁，用这个。\n\n关闭与之前逐字节相同。
+Default leaves the choice to the model.\n\nNot the same scale as the super resolution or ray reconstruction presets --\nthe same number means something different here.=默认：把选择权交给模型。\n\n与超分辨率或光线重建的预设不是同一套刻度——\n在这里同样的数字含义不同。
+The model's own processing profiles.\n\nDefault (standard): the strongest. Boosts local contrast and deepens\nlighting, and can oversaturate or look stylised -- most of what reads as\n'the model changed my game's look' is this profile.\n\nNatural: the same detail work with a gentler hand. Keeps skin tones and\ntonal balance closer to what the game rendered.\n\nCinematic: tones down the shine and over-processing for a film-like look.\n\nRead when the model is built, so a change rebuilds it after a moment. The\nnames come from community testing; NVIDIA ships no names in the binaries.=模型自带的处理配置。\n\n默认（标准）：最强。提升局部对比并加深光影，\n可能过饱和或显得风格化——多数「模型改变了我的游戏画面」的说法\n都出自这个配置。\n\n自然：同样的细节处理，手法更温和。\n肤色和影调平衡更接近游戏原本渲染的样子。\n\n电影感：压低光泽和过度处理，营造胶片感。\n\n在模型构建时读取，因此修改后会稍等片刻重建。\n这些名字来自社区实测；NVIDIA 在二进制里没有给出任何名称。
+The model's own strength control, applied inside it. Distinct from detail\nstrength above, which scales the result afterwards.=模型自身的强度控制，在模型内部生效。\n与上面的「细节强度」不同，后者是在结果出来之后再对它缩放。
+Local structure=局部结构
+Local tone=局部影调
+Skin structure=皮肤结构
+-1 means follow local structure, and is the model's own default -- it is not a\nstrength of zero. 0 and above set skin independently of the rest of the frame.=-1 表示跟随局部结构，这是模型自身的默认值——\n它不是强度为零。0 及以上则让皮肤独立于画面其余部分单独设置。
+Lets the model find skin itself rather than treating the frame uniformly.=让模型自己识别皮肤，而不是把整个画面一视同仁。
+; ---------------------------------------------------------------------------
+;  神经渲染 —— 白点来源说明
+; ---------------------------------------------------------------------------
+Where the number that divides the frame comes from.\n\nPaper white only -- the slider below and nothing else. Right for a\ngame whose exposure never moves, wrong the moment it does: one\nconstant cannot serve a cave and a field.\n\nThe game's own exposure -- read from the texture the game hands\nthe upscaler. The best source there is, because it is decided\nupstream and nothing this pass does can move it. Not every game\nsupplies one.\n\nA buffer the scan found -- for games that compute an exposure and\nnever pass it on. A GUESS: candidates are matched by shape, and in\nGTA V the best one tracks the real exposure but at its own scale,\nwhich the anchor's ratio cancels. Needs anchoring once, and checking\nafterwards.=用来做除法的那个数从哪来。\n\n仅纸张白——就是下方的滑块，不看别的。\n适合曝光永不变化的游戏，一旦曝光会变就不合适：\n一个常数没法同时适用于洞穴和原野。\n\n游戏自身曝光——从游戏交给超分器的纹理里读取。\n这是最好的来源，因为它在更上游就已确定，本通道做什么都改变不了它。\n并非每个游戏都提供。\n\n扫描发现的缓冲区——针对那些计算了曝光却从不传出来的游戏。\n这是一个猜测：候选按形状匹配，在 GTA V 里最合适的那个能跟上真实曝光，\n但用的是它自己的刻度，这可以由锚定的比例抵消。\n需要锚定一次，并在之后复查。
+The most the pass may move any pixel, as a multiple of what it already was, in\nboth directions -- a pixel may not be brightened past this nor darkened past\nits reciprocal. Lights are where the model has least to say and rescaling its\nanswer does the most damage; 2x leaves detail intact while stopping a strip\nlight turning into a string of coloured cells. Raise it only if bright areas\nlook clipped.=本通道对任一像素改动的上限，按它原本亮度的倍数计，\n两个方向都适用——像素不会被提亮超过这个值，也不会被压暗超过其倒数。\n光源处模型最没有发言权，而缩放它的输出造成的破坏最大；\n2x 能保留细节，同时避免条形光源变成一串彩色色块。\n只有在高光区域看起来被裁切时才调高它。
+; ---------------------------------------------------------------------------
+;  DLSS / FSR / XeSS 状态与提示
+; ---------------------------------------------------------------------------
+Linear (Default)=线性（默认）
+Non-Linear PQ=非线性 PQ
+Non-Linear sRGB=非线性 sRGB
+Preset 0=预设 0
+Preset 4=预设 4
+Preset 5=预设 5
+Presets are overridden externally=预设已被外部覆盖
+Save Settings and restart to apply the changes=保存设置并重启以应用更改
+Save INI and restart to apply the changes=保存 INI 并重启以应用更改
+Let XeFG to handle frametimes=让 XeFG 处理帧时间
+Uses frametimes calculated by Opti=使用 OptiScaler 计算的帧时间
+Uses frametimes provided by\nDLSSG or FSR-FG\s=使用 DLSSG 或 FSR-FG\n提供的帧时间
+Restart the game to apply correct XeFG settings!=重启游戏以应用正确的 XeFG 设置！
+Requires disabling dilated motion vectors=需要禁用膨胀运动矢量
+Borderless display mode required!=需要无边框显示模式！
+XeFG only supports HDR10=XeFG 仅支持 HDR10
+DLSSG only supports HDR10=DLSSG 仅支持 HDR10
+ON {}x=开启 {}x
+amd_fidelityfx_dx12.dll is missing!=缺少 amd_fidelityfx_dx12.dll！
+libxess_fg.dll is missing!=缺少 libxess_fg.dll！
+Please put dlssg_to_fsr3_amd_is_better.dll into OptiScaler folder=请把 dlssg_to_fsr3_amd_is_better.dll 放进 OptiScaler 文件夹
+Please put dlss-enabler-headless.dll into OptiScaler folder=请把 dlss-enabler-headless.dll 放进 OptiScaler 文件夹
+Using a subset of features from DLSS Enabler=正在使用 DLSS Enabler 的部分功能
+Reflex not hooked=Reflex 未挂载
+DLSSG is purposefully disabled when this menu is visible=菜单可见时 DLSSG 会被有意禁用
+ACTIVATE FG=启用帧生成
+Using RTSS Reflex injection with FSR Anti-Lag 2.0 and FSR FG might cause issues=同时使用 RTSS 的 Reflex 注入、FSR Anti-Lag 2.0 与 FSR FG 可能引发问题
+Using Reflex's limit with FSR FG has performance overhead=配合 FSR FG 使用 Reflex 的帧率限制会带来性能开销
+Update available: %s (current %s)=有可用更新: %s（当前 %s）
+Open release page=打开发布页面
+Doesn't Exist=不存在
+Don't Exist=不存在
+nvngx_dlss.dll not found, DLSS disabled!=未找到 nvngx_dlss.dll，DLSS 已禁用！
+(Potential FSR3 fallback)=（可能是 FSR3 回退）
+nvngx.ini detected, please move over to using OptiScaler.ini and delete the old config=检测到 nvngx.ini，请改用 OptiScaler.ini 并删除旧配置
+; ---------------------------------------------------------------------------
+;  FPS 叠加层选项
+; ---------------------------------------------------------------------------
+Top Left=左上
+Top Right=右上
+Bottom Left=左下
+Bottom Right=右下
+Detailed + Graph=详细 + 图表
+Full + Graph=完整 + 图表
+Just FPS=仅帧率
+Reflex timings=Reflex 计时
+Same as menu=与菜单一致
+FPS Overlay=帧率叠加层
+FPS Overlay Cycle=帧率叠加层循环
+Frame Generation=帧生成
+; ---------------------------------------------------------------------------
+;  帧生成计时行（注意首尾空格用 \s）
+; ---------------------------------------------------------------------------
+Running%s - %.2f ms per frame%s=运行中%s - 每帧 %.2f 毫秒%s
+Running natively on Vulkan - %llu frames%s=在 Vulkan 上原生运行 - %llu 帧%s
+Running.%s=运行中。%s
+\snatively on Vulkan= 在 Vulkan 上原生运行
+\s\s(held: absent this frame)=  （保持：本帧缺失）
+\sw/Dx12= 使用 Dx12
+(DXVK)\s=(DXVK)
+; ---------------------------------------------------------------------------
+;  多帧生成解锁（Ada）说明
+; ---------------------------------------------------------------------------
+Rewrites, in memory only, the two places where nvngx_dlssg.dll checks for an RTX 50 before advertising and generating more than one frame, so the game's own DLSS Frame Generation can run 3x/4x (and up to 6x where the Streamline plugin allows) on an RTX 40.\n\nNothing on disk is modified. NVIDIA verifies the file's signature when it loads it, not afterwards.\n\nApplied when the DLL is mapped: enable this, save, and restart the game. Leave OptiScaler's own Frame Generation off -- the game's DLSS-G does the work here.=仅在内存中改写 nvngx_dlssg.dll 里检查 RTX 50 的两处代码——\n正是它们决定了能否对外声称并生成多于一帧。改写后，\n游戏自身的 DLSS 帧生成就能在 RTX 40 上跑 3x/4x\n（在 Streamline 插件允许的地方最高 6x）。\n\n磁盘上不做任何修改。NVIDIA 是在加载文件时校验签名，而不是加载之后。\n\n在 DLL 被映射时生效：启用此项、保存、重启游戏。\n请保持 OptiScaler 自身的帧生成关闭——这里由游戏的 DLSS-G 干活。
+Leave off for games with their own 2x/3x/4x selector -- forcing would override your in-game choice. Use it where frame generation is only on/off: the game keeps asking for 2x and this raises the request on its way to Streamline. 6x is the plugin's own hard ceiling; a refusal is logged and the game's request goes through unchanged.=对于自带 2x/3x/4x 选择的游戏请保持关闭——强制会覆盖你在游戏里的选择。\n适用于帧生成只有开/关的游戏：游戏一直请求 2x，\n而这里在请求发往 Streamline 的途中把它调高。\n6x 是插件自身的硬上限；若被拒绝会记入日志，\n游戏的请求则原样通过。
+The interpolation kernel shipped for Ada blends the two source frames with a constant 0.5, so 3x/4x would show identical half-way frames. This rewrites the kernel's PTX so the blend weight comes from its temporal parameter. Applied once when the snippet loads; restart the game to change it.=为 Ada 提供的插值内核用固定的 0.5 混合两个源帧，\n因此 3x/4x 会显示出完全相同的中间帧。\n这里改写内核的 PTX，让混合权重改由它的时间参数决定。\n在代码片段加载时应用一次；修改后需重启游戏。
+Blackwell paces multi-frame output with hardware flip metering that Ada does not have; left enabled, 3x/4x can freeze the picture while audio keeps running. This pins the Streamline plugin onto its software pacer. Leave off with current Streamline builds; enable only if 3x/4x freezes. Forcing a multiplier above 2x applies it on demand anyway.=Blackwell 用硬件翻转计量来调节多帧输出，而 Ada 没有这个能力；\n若保持启用，3x/4x 可能画面卡死而声音仍在播放。\n这会把 Streamline 插件固定到它的软件节拍器上。\n当前的 Streamline 版本请保持关闭；只有 3x/4x 卡死时才启用。\n反正强制大于 2x 的倍数时会按需应用。
+Old sl.dlss_g builds are compiled with a ceiling of 3 generated frames (4x). Lifting it is not the same as the plugin being able to cope -- it broke GTA V Enhanced. Off by default; updating the plugin is the sound fix. Read when the pacing patch is applied.=旧的 sl.dlss_g 构建把生成帧上限编译为 3（即 4x）。\n提高这个上限并不等于插件就能应付——它把《GTA V 增强版》弄崩了。\n默认关闭；更新插件才是稳妥的修法。在应用节奏补丁时读取。
+Some games drop the flags that let Streamline load the driver's downloaded (newer) plugin set. Putting them back means a matched, signed, current sl.dlss_g -- but a newer plugin can also crash a game that was never tested with it. Off by default; needs a restart.=有些游戏会去掉那些让 Streamline 加载驱动已下载（较新）插件集的标志。\n把它们放回去意味着使用配套、已签名且较新的 sl.dlss_g——\n但较新的插件也可能让从未用它测试过的游戏崩溃。\n默认关闭；需要重启。
+; ---------------------------------------------------------------------------
+;  错误与回退提示
+; ---------------------------------------------------------------------------
+{} is not available.\nFalling back to {}.={} 不可用。\n回退到 {}。
+{} is not available and can't fallback={} 不可用，且无法回退
+Can't init FSR FG\nAre you missing the required DLLs?=无法初始化 FSR 帧生成\n是不是缺少所需的 DLL？
+Can't init XeFG\nAre you missing the required DLLs?=无法初始化 XeFG\n是不是缺少所需的 DLL？
+Can't init DLSSG Output\nAre you missing the streamline folder?=无法初始化 DLSSG 输出\n是不是缺少 streamline 文件夹？
+Upscaler failed to run!=超分运行失败！
+Falling back to FSR 2.1.2=回退到 FSR 2.1.2
+Falling back to FSR 2.2=回退到 FSR 2.2
+Falling back to XeSS=回退到 XeSS
+Can't load amd_fidelityfx_dx12\nDid you forget to extract that dll?=无法加载 amd_fidelityfx_dx12\n是不是忘了解压那个 dll？
+Failed to create a shared texture\nMake sure you are using at least Wine/Proton 11=无法创建共享纹理\n请确认至少使用 Wine/Proton 11
+Couldn't load libxess.dll\nCheck if the dll is present=无法加载 libxess.dll\n请检查该 dll 是否存在
+Couldn't create XeSS context\n{}=无法创建 XeSS 上下文\n{}
+Couldn't load libxess_dx11.dll\nCheck if the dll is present=无法加载 libxess_dx11.dll\n请检查该 dll 是否存在
+
+
+; ============================================================================
+;  第三批：参数说明（tooltip 悬浮说明）
+;  这批文本走 MenuCommon::ShowHelpMarker() / SeparatorWithHelpMarker()，
+;  它们在 menu_common.cpp 里是成员函数，第一轮入口列表没有它们。
+; ============================================================================
+
+; ---------------------------------------------------------------------------
+;  FSR4 / 超分预设
+; ---------------------------------------------------------------------------
+Which copium do you choose?=你选哪种安慰剂？
+Likely doesn't do much=大概没什么实际作用
+List of upscalers reported by FFX SDK=FFX SDK 报告的超分器列表
+Select the input color space that the game uses.\nNon-Linear / sRGB: Might improve FSR4 upscaling quality, might increase ghosting.\nPQ: Rarest, might increase ghosting and break lights.=选择游戏使用的输入色彩空间。\n非线性 / sRGB：可能提升 FSR4 超分质量，也可能加重拖影。\nPQ：最少见，可能加重拖影并使光源异常。
+Each internal FSR4 preset is tuned for a specific resolution.\nSelecting an FSR4 preset won't change the in-game\nupscaler preset!!!\n\nPreset 0 is meant for FSR Native AA\nPreset 1 is meant for Quality/Ultra Quality\nPreset 2 is meant for Balanced\nPreset 3 is meant for Performance\nPreset 4 is meant for DRS\nPreset 5 is meant for Ultra Performance=每个 FSR4 内部预设都是针对特定分辨率调校的。\n选择 FSR4 预设不会改变游戏内的\n超分预设！！！\n\n预设 0 对应 FSR 原生 AA\n预设 1 对应 画质/极高画质\n预设 2 对应 均衡\n预设 3 对应 性能\n预设 4 对应 DRS\n预设 5 对应 极致性能
+Top left: Dilated Motion Vectors\nTop right: Predicted Blend Factor=左上：膨胀运动矢量\n右上：预测混合因子
+Top left: Dilated Motion Vectors\nTop middle: Protected Areas\nTop right: Dilated Depth\nMiddle: Upscaled frame\nBottom left: Disocclusion mask\nBottom middle: Reactiveness\nBottom right: Detail Protection Takedown=左上：膨胀运动矢量\n上中：保护区\n右上：膨胀深度\n中间：超分后的帧\n左下：去遮挡遮罩\n下中：反应度\n右下：细节保护解除
+After changing this option, please Save Settings.\nIt will be applied on next launch.=修改此项后请保存设置。\n将在下次启动时生效。
+After changing this option, please Save Settings\nIt will be applied on next launch.=修改此项后请保存设置\n将在下次启动时生效。
+Value of 0.0f can improve temporal stability of bright pixels\nLower values are more stable with ghosting\nHigher values are more pixelly, but less ghosting=取值 0.0f 可提升亮像素的时域稳定性\n值越低，拖影表现越稳定\n值越高，像素感越强，但拖影更少
+Meant for development purpose to test if\nwriting a larger value to reactive mask, reduces ghosting.=用于开发测试：\n向反应遮罩写入更大的值是否能减少拖影。
+Increasing this scales FSR3.1 computed shading\nchange value at read to have higher reactiveness.=提高此项会在读取时缩放 FSR3.1 计算的着色\n变化值，以获得更高的反应度。
+Corresponds to amount of accumulation added per frame\nat pixel coordinate where disocclusion occured or when\nreactive mask value is > 0.0f. Decreasing this and \ndrawing the ghosting object (IE no mv) to reactive mask \nwith value close to 1.0f can decrease temporal ghosting.\nDecreasing this could result in more thin feature pixels flickering.=对应在发生去遮挡的像素处、或反应遮罩值 > 0.0f 时，\n每帧增加的累积量。降低此值，并把产生拖影的物体\n（即没有运动矢量的物体）以接近 1.0f 的值\n画进反应遮罩，可以减轻时域拖影。\n但降低它也可能让细窄特征像素更容易闪烁。
+Increasing this value may reduce white pixel temporal\nflickering around swaying thin objects that are disoccluding \none another often. Too high value may increase ghosting.=提高此值可以减轻摆动的细窄物体相互\n频繁去遮挡时周围白色像素的时域闪烁。\n但值过高会加重拖影。
+This usually happens due to using tools\nsuch as Nvidia App or Nvidia Inspector=这通常是因为使用了\nNvidia App 或 Nvidia Inspector 之类的工具
+Each render preset has it strengths and weaknesses\nOverride to potentially improve image quality\nPress apply after enable/disable=每个渲染预设各有长短\n覆盖以尝试改善画质\n启用/禁用后请按应用
+Each render preset has it strengths and weaknesses\nOverride to potentially improve image quality\nPress Apply after enable/disable=每个渲染预设各有长短\n覆盖以尝试改善画质\n启用/禁用后请按应用
+Use generic appid with NGX\nFixes OptiScaler preset override not working with certain games\nRequires a game restart=对 NGX 使用通用 appid\n修复某些游戏中 OptiScaler 预设覆盖失效的问题\n需要重启游戏
+; ---------------------------------------------------------------------------
+;  帧生成（通用）
+; ---------------------------------------------------------------------------
+The data source to be used for FG\nThe native FG which the game supports=帧生成所用的数据源\n游戏原生支持的帧生成
+What backend to use instead of the real DLSSG=用来替代真正 DLSSG 的后端
+The FG that you will actually be using=你实际会使用的帧生成
+An active limit of 0 means auto-detect the display refresh rate=限制值为 0 表示自动检测显示器刷新率
+List of FGs reported by FFX SDK=FFX SDK 报告的帧生成列表
+Enable Frame Generation=启用帧生成
+Using upscaler data for FG=使用超分数据做帧生成
+Enable HUD stability fix, might cause crashes!=启用 HUD 稳定性修复，可能导致崩溃！
+Delay HUDless capture, high values might cause crash!=延迟无 HUD 捕获，值过高可能导致崩溃！
+Extended format checks for possible HUDless\nMight cause crashes and slowdowns!=对可能的无 HUD 做扩展格式检查\n可能导致崩溃和卡顿！
+Enables capturing of resources before shader execution.\nIncrease HUDless capture chances, but might cause capturing of unnecessary resources.=在着色器执行前捕获资源。\n可提高无 HUD 的捕获几率，但也可能捕获不必要的资源。
+Fix for DLSS-D wrong depth inputs=修复 DLSS-D 深度输入错误
+Flip Velocity & Depth resources of Unity games=翻转 Unity 游戏的速度与深度资源
+Use height difference as offset=用高度差作为偏移
+Block rarely used resources from using as HUDless \nto prevent flickers and other issues\n\nHUDfix enable/disable will reset the block list!=阻止罕用资源被用作无 HUD，\n以防闪烁及其他问题\n\n启用/禁用 HUD 修复会重置阻止列表！
+Relax resolution checks for HUDless by 32 pixels \nHelps games which use black borders for some \nresolutions and screen ratios (e.g. Witcher 3)=对无 HUD 的分辨率检查放宽 32 像素\n有助于那些在部分分辨率和屏幕比例下\n使用黑边的游戏（如《巫师 3》）
+Always track resources, might cause performance issues\n, but also might fix HUDFix related crashes!=始终跟踪资源，可能带来性能问题\n，但也可能修复与 HUD 修复相关的崩溃！
+Make a copy of motion vectors to use with OptiFG\nFor preventing corruptions that might happen=复制一份运动矢量供 OptiFG 使用\n用于防止可能出现的画面损坏
+Make a copy of depth to use with OptiFG\nFor preventing corruptions that might happen=复制一份深度供 OptiFG 使用\n用于防止可能出现的画面损坏
+Depth values will be divided to this value=深度值将除以这个数
+Use mutex to prevent desync of FG and crashes\nDisabling might improve the perf but decrease stability=用互斥锁防止帧生成失步与崩溃\n禁用可提升性能但会降低稳定性
+Makes a copy of the depth buffer\nCan fix broken visuals in some games on AMD GPUs under Windows\nCan cause stutters, so best to use only when necessary=复制一份深度缓冲区\n可修复 Windows 下 AMD 显卡在部分游戏中的画面异常\n可能造成卡顿，因此最好仅在必要时使用
+Required for Debug flags to work correctly=调试标志正常工作的前提
+Might be required for some sets of DispatchFlags=某些 DispatchFlags 组合可能需要
+; ---------------------------------------------------------------------------
+;  HUDless 资源跟踪开关（9 项，句式相同）
+; ---------------------------------------------------------------------------
+Disable tracking of CreateRenderTargetView\nThis might help filtering of wrong HUDless resources=禁用 CreateRenderTargetView 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+Disable tracking of CreateShaderResourceView\nThis might help filtering of wrong HUDless resources=禁用 CreateShaderResourceView 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+Disable tracking of CreateUnorderedAccessView\nThis might help filtering of wrong HUDless resources=禁用 CreateUnorderedAccessView 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+Disable tracking of OMSetRenderTargets\nThis might help filtering of wrong HUDless resources=禁用 OMSetRenderTargets 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+Disable tracking of SetComputeRootDescriptorTable\nThis might help filtering of wrong HUDless resources=禁用 SetComputeRootDescriptorTable 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+Disable tracking of SetGraphicsRootDescriptorTable\nThis might help filtering of wrong HUDless resources=禁用 SetGraphicsRootDescriptorTable 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+Disable tracking of DrawInstanced\nThis might help filtering of wrong HUDless resources=禁用 DrawInstanced 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+Disable tracking of DrawIndexedInstanced\nThis might help filtering of wrong HUDless resources=禁用 DrawIndexedInstanced 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+Disable tracking of Dispatch\nThis might help filtering of wrong HUDless resources=禁用 Dispatch 的跟踪\n可能有助于过滤掉错误的无 HUD 资源
+; ---------------------------------------------------------------------------
+;  HUDFix / UI
+; ---------------------------------------------------------------------------
+Needs HUDless texture to compare with final image.\nUI elements and ONLY UI elements should have a pink tint!=需要无 HUD 纹理与最终画面比对。\nUI 元素、且仅限 UI 元素应该带有粉色着色！
+Draws UI resource over the final image\nIf no UI visible, enable this!=把 UI 资源绘制到最终画面上\n如果看不到 UI，就启用这个！
+If UI is too faint, disable this option=如果 UI 太淡，请关闭此选项
+For when the game sends a UI texture, but you want to disable it=适用于游戏发送了 UI 纹理但你想要禁用的情况
+For when the game sends HUDless, but you want to disable it=适用于游戏发送了无 HUD 纹理但你想要禁用的情况
+Will use more VRAM, but Uniscaler needs this\nMaybe some other games might need too=会占用更多显存，但 Uniscaler 需要它\n个别其他游戏可能也需要
+Will use more VRAM, but some games might need this=会占用更多显存，但某些游戏可能需要
+If source tags more than one HUDless, only use the first one=如果来源标记了多个无 HUD，只使用第一个
+Don't use reset signals from FG Inputs=不使用来自帧生成输入的重置信号
+Number of frames the FG is allowed to be ahead of the game\nMight prevent FG on/off switching, but also might cause issues=帧生成允许领先游戏的帧数\n可能阻止帧生成的开/关切换，但也可能引发问题
+Select source for frametime\nMight help frame pacing and stutter issues=选择帧时间的来源\n可能有助于改善帧节奏和卡顿
+Cutoffs transparency from UI to help with interpolation\nYou can use Show Detected UI to see the difference\n0.0 is auto=裁掉 UI 的透明部分以帮助插值\n可以用「显示检测到的 UI」查看差异\n0.0 为自动
+; ---------------------------------------------------------------------------
+;  FSR 帧生成 / 帧节奏
+; ---------------------------------------------------------------------------
+Enable Async for better FG performance\nMight cause crashes, especially with HUD Fix!=启用异步以改善帧生成性能\n可能导致崩溃，尤其是配合 HUD 修复时！
+Enable FSR3.1-FG Debug view\n\nTop left: Game Motion Vectors\nTop middle: GMV Depth\nTop right: Optical Flow MV\nMiddle: Interpolated frame only\nBottom left: Disocclusion mask\nBottom middle: Interpolation source (w/o UI)\nBottom right: HUDless resource=启用 FSR3.1-FG 调试视图\n\n左上：游戏运动矢量\n上中：GMV 深度\n右上：光流运动矢量\n中间：仅插值帧\n左下：去遮挡遮罩\n下中：插值来源（无 UI）\n右下：无 HUD 资源
+Display only FSR 3.1 Generated frames=仅显示 FSR 3.1 生成的帧
+Enables drawing of Interpolation skip lines=启用插值跳过线的绘制
+Enables drawing of Tear and Interpolation skip lines=启用撕裂线与插值跳过线的绘制
+Enables drawing of Pacing lines=启用节奏线的绘制
+Frame generation rectangle, adjust for letterboxed content=帧生成矩形，用于适配加黑边的内容
+Resets Frame generation rectangle=重置帧生成矩形
+Safety margins in millisecons\nFSR default value: 0.1ms\nOpti default value: 0.01ms=安全余量（毫秒）\nFSR 默认值：0.1ms\nOpti 默认值：0.01ms
+Variance factor\nFSR default value: 0.1\nOpti default value: 0.3=方差因子\nFSR 默认值：0.1\nOpti 默认值：0.3
+Allows pacing spinlock to sleep, should reduce CPU usage\nMight cause slow ramp up of FPS=允许节奏自旋锁休眠，可降低 CPU 占用\n可能导致帧率爬升缓慢
+How long to spin if FPTHybridSpin is true. Measured in timer resolution units.\nNot recommended to go below 2. Will result in frequent overshoots=FPTHybridSpin 为真时自旋的时长。单位为计时器分辨率。\n不建议低于 2，否则会频繁超调
+Allows WaitForSingleObject instead of spinning for fence value=允许用 WaitForSingleObject 代替自旋等待栅栏值
+; ---------------------------------------------------------------------------
+;  XeFG
+; ---------------------------------------------------------------------------
+Ignores all prechecks for XeFG\nDon't use this option to skip MV size warning for UE games!\nIt might cause crashes and bad IQ!=忽略 XeFG 的所有预检查\n不要用这个选项来跳过 UE 游戏的 MV 尺寸警告！\n可能导致崩溃和画质劣化！
+Set XeFG interpolation count=设置 XeFG 插值帧数
+Disable HUD/UI interpolation\nReverts back to previous XeFG 2 behaviour\n\nFixes artifacting transparent HUD/UI=禁用 HUD/UI 插值\n回退到 XeFG 2 的旧行为\n\n修复透明 HUD/UI 的伪影
+Enable XeFG Debug view=启用 XeFG 调试视图
+Forces Borderless display mode\n\nFor best results, set fullscreen \nresolution to your display resolution\nMight cause some instability issues.\n\nNEEDS GAME RESTART TO BE ACTIVE!=强制无边框显示模式\n\n为获得最佳效果，请把全屏分辨率\n设为显示器分辨率\n可能引发一些稳定性问题。\n\n需要重启游戏才能生效！
+Set DLSSG interpolation count=设置 DLSSG 插值帧数
+; ---------------------------------------------------------------------------
+;  各帧生成后端的标题与说明
+; ---------------------------------------------------------------------------
+Frame Generation (OptiFG)=帧生成 (OptiFG)
+Frame Generation (FSR-FG Inputs)=帧生成（FSR-FG 输入）
+Frame Generation (Streamline FG Inputs)=帧生成（Streamline 帧生成输入）
+Frame Generation (FSR3-FG via Nukem's DLSSG)=帧生成（经 Nukem 的 DLSSG 实现 FSR3-FG）
+Frame Generation (FSR3-MFG via DLSS Enabler)=帧生成（经 DLSS Enabler 实现 FSR3-MFG）
+Frame Generation (FSRFG via FFX)=帧生成（经 FFX 实现 FSRFG）
+Frame Generation (Enabler + FFX)=帧生成（Enabler + FFX）
+Requires Nukem's dlssg_to_fsr3 dll=需要 Nukem 的 dlssg_to_fsr3 dll
+DLSS Enabler as dlss-enabler-headless.dll=以 dlss-enabler-headless.dll 形式提供的 DLSS Enabler
+FFX using the DLSSG swapchain=FFX 使用 DLSSG 的交换链
+FFX for middle fake frames, and Enabler for the rest\n\n2x - FFX\n3x - Enabler\n4x - FFX + Enabler\n5x - Enabler\n6x - FFX + Enabler=中间的假帧由 FFX 生成，其余由 Enabler 生成\n\n2x - FFX\n3x - Enabler\n4x - FFX + Enabler\n5x - Enabler\n6x - FFX + Enabler
+Select FSR-FG in-game=在游戏内选择 FSR-FG
+Select DLSS-FG in-game=在游戏内选择 DLSS-FG
+Do not use HUDless set at ffxConfig=不使用 ffxConfig 中设置的无 HUD
+Do not use HUDless set at ffxDispatch=不使用 ffxDispatch 中设置的无 HUD
+FSR Common Settings=FSR 通用设置
+Affects both FSR-FG & Upscalers=同时影响 FSR-FG 与超分器
+; ---------------------------------------------------------------------------
+;  延迟 / 低延迟
+; ---------------------------------------------------------------------------
+Might help achieve better image quality=可能有助于获得更好的画质
+Might help achieve better image quality\nAnd potentially less ghosting=可能有助于获得更好的画质\n并可能减少拖影
+Uses Reflex when possible\nOn AMD/Intel cards, you can use Fakenvapi to substitute Reflex=尽可能使用 Reflex\n在 AMD/Intel 显卡上，可以用 Fakenvapi 替代 Reflex
+FSR Anti-Lag 2.0 is the new name for AntiLag 2\nDon't ask me why=FSR Anti-Lag 2.0 是 AntiLag 2 的新名字\n别问我为什么
+By default, FSR Anti-Lag 2.0/XeLL is used when available.\nThis setting lets you force LatencyFlex instead=默认情况下，可用时会使用 FSR Anti-Lag 2.0/XeLL。\n此设置让你改为强制使用 LatencyFlex
+Allows XeLL to work without FG on non-Intel cards.\n\nDisables FG options\n\nRequires a restart=让 XeLL 在非 Intel 显卡上无需帧生成也能工作。\n\n会禁用帧生成选项\n\n需要重启
+; ---------------------------------------------------------------------------
+;  锐化 / 深度感知
+; ---------------------------------------------------------------------------
+Ignores the value sent by the game\nand uses the value set below=忽略游戏发送的值\n改用下方设定值
+Enable OptiScaler's sharpening filter\nBy default uses a sharpening value provided by the game\nSelect 'Override' under 'Sharpness' and adjust the slider\nto change it\n\nSome upscalers have their own sharpness filter, so this\noption is not always needed=启用 OptiScaler 的锐化滤镜\n默认使用游戏提供的锐化值\n在「锐化」下选择「覆盖」并调整滑块\n即可修改\n\n部分超分器自带锐化滤镜，因此\n不一定需要这个选项
+Use AMD's RCAS\nModified to add Contrast parameter\nand MAS support=使用 AMD 的 RCAS\n已修改以增加对比度参数\n并支持 MAS
+Use Depth Aware Sharpening (RCAS)\nSmarter sharpening with less artifacts,\nbut also heavier\n\nThe farther away is the object, the more\nsharpening is applied=使用深度感知锐化 (RCAS)\n更聪明、伪影更少的锐化，\n但开销也更大\n\n物体越远，施加的\n锐化越强
+Use Depth Aware Sharpening (DAS)\nDepth-aware directional adaptive luma sharpener\nSmarter sharpening with less artifacts,\nbut also heavier\n\nThe farther away is the object, the more\nsharpening is applied=使用深度感知锐化 (DAS)\n深度感知方向自适应亮度锐化器\n更聪明、伪影更少的锐化，\n但开销也更大\n\n物体越远，施加的\n锐化越强
+Enables sharpness adjustments according to the motion=根据运动情况调整锐化
+Enable DA + MAS debug views\nBlue tint for DA detected edges\n\nMore red areas will have more sharpness applied\nGreen areas will get reduced sharpness=启用 DA + MAS 调试视图\nDA 检测到的边缘会带蓝色着色\n\n越红的区域施加的锐化越强\n绿色区域则减少锐化
+Areas that are more red will have more sharpness applied\nGreen areas will get reduced sharpness=越红的区域施加的锐化越强\n绿色区域则减少锐化
+Clamps the final image to the [0, 1] range.\n\nPrevents overshoot artifacts such as bright halos or negative colors.\nRecommended for LDR pipelines; optional for HDR depending on tone-mapping.\n\nWhen not set OptiScaler controls it via upscalers HDR flag=把最终画面钳制到 [0, 1] 范围。\n\n可防止过冲伪影，如亮光晕或负色。\n推荐用于 LDR 流程；HDR 下取决于色调映射，可选。\n\n未设置时，OptiScaler 通过超分器的 HDR 标志来控制
+Ignores small depth differences before edge detection.\n\nHigher values reduce flickering and noise from minor depth changes, but may soften real geometry edges.\nLower values preserve fine detail but can cause unstable or noisy edge detection.=在边缘检测前忽略微小的深度差异。\n\n值越高，越能减少轻微深度变化引起的闪烁和噪点，但可能柔化真实的几何边缘。\n值越低，越能保留精细细节，但边缘检测可能变得不稳定或有噪点。
+Controls how strongly sharpening is reduced across depth edges.\n\nHigher values more aggressively prevent sharpening across object boundaries (reduces halos).\nLower values allow more sharpening to pass across edges (sharper but riskier).=控制在深度边缘处锐化被削弱的强度。\n\n值越高，越积极地阻止锐化跨越物体边界（减少光晕）。\n值越低，允许更多锐化跨越边缘（更锐利但有风险）。
+Controls sharpness at high contrast areas.=控制高对比区域的锐化程度。
+Positive values decrease sharpness at high contrast areas.\nNegative values increase sharpness at high contrast areas.=正值降低高对比区域的锐化。\n负值提高高对比区域的锐化。
+Maximum amount of sharpness that motion can add or remove.\n\nNegative values reduce sharpening in motion (recommended).\nPositive values increase sharpening in motion.\n\nThe final adjustment scales with motion and is capped at this value.=运动可以增加或减少的锐化量上限。\n\n负值会降低运动中的锐化（推荐）。\n正值会提高运动中的锐化。\n\n最终调整量随运动缩放，并以该值为上限。
+Minimum motion required before motion-based sharpening adjustment begins.\n\nHigher values ignore small movements (more stable).\nLower values react to subtle motion (more sensitive).=开始进行基于运动的锐化调整所需的最小运动量。\n\n值越高，越会忽略小幅移动（更稳定）。\n值越低，对细微运动越敏感。
+Defines the motion range over which the effect ramps from zero to full strength.\n\nValues above the threshold are mapped into this range.\nLarger values make the response smoother and more gradual.\nSmaller values make the effect react more quickly and aggressively.=定义效果从零增强到满强度所跨越的运动范围。\n\n高于阈值的值会被映射到这个区间。\n值越大，响应越平滑渐进。\n值越小，效果反应越快越激进。
+; ---------------------------------------------------------------------------
+;  比例 / 输出缩放
+; ---------------------------------------------------------------------------
+Overrides every upscaler preset with the set value\n\n1.5x on a 1080p screen means an internal res of 720p\n1080 / 1.5 \= 720=用设定值覆盖所有超分预设\n\n1080p 屏幕上 1.5x 意味着内部分辨率为 720p\n1080 / 1.5 = 720
+Lets you override each preset's ratio individually\nNote that not every game supports every quality preset\n\n1.5x on a 1080p screen means internal resolution of 720p\n1080 / 1.5 \= 720=让你单独覆盖每个预设的比例\n注意并非每个游戏都支持所有画质预设\n\n1080p 屏幕上 1.5x 意味着内部分辨率为 720p\n1080 / 1.5 = 720
+Upscales the image internally to a higher output resolution\nthen downscales it back to your display resolution\n\nValues <1.0 make the upscaler cheaper\nValues >1.0 make image sharper at the cost of performance\n\nIf greyed out, please check Git Wiki - Unreal Engine tweaks\n\nTarget res and total ratio at the bottom (max. total 3.0!)=在内部把画面超分到更高的输出分辨率，\n再降采样回你的显示器分辨率\n\n值 <1.0 可降低超分开销\n值 >1.0 会让画面更锐利，代价是性能\n\n如果显示为灰色，请查阅 Git Wiki - Unreal Engine tweaks\n\n目标分辨率与总比例见底部（总比例最大 3.0！）
+Extended sliders limit for quality presets\n\nUsing this option changes resolution detection logic\nand might cause issues and crashes!=扩展画质预设的滑块上限\n\n使用此选项会改变分辨率检测逻辑\n可能引发问题和崩溃！
+Fix for games ignoring official DRS limits=针对忽略官方 DRS 限制的游戏的修复
+; ---------------------------------------------------------------------------
+;  输入 / 反应遮罩
+; ---------------------------------------------------------------------------
+Some Unreal Engine games need this\n\nTry using if colours flickering or\nobjects have ghosting trails=某些 Unreal Engine 游戏需要它\n\n如果出现颜色闪烁或\n物体有拖影，可以试试
+Allows the use of a Reactive mask\nKeep in mind that a Reactive mask sent to DLSS\nwill not produce a good image in combination with FSR/XeSS=允许使用反应遮罩\n请记住，把反应遮罩送给 DLSS\n再配合 FSR/XeSS 使用时画面效果不会好
+Option disabled because the game doesn't provide a Reactive mask=该选项已禁用，因为游戏未提供反应遮罩
+You shouldn't need to change it=一般不需要改动它
+Might help with purple hue in some games=可能有助于解决某些游戏中的紫色偏色
+Mostly a fix for Unreal Engine games\nTop left part of the screen will be blurry=主要针对 Unreal Engine 游戏的修复\n屏幕左上部分会变模糊
+Fix for games that send motion data with preapplied jitter=针对发送已预加抖动的运动数据的游戏的修复
+Values above 0 activate usage of Reactive mask=大于 0 的值会启用反应遮罩
+; ---------------------------------------------------------------------------
+;  垂直同步 / Mipmap / 其它
+; ---------------------------------------------------------------------------
+This setting will become active on next boot!=此设置将在下次启动时生效！
+Controls the DXGI Present sync interval, which determines how\nthe swap chain waits for vertical refresh.\n\n0  \= Present immediately, no VSync wait.\n1  \= Sync to every refresh, normal VSync.\n2+ \= Present every N refreshes, reducing effective frame rate.\n\nHigher values can reduce tearing but may increase latency and cap FPS.\nFor most games, use 0 for lowest latency or 1 for normal VSync.=控制 DXGI Present 的同步间隔，它决定\n交换链如何等待垂直刷新。\n\n0  = 立即 Present，不等待垂直同步。\n1  = 与每次刷新同步，即普通垂直同步。\n2+ = 每 N 次刷新才 Present，会降低有效帧率。\n\n值越高越能减少撕裂，但可能增加延迟并限制帧率。\n对多数游戏而言，0 延迟最低，1 为普通垂直同步。
+Force V-Sync On/Off & Sync Interval options=强制垂直同步开/关与同步间隔选项
+Can help with blurry textures in broken games\nNegative values will make textures sharper\nPositive values will make textures more blurry\n\nHas a small performance impact=有助于解决某些游戏中纹理模糊的问题\n负值会让纹理更锐利\n正值会让纹理更模糊\n\n对性能有轻微影响
+Apply same override value to all textures=对所有纹理应用相同的覆盖值
+Apply override value as scale multiplier\nWhen using scale mode, please use positive\noverride values to increase sharpness!=把覆盖值作为缩放倍数应用\n使用缩放模式时，请使用正的\n覆盖值来提高锐度！
+Override all textures mipmap values\nNormally OptiScaler only overrides\nbelow zero mipmap values!=覆盖所有纹理的 mipmap 值\n通常 OptiScaler 只覆盖\n低于零的 mipmap 值！
+Update comparison filters=更新比较过滤器
+Update min/max filters=更新最小/最大过滤器
+Skip updating of point filters=跳过点采样过滤器的更新
+Click to open the OptiScaler Wiki page\nin your default browser\n\nCompatibility list with known game issues\nand workarounds, FG options explained\nand other useful info=点击在默认浏览器中打开\nOptiScaler 的 Wiki 页面\n\n其中包含已知游戏问题与解决办法的\n兼容性列表、帧生成选项说明\n以及其他有用信息
+
+
+; ============================================================================
+;  第四批：折叠标题、下拉选项、启动画面彩蛋
+;  这批漏在「数据结构」里——文字不是写在调用参数里，而是结构体字段：
+;    ScopedCollapsingHeader("...")          蓝色折叠标题（29 处）
+;    std::vector<MenuOption<T>> = {{v,"label","tooltip"}}
+;    std::vector<FlagDefinition> = {{"name",mask,"description"}}
+;    std::vector<std::string> splashText = {"..."}   启动画面玩笑文字
+; ============================================================================
+
+; ---------------------------------------------------------------------------
+;  启动画面彩蛋（随机显示）
+; ---------------------------------------------------------------------------
+Cope smarter, not harder=应对要聪明，不要硬扛
+Coping is strong with this one...=这家伙的「适应力」很强……
+This is where the fun begins...=好戏这才开始……
+Got any more of them scalers?...=还有更多超分器吗？……
+Fake pixels and even faker frames...=假像素，还有更假的帧……
+Fake frames, get your fake frames...=假帧，假帧便宜卖咯……
+I'm here to kick pixels and chew frames...=我来这儿是揍像素、嚼帧的……
+I find your lack of supersampling disturbing...=你的超采样不足，这让我很不安……
+Frame by frame, I scale-up!=一帧一帧地向上缩放！
+Resistance is futile. Your pixels will be upscaled.=抵抗是徒劳的。你的像素终将超分。
+I've got 99 problems, but low-res ain't one.=我有 99 个问题，但低分辨率不是其中之一。
+It's over, DLSS, I have the higher ground!=结束了，DLSS，我占据高地！
+This isn't the resolution you're looking for=这不是你要找的分辨率
+To infinity and beyond... with ray tracing off=飞向无限……顺便把光线追踪关了
+I have a bad feeling about this frame pacing=这帧节奏让我有种不祥的预感
+It's Dangerous to Go Alone-Take This Upscaler=一个人出去很危险——带上这个超分器
+Upscaled beyond recognition.=超分到面目全非。
+Trust the process. Ignore the shimmer.=相信过程。忽略闪烁。
+Real fake frames. Certified.=真正的假帧。已认证。
+The illusion of performance=性能的幻觉
+This upscaler belongs in a museum!=这个超分器该进博物馆了！
+Because native rendering is overrated.=毕竟原生渲染被过誉了。
+The more you upscaler, the more you save=超分越多，省得越多
+It's never too late to buy a better GPU=换块更好的显卡永远不晚
+We don't need real pixels where we're going=我们要去的地方不需要真像素
+Did you know that Intel released XeFG for everyone?=你知道吗，Intel 把 XeFG 开放给所有人了？
+MFG totally works with Nukem's 100%% no scam=MFG 配 Nukem 的版本完全能用，100%% 不骗你
+Some of those pixels might even be real!=那些像素里说不定还有真的！
+Just don't look too closely at the image=别把画面看得太仔细就行
+Even supports "software" XeSS!=连「软件版」XeSS 都支持！
+It's too blurry to go alone, take RCAS with you=这么糊没法一个人走，带上 RCAS 吧
+Thanks nitec, back to you nitec=感谢 nitec，接下来交回给 nitec
+Tested and approved by By-U=经 By-U 测试并认可
+0.8 was an inside job=0.8 是内部人干的
+FSR4 DP4a wenETA, AMD plz=FSR4 DP4a 什么时候来啊，AMD 求你了
+OptiCopers, assemble!=Opti 信徒们，集合！
+The Way It's Meant To Be Upscaled=本该如此超分
+Your game may not even crash today=你的游戏今天说不定不会崩
+Expanded and Enhanced=扩展又增强
+It's only my 5th crash today=今天才崩了第五次而已
+Latency with FG? But I have good internet=帧生成还有延迟？可我网速很好啊
+Console peasants can't do that=主机党做不到的
+Hope you don't have a good eyesight=希望你视力不太好
+Such an aggressive upscaling? A bold move=这么激进的超分？胆子不小
+I almost don't feel the input lag=我几乎感觉不到输入延迟
+And that's how you get to 60 FPS=60 帧就是这么来的
+Together We Upscale=我们一起超分
+For upscalers, by upscalers=超分者所享，超分者所造
+Opti Sports, it's in the sampling=Opti 运动，精髓在采样
+Render in your world. Upscale in ours=在你的世界里渲染，在我们的世界里超分
+Upscaling for the masses, not the classes=超分为大众，而非为阶层
+Generating discord since 2023=自 2023 年起就在制造分歧
+Enabling DLSS since 2023=自 2023 年起就在启用 DLSS
+[REDACTED] never looked better=[已隐去] 从未如此好看
+Free and always free=免费，而且永远免费
+Getting unshackled from green chains in progress...=正在挣脱绿色枷锁……
+Who's Nukem anyway?=Nukem 到底是谁？
+Compiling shaders... ETA: 05h:49m=正在编译着色器……预计还需 05:49
+Did you really just pay 70 EUR for this game?!=你真花了 70 欧买这游戏？！
+Guess who forgot about a nullptr check again=猜猜谁又忘了做空指针检查
+AI can't outslop this=AI 都糊不出这种效果
+Guess we're pre-alpha build demos now=看来我们现在是 pre-alpha 版演示了
+New app on the block - TH=新来的——TH
+One more stutter and I might lose it=再卡一下我就要崩溃了
+Mostly stable, unlike the driver=基本稳定，不像驱动那样
+Vul... what? ~AMD=Vul……什么？——AMD 如是说
+My 8 points are floating=我的 8 个点浮起来了
+No floating here - I'm strictly between -128 and 127=这儿不浮点——我严格待在 -128 到 127 之间
+Fake it til you bake it=装到能烤出来为止
+Worst case just turn it off and on=最差也就是关掉再打开
+*On a generative damage control mode at geometry level*=*以几何层级的生成式损害控制模式运行*
+Deep Learning Slop Sampling 5=深度学习糊糊采样 5
+2D AI filters, now powered by just 2x 5090s=2D AI 滤镜，现在只要两块 5090 就能跑
+Neural Slop Sampling with DLSS5=搭配 DLSS5 的神经糊糊采样
+DLSS 5 - the way it's meant to be slopped=DLSS 5——本该如此糊
+Just when I think I'm out, they scale me back in=每次我以为自己脱身了，他们又把我缩放回来
+Like going in the first gear on the highway=就像在高速上挂一档
+Nitec's Bizarre Upscaling=Nitec 的奇妙超分
+"Framegen really attracts some strange clientelle"="帧生成真是招来些奇怪的客人"
+How to remove those corny messages?!=怎么去掉这些尬聊提示？！
+<Your funny text goes here>=<把你的段子写在这里>
+; ---------------------------------------------------------------------------
+;  DLSS 渲染预设（下拉选项）
+; ---------------------------------------------------------------------------
+DEFAULT=默认
+Whatever the game uses=游戏用什么就用什么
+PRESET A=预设 A
+PRESET B=预设 B
+PRESET C=预设 C
+PRESET D=预设 D
+PRESET E=预设 E
+PRESET F=预设 F
+PRESET G=预设 G
+PRESET H=预设 H
+PRESET I=预设 I
+PRESET J=预设 J
+PRESET K=预设 K
+PRESET L=预设 L
+PRESET M=预设 M
+PRESET N=预设 N
+PRESET O=预设 O
+Latest=最新
+Latest supported by the dll=dll 所支持的最新版本
+Unused=未使用
+Intended for Performance/Balanced/Quality modes.\nAn older variant best suited to combat ghosting...\nRemoved on recent versions!=面向 性能/均衡/画质 模式。\n较老的变体，最擅长对付拖影……\n在较新版本中已移除！
+Intended for Ultra Performance mode.\nSimilar to Preset A...\nRemoved on recent versions!=面向 极致性能 模式。\n与预设 A 类似……\n在较新版本中已移除！
+Intended for Performance/Balanced/Quality modes.\nGenerally favors current frame information...\nRemoved on recent versions!=面向 性能/均衡/画质 模式。\n总体上偏向当前帧的信息……\n在较新版本中已移除！
+Default preset for Performance/Balanced/Quality modes;\ngenerally favors image stability.\nRemoved on recent versions!=性能/均衡/画质 模式的默认预设；\n总体上偏向画面稳定性。\n在较新版本中已移除！
+DLSS 3.7+, a better D preset\nRemoved on recent versions!=DLSS 3.7+，改进版的 D 预设\n在较新版本中已移除！
+Default preset for Ultra Performance and DLAA modes\nRemoved on recent versions!=极致性能与 DLAA 模式的默认预设\n在较新版本中已移除！
+Similar to preset K. Preset J might exhibit slightly\nless ghosting...\n1st Gen Transformer=与预设 K 类似。预设 J 的拖影可能\n略少一些……\n第一代 Transformer
+Default preset for DLAA/Balanced/Quality modes...\n1st Gen Transformer=DLAA/均衡/画质 模式的默认预设……\n第一代 Transformer
+Default for Ultra Perf mode\n2nd Gen Transformers=极致性能模式的默认预设\n第二代 Transformer
+Default for Perf mode\n2nd Gen Transformer=性能模式的默认预设\n第二代 Transformer
+Latest Transformer model\nMust use if DoF guide is needed=最新的 Transformer 模型\n如需景深引导则必须使用
+Preset A\nRemoved on recent versions!=预设 A\n在较新版本中已移除！
+Preset B\nRemoved on recent versions!=预设 B\n在较新版本中已移除！
+Preset C\nRemoved on recent versions!=预设 C\n在较新版本中已移除！
+Default model, Transformer=默认模型，Transformer
+; ---------------------------------------------------------------------------
+;  DLSSG 标志位（FlagDefinition 的 name + description）
+; ---------------------------------------------------------------------------
+Antighosting (GB)=抗拖影 (GB)
+Enable anti-ghosting correction=启用抗拖影校正
+Temporal HUD pin=时域 HUD 固定
+Enable temporal HUD pinning (present-backbuffer stability)=启用时域 HUD 固定（提交缓冲区稳定性）
+HUD interpolation=HUD 插值
+HUD OF interpolation (0\=legacy pin-present, 1\=OF warp)=HUD 光流插值（0=旧式固定提交，1=光流扭曲）
+Ignore UI texture=忽略 UI 纹理
+Ignore dedicated DLSSG.UI texture (force legacy HUD path)=忽略专用的 DLSSG.UI 纹理（强制走旧式 HUD 路径）
+Pin backbuffer=固定后台缓冲
+Pin DLSSG.Backbuffer to subframe-1 snapshot across MFG frame=在多帧生成期间把 DLSSG.Backbuffer 固定到 subframe-1 快照
+Antighosting red tint=抗拖影红色着色
+Debug: red tint on corrected pixels=调试：对已校正像素加红色着色
+Antighosting split screen=抗拖影分屏
+Debug: split screen comparison=调试：分屏对比
+Frame index line=帧序号线
+HUD detection=HUD 检测
+Disocclusion tint=去遮挡着色
+Artifacts detection=伪影检测
+Camera MV debug=相机运动矢量调试
+Debug: blue tint where camera MV fallback is used=调试：使用相机运动矢量回退处加蓝色着色
+Generic visualization=通用可视化
+Debug: trapezoid zone visualization=调试：梯形区域可视化
+; ---------------------------------------------------------------------------
+;  延迟模式（下拉选项）
+; ---------------------------------------------------------------------------
+Conservative=保守
+The safest, but might not reduce latency well=最安全，但可能降低延迟的效果一般
+Aggressive=激进
+Improves latency, but in some cases will lower FPS more than expected=改善延迟，但某些情况下帧率下降会超出预期
+Reflex ID=Reflex ID
+Best when can be used, some games are not compatible (e.g. Cyberpunk)\nand will fallback to Aggressive=能用时效果最好，但部分游戏不兼容（如《赛博朋克》）\n会自动回退到「激进」
+Follow in-game=跟随游戏内设置
+Force Disable=强制关闭
+Force Enable=强制开启
+None (Off)=无（关闭）
+AntiLag 2=AntiLag 2
+Reflex=Reflex
+XeLL=XeLL
+UeLowLatency=UeLowLatency
+LatencyFlex=LatencyFlex
+AntiLag Vk=AntiLag Vk
+; ---------------------------------------------------------------------------
+;  降采样滤波器（下拉选项）
+; ---------------------------------------------------------------------------
+FSR1=FSR1
+Kaiser2=Kaiser2
+Kaiser3=Kaiser3
+MAGIC=MAGIC
+Default option.\nGood enough image quality and very fast.=默认选项。\n画质够用，速度很快。
+Bicubic=Bicubic
+Fastest traditional option.\nProduces a very soft/blurry image, but might be okay for downscaling.=最快的传统选项。\n画面很柔、偏糊，但用于降采样或许可以。
+Catmull-Rom=Catmull-Rom
+Designed primarily for downscaling.\nRetains good contrast with minimal artefacts, but softer than Lanczos.=主要为降采样设计。\n对比度保持得好、伪影极少，但比 Lanczos 柔。
+Lanczos2=Lanczos2
+Lighter and faster than Lanczos3.\nLess prone to ringing artefacts, but slightly blurrier.=比 Lanczos3 更轻更快。\n不易产生振铃伪影，但略糊。
+Lanczos3=Lanczos3
+Heavier version of Lanczos2.\nOffers the sharpest image, but is the most prone to ringing.\nConsidered the best along with Kaiser3.=Lanczos2 的加重版。\n画面最锐利，但也最容易产生振铃。\n与 Kaiser3 并列为最佳。
+Similar to Lanczos2.\nSmoother and less prone to artefacts than Lanczos, but slightly blurrier.=与 Lanczos2 类似。\n比 Lanczos 更平滑、伪影更少，但略糊。
+Similar to Lanczos3.\nFar less prone to artefacting than Lanczos3, but much heavier on the GPU.\nConsidered the best along with Lanczos3.=与 Lanczos3 类似。\n伪影远少于 Lanczos3，但对显卡的负担重得多。\n与 Lanczos3 并列为最佳。
+Specialised to prevent artifacts.\nEliminates harsh halos for a natural look, but can appear slightly soft.=专为防止伪影而设计。\n消除生硬的光晕，观感自然，但可能略显柔。
+; ---------------------------------------------------------------------------
+;  帧生成选项说明（MenuOption 的 tooltip）
+; ---------------------------------------------------------------------------
+Upscaler must be enabled\n\nCan be used with any FG Output, but might be imperfect with some\nTo prevent UI glitching, HUDfix required=必须先启用超分\n\n可用于任意帧生成输出，但对某些输出可能不完美\n为防止 UI 错乱，需要开启 HUD 修复
+Can be used with any FG Output\n\nRequires enabling DLSS-FG in game settings\nSupports HUDless out of the box\n\nLimited to games that use Streamline=可用于任意帧生成输出\n\n需要在游戏设置中启用 DLSS-FG\n开箱即支持无 HUD\n\n仅限使用 Streamline 的游戏
+Limited to variants of FSR FG\n\nRequires enabling DLSS-FG in game settings\nSupports HUDless out of the box\nUses Streamline swapchain for pacing=仅限 FSR 帧生成的各变体\n\n需要在游戏设置中启用 DLSS-FG\n开箱即支持无 HUD\n使用 Streamline 交换链做节奏控制
+Can be used with any FG Output\n\nRequires enabling FSR-FG in game settings\nSupports HUDless out of the box=可用于任意帧生成输出\n\n需要在游戏设置中启用 FSR-FG\n开箱即支持无 HUD
+FSR3/4-FG, RDNA4 autoupgrades to FSR4-FG\n\nFSR4-FG sometimes better/worse than XeFG=FSR3/4-FG，RDNA4 会自动升级到 FSR4-FG\n\nFSR4-FG 有时比 XeFG 好，有时更差
+DLSSG output\ncan be used in conjuction with Nukem's for example=DLSSG 输出\n例如可与 Nukem 的方案配合使用
+XeFG - heaviest, but best universal FG\n\nXeFG 3 overall deals best with HUD\n\nEnable UI Composition if HUD ghosting=XeFG——开销最大，但最通用\n\nXeFG 3 总体上对 HUD 处理最好\n\n如果 HUD 有拖影，启用 UI 合成
+No real DLSSG, unsupported hardware\nOnly Nvngx FG replacements available=没有真正的 DLSSG，硬件不受支持\n只能使用 Nvngx 帧生成替代方案
+FFX for the middle fake frame, Enabler for the rest\n\n2x - FFX\n3x - Enabler\n4x - FFX + Enabler\n5x - Enabler\n6x - FFX + Enabler=中间的假帧由 FFX 生成，其余由 Enabler 生成\n\n2x - FFX\n3x - Enabler\n4x - FFX + Enabler\n5x - Enabler\n6x - FFX + Enabler
+; ---------------------------------------------------------------------------
+;  折叠标题与零散条目
+; ---------------------------------------------------------------------------
+FoV & Camera Values=视场角与相机参数
+Game's XeLL=游戏的 XeLL
+On + Ext=开 + 扩展
+Open Wiki (?)=打开 Wiki (?)
+Motion Adaptive Sharpness=运动自适应锐化
+Nukem's=Nukem 的
+FFX + Enabler=FFX + Enabler
+R=重置
+Disable=禁用
+Consider renaming OptiScaler from %s to other supported name.\nYou may experience issues otherwise.=建议把 OptiScaler 从 %s 改名为其他受支持的名称。\n否则可能会遇到问题。
+\s({} Doesn't support more than {}x)=\s（{} 不支持超过 {}x）
+\s({} off)=\s（{} 已关闭）
+\s({} x{})=\s（{} x{}）
+Trim (x the game's exposure)=微调（× 游戏曝光）
+RTSS + XeFG detected=检测到 RTSS + XeFG
+RTSS Reflex Injection is known to cause issues.\nEspecially when using XeFG.\nPlease disable it.=已知 RTSS 的 Reflex 注入会引发问题。\n尤其是在使用 XeFG 时。\n请将其禁用。=已知 RTSS 的 Reflex 注入会引发问题。\n尤其是在使用 XeFG 时。\n请将其禁用。
+You are missing the following dlls from the streamline folder:\n=streamline 文件夹中缺少以下 dll：\n
+All your pixels are belong to us=你们所有的像素都属于我们
+
+
+
+; ============================================================================
+;  第五批：已启用兼容性调整（Quirks）
+;  dllmain.cpp 的 printQuirks() 把字符串 push 进 State::detectedQuirks，
+;  菜单在 menu_common.cpp:5939 处把它们列出来。同时也写进日志。
+; ============================================================================
+
+Allowed Frame Ahead: 2=允许提前帧数: 2
+Always capture FSR-FG swapchain=始终捕获 FSR-FG 交换链
+Correct simulation start marker's frame id=修正模拟起始标记的帧 ID
+Create D3D12 device for Luma before loading Reshade=加载 ReShade 前为 Luma 创建 D3D12 设备
+Create SL on the 2nd device=在第二个设备上创建 Streamline
+Disable FFX Inputs=禁用 FFX 输入
+Disable FSR 2.X Inputs=禁用 FSR 2.X 输入
+Disable FSR 3.0 Inputs=禁用 FSR 3.0 输入
+Disable Reactive Masks=禁用反应遮罩
+Disable Resize Skip=禁用 Resize 跳过
+Disable Use FSR Input Values=禁用「使用 FSR 输入值」
+Disable custom pipeline creation for XeSS=禁用 XeSS 的自定义管线创建
+Disable fakenvapi=禁用 fakenvapi
+Disabling Hudfix due to known issues=因已知问题禁用 HUD 修复
+Don't Preserve FG Swapchain=不保留帧生成交换链
+Don't use NTShared enabled=禁用 NTShared
+Don't use V-Sync overrides=不使用垂直同步覆盖
+Don't use color resource barrier fix for Unreal Engine games=不对 UE 游戏使用颜色资源屏障修复
+Don't use motion vector resource barrier fix for Unreal Engine games=不对 UE 游戏使用运动矢量资源屏障修复
+Dxgi spoofing disabled by default=默认禁用 DXGI 伪装
+Enable KernelBase hooks=启用 KernelBase 钩子
+Enabling AutoExposure=启用自动曝光
+Enabling restore compute signature on AMD/Intel=在 AMD/Intel 上启用计算签名恢复
+Enabling restore compute signature on Nvidia=在 Nvidia 上启用计算签名恢复
+Extended signatures restore=扩展签名恢复
+FG Inputs are enabled, LoadSpecialK disabled=帧生成输入已启用，Special K 加载已禁用
+FSR FG hudless mismatch fixup=FSR FG 无 HUD 不匹配修正
+Factory wrapping enabled due to delayed ReShade + FG=因 ReShade + FG 延迟而启用工厂包装
+Fix DLSS quality selection in Pragmata=修复《Pragmata》的 DLSS 画质选择
+Fix DLSS/DLSSG barriers on Vulkan=修复 Vulkan 上的 DLSS/DLSSG 屏障
+Fixing DLSSG's hudless state in Cyberpunk=修复《赛博朋克》中 DLSSG 的无 HUD 状态
+Force Borderless when using XeFG=使用 XeFG 时强制无边框
+Force FG render size motion vectors=强制帧生成渲染尺寸的运动矢量
+Force create D3D12 device for w/Dx12=为 w/Dx12 强制创建 D3D12 设备
+Force depth as D32S8=强制深度格式为 D32S8
+Force detected engine as Unreal Engine=强制把引擎识别为 Unreal Engine
+Hack for broken Hitman reflex=针对《杀手》Reflex 异常的兼容处理
+Ignore ValidUntilEvaluate resources for FG=帧生成时忽略 ValidUntilEvaluate 资源
+Ignore tagging calls that lack Hudless resource for FG=帧生成时忽略缺少无 HUD 资源的标记调用
+Load d3d12.dll=加载 d3d12.dll
+Load vulkan-1.dll=加载 vulkan-1.dll
+Luma UE detected, disabling DxgiSpoofing=检测到 Luma UE，禁用 DXGI 伪装
+Luma detected, disabling DxgiSpoofing=检测到 Luma，禁用 DXGI 伪装
+Luma detected, enabling DontUseNTShared=检测到 Luma，启用「不使用 NTShared」
+Override Vsync when using XeFG=使用 XeFG 时覆盖垂直同步
+Sekiro TSR detected, enabling DontUseNTShared=检测到《只狼》TSR，启用「不使用 NTShared」
+Skip pre init checks for XeFG=跳过 XeFG 的预初始化检查
+Skip turning the first swapchain created into an FSR swapchain=不把创建的第一个交换链转为 FSR 交换链
+Skipping D3D11 feature level elevation, native FSR3.1 will be disabled!=跳过 D3D11 功能级别提升，原生 FSR3.1 将被禁用！
+Skipping first FSR 3 method=跳过首个 FSR 3 方法
+Skipping upscaling for first 10 frames=前 10 帧跳过超分
+Spoof Registry=伪装注册表
+Use FSR2 DX11 inputs=使用 FSR2 DX11 输入
+Use FSR2 Vulkan inputs=使用 FSR2 Vulkan 输入
+Use FSR2 pattern matching=使用 FSR2 模式匹配
+Using kernel hooks instead of NTdll ones=使用内核钩子而非 NTdll 钩子
+Using old overlay (draws on upscaled image)=使用旧版叠加层（绘制在超分后的画面上）
+
+
+; ============================================================================
+;  第六批：折叠标题、下拉选项标签、通知
+;  「蓝色下拉标题」就在这里——它们走 ScopedCollapsingHeader()，是菜单里
+;  最显眼的那层分组标题。另外还补齐了帧生成/预设下拉的全部选项名。
+; ============================================================================
+
+; ---------------------------------------------------------------------------
+;  折叠标题（ScopedCollapsingHeader）—— 蓝色分组标题
+; ---------------------------------------------------------------------------
+DLSS Multi Frame Generation (RTX 40 unlock)=DLSS 多帧生成（RTX 40 解锁）
+DLSS Neural Rendering=DLSS 神经渲染
+Dx11 with Dx12 Settings=Dx11 配合 Dx12 设置
+Vulkan with Dx12 Settings=Vulkan 配合 Dx12 设置
+XeSS Settings=XeSS 设置
+FSR 3 Upscaler Manual Tuning=FSR 3 超分手动调校
+Advanced DLSS Settings=DLSS 高级设置
+Advanced DLSSD Settings=DLSSD 高级设置
+Advanced FG Settings=帧生成高级设置
+Extended FSR FG Settings=FSR 帧生成扩展设置
+Extended XeFG Settings=XeFG 扩展设置
+Advanced OptiFG Settings=OptiFG 高级设置
+Advanced DA Parameters=深度感知高级参数
+Advanced Settings=高级设置
+Advanced Init Flags=高级初始化标志
+Resource Barriers=资源屏障
+Root Signatures=根签名
+Menu Theme and Color=菜单主题与配色
+Upscaler Inputs=超分输入
+V-Sync Settings=垂直同步设置
+Anisotropic Filtering=各向异性过滤
+Active Quirks=已启用的兼容调整
+Active DispatchFlags=已启用的 DispatchFlags
+VRR Frame Cap Calculator=VRR 帧率上限计算器
+LatencyFlex mode=LatencyFlex 模式
+Force Reflex=强制 Reflex
+Force State=强制状态
+No support=不支持
+FSR Anti-Lag 2.0=FSR Anti-Lag 2.0
+Vulkan AntiLag=Vulkan AntiLag
+; ---------------------------------------------------------------------------
+;  帧生成 —— 下拉选项标签
+; ---------------------------------------------------------------------------
+OptiFG (Upscaler)=OptiFG（超分）
+DLSSG via Streamline=DLSSG（经 Streamline）
+DLSSG via Nvngx=DLSSG（经 Nvngx）
+FSR 3.1 FG=FSR 3.1 FG
+FSR 3.0 FG=FSR 3.0 FG
+FSR 3 FG=FSR 3 FG
+FSR 3 MFG=FSR 3 多帧生成
+FSR 3/4 FG=FSR 3/4 FG
+FSR 3/4 FG using the FFX=FSR 3/4 FG（经 FFX）
+None (Real DLSSG)=无（使用真正的 DLSSG）
+Real DLSSG, For RTX 40xx and above=真正的 DLSSG，需要 RTX 40 系及以上
+Unsupported API=不支持的 API
+Unsupported hardware=不支持的硬件
+Unsupported hardware and no replacements=硬件不受支持，且没有替代方案
+Support not implemented, they meant FG Output=尚未支持，他们想找的是「帧生成输出」
+FG Input=帧生成输入
+FG Nvngx=帧生成 Nvngx
+FG Output=帧生成输出
+FG Nvngx Replacement=帧生成 Nvngx 替代
+Nvngx FFX=Nvngx FFX
+DLSS NR : ON=DLSS 神经渲染 : 开
+DLSS NR : OFF=DLSS 神经渲染 : 关
+; ---------------------------------------------------------------------------
+;  预设 —— 下拉选项标签
+; ---------------------------------------------------------------------------
+Override Preset=覆盖预设
+DLAA Preset=DLAA 预设
+UltraQ Preset=极高画质预设
+Quality Preset=画质预设
+Balanced Preset=均衡预设
+Perf Preset=性能预设
+UltraP Preset=极致性能预设
+; ---------------------------------------------------------------------------
+;  其它界面文本
+; ---------------------------------------------------------------------------
+Just Ext=仅扩展
+DXVK w/Dx12=DXVK 配合 Dx12
+off (game decides)=关闭（由游戏决定）
+Only FSR1 and Bicubic are supported when Ratio is below 1.0.=比例低于 1.0 时仅支持 FSR1 和 Bicubic。
+Custom Accent Color=自定义强调色
+Custom BG Colour=自定义背景色
+Display Width=显示宽度
+Render Width=渲染宽度
+Auto (%3.1f)=自动 (%3.1f)
+\s(RTSS)=\s（RTSS）
+\s(inactive)=\s（未生效）
+\s\s(model running, edit hidden)=\s\s（模型运行中，修改已隐藏）
+Paper white (editing point %d)=纸张白（正在编辑第 %d 个点）
+\s\s\s[editing]=\s\s\s[编辑中]
+%.1f%% of screen=屏幕的 %.1f%%
+%.2f%% of screen=屏幕的 %.2f%%
+; ---------------------------------------------------------------------------
+;  FPS 叠加层（printf 格式串，占位符必须保留）
+; ---------------------------------------------------------------------------
+FPS: %6.1f/%5.1f, %7.2f ms=帧率: %6.1f/%5.1f, %7.2f 毫秒
+FPS: %6.1f/%5.1f, Avg: %6.1f=帧率: %6.1f/%5.1f, 平均: %6.1f
+FPS: %6.1f, %7.2f ms=帧率: %6.1f, %7.2f 毫秒
+FPS: %6.1f, Avg: %6.1f=帧率: %6.1f, 平均: %6.1f
+Frame Time: %7.2f ms, Avg: %7.2f ms=帧时间: %7.2f 毫秒, 平均: %7.2f 毫秒
+Upscaler Time: %7.2f ms, Avg: %7.2f ms=超分耗时: %7.2f 毫秒, 平均: %7.2f 毫秒
+%7.2f ms / %6.1f fps=%7.2f 毫秒 / %6.1f 帧
+; ---------------------------------------------------------------------------
+;  通知（toast）
+; ---------------------------------------------------------------------------
+OptiScaler Update available=OptiScaler 有可用更新
+Press %s for more info=按 %s 查看详情
+Late Streamline hook detected=检测到 Streamline 挂载过晚
+Silly goose detected=检测到憨憨行为
+FSR 4 FP8 only works on AMD=FSR 4 的 FP8 仅在 AMD 上可用
+Trace logging still active=跟踪日志仍处于开启状态
+; ---------------------------------------------------------------------------
+;  XeSS 错误描述
+; ---------------------------------------------------------------------------
+Warning Nonexistent Folder=警告：文件夹不存在
+Warning Old Driver=警告：驱动过旧
+Unsupported Device=不支持的设备
+Unsupported Driver=不支持的驱动
+Invalid Argument=参数无效
+Device Out of Memory=设备显存不足
+Device Error=设备错误
+Not Implemented=尚未实现
+Invalid Context=上下文无效
+Operation in Progress=操作正在进行
+Cannot Load Library=无法加载库
+; ---------------------------------------------------------------------------
+;  FFX 结果码描述（用于日志与提示）
+; ---------------------------------------------------------------------------
+The operation was successful.=操作成功。
+An error occurred that is not further specified.=发生了未进一步说明的错误。
+The structure type given was not recognized for the function or context with which it was used. This is likely a programming error.=给定的结构体类型未被该函数或上下文识别。这很可能是程序错误。
+The underlying runtime (e.g. D3D12, Vulkan) or effect returned an error code.=底层运行时（如 D3D12、Vulkan）或效果返回了错误码。
+No provider was found for the given structure type. This is likely a programming error.=未找到该结构体类型的提供者。这很可能是程序错误。
+A memory allocation failed.=内存分配失败。
+A parameter was invalid, e.g. a null pointer, empty resource or out-of-bounds enum value.=参数无效，例如空指针、空资源或越界的枚举值。
+; ---------------------------------------------------------------------------
+;  Vulkan 叠加层调试资源名
+; ---------------------------------------------------------------------------
+ImGui Backbuffer View=ImGui 后台缓冲视图
+ImGui Backbuffer Framebuffer=ImGui 后台缓冲帧缓冲
+ImGui Backbuffer Command Pool=ImGui 后台缓冲命令池
+ImGui Backbuffer Command Buffer=ImGui 后台缓冲命令缓冲
+ImGui Backbuffer Fence=ImGui 后台缓冲栅栏
+ImGui Backbuffer Semaphore=ImGui 后台缓冲信号量
+
+
+; ============================================================================
+;  第七批：printf 参数与 snprintf 拼装串
+;  这些字符串在进入 ImGui 之前就被替换或拼好了，绘制钩子看不到它们，
+;  因此源码里改用 L10N::T() 显式翻译（见 Localization.h 的说明）。
+; ============================================================================
+
+; ---------------------------------------------------------------------------
+;  文件存在性状态（作为 printf 参数传入）
+; ---------------------------------------------------------------------------
+Exists=存在
+Exist=存在
+; ---------------------------------------------------------------------------
+;  DispatchFlags 资源状态
+; ---------------------------------------------------------------------------
+Passive=未启用
+MOVES=有变化
+; ---------------------------------------------------------------------------
+;  帧生成输出选项
+; ---------------------------------------------------------------------------
+None=无
+FSR FG=FSR 帧生成
+; ---------------------------------------------------------------------------
+;  曝光扫描列表（snprintf 拼装 / 作为 printf 参数）
+; ---------------------------------------------------------------------------
+%zu. %s \= %.5f  (seen %.5f..%.5f) %s=%zu. %s = %.5f  （区间 %.5f..%.5f） %s
+%s scan %.4f  ->  white %.2f%s=%s 扫描 %.4f  ->  白点 %.2f%s
+
+; ---------------------------------------------------------------------------
+;  上游 2026-11 更新新增的菜单条目（卡片式菜单 / XeFG / 界面外观等）
+; ---------------------------------------------------------------------------
+Upscalers=超分器
+Menu=菜单
+Keybinds=按键绑定
+Logging=日志
+Quirks=兼容性调整
+Custom Tab=自定义标签页
+Presets=预设
+Layout=布局
+Colors=颜色
+Text=文本
+Method=方式
+Model=模型
+Colour=颜色
+Strength=强度
+Yes=是
+OFF=关
+Idle=空闲
+DLSS capable GPU=支持 DLSS 的 GPU
+FSR4 capable GPU=支持 FSR 4 的 GPU
+DXGI Spoofing=DXGI 伪装
+VLK Spoofing=Vulkan 伪装
+VLK Extension Spoofing=Vulkan 扩展伪装
+Ntdll Hooks=Ntdll 钩子
+FSR hooks=FSR 钩子
+Barriers overridden=已覆盖屏障
+nvngx replacement=nvngx 替代
+Single File=单文件
+Spoof=伪装
+Game's=游戏的
+Game's present mode: %s=游戏的呈现模式：%s
+Incompatible: %s=不兼容：%s
+Current XeFG state:=当前 XeFG 状态：
+Dynamic Res. (DRS)=动态分辨率（DRS）
+DRS Override Maximum=DRS 覆盖上限
+DRS Override Minimum=DRS 覆盖下限
+FFX SR=FFX 超分
+FFX Vk=FFX Vulkan
+FFX Vk FG=FFX Vulkan 帧生成
+FFX Vk SR=FFX Vulkan 超分
+Dynamic MFG=动态 MFG
+Allow 1X=允许 1X
+Override Vsync=覆盖垂直同步
+Disable HW Flip Metering=禁用硬件翻转计量
+Disable Splash message=禁用启动提示
+Disable Overlays=禁用覆盖层
+Disable HUDFix Resource Tracking=禁用 HUDFix 资源追踪
+Save Settings and restart the game: XeFG keeps the low latency output it started with=保存设置并重启游戏：XeFG 会保持启动时的低延迟输出方式
+FPS Row=FPS 行
+Graph Height=图表高度
+Horizontal Position=水平位置
+Vertical Position=垂直位置
+Update Interval=刷新间隔
+Font Size=字体大小
+Row Spacing=行间距
+Letter Spacing=字间距
+Text Shadow=文字阴影
+Use Theme=使用主题
+Reset Appearance=重置外观
+Menu font=菜单字体
+Corner Rounding=圆角
+Background Blur=背景模糊
+Blur Strength=模糊强度
+Shadow Strength=阴影强度
+Show static elements=显示静态元素
+Show Custom tab=显示自定义标签页
+Reset Custom Tab=重置自定义标签页
+Nothing picked yet, choose the boxes in Menu > Custom Tab=尚未选择任何项目，请在「菜单 > 自定义标签页」中勾选卡片
+None of the picked boxes are available right now=已勾选的卡片当前都不可用
+Check for Update=检查更新
+Copy Code=复制代码
+Paste Code=粘贴代码
+Late latch mouse=延迟锁存鼠标
+Cutoff expand=切断扩展
+Depth cutoff=深度切断
+Direction cache=方向缓存
+Not updating camera rotation=未更新相机旋转
+Updated camera rotation by: %.1fms=相机旋转已更新 %.1fms
+1st person (%.2f, orbit %.2f)=第一人称（%.2f，环绕 %.2f）
+3rd person detected (%.2f, orbit %.2f)=检测到第三人称（%.2f，环绕 %.2f）
+Pause in 3rd person=第三人称时暂停
+Paused, 3rd person detected=已暂停，检测到第三人称
+(needs the parallax scale)=（需要视差缩放）
+(no usable motion vectors)=（没有可用的运动向量）
+UI Texture=UI 纹理
+Unblend UI=分离 UI 混合
+Flip HUDless=翻转无 HUD 帧
+Per shader GPU times=各着色器 GPU 耗时
+Load ASI plugins=加载 ASI 插件
+(DRS)=（DRS）
+(Dynamic)=（动态）
+(Off)=（关）
+(Current: disabled)=（当前：已禁用）
+(Current: %.3f)=（当前：%.3f）
+(Active: %s)=（生效：%s）
+(Mode %u)=（模式 %u）
+Save Settings and restart the game for Enable and Pattern changes to apply=保存设置并重启游戏后，启用与图案的改动才会生效
+Selecting setting below will disable that external override\n=选择下面的设置会关闭那个外部覆盖\n
+Please select %s as upscaler from game options and load a save game to enable Opti settings.\n=请在游戏选项中选择 %s 作为超分器，并载入一个存档，才能启用 Opti 设置。\n
+Please select DLSS Frame Generation in the game options\n=请在游戏选项中选择 DLSS 帧生成\n
+Please select FSR Frame Generation in the game options\n=请在游戏选项中选择 FSR 帧生成\n
+%s active, but currently not used by the game\nPlease load into the game=%s 已生效，但游戏当前未使用它\n请进入游戏
+%08x, %s->%s, Count: %llu, %s=%08x, %s->%s, 数量：%llu, %s
+Frametime: %.2fms / %.1ffps (avg: %.1ffps)=帧耗时：%.2fms / %.1ffps（平均：%.1ffps）
+Upscaler GPU time: %.2fms (avg: %.2fms)=超分 GPU 耗时：%.2fms（平均：%.2fms）
+GB Ver: %d.%d=GB 版本：%d.%d
+Click a row to edit it with the slider above; click it again=点击一行即可用上方的滑块编辑；再点一次取消选中
+(the scan is only watching -- the white point above comes=（扫描只是在观察——上方的白点来自
+The model was trained on finished, sRGB-encoded frames. The upscaler's=该模型是在成品 sRGB 编码画面上训练的。超分器输出的
+Supersampling %.2fx: the model runs ABOVE native, then\n=超采样 %.2fx：模型在原生分辨率之上运行，然后\n
+Can be toggled with a key -- bind it under Keybinds, "Neural Rendering".=可以用按键切换——在「按键绑定」里给「神经渲染」绑定一个键。
+Use as FPS limit=用作 FPS 上限

@@ -2551,6 +2551,200 @@
         "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/pipo-sm86-10-complete-0a4a32462a6f.zip"
       },
       "version": "0.4.2"
+    },
+    {
+      "archive": "optiscaler-nr-0.9.97-base-78b7437958e2.zip",
+      "archive_prefix": "",
+      "backends": [
+        "optiscaler_nr"
+      ],
+      "bytes": 175575365,
+      "component": false,
+      "files": [
+        {
+          "bytes": 28002152,
+          "name": "dxgi.dll",
+          "sha256": "d60b33a874b8a964451d562821b639deed16451af1cc26e5a6ba727191aa8e10"
+        },
+        {
+          "bytes": 79634,
+          "name": "OptiScaler.ini",
+          "sha256": "a9a6c21ac89c3992ce7bd1121de3b3cb04d114af8ab763b6d940bf2f2927530c"
+        },
+        {
+          "bytes": 40085776,
+          "name": "OptiScaler/amd_fidelityfx_framegeneration_dx12.dll",
+          "sha256": "02297beedd285e822d3a64f314cf00faf378dcec0edc47ff0c4dd71b3a8c2f18"
+        },
+        {
+          "bytes": 26376,
+          "name": "OptiScaler/amd_fidelityfx_loader_dx12.dll",
+          "sha256": "e2d85aa05a9bd9ed8b38935fdf5199372cca6f74c12015143bb6f945ee1608aa"
+        },
+        {
+          "bytes": 28761864,
+          "name": "OptiScaler/amd_fidelityfx_upscaler_dx12.dll",
+          "sha256": "d0dcccc74a43c44ba435b7a369b456e0970d8a4464e4bd683119b374f2c9fb46"
+        },
+        {
+          "bytes": 9332432,
+          "name": "OptiScaler/amd_fidelityfx_vk.dll",
+          "sha256": "a1624cc4238fef046f30c4d80ce3f47be63fc5f5373f49e3ee9edb9960f54c78"
+        },
+        {
+          "bytes": 3351064,
+          "name": "OptiScaler/D3D12_OptiScaler/D3D12Core.dll",
+          "sha256": "07d286c306f8117321422affd9e6388c12d0fb4be1c7fc689d9e899324feeb24"
+        },
+        {
+          "bytes": 830176,
+          "name": "OptiScaler/dlssg_sm86/dlssg_sm86.dll",
+          "sha256": "321af25f3048b6b38cd9e085de69320b860c3bd9c25fb2f4f098464329296a6e"
+        },
+        {
+          "bytes": 10593,
+          "name": "OptiScaler/dlssg_sm86/dlssg_sm86.ini",
+          "sha256": "135aa53447e332028d344d3968e6a430d92ad133aba1416013547dbb729a2794"
+        },
+        {
+          "bytes": 2356416,
+          "name": "OptiScaler/dlssg_sm86/dlssg_sm86/backend/sm86_backend.dll",
+          "sha256": "bcda9db15c1069892e224321329ecd7741c0f5962e3794502dce93248306bdfa"
+        },
+        {
+          "bytes": 11987504,
+          "name": "OptiScaler/dlssg_sm86/dlssg_sm86/kernels/fg_kernels.dll",
+          "sha256": "af51556ff35b1fcf6d4f345c968e6ecf506e08cc7437e08ad152d1a2d9e303be"
+        },
+        {
+          "bytes": 7506544,
+          "name": "OptiScaler/dlssg_sm86/dlssg_sm86/runtime/nvngx_dlssg.dll",
+          "sha256": "cadee1aa6db3907babdc3285da2aebc4553d92b89c38ba3eae8abd8bba1bea72"
+        },
+        {
+          "bytes": 415368,
+          "name": "OptiScaler/libxell.dll",
+          "sha256": "d2030dcd694fda8f2ec7e044b13e6db8f0b56d4ba9113a5efad334e3f3ded8c7"
+        },
+        {
+          "bytes": 156016,
+          "name": "OptiScaler/libxess_dx11.dll",
+          "sha256": "c7cfe86f0c9d94e4fb3696d3cd5035e2bbb6a8b1b0572f8b7395a4cdfd0c625e"
+        },
+        {
+          "bytes": 22957432,
+          "name": "OptiScaler/libxess_fg.dll",
+          "sha256": "ec5e0c65e075570c6ede72618bb666d0be0c2e10b2ea9762c0fe8cb8e375ab27"
+        },
+        {
+          "bytes": 77795704,
+          "name": "OptiScaler/libxess.dll",
+          "sha256": "251659dd84a3e84de67c886a4186e01f3eca49b00641906fe38bb6b807e5d5b7"
+        },
+        {
+          "bytes": 5013480,
+          "name": "OptiScaler/nvfp4/hybrid/candidate/split-half/fused_expand.cubin",
+          "sha256": "d516fe1ac387d59f83b097214ca9b89fcebc86f26367f9ddc7e8cb692e776659"
+        },
+        {
+          "bytes": 55808,
+          "name": "OptiScaler/nvfp4/hybrid/candidate/split-half/params_builder.dll",
+          "sha256": "59c9da127ef3feb56939632004ed0921621dcb6be5f8630c00e7ac89f7763a04"
+        },
+        {
+          "bytes": 591,
+          "name": "OptiScaler/nvfp4/hybrid/contract_m2160/manifest.txt",
+          "sha256": "f37a469b587bd0ed254fcb04d99f6b7ad791a27204ecb03a2a4988254be8e203"
+        },
+        {
+          "bytes": 3456,
+          "name": "OptiScaler/nvfp4/hybrid/contract_m2160/params.bin",
+          "sha256": "4f11ba182d9929b2d221ae7f7c7575dd9d6ac61f6d50bf3dd8b7e42a44d8126e"
+        },
+        {
+          "bytes": 591,
+          "name": "OptiScaler/nvfp4/hybrid/contract_m3840/manifest.txt",
+          "sha256": "f11afd6affb0b438313367d885e5bd33fae01a77a7c370dd3f31822530be7717"
+        },
+        {
+          "bytes": 3456,
+          "name": "OptiScaler/nvfp4/hybrid/contract_m3840/params.bin",
+          "sha256": "e19897f8174aaf4fac22db6c7e9ac52b0bd4af6b17a283be07280da697667698"
+        },
+        {
+          "bytes": 590,
+          "name": "OptiScaler/nvfp4/hybrid/contract/manifest.txt",
+          "sha256": "f7e18e5a454abaaa61faf56040a8c44a25661f98ada48e7f4358ba022c9067b4"
+        },
+        {
+          "bytes": 3456,
+          "name": "OptiScaler/nvfp4/hybrid/contract/params.bin",
+          "sha256": "928907d65a5c714799b78f002a610837c264a2a00b0aae3aba838d25a05b2551"
+        },
+        {
+          "bytes": 116,
+          "name": "OptiScaler/nvfp4/hybrid/contracts.txt",
+          "sha256": "57c4627aeb05e8efe16f5f1116c06cd12afbe527a772be9d3c02f3df7ff154ac"
+        },
+        {
+          "bytes": 4960880,
+          "name": "OptiScaler/nvfp4/hybrid/expansion/fused_expand.cubin",
+          "sha256": "fe7f5700ac5e6d5a2fe6571d0f369c9432fabcb29120fdfa33f1ec1c05727ee1"
+        },
+        {
+          "bytes": 55296,
+          "name": "OptiScaler/nvfp4/hybrid/expansion/params_builder.dll",
+          "sha256": "5b5a8902dd856aae752bafc3ea30db9a69beb348a0f50fb79bf1377f690ff4fb"
+        },
+        {
+          "bytes": 82712,
+          "name": "OptiScaler/nvfp4/hybrid/original_io.cubin",
+          "sha256": "9def9af8e5ebf6a17cd8dc2f8ca36d6bd5bdc1eb8c927f9d9a890e38fde0890e"
+        },
+        {
+          "bytes": 2706504,
+          "name": "OptiScaler/nvfp4/hybrid/sm120_16255890_da0cd6180a8a.cubin",
+          "sha256": "da0cd6180a8a4d739c3bd94ade55cbafc4246039a4f7c3dc8cc1a93ddd79df31"
+        },
+        {
+          "bytes": 37765120,
+          "name": "OptiScaler/nvfp4/hybrid/weights.bin",
+          "sha256": "735f0a04a156dcf625097ae34222827bb9cbab8c4c69d09418a7e577034a0371"
+        },
+        {
+          "bytes": 636,
+          "name": "OptiScaler/nvfp4/hybrid/weights.txt",
+          "sha256": "dc15da940164cd71eb619ae24d85f9c3ddf3e84ca332445fa9ee6fed00b444ab"
+        },
+        {
+          "bytes": 111608,
+          "name": "OptiScaler/nvsmooth30.dll",
+          "sha256": "81c5a8dca5abecf6d75fd13bf5b6ce106c7f6aac96edf3451630365e14927ec7"
+        },
+        {
+          "bytes": 235846,
+          "name": "OptiScaler/licenses/THIRD-PARTY-NOTICES.txt",
+          "sha256": "d2f76c221444ec78b2f4eac3427aec503db94d7666a7b93449cd121d943b048d"
+        }
+      ],
+      "id": "optiscaler-nr-0.9.97-78b7437958e2",
+      "label": "OptiScaler-NR-PreSR-MFG · 0.9.97",
+      "labels": {
+        "en": "OptiScaler-NR-PreSR-MFG · 0.9.97",
+        "ja": "OptiScaler-NR-PreSR-MFG · 0.9.97",
+        "ko": "OptiScaler-NR-PreSR-MFG · 0.9.97",
+        "ru": "OptiScaler-NR-PreSR-MFG · 0.9.97",
+        "zh": "OptiScaler-NR-PreSR-MFG · 0.9.97"
+      },
+      "proxy": "dxgi.dll",
+      "scheme_id": "optiscaler-nr-presr-mfg",
+      "sha256": "78b7437958e2493a613da09edfd73b9cff0cd165a78d939975fbf18361ede353",
+      "upstream_version": "0.9.97",
+      "urls": {
+        "domestic": "https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager-payloads/releases/download/payloads/optiscaler-nr-0.9.97-base-78b7437958e2.zip",
+        "github": "https://github.com/pandaligx/RTX-FG-Manager/releases/download/payloads/optiscaler-nr-0.9.97-base-78b7437958e2.zip"
+      },
+      "version": "0.9.97"
     }
   ],
   "revision": "bundles-331fa0797a23b5e1e2d2",
@@ -2738,6 +2932,17 @@
       "ini_policy": "native",
       "max_selected_proxies": 5,
       "parameter_profile": "native026"
+    },
+    "optiscaler-nr-presr-mfg": {
+      "defaults": {},
+      "gpu_paths": [
+        "SM75",
+        "SM86",
+        "SM89"
+      ],
+      "ini_policy": "optiscaler_nr",
+      "max_selected_proxies": 1,
+      "parameter_profile": "optiscaler_nr_ini"
     },
     "pipo-sm86-10": {
       "capabilities": [],

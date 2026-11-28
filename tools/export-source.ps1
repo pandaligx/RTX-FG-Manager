@@ -77,6 +77,11 @@ foreach ($name in @(
 )) { Add-File $name }
 foreach ($name in @('README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md', 'CONTRIBUTING.md', 'SECURITY.md', 'docs/encore-1.1.0.md', 'docs/encore-1.1.0.zh-CN.md')) { Add-File $name $false }
 Add-File 'tools/build_game_names.py'
+Add-File 'tools/package_optiscaler_nr.py'
+foreach ($name in @('README.md', 'LICENSE.upstream', 'OFL-Noto.txt', 'MenuZh.h', 'build_menu.py', 'overlay.tsv', 'upstream-zh-CN.txt', 'verify_menu.cpp', 'optiscaler-0.9.97.patch')) {
+    Add-File "packaging/optiscaler-menu-zh-CN/$name"
+}
+Add-File 'tests/encore_shared_clean_game.rs'
 Add-File 'tools/game-name-overrides.json'
 Add-File 'tests/test_game_names.py'
 Add-File '.github/workflows/update-game-names.yml'

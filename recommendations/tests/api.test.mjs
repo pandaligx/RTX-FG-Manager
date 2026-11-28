@@ -14,6 +14,26 @@ const content=()=>({schema:1,game:{id:'steam:292030',name:'巫师 3'},title:'DX1
 const shared=()=>({...content(),patchVersion:'1.4.2',presets:{schema:1,profile:'rtx_encore_json_v4',values:{nrIntensity:'0.5',nrEnabled:'0'},defaults:{nrIntensity:'1',nrEnabled:'0'}}});
 const complete=()=>({...shared(),runtimes:{schema:1,components:[{kind:'sr',source:'game',versions:['310.9.16.0']},{kind:'nr',source:'game',versions:['310.9.16.0']}]}});
 
+test('standalone OptiScaler presets survive an older client editing the notes', async t => {
+  const f = fixture(t), user = await f.login();
+  const headers = {'x-rtxfg-optiscaler-nr':'1','x-rtxfg-optiscaler-sl':'1'};
+  const presets = {schema:1, profile:'optiscaler_nr_ini', values:{nr_passes:'2'}, defaults:{nr_passes:'auto'}};
+  const runtimes = {schema:1,components:[{kind:'optiscaler-sl',source:'managed',versions:['2.14.16'],packageVersion:'2.14.16'}]};
+  const setup = {...content(), scheme:'optiscaler-nr-presr-mfg', patchVersion:'0.9.97', entries:['OptiScaler.asi'], presets, runtimes};
+  const posted = await f.call('POST','/v1/recipes',{submission:randomUUID(),content:setup},user.token,'test-ip',16,headers);
+  const path = '/v1/recipes/'+posted.id;
+  const old = await f.call('GET',path,null,user.token,'test-ip',16);
+  assert.equal(old.content.presets,undefined);
+  assert.equal(old.content.runtimes,undefined);
+  await f.call('PUT',path,{revision:1,content:{...old.content,notes:'Updated notes'}},user.token,'test-ip',16);
+  const fresh = await f.call('GET',path,null,user.token,'test-ip',16,headers);
+  assert.deepEqual(fresh.content.presets,presets);
+  assert.deepEqual(fresh.content.runtimes,runtimes);
+  assert.throws(()=>recipe({...content(),runtimes}));
+  assert.deepEqual(fresh.content.entries,['OptiScaler.asi']);
+  assert.throws(()=>recipe({...setup,entries:['dxgi.dll','version.dll']}));
+});
+
 test('creator homepages and the 1.7.2 route survive a legacy edit; the author can remove them', async t => {
   const f = fixture(t), user = await f.login();
   const modern = {'x-rtxfg-mfg172':'1', 'x-rtxfg-creator-links':'1'};

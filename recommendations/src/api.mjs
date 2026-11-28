@@ -52,6 +52,7 @@ export function createApi(db, options) {
     const supportsEncore240=headers['x-rtxfg-encore240']==='1';
     const unsupportedPreset = content => content.presets && (
       content.scheme==='pipo-sm86-10' && headers['x-rtxfg-pipo042']!=='1'
+      || content.scheme==='optiscaler-nr-presr-mfg' && headers['x-rtxfg-optiscaler-nr']!=='1'
       || content.presets.profile==='rtx_encore_json_v4' && headers['x-rtxfg-encore250']!=='1'
         && ['values','defaults'].some(part=>content.presets[part]?.dlssWithoutGameDlssEngine==='mwsr')
     );
@@ -66,6 +67,8 @@ export function createApi(db, options) {
     const encore220=p=>p?.profile==='rtx_encore_json_v4' && ['values','defaults'].some(part=>['overrideAutoFrameGeneration','spatialSharpness','spatialAa','spatialAaPlacement','spatialAaQuality'].some(k=>Object.hasOwn(p[part],k)) || p[part].dlssWithoutGameDlssEngine==='nis');
     const encore230=p=>p?.profile==='rtx_encore_json_v4' && ['values','defaults'].some(part=>['xefgSourcePacingMode','xefgSourcePacingLossPercent','xefgSourcePacingManualDetection','xefgSourcePacingManualAdjustments','nrExposureMode'].some(k=>Object.hasOwn(p[part],k)) || p[part].nrPlacement==='present' || p[part].presentOpticalFlow==='game' || p[part].dlssWithoutGameDlssEngine==='fsr1');
     const nativeSL = headers['x-rtxfg-native-streamline'] === '1';
+    const privateSL = headers['x-rtxfg-optiscaler-sl'] === '1';
+    const visibleSL = c => (c.kind!=='streamline' || nativeSL) && (c.kind!=='optiscaler-sl' || privateSL);
     const addedFg=r=>r?.components.some(c=>c.kind==='encorefg');
     const crossStore=['4','5','6','7','8','9','10','11','12','13','14','15','16'].includes(feedback);
     const context=url.searchParams.get('game');
@@ -74,8 +77,8 @@ export function createApi(db, options) {
       if (supportsInstalls) result.downloads = Number(row.downloads);
       if(!['6','7','8','9','10','11','12','13','14','15','16'].includes(feedback)) delete result.content.presets;
       if(!['7','8','9','10','11','12','13','14','15','16'].includes(feedback)) delete result.content.runtimes;
-      if(!nativeSL && result.content.runtimes){
-        result.content.runtimes.components=result.content.runtimes.components.filter(c=>c.kind!=='streamline');
+      if((!nativeSL || !privateSL) && result.content.runtimes){
+        result.content.runtimes.components=result.content.runtimes.components.filter(visibleSL);
         if(!result.content.runtimes.components.length)delete result.content.runtimes;
       }
       if(!['9','10','11','12','13','14','15','16'].includes(feedback) && result.content.presets?.profile==='upstream041') delete result.content.presets;
@@ -247,11 +250,11 @@ export function createApi(db, options) {
         if(encore200(original.presets)) content.presets=original.presets;
         if(addedFg(original.runtimes)) content.runtimes=original.runtimes;
       }
-      if(!nativeSL && original.scheme===content.scheme && original.patchVersion===content.patchVersion){
-        const sl=original.runtimes?.components.find(c=>c.kind==='streamline');
-        if(sl){
-          const components=(content.runtimes?.components || []).filter(c=>c.kind!=='streamline');
-          content.runtimes={schema:1,components:[...components,sl]};
+      if((!nativeSL || !privateSL) && original.scheme===content.scheme && original.patchVersion===content.patchVersion){
+        const hidden=original.runtimes?.components.filter(c=>!visibleSL(c));
+        if(hidden?.length){
+          const components=(content.runtimes?.components || []).filter(visibleSL);
+          content.runtimes={schema:1,components:[...components,...hidden]};
         }
       }
       if(!crossStore)for(const field of ['platform','edition'])if(original[field])content[field]=original[field];

@@ -812,7 +812,11 @@ impl Manager {
                     if yes && !p.contains(&name) {
                         // Plugin mode and DLL mode are distinct loading methods.
                         if name.ends_with(".asi")
-                            || self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE
+                            || matches!(
+                                self.c.parameter_profile().as_str(),
+                                rtx_fg_manager::anr::PROFILE
+                                    | rtx_fg_manager::optiscaler_nr::PROFILE
+                            )
                         {
                             p.clear();
                         } else {
@@ -820,8 +824,10 @@ impl Manager {
                         }
                         p.push(name)
                     } else if !yes
-                        && !(self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE
-                            && p.len() == 1)
+                        && !(matches!(
+                            self.c.parameter_profile().as_str(),
+                            rtx_fg_manager::anr::PROFILE | rtx_fg_manager::optiscaler_nr::PROFILE
+                        ) && p.len() == 1)
                     {
                         p.retain(|p| *p != name)
                     }
@@ -2368,6 +2374,7 @@ impl Manager {
             .child(title)
             .when(self.c.boolean("preset_help_open", false), |d| d.child(Alert::info("preset-inline-help", self.t(if context.profile == rtx_fg_manager::rtxmfg::PROFILE {
                 "独立安装按 Backspace 打开菜单。插件模式在 OptiScaler 中选择帧生成输出。"
+            } else if context.profile == rtx_fg_manager::optiscaler_nr::PROFILE { rtx_fg_manager::optiscaler_nr::HELP
             } else if context.profile == rtx_fg_manager::anr::PROFILE {
                 "ANR FG：Insert（Ins）打开菜单。游戏内开启帧生成；默认最高6X，实际倍率由游戏请求。修改参数后重启游戏。"
             } else if context.profile == rtx_fg_manager::transfusion::PROFILE {
@@ -2443,6 +2450,8 @@ impl Manager {
             "Insert 打开菜单。建议单选 DLL；ASI 不能与 DLL 同装。多选可能冲突，Bink 原件须保留为 Hooked 文件。"
         } else if self.c.parameter_profile() == rtx_fg_manager::presets::MFG_VULKAN {
             "仅用 version.dll，不要改名或混装其他 DLL。"
+        } else if self.c.parameter_profile() == rtx_fg_manager::optiscaler_nr::PROFILE {
+            rtx_fg_manager::optiscaler_nr::HELP
         } else if self.c.parameter_profile() == rtx_fg_manager::anr::PROFILE {
             "Insert（Ins）打开菜单。DX12 选 dxgi.dll，Vulkan 选 winmm.dll。需 VC++ 2015–2022 x64；已有 OptiScaler 请先还原。"
         } else if self.c.parameter_profile() == rtx_fg_manager::transfusion::PROFILE {
@@ -3038,22 +3047,22 @@ impl Manager {
             .map(|e| e.native_neural_runtimes.as_slice())
             .unwrap_or_default();
         let added_nr = !statuses.is_empty()
-            && statuses
-                .iter()
-                .all(|n| rtx_fg_manager::encore::supports_200(n.encore_version.as_deref()));
+            && statuses.iter().all(|n| {
+                n.optiscaler_nr || rtx_fg_manager::encore::supports_200(n.encore_version.as_deref())
+            });
         let reason = if statuses.is_empty() {
             "正在检测…"
         } else if statuses
             .iter()
-            .any(|n| n.encore_version.is_none() && n.mfg_version.is_none())
+            .any(|n| !n.optiscaler_nr && n.encore_version.is_none() && n.mfg_version.is_none())
         {
             if native_files.is_empty() {
-                "请先在所有部署目录安装 Encore 或 MFG 1.7+。"
+                "请先在所有部署目录安装支持神经渲染的方案。"
             } else {
-                "原生开关由游戏和显卡决定。此处的安装按钮仅用于 Encore 或 MFG。"
+                "游戏内的神经渲染开关取决于游戏和显卡。"
             }
         } else if statuses.iter().any(|n| !n.supports(version)) {
-            "NR 需要 Encore 1.1.0+ 或 MFG 1.7.0+；MFG 使用 310.9.16 运行库"
+            "当前方案不支持所选运行库版本。"
         } else if added_nr {
             ""
         } else if evidence.is_none() {
@@ -3112,7 +3121,7 @@ impl Manager {
                 .join("\n\n");
             format!(
                 "{locations}\n\n{}",
-                self.c.text("仅安装运行库；游戏内开启 DLSS/DLAA 后，Encore 按 Insert，MFG 按 Backspace 设置 NR。")
+                self.c.text(if statuses.iter().any(|n| n.optiscaler_nr) { rtx_fg_manager::optiscaler_nr::HELP } else { "仅安装运行库；游戏内开启 DLSS/DLAA 后，Encore 按 Insert，MFG 按 Backspace 设置 NR。" })
             )
         };
         let runtime_items = [
@@ -3834,7 +3843,12 @@ impl Manager {
             (self.t("日志级别"),self.t("默认 1 只记录错误；2 用于诊断；3 记录详细过程。0.2.6 的 Vulkan 桥接日志暂不受此开关控制。")),
             (self.t("怎样生效"),self.t("仅保存当前游戏、当前方案的参数。完全退出游戏后点击安装补丁以应用；已部署相同 DLL 时只更新这些参数，保留其他 INI 内容。恢复默认只重置这里的选项。")),
         ];
-        if profile == rtx_fg_manager::anr::PROFILE {
+        if profile == rtx_fg_manager::optiscaler_nr::PROFILE {
+            sections = vec![(
+                self.t("使用说明"),
+                self.t(rtx_fg_manager::optiscaler_nr::HELP),
+            )];
+        } else if profile == rtx_fg_manager::anr::PROFILE {
             sections = vec![
                 (self.t("当前方案"), self.c.cloud_label(self.c.catalog.selected(&self.c.cloud_scheme())).into()),
                 (self.t("使用说明"), self.t("ANR FG：Insert（Ins）打开菜单。游戏内开启帧生成；默认最高6X，实际倍率由游戏请求。修改参数后重启游戏。")),

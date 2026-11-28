@@ -213,6 +213,7 @@ fn defer_if_running(
 pub struct NativeSelections {
     pub runtimes: BTreeMap<String, BTreeSet<runtime_files::NativeComponent>>,
     pub yanyun: BTreeSet<String>,
+    pub opti_nr: BTreeSet<String>,
 }
 impl NativeSelections {
     fn clear(&mut self) {
@@ -236,6 +237,7 @@ pub struct PatchInstallPlan {
     pub fingerprint: String,
     pub paths: BTreeSet<String>,
     pub choices: Vec<rtx_fg_manager::encore_install::Choice>,
+    pub opti_options: Vec<(String, String)>,
     pub dlssg_options: Vec<DlssgInstallOption>,
 }
 struct PatchRequest {
@@ -338,6 +340,7 @@ fn uses_explicit_edits(profile: &str) -> bool {
     matches!(
         profile,
         rtx_fg_manager::encore::PROFILE
+            | rtx_fg_manager::optiscaler_nr::PROFILE
             | rtx_fg_manager::anr::PROFILE
             | rtx_fg_manager::rtxmfg::PROFILE
             | rtx_fg_manager::upstream040::PROFILE
@@ -350,6 +353,7 @@ fn read_json_preset_values(
     profile: &str,
 ) -> Result<rtx_fg_manager::presets::Values> {
     let config = match profile {
+        rtx_fg_manager::optiscaler_nr::PROFILE => rtx_fg_manager::optiscaler_nr::CONFIG,
         rtx_fg_manager::anr::PROFILE => rtx_fg_manager::anr::CONFIG,
         rtx_fg_manager::encore::PROFILE => rtx_fg_manager::encore::CONFIG,
         rtx_fg_manager::rtxmfg::PROFILE => rtx_fg_manager::rtxmfg::CONFIG,
@@ -361,7 +365,9 @@ fn read_json_preset_values(
     let path = core::no_links(&target.directory.join(config))?;
     anyhow::ensure!(path.metadata()?.len() <= 1024 * 1024, "配置文件过大");
     let bytes = std::fs::read(path)?;
-    if profile == rtx_fg_manager::anr::PROFILE {
+    if profile == rtx_fg_manager::optiscaler_nr::PROFILE {
+        rtx_fg_manager::presets::read_values(&bytes, profile)
+    } else if profile == rtx_fg_manager::anr::PROFILE {
         rtx_fg_manager::anr::read(&bytes)
     } else if profile == rtx_fg_manager::encore::PROFILE {
         let record = core::record(&target.directory)?;
@@ -400,6 +406,7 @@ fn display_stamp(target: &core::DeploymentTarget) -> Result<Vec<(u64, u64)>> {
             ".rtx-fg-runtimes/sr/ownership.json",
             ".rtx-fg-runtimes/rr/ownership.json",
             ".rtx-fg-runtimes/fg/ownership.json",
+            ".rtx-fg-runtimes/optiscaler-sl/ownership.json",
             ".rtx-fg-runtimes/xemfg/ownership.json",
             core::INI,
             rtx_fg_manager::rtxmfg::CONFIG,
@@ -583,10 +590,10 @@ impl Controller {
             let explicit = state["cloud_source"]
                 .as_str()
                 .or_else(|| state["update_source"].as_str());
-            state["download_source"] = json!(if explicit == Some("github") {
-                "github"
-            } else {
-                "domestic"
+            state["download_source"] = json!(match explicit {
+                Some("github") => "github".to_owned(),
+                Some("gitee" | "gitcode" | "domestic") => "domestic".to_owned(),
+                _ => win::region(),
             });
         }
         let tr = i18n::Translator::new(state["language"].as_str().unwrap_or("system"));
@@ -2437,6 +2444,7 @@ impl Controller {
             .any(|p| {
                 let version = p.upstream_version.as_deref().unwrap_or(&p.version);
                 match scheme {
+                    rtx_fg_manager::optiscaler_nr::SCHEME => true,
                     rtx_fg_manager::encore::SCHEME => {
                         rtx_fg_manager::encore::supports_200(Some(version))
                     }
@@ -2511,6 +2519,7 @@ impl Controller {
             let result = (|| -> Result<PatchInstallPlan> {
                 let mut choices = Vec::new();
                 let mut dlssg_options = Vec::new();
+                let mut opti_options = Vec::new();
                 for (name, scheme, patch_label, miles_patch, version, proxies, game) in jobs {
                     for target in game.deployment_targets() {
                         let exe = target.game_exe.display().to_string();
@@ -2518,6 +2527,10 @@ impl Controller {
                             continue;
                         }
                         anyhow::ensure!(!cancel.load(Ordering::Relaxed), "已取消");
+                        if scheme == rtx_fg_manager::optiscaler_nr::SCHEME {
+                            opti_options.push((exe, name.clone()));
+                            continue;
+                        }
                         if dlssg_native_options(&scheme) {
                             let unavailable =
                                 runtime_files::NativeComponent::unavailable(&target, miles_patch);
@@ -2596,6 +2609,7 @@ impl Controller {
                     fingerprint,
                     paths,
                     choices,
+                    opti_options,
                     dlssg_options,
                 })
             })();
@@ -2617,6 +2631,13 @@ impl Controller {
             "游戏或配置已变化，请重新发起操作。"
         );
         anyhow::ensure!(choices.len() == plan.choices.len(), "安装选择不完整");
+        anyhow::ensure!(
+            selected_native
+                .opti_nr
+                .iter()
+                .all(|exe| plan.opti_options.iter().any(|(path, _)| path == exe)),
+            "安装计划已变化"
+        );
         anyhow::ensure!(
             selected_native
                 .runtimes
@@ -3368,6 +3389,14 @@ impl Controller {
                     if let Ok(files) = cloud::download_files(&catalog, scheme, *series, proxies) {
                         queue.extend(files);
                     }
+                    if scheme == rtx_fg_manager::optiscaler_nr::SCHEME {
+                        let mut needs_nr = false;
+                        for exe in targets {
+                            if !selected_native.opti_nr.contains(exe) { continue; }
+                            needs_nr |= rtx_fg_manager::neural_runtime::OptiScalerCompanion::needs_file(&game.deployment_target(std::path::Path::new(exe))).unwrap_or(true);
+                        }
+                        if needs_nr { queue.push(rtx_fg_manager::neural_runtime::OptiScalerCompanion::download()?); }
+                    }
                     if dlssg_native_options(scheme) {
                         if targets.iter().any(|exe| selected_native.yanyun.contains(exe)) {
                             queue.push(runtime_files::yanyun::download_file()?);
@@ -3405,6 +3434,7 @@ impl Controller {
                     transfer, proxy: String::new(), package_index: 1, package_count: 1,
                 }));
                 let mut yanyun = None;
+                let mut opti_nr = None;
                 let prepared = if clean {
                     Ok(None)
                 } else {
@@ -3427,6 +3457,19 @@ impl Controller {
                                     yanyun = Some(runtime_files::yanyun::Component::prepare(catalog.prefer_github, &cancel, &mut runtime_progress)?);
                                 }
                                 yanyun.as_ref().context("燕云组件缺失")?.preflight(&target)?;
+                            }
+                        }
+                        if scheme == rtx_fg_manager::optiscaler_nr::SCHEME {
+                            let destinations: Vec<_> = targets.iter().map(|exe| game.deployment_target(std::path::Path::new(exe))).collect();
+                            for target in &destinations {
+                                let existing = core::record(&target.directory)?;
+                                rtx_fg_manager::optiscaler_nr::preflight(target, existing.as_ref().is_some_and(|r|r.backend==rtx_fg_manager::optiscaler_nr::BACKEND))?;
+                            }
+                            let nr_targets = destinations.into_iter().filter(|t| selected_native.opti_nr.contains(&t.game_exe.display().to_string())).collect::<Vec<_>>();
+                            if !nr_targets.is_empty() {
+                                opti_nr = Some(rtx_fg_manager::neural_runtime::OptiScalerCompanion::prepare(
+                                    &nr_targets, catalog.prefer_github, &cancel, &mut runtime_progress,
+                                )?);
                             }
                         }
                         for (kind, group) in &native_groups {
@@ -3543,7 +3586,7 @@ impl Controller {
                                     &available,
                                     version,
                                 )?
-                            } else if matches!(payload.backend.as_str(), rtx_fg_manager::upstream040::BACKEND | rtx_fg_manager::anr::BACKEND) {
+                            } else if matches!(payload.backend.as_str(), rtx_fg_manager::upstream040::BACKEND | rtx_fg_manager::anr::BACKEND | rtx_fg_manager::optiscaler_nr::BACKEND) {
                                 if core::record(&game.deployment_target(&p).directory)?.is_some() {
                                     // Existing installations preserve their disk values.
                                     files[name].clone()
@@ -3570,6 +3613,9 @@ impl Controller {
                                 payload.upstream_version.as_deref(),
                             ) };
                             let message = deployed?;
+                            if selected_native.opti_nr.contains(&exe) && let Some(nr) = &opti_nr {
+                                nr.install(&game.deployment_target(&p), &cancel).context("补丁已安装，NR 运行库尚未装好，可重试安装")?;
+                            }
                             if selected_native.yanyun.contains(&exe) {
                                 yanyun.as_ref().context("燕云组件缺失")?.install(&game.deployment_target(&p))
                                     .context("帧生成补丁已安装，燕云神经渲染组件安装未完成")?;
@@ -3878,7 +3924,13 @@ impl Controller {
                     .filter(|d| d.0 == scheme)
                     .map(|d| json!(d.1))
             })
-            .unwrap_or_else(|| self.state["proxies"].clone());
+            .unwrap_or_else(|| {
+                if scheme == rtx_fg_manager::optiscaler_nr::SCHEME {
+                    json!(["dxgi.dll"])
+                } else {
+                    self.state["proxies"].clone()
+                }
+            });
         let selected: Vec<String> = saved
             .as_array()
             .map(|v| {
@@ -4239,7 +4291,10 @@ impl Controller {
                     if self.closing || self.cancel.load(Ordering::Relaxed) => {}
                 Event::InstallOptionsPrepared(result) => match result {
                     Ok(plan) if plan.fingerprint == self.patch_options_fingerprint(&plan.paths) => {
-                        if plan.choices.is_empty() && plan.dlssg_options.is_empty() {
+                        if plan.choices.is_empty()
+                            && plan.dlssg_options.is_empty()
+                            && plan.opti_options.is_empty()
+                        {
                             self.resume_install = Some(plan.paths);
                         } else {
                             self.patch_install_plan = Some(plan);
@@ -7488,6 +7543,7 @@ mod tests {
             fingerprint: c.patch_options_fingerprint(&paths),
             paths,
             choices: vec![],
+            opti_options: vec![],
             dlssg_options: vec![],
         };
         c.cancel.store(true, Ordering::Relaxed);
@@ -7509,6 +7565,7 @@ mod tests {
             fingerprint: c.patch_options_fingerprint(&paths),
             paths,
             choices: vec![],
+            opti_options: vec![],
             dlssg_options: vec![],
         });
         c.catalog.revision.push_str("-new");

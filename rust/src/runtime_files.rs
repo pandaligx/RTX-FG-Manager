@@ -13,6 +13,7 @@ use std::{
 };
 
 const OWN: &str = ".rtx-fg-runtimes";
+pub mod opti_streamline;
 pub mod yanyun;
 const LIMIT: u64 = 512 * 1024 * 1024;
 pub const KINDS: [&str; 6] = ["sr", "rr", "fg", "streamline", "xemfg", "encorefg"];
@@ -1307,7 +1308,7 @@ pub(crate) fn validate_encore_features(
     Ok(())
 }
 fn root(target: &core::DeploymentTarget, kind: &str) -> Result<PathBuf> {
-    if kind != yanyun::KIND {
+    if !matches!(kind, yanyun::KIND | opti_streamline::KIND) {
         filename(kind)?;
     }
     core::no_links(&target.directory.join(OWN).join(kind))
@@ -1349,6 +1350,13 @@ fn record_path(path: &Path) -> Result<String> {
 }
 fn destination(target: &core::DeploymentTarget, kind: &str, entry: &Entry) -> Result<PathBuf> {
     let p = core::no_links(Path::new(&entry.path))?;
+    if kind == opti_streamline::KIND {
+        ensure!(
+            opti_streamline::valid_destination(target, &p),
+            "OptiScaler Streamline 路径无效"
+        );
+        return Ok(p);
+    }
     if kind == yanyun::KIND {
         ensure!(
             yanyun::valid_destination(target, &p),
@@ -1617,7 +1625,7 @@ fn plan_entries(
     let mut entries = Vec::new();
     for p in destinations {
         let p = core::no_links(p)?;
-        if kind != "xemfg" {
+        if !matches!(kind, "xemfg" | opti_streamline::KIND) {
             ensure!(
                 !protected(
                     target,
@@ -1638,7 +1646,7 @@ fn plan_entries(
                 .iter()
                 .find(|e| core::key(Path::new(&e.path)) == core::key(&p))
         });
-        if kind == "encorefg" && p.exists() {
+        if matches!(kind, "encorefg" | opti_streamline::KIND) && p.exists() {
             // Recheck after downloading too: another mod/game update may have
             // created this file since the initial no-native-FG preflight.
             ensure!(

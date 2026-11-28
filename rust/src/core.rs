@@ -11,7 +11,7 @@ use std::{
 pub const OWN: &str = ".rtx-fg-v3";
 pub const MARKER: &str = "install.json";
 pub const INI: &str = "dlssg_sm86.ini";
-pub const PROXIES: [&str; 22] = [
+pub const PROXIES: [&str; 23] = [
     "version.dll",
     "winmm.dll",
     "dinput8.dll",
@@ -34,8 +34,10 @@ pub const PROXIES: [&str; 22] = [
     "xinputuap.dll",
     crate::mfg_plugin::ENTRY,
     "rtx-encore.asi",
+    "OptiScaler.asi",
 ];
-pub const BACKENDS: [&str; 12] = [
+pub const BACKENDS: [&str; 13] = [
+    crate::optiscaler_nr::BACKEND,
     crate::anr::BACKEND,
     "native20",
     "native30",
@@ -427,7 +429,9 @@ pub fn normalize_proxies(proxies: &[String]) -> Result<Vec<String>> {
         .collect())
 }
 pub fn config_name(backend: &str) -> &'static str {
-    if backend == crate::anr::BACKEND {
+    if backend == crate::optiscaler_nr::BACKEND {
+        crate::optiscaler_nr::CONFIG
+    } else if backend == crate::anr::BACKEND {
         crate::anr::CONFIG
     } else if backend == crate::encore::BACKEND {
         crate::encore::CONFIG
@@ -444,6 +448,7 @@ pub fn config_name(backend: &str) -> &'static str {
 pub fn backend_matches_profile(backend: &str, profile: &str) -> bool {
     match profile {
         crate::anr::PROFILE => backend == crate::anr::BACKEND,
+        crate::optiscaler_nr::PROFILE => backend == crate::optiscaler_nr::BACKEND,
         crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 => {
             backend == crate::upstream040::BACKEND
         }
@@ -480,6 +485,20 @@ fn deployment_names_for_version(
 ) -> Result<Vec<String>> {
     folder(backend)?;
     let mut names = normalize_proxies(proxies)?;
+    if backend == crate::optiscaler_nr::BACKEND {
+        ensure!(
+            names.len() == 1 && crate::optiscaler_nr::ENTRIES.contains(&names[0].as_str()),
+            "OptiScaler 每次仅使用一个入口"
+        );
+        names.push(crate::optiscaler_nr::CONFIG.into());
+        names.extend(
+            crate::optiscaler_nr::components()
+                .iter()
+                .copied()
+                .map(str::to_owned),
+        );
+        return Ok(names);
+    }
     if backend == crate::anr::BACKEND {
         ensure!(
             names.len() == 1 && crate::anr::PROXIES.contains(&names[0].as_str()),
@@ -581,7 +600,7 @@ pub fn package(backend: &str, proxies: &[String]) -> Result<BTreeMap<String, Vec
     Ok(out)
 }
 pub fn configure_package(backend: &str, out: &mut BTreeMap<String, Vec<u8>>) -> Result<()> {
-    if backend == crate::anr::BACKEND {
+    if matches!(backend, crate::anr::BACKEND | crate::optiscaler_nr::BACKEND) {
         return Ok(());
     }
     // Bundled upstream runtimes default to the user cache. Moving their extracted
@@ -764,6 +783,15 @@ impl Record {
                 .as_deref()
                 .or(self.payload_version.as_deref()),
         )?;
+        // Split-package candidates tracked these six files in a separate runtime journal.
+        if self.backend == crate::optiscaler_nr::BACKEND
+            && !self
+                .hashes
+                .keys()
+                .any(|name| name.starts_with("OptiScaler/streamline/"))
+        {
+            names.retain(|name| !name.starts_with("OptiScaler/streamline/"));
+        }
         if self.backend == crate::encore::BACKEND
             && crate::encore::INTEL_FILES
                 .iter()
@@ -1018,6 +1046,8 @@ pub fn status_at(target: &DeploymentTarget) -> String {
                 if digest(&q)? != *h {
                     if n == config_name(&r.backend)
                         || (r.backend == crate::anr::BACKEND && n == "OptiScaler.ini")
+                        || (r.backend == crate::optiscaler_nr::BACKEND
+                            && crate::optiscaler_nr::owned_sm86_ini(n, &q)?)
                     {
                         edited = true
                     } else {
@@ -1292,6 +1322,12 @@ fn deploy_prepared_files(
         )?;
     }
     let mut existing = record(dir)?;
+    if backend == crate::optiscaler_nr::BACKEND {
+        crate::optiscaler_nr::preflight(
+            &target,
+            existing.as_ref().is_some_and(|r| r.backend == backend),
+        )?;
+    }
     let legacy_anr_loader = if backend == crate::anr::BACKEND {
         crate::anr::install_residue(
             &target,
@@ -1490,6 +1526,7 @@ fn deploy_prepared_files(
     if existing.is_none()
         && backend != crate::encore::BACKEND
         && backend != crate::anr::BACKEND
+        && backend != crate::optiscaler_nr::BACKEND
         && !mfg_plugin
         && context.is_some()
         && dir.join(config).is_file()
@@ -1568,6 +1605,12 @@ fn deploy_prepared_files(
                             .as_deref()
                             .or(r.payload_version.as_deref()),
                     )?
+                } else if backend == crate::optiscaler_nr::BACKEND {
+                    crate::presets::configure(
+                        &current,
+                        crate::optiscaler_nr::PROFILE,
+                        explicit_overrides.unwrap_or(&no_overrides),
+                    )?
                 } else if backend == crate::anr::BACKEND {
                     crate::anr::configure(&current, explicit_overrides.unwrap_or(&no_overrides))?
                 } else if backend == crate::rtxmfg::BACKEND {
@@ -1638,7 +1681,7 @@ fn deploy_prepared_files(
         }
         bail!("已有部署或未完成操作，请先清理再重新部署")
     }
-    if backend == crate::anr::BACKEND
+    if matches!(backend, crate::anr::BACKEND | crate::optiscaler_nr::BACKEND)
         || backend == "upstream_sm86"
         || backend == crate::upstream040::BACKEND
         || backend == crate::rtxmfg::BACKEND
@@ -1656,7 +1699,7 @@ fn deploy_prepared_files(
             );
         }
     }
-    let conflicts = if backend == crate::anr::BACKEND
+    let conflicts = if matches!(backend, crate::anr::BACKEND | crate::optiscaler_nr::BACKEND)
         || backend.starts_with("native")
         || backend == "upstream_sm86"
         || backend == crate::upstream040::BACKEND

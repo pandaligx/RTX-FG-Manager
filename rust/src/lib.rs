@@ -40,6 +40,7 @@ pub mod mfg_plugin;
 #[cfg(windows)]
 pub mod miles_profile;
 pub mod operation_history;
+pub mod optiscaler_nr;
 #[cfg(target_os = "linux")]
 pub mod pe_version;
 pub mod platform;

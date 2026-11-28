@@ -2,6 +2,8 @@
 
 GitHub 为主仓库，GitCode 为国内下载源，Gitee 保留过渡版与旧更新清单。所有客户端来源失败均可回退 GitHub；旧下载缓存不因迁移而失效。
 
+OptiScaler 0.9.97 从所选线路下载中文补丁，并复用已有的 Streamline 2.14.16 配套包。DLSS 神经渲染可另行勾选，默认关闭。
+
 - GitCode 主仓库：`gcw_qWIjmve7/RTX-FG-Manager`
 - GitCode 补丁库：`gcw_qWIjmve7/RTX-FG-Manager-payloads`
 - 4.3.1 完整包元数据：`cloud/bundles/catalog.json` 与不可变版本索引。4.3.0 的 `cloud/v3/catalog.json` 和更早的 `cloud/catalog.json` 保留供旧客户端使用。

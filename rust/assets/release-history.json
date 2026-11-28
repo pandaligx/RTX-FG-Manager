@@ -1,5 +1,15 @@
 [
   {
+    "version": "4.3.46",
+    "notes": {
+      "zh-CN": "## 本次更新\n- 修复 Windows 版《燕云十六声》国际服勾选 DLSS5 神经渲染套件后仍只启用帧生成的问题。现按国服 yysls.exe、国际服 wwm.exe 分别配置。已安装国际服套件的玩家，退出游戏后重新勾选并安装一次即可保留原画质设置。\n- 分享或编辑玩家方案时，分享者名字、主页和视频教程等选填信息移到了适配方案上方。\n\n## 致谢\n- 感谢小黑盒玩家 ISHOW操作、抖音玩家 Tamako 对项目的支持。两位的主页可在「设置 → 关于」打开。",
+      "en": "## What's new\n- Fixed a Windows issue where installing the optional DLSS Neural Rendering kit for the global edition of Where Winds Meet enabled only frame generation. The manager now configures yysls.exe for the Chinese edition and wwm.exe for the global edition. To repair an existing global installation, exit the game, select the kit again and install it. Your graphics settings are preserved.\n- When sharing or editing a setup, optional fields such as the author name, profile links and video tutorial now appear above the patch details.\n\n## Acknowledgments\n- Thanks to ISHOW操作 on HeyBox and Tamako on Douyin for supporting the project. You can open both profiles from Settings → About.",
+      "ru": "## Что нового\n- В Windows исправлена настройка комплекта нейронного рендеринга DLSS для международной версии Where Winds Meet (wwm.exe). Для китайской версии используется yysls.exe. Чтобы исправить уже установленный комплект, выйдите из игры и снова выберите и установите его. Настройки графики сохранятся.\n- Имя автора, ссылки на профили и видеоинструкцию теперь можно заполнить над сведениями о патче.\n\n## Благодарности\n- Спасибо ISHOW操作 из HeyBox и Tamako из Douyin за поддержку проекта. Ссылки на их профили есть в настройках, в разделе «О программе».",
+      "ja": "## 更新内容\n- Windows 版で『燕雲十六声』グローバル版に DLSS ニューラルレンダリングキットを導入しても、フレーム生成しか有効にならない問題を修正しました。中国版には yysls.exe、グローバル版には wwm.exe を設定します。導入済みの場合はゲームを終了し、キットを選び直してインストールしてください。画質設定は引き継がれます。\n- 共有時や編集時に、投稿者名、プロフィール、解説動画などの任意項目がパッチ情報の上に表示されます。\n\n## 謝辞\n- 小黒盒（HeyBox）の ISHOW操作 さんと抖音（Douyin）の Tamako さん、ご支援ありがとうございます。プロフィールは設定の「このアプリについて」から開けます。",
+      "ko": "## 업데이트 내용\n- Windows에서 연운 글로벌판에 DLSS 신경 렌더링 키트를 설치해도 프레임 생성만 작동하던 문제를 수정했습니다. 중국판은 yysls.exe, 글로벌판은 wwm.exe에 맞춰 설정합니다. 이미 설치했다면 게임을 종료하고 키트를 다시 선택해 설치하세요. 그래픽 설정은 유지됩니다.\n- 설정 공유 및 편집 화면에서 작성자 이름, 프로필 링크, 영상 가이드 등 선택 입력 항목을 패치 정보 위로 옮겼습니다.\n\n## 감사의 말\n- 프로젝트를 응원해 주신 HeyBox의 ISHOW操作 님과 Douyin의 Tamako 님께 감사드립니다. 설정의 앱 정보에서 두 분의 프로필을 열 수 있습니다."
+    }
+  },
+  {
     "version": "4.3.27",
     "notes": {
       "zh-CN": "4.2.9 候选 · 尚未发布（正式版仍为 4.2.8）\n\n• RTX40 MFG · 1.4.2 改善《巫师 3》路径追踪毛发兼容检测；此功能仍属实验，菜单按 Backspace。\n• RTX MFG 支持保留设置升级：须有合法管理器记录、同方案同入口、旧版升级新版。退出游戏后点“安装并应用”；未知改动受到保护。\n• 原 Transfusion 适配 Encore 1.0.0-beta.2，提供完整高级参数与保留设置迁移。19 个入口单选，菜单按 Insert。\n• Encore 的 NR 与 Smooth Motion 默认关闭；NR 需自行提供 NVIDIA nvngx_dlssnr.dll 310.8.0，Smooth Motion 限 RTX30 与指定驱动，详见帮助。\n• 五语言帮助精简为八节操作步骤，保留目录、滚动和复制。管理器更新不会自动替换游戏 DLL。",

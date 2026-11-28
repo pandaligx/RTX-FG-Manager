@@ -217,7 +217,7 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
             && let Some(r) = record.as_ref()
             && matches!(
                 r.backend.as_str(),
-                crate::encore::BACKEND | crate::rtxmfg::BACKEND
+                crate::encore::BACKEND | crate::rtxmfg::BACKEND | crate::optiscaler_nr::BACKEND
             )
             && target.validate_record(r).is_ok()
         {
@@ -228,7 +228,9 @@ pub fn inspect(game: &Game, catalog: &Catalog) -> Snapshot {
                     .unwrap_or("0.0.0")
                     .into(),
             );
-            if r.backend == crate::rtxmfg::BACKEND {
+            if r.backend == crate::optiscaler_nr::BACKEND {
+                nr.optiscaler_nr = true;
+            } else if r.backend == crate::rtxmfg::BACKEND {
                 nr.mfg_version = version;
             } else {
                 nr.encore_version = version;

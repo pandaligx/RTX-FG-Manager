@@ -148,10 +148,12 @@ impl GameLink {
         (pair.platform.id == active.id && pair.valid()).then_some(pair)
     }
     pub fn accepts(game: &Game, catalog: &game_names::Catalog, id: &str) -> bool {
-        identify(game, catalog).is_some_and(|primary| {
+        if let Some(primary) = identify(game, catalog) {
             primary.accepts_group(id, catalog)
                 || Self::saved(game, &primary).is_some_and(|link| link.historical.id == id)
-        })
+        } else {
+            manual_public_group(game, catalog).is_some_and(|group| group.id == id)
+        }
     }
 }
 
@@ -182,6 +184,39 @@ fn exe_stem(name: &str) -> Option<&str> {
 pub fn search_title(name: &str) -> &str {
     let name = name.trim();
     exe_stem(name).unwrap_or(name)
+}
+
+/// An unbound, manually added game may already have shares under its exact
+/// public custom ID. Query the ID alone; never send a local path or nickname.
+pub fn manual_public_group(game: &Game, catalog: &game_names::Catalog) -> Option<GameIdentity> {
+    if !game_names::keys(game).is_empty() || identify(game, catalog).is_some() {
+        return None;
+    }
+    let original = game_names::original(game);
+    let title = search_title(&original);
+    let key = title_key(title);
+    if game_names::manual(game).is_some_and(|alias| title_key(search_title(alias)) != key) {
+        return None;
+    }
+    let base = key.strip_suffix("win64shipping").unwrap_or(&key);
+    if base.chars().count() < 4
+        || matches!(
+            base,
+            "launcher"
+                | "launcher64"
+                | "client"
+                | "game"
+                | "shipping"
+                | "gamelaunchhelper"
+                | "gamelauncher"
+                | "unrealgame"
+                | "bootstrapper"
+                | "startgame"
+        )
+    {
+        return None;
+    }
+    GameIdentity::custom(title).ok()
 }
 
 /// Automatic lookups may send a reviewed public title, never an arbitrary
@@ -437,6 +472,7 @@ impl Recipe {
             crate::encore::SCHEME => "RTX Encore",
             "rtx40mfg-1.3.3-hf2" | crate::recommendation_presets::MFG_161_COMPAT => "MFG Unlocker",
             crate::anr::SCHEME => "ANR FG",
+            crate::optiscaler_nr::SCHEME => "OptiScaler NR",
             other => other,
         };
         let version = if self.scheme == crate::anr::SCHEME {
@@ -1281,6 +1317,8 @@ impl Client {
             .header("X-RTXFG-Yanyun-NR", "1")
             .header("X-RTXFG-Recipe-Installs", "1")
             .header("X-RTXFG-ANR", "1")
+            .header("X-RTXFG-OptiScaler-NR", "1")
+            .header("X-RTXFG-OptiScaler-SL", "1")
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache");
         if method == Method::GET {

@@ -265,6 +265,9 @@ pub fn parameters_for_scheme(scheme: &str, profile: &str) -> Vec<Parameter> {
     fields
 }
 pub fn parameters(profile: &str) -> Vec<Parameter> {
+    if profile == crate::optiscaler_nr::PROFILE {
+        return crate::optiscaler_nr::parameters();
+    }
     if profile == crate::anr::PROFILE {
         return crate::anr::parameters();
     }
@@ -397,6 +400,7 @@ pub fn validate(profile: &str, values: &Values) -> Result<()> {
         matches!(
             profile,
             "upstream035"
+                | crate::optiscaler_nr::PROFILE
                 | crate::anr::PROFILE
                 | crate::upstream040::PROFILE
                 | crate::upstream040::PROFILE_041
@@ -552,6 +556,13 @@ pub fn merge_context(
     backend: &str,
     context: Option<&Context>,
 ) -> Result<Vec<u8>> {
+    if backend == crate::optiscaler_nr::BACKEND {
+        return configure(
+            current,
+            crate::optiscaler_nr::PROFILE,
+            &read_values(desired, crate::optiscaler_nr::PROFILE)?,
+        );
+    }
     if backend == crate::anr::BACKEND {
         return crate::anr::configure(current, &crate::anr::read(desired)?);
     }
@@ -700,9 +711,21 @@ pub fn read_values(bytes: &[u8], profile: &str) -> Result<Values> {
     let mut values = Values::new();
     for p in parameters(profile) {
         if let Some(value) = crate::diagnostics::ini_value(&text, p.section, p.ini_key)?
-            && p.choices.iter().any(|(v, _)| *v == value)
+            && let Some(&(choice, _)) = p.choices.iter().find(|(v, _)| {
+                if profile == crate::optiscaler_nr::PROFILE {
+                    // OptiScaler Save Settings writes DLSSG, Upscaler and XeFG.
+                    v.eq_ignore_ascii_case(&value)
+                        || (p.key == "nr_scale"
+                            && v.parse::<f32>()
+                                .ok()
+                                .zip(value.parse::<f32>().ok())
+                                .is_some_and(|(a, b)| a == b))
+                } else {
+                    *v == value
+                }
+            })
         {
-            values.insert(p.key.into(), value);
+            values.insert(p.key.into(), choice.to_owned());
         }
     }
     normalize(profile, &mut values);
@@ -780,6 +803,8 @@ pub fn inspect_at(
                 .is_some_and(|r| r.backend == crate::transfusion::BACKEND)
             {
                 crate::transfusion::CONFIG
+            } else if policy.parameter_profile == crate::optiscaler_nr::PROFILE {
+                crate::optiscaler_nr::CONFIG
             } else if policy.parameter_profile == crate::anr::PROFILE {
                 crate::anr::CONFIG
             } else if policy.parameter_profile == crate::encore::PROFILE {

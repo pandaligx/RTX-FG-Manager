@@ -164,9 +164,13 @@ pub struct Status {
     pub warning: Option<String>,
     pub encore_version: Option<String>,
     pub mfg_version: Option<String>,
+    pub optiscaler_nr: bool,
 }
 impl Status {
     pub fn supports(&self, version: &str) -> bool {
+        if self.optiscaler_nr {
+            return version == RECOMMENDED;
+        }
         if let Some(mfg) = &self.mfg_version {
             return version == RECOMMENDED
                 && semver::Version::parse(mfg).is_ok_and(|v| v >= semver::Version::new(1, 7, 0));
@@ -281,6 +285,95 @@ pub fn install_many(
     })
 }
 
+/// Approved NVIDIA file used beside the executable by standalone OptiScaler.
+/// A byte-identical copy supplied by the game stays owned by the game.
+pub struct OptiScalerCompanion {
+    source: Option<PathBuf>,
+}
+
+impl OptiScalerCompanion {
+    pub fn download() -> Result<transfer::DownloadFile> {
+        download_file(RECOMMENDED)
+    }
+
+    pub fn needs_file(target: &core::DeploymentTarget) -> Result<bool> {
+        let destination = core::no_links(&target.directory.join(FILE))?;
+        let backup = core::no_links(&target.directory.join(OWN))?;
+        let owned = read(target)?;
+        if let Some(record) = &owned {
+            original_valid(&backup, record)?;
+            ensure!(
+                accepted(&destination, record)?,
+                "NR 文件已被其他程序修改，已保留；请先处理冲突"
+            );
+        } else {
+            ensure!(!backup.exists(), "发现未完成的 NR 备份，请保留并检查该目录");
+        }
+        if !destination.try_exists()? {
+            return Ok(true);
+        }
+        ensure!(
+            destination.is_file() && destination.metadata()?.len() <= LIMIT,
+            "NR 文件类型或大小异常"
+        );
+        let sha = core::digest(&destination)?;
+        if sha == runtime(RECOMMENDED)?.sha256 {
+            return Ok(false);
+        }
+        // Preserve unknown game/mod revisions. The independent runtime window
+        // offers an explicit, backed-up replacement if the player wants one.
+        let known: Vec<Runtime> =
+            serde_json::from_str(include_str!("../assets/neural-runtimes.json"))?;
+        ensure!(
+            owned.is_some() || known.iter().any(|r| r.sha256 == sha),
+            "游戏已有其他版本的 nvngx_dlssnr.dll，请先备份并移走该文件"
+        );
+        Ok(true)
+    }
+
+    pub fn prepare(
+        targets: &[core::DeploymentTarget],
+        github: bool,
+        cancel: &AtomicBool,
+        progress: &mut dyn FnMut(transfer::Progress),
+    ) -> Result<Self> {
+        let mut download = false;
+        for target in targets {
+            download |= Self::needs_file(target)?;
+        }
+        let source = if download {
+            Some(prepare(RECOMMENDED, github, cancel, progress)?)
+        } else {
+            None
+        };
+        Ok(Self { source })
+    }
+
+    pub fn install(&self, target: &core::DeploymentTarget, cancel: &AtomicBool) -> Result<()> {
+        if !Self::needs_file(target)? {
+            return Ok(());
+        }
+        let source = self
+            .source
+            .as_ref()
+            .context("游戏运行库在安装期间发生变化，请重试")?;
+        install_many_with(
+            std::slice::from_ref(target),
+            RECOMMENDED,
+            cancel,
+            &mut |_| {},
+            |_, _| {
+                Self::needs_file(target)?;
+                ensure!(
+                    matches_file(source, &runtime(RECOMMENDED)?.sha256)?,
+                    "NR 运行库摘要不匹配"
+                );
+                Ok(source.clone())
+            },
+        )
+    }
+}
+
 fn validated_targets(
     targets: &[core::DeploymentTarget],
     installing: bool,
@@ -338,9 +431,10 @@ fn preflight_install(target: &core::DeploymentTarget, version: &str) -> Result<(
     let record =
         core::record(&target.directory)?.context("请先安装 RTX Encore 或 MFG Unlocker 1.7+")?;
     target.validate_record(&record)?;
+    let opti = record.backend == crate::optiscaler_nr::BACKEND;
     let mfg = record.backend == crate::rtxmfg::BACKEND;
     ensure!(
-        record.backend == encore::BACKEND || mfg,
+        record.backend == encore::BACKEND || mfg || opti,
         "请先安装 RTX Encore 或 MFG Unlocker 1.7+"
     );
     ensure!(
@@ -349,7 +443,9 @@ fn preflight_install(target: &core::DeploymentTarget, version: &str) -> Result<(
             && !crate::rtxmfg_upgrade::has_pending(&target.directory)?,
         "请先完成补丁安装或恢复，再添加 NR 运行库"
     );
-    if version == RECOMMENDED || mfg {
+    if opti {
+        ensure!(version == RECOMMENDED, "OptiScaler NR 需要 310.9.16 运行库");
+    } else if version == RECOMMENDED || mfg {
         ensure!(
             record
                 .upstream_version
@@ -374,6 +470,7 @@ fn preflight_install(target: &core::DeploymentTarget, version: &str) -> Result<(
                     .as_deref()
                     .or(record.payload_version.as_deref())
             )
+            || opti
             || scanner::inspect(&target.game_exe).neural_input(),
         "未发现游戏的 DLSS 超分或光线重建组件；不会添加 NR 运行库"
     );

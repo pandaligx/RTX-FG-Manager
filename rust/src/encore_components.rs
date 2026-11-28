@@ -112,15 +112,7 @@ pub fn deploy(
         applied_overrides = &empty;
     }
     if !selection.intel {
-        for name in encore::INTEL_FILES {
-            files.remove(name);
-            if let Some(old) = &previous
-                && old.backend == encore::BACKEND
-                && old.hashes.contains_key(name)
-            {
-                files.insert(name.into(), owned_bytes(target, old, name)?);
-            }
-        }
+        keep_existing_intel(target, previous.as_ref(), &mut files)?;
     }
     core::deploy_prepared_context_at_with_overrides(
         target,
@@ -133,6 +125,22 @@ pub fn deploy(
         Some(applied_overrides),
         upstream.as_deref(),
     )
+}
+pub(crate) fn keep_existing_intel(
+    target: &core::DeploymentTarget,
+    previous: Option<&core::Record>,
+    files: &mut BTreeMap<String, Vec<u8>>,
+) -> Result<()> {
+    for name in encore::INTEL_FILES {
+        files.remove(name);
+        if let Some(old) = previous
+            && old.backend == encore::BACKEND
+            && old.hashes.contains_key(name)
+        {
+            files.insert(name.into(), owned_bytes(target, old, name)?);
+        }
+    }
+    Ok(())
 }
 fn owned_bytes(target: &core::DeploymentTarget, old: &core::Record, name: &str) -> Result<Vec<u8>> {
     let path = core::no_links(&target.directory.join(name))?;

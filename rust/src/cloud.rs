@@ -1,6 +1,7 @@
 //! Cloud payloads: bounded downloads, validated archives and offline cache.
 //! Network requests run only in controller workers, never in cleanup or rendering.
 use crate::{assets, core};
+mod opti_distribution;
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -235,6 +236,7 @@ impl CompactCatalog {
                 "Duplicate/empty scheme"
             );
             let (ini_policy, max_selected_proxies) = match s.profile.as_str() {
+                crate::optiscaler_nr::PROFILE => ("optiscaler_nr", 1),
                 crate::anr::PROFILE => ("anr_full", 1),
                 "initial" => ("initial", 1),
                 crate::upstream040::PROFILE | crate::upstream040::PROFILE_041 => ("upstream040", 1),
@@ -274,7 +276,10 @@ impl CompactCatalog {
                         vec!["SM89".into()]
                     } else if matches!(
                         s.profile.as_str(),
-                        crate::transfusion::PROFILE | crate::encore::PROFILE | crate::anr::PROFILE
+                        crate::transfusion::PROFILE
+                            | crate::encore::PROFILE
+                            | crate::anr::PROFILE
+                            | crate::optiscaler_nr::PROFILE
                     ) {
                         vec!["SM75".into(), "SM86".into(), "SM89".into()]
                     } else {
@@ -400,6 +405,12 @@ impl Catalog {
             );
             ensure!(
                 match policy.parameter_profile.as_str() {
+                    crate::optiscaler_nr::PROFILE =>
+                        p.scheme_id == crate::optiscaler_nr::SCHEME
+                            && policy.ini_policy == "optiscaler_nr"
+                            && policy.max_selected_proxies == 1
+                            && p.proxy == "dxgi.dll"
+                            && p.backends == [crate::optiscaler_nr::BACKEND],
                     crate::anr::PROFILE =>
                         policy.ini_policy == "anr_full"
                             && policy.max_selected_proxies == 1
@@ -505,6 +516,7 @@ impl Catalog {
             }
             ensure!(!p.component, "Components require a directory protocol");
             let encore = policy.parameter_profile == crate::encore::PROFILE;
+            let opti = policy.parameter_profile == crate::optiscaler_nr::PROFILE;
             let anr = policy.parameter_profile == crate::anr::PROFILE;
             let intel = encore && crate::encore::supports_120(p.upstream_version.as_deref());
             let mfg_notice = policy.parameter_profile == crate::rtxmfg::PROFILE
@@ -518,7 +530,9 @@ impl Catalog {
             ensure!(
                 core::PROXIES.contains(&p.proxy.as_str())
                     && p.files.len()
-                        == if anr {
+                        == if opti {
+                            opti_distribution::public_components().count() + 2
+                        } else if anr {
                             crate::anr::components(
                                 p.upstream_version.as_deref().or(Some(&p.version)),
                             )
@@ -550,7 +564,9 @@ impl Catalog {
             );
             let mut expected_entries = BTreeSet::from([
                 p.proxy.as_str(),
-                if anr {
+                if opti {
+                    crate::optiscaler_nr::CONFIG
+                } else if anr {
                     crate::anr::CONFIG
                 } else if encore {
                     crate::encore::CONFIG
@@ -564,6 +580,11 @@ impl Catalog {
             ]);
             if encore {
                 expected_entries.insert(crate::encore::NOTICES);
+            }
+            if opti {
+                for entry in opti_distribution::public_components() {
+                    expected_entries.insert(entry);
+                }
             }
             if anr {
                 expected_entries.extend(
@@ -608,6 +629,7 @@ impl Catalog {
                         policy.ini_policy.as_str(),
                         "native"
                             | "anr_full"
+                            | "optiscaler_nr"
                             | "initial"
                             | "upstream_proxy"
                             | "rtxmfg_json"
@@ -627,7 +649,9 @@ impl Catalog {
                     routes.insert((&p.scheme_id, b, &p.proxy)),
                     "Ambiguous package route"
                 );
-                let expected = if b == crate::anr::BACKEND {
+                let expected = if b == crate::optiscaler_nr::BACKEND {
+                    "optiscaler_nr"
+                } else if b == crate::anr::BACKEND {
                     "anr_full"
                 } else if b == crate::rtxmfg::BACKEND {
                     "rtxmfg_json"
@@ -654,6 +678,7 @@ impl Catalog {
                                 || matches!(
                                     policy.parameter_profile.as_str(),
                                     crate::rtxmfg::PROFILE
+                                        | crate::optiscaler_nr::PROFILE
                                         | crate::anr::PROFILE
                                         | crate::transfusion::PROFILE
                                         | crate::encore::PROFILE
@@ -721,7 +746,7 @@ impl Catalog {
             .iter()
             .filter(|p| self.is_installable(&p.scheme_id) && seen.insert(&p.scheme_id))
             .collect();
-        const ORDER: [&str; 8] = [
+        const ORDER: [&str; 9] = [
             "upstream-0.3.5-310-9",
             DELTA_041_SCHEME,
             "rtxfg-0.3.5-dx12-vulkan",
@@ -730,6 +755,7 @@ impl Catalog {
             "dlssg-transfusion-1.4.5.3",
             "mfg-unlocker-1.6.1-compat",
             crate::anr::SCHEME,
+            crate::optiscaler_nr::SCHEME,
         ];
         schemes.sort_by_key(|p| {
             (
@@ -758,6 +784,7 @@ impl Catalog {
     pub fn scheme_source_url(&self, id: &str) -> Option<&'static str> {
         let policy = self.scheme_policies.get(id)?;
         Some(match policy.parameter_profile.as_str() {
+            crate::optiscaler_nr::PROFILE => crate::optiscaler_nr::SOURCE,
             crate::anr::PROFILE => crate::anr::SOURCE,
             crate::encore::PROFILE => crate::encore::SOURCE,
             crate::transfusion::PROFILE => crate::transfusion::SOURCE,
@@ -782,6 +809,7 @@ impl Catalog {
         };
         match policy.parameter_profile.as_str() {
             _ if id == crate::upstream040::PIPO_SCHEME => "NVIDIA RTX 3070 已测试；RTX 20 待验证",
+            crate::optiscaler_nr::PROFILE => "NR：NVIDIA RTX；XeSS / FSR：按游戏与显卡支持情况",
             crate::anr::PROFILE => {
                 "NVIDIA RTX 20 / 30 / 40 / 50、GTX 16\nAMD RX 5000 / 6000 / 7000 / 9000、Steam Deck\nIntel Arc A / B"
             }
@@ -824,6 +852,16 @@ impl Catalog {
         }
     }
     pub fn proxies(&self, id: &str) -> Vec<String> {
+        if self
+            .scheme_policies
+            .get(id)
+            .is_some_and(|p| p.parameter_profile == crate::optiscaler_nr::PROFILE)
+        {
+            return crate::optiscaler_nr::ENTRIES
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+        }
         if self
             .scheme_policies
             .get(id)
@@ -886,6 +924,9 @@ impl Catalog {
 fn package_supports_entry(p: &Package, policy: &Policy, name: &str) -> bool {
     if p.component {
         return false;
+    }
+    if policy.parameter_profile == crate::optiscaler_nr::PROFILE {
+        return p.proxy == "dxgi.dll" && crate::optiscaler_nr::ENTRIES.contains(&name);
     }
     if policy.parameter_profile == crate::anr::PROFILE {
         return p.proxy == "dxgi.dll" && crate::anr::PROXIES.contains(&name);
@@ -981,6 +1022,7 @@ fn retain_newer_baseline(catalog: &mut Catalog, baseline: &Catalog) {
 /// explicit minimum-client exclusions are authoritative.
 fn retain_newly_introduced(catalog: &mut Catalog, baseline: &Catalog) {
     let added: &[&str] = match catalog.revision.as_str() {
+        "bundles-331fa0797a23b5e1e2d2" => &[crate::optiscaler_nr::SCHEME],
         "bundles-6ae5a179dcf09ec348b7" => &[crate::anr::SCHEME, crate::upstream040::PIPO_SCHEME],
         "bundles-fd7e2a6355153be0583d" => &[crate::upstream040::PIPO_SCHEME],
         _ => &[],
@@ -1214,6 +1256,11 @@ pub fn unpack(p: &Package, bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
                     && u16::from_le_bytes([h[22], h[23]]) & 0x2000 != 0,
                 "Not an x64 DLL"
             );
+        } else if p.backends == [crate::optiscaler_nr::BACKEND]
+            && crate::optiscaler_nr::components().contains(&f.name.as_str())
+            && (f.name.ends_with(".cubin") || f.name.ends_with(".bin"))
+        {
+            ensure!(!b.is_empty(), "Empty model");
         } else if f.name.ends_with(".nrx")
             && p.backends == [crate::anr::BACKEND]
             && crate::anr::COMPONENTS.contains(&f.name.as_str())
@@ -1242,6 +1289,17 @@ fn remove_partial(path: &Path) -> Result<()> {
     crate::transfer::remove_partial(path)
 }
 fn archive(
+    c: &Catalog,
+    p: &Package,
+    cancel: &AtomicBool,
+    report: &mut impl FnMut(crate::transfer::Progress),
+) -> Result<BTreeMap<String, Vec<u8>>> {
+    if p.scheme_id == crate::optiscaler_nr::SCHEME {
+        return opti_distribution::prepare(c, p, cancel, report);
+    }
+    base_archive(c, p, cancel, report)
+}
+fn base_archive(
     c: &Catalog,
     p: &Package,
     cancel: &AtomicBool,
@@ -1368,7 +1426,9 @@ fn selected_package<'a>(
                     if crate::upstream040::is_profile(&policy.parameter_profile) {
                         return b == crate::upstream040::BACKEND;
                     }
-                    if policy.parameter_profile == crate::anr::PROFILE {
+                    if policy.parameter_profile == crate::optiscaler_nr::PROFILE {
+                        b == crate::optiscaler_nr::BACKEND
+                    } else if policy.parameter_profile == crate::anr::PROFILE {
                         b == crate::anr::BACKEND
                     } else if policy.parameter_profile == crate::rtxmfg::PROFILE {
                         b == crate::rtxmfg::BACKEND
@@ -1398,6 +1458,9 @@ pub fn download_files(
     let mut files = Vec::new();
     for proxy in core::normalize_proxies(proxies)? {
         files.push(selected_package(c, scheme, series, &proxy)?.download_file());
+    }
+    if scheme == crate::optiscaler_nr::SCHEME {
+        files.push(crate::runtime_files::opti_streamline::download_file()?);
     }
     files.extend(
         c.packages
@@ -1473,7 +1536,9 @@ pub fn prepare_with_progress(
                 if crate::upstream040::is_profile(&policy.parameter_profile) {
                     return b.as_str() == crate::upstream040::BACKEND;
                 }
-                if policy.parameter_profile == crate::anr::PROFILE {
+                if policy.parameter_profile == crate::optiscaler_nr::PROFILE {
+                    b.as_str() == crate::optiscaler_nr::BACKEND
+                } else if policy.parameter_profile == crate::anr::PROFILE {
                     b.as_str() == crate::anr::BACKEND
                 } else if policy.parameter_profile == crate::rtxmfg::PROFILE {
                     b.as_str() == crate::rtxmfg::BACKEND
@@ -1508,7 +1573,10 @@ pub fn prepare_with_progress(
         for (name, bytes) in archive(c, p, cancel, &mut package_progress)? {
             let name = if matches!(
                 policy.parameter_profile.as_str(),
-                crate::rtxmfg::PROFILE | crate::encore::PROFILE | crate::anr::PROFILE
+                crate::rtxmfg::PROFILE
+                    | crate::encore::PROFILE
+                    | crate::anr::PROFILE
+                    | crate::optiscaler_nr::PROFILE
             ) && name == p.proxy
             {
                 proxy.clone()
@@ -1626,7 +1694,12 @@ mod tests {
                 .join(format!("{}.json", parse()?.revision)),
         )?;
         let old = parse()?.expand_for_manager_version(&index, "4.3.36")?;
-        let current = parse()?.expand(&index)?;
+        let mut current = parse()?.expand(&index)?;
+        // Compare the effective catalogs used online and offline by this client.
+        // refresh() also applies the bundled baseline after expanding the remote index.
+        current.retain_bundled_versions();
+        assert!(!old.is_installable(crate::optiscaler_nr::SCHEME));
+        assert!(current.is_installable(crate::optiscaler_nr::SCHEME));
         let pre_miles = parse()?.expand_for_manager_version(&index, "4.3.39")?;
         let hf1 = parse()?.expand_for_manager_version(&index, "4.3.40")?;
         assert_eq!(
@@ -1960,6 +2033,7 @@ mod tests {
             "dlssg-transfusion-1.4.5.3",
             "mfg-unlocker-1.6.1-compat",
             crate::anr::SCHEME,
+            crate::optiscaler_nr::SCHEME,
         ];
         assert_eq!(
             c.schemes()

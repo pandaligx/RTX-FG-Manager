@@ -23,6 +23,7 @@ enum Mode {
 }
 enum Update {
     Init(rec::Client),
+    ExactGroup(String, rec::GameIdentity, rec::FeedPage),
     Page(rec::FeedPage, bool),
     Games(String, Vec<rec::GameCandidate>),
     Draft(rec::Recipe, bool),
@@ -362,38 +363,49 @@ impl Recommendations {
                     super::tasks::notify(super::tasks::FeedbackKind::Error, self.t(&e), window, cx);
                 }
                 Ok(Update::Init(client)) => {
-                    self.client = Some(client);
+                    self.client = Some(client.clone());
                     if self.identity.is_some() {
                         self.refresh(false);
                         self.find_historical_shares(cx);
+                    } else if let Some(group) = rec::manual_public_group(&self.game, &self.names) {
+                        let catalog = self.catalog.clone();
+                        let names = self.names.clone();
+                        let query = self.query.read(cx).value().to_string();
+                        let sort = self.sort;
+                        self.job(move || {
+                            let page = client.browse_feeds(
+                                &group,
+                                &names,
+                                &catalog,
+                                rec::FeedFilter::Public,
+                                None,
+                                sort,
+                            )?;
+                            Ok(Update::ExactGroup(query, group, page))
+                        });
                     } else {
                         self.find_candidates(true, cx);
                     }
                 }
-                Ok(Update::Page(page, append)) => {
-                    if !append {
-                        self.cards.clear();
-                        self.visible = 12;
-                        self.total = page.total;
+                Ok(Update::ExactGroup(query, group, page)) => {
+                    if self.identity.is_some()
+                        || self.mode != Mode::Identity
+                        || self.query.read(cx).value().as_str() != query
+                    {
+                        cx.notify();
+                        continue;
                     }
-                    for card in page.items {
-                        if let Some(old) = self.cards.iter_mut().find(|v| v.id == card.id) {
-                            *old = card;
-                        } else {
-                            self.cards.push(card);
-                        }
+                    if page.items.is_empty() {
+                        self.find_candidates(true, cx);
+                        cx.notify();
+                        continue;
                     }
-                    self.sort.rank(&mut self.cards);
-                    self.next = page.next;
-                    self.loaded = true;
-                    self.cached = page.notice.is_some();
-                    if append {
-                        self.visible += 12;
-                    }
-                    if let Some(message) = page.notice {
-                        self.message = self.t(message);
-                    }
+                    self.identity = Some(group);
+                    self.mode = Mode::Browse;
+                    self.refresh_at = Instant::now() + Duration::from_secs(45);
+                    self.show_page(page, false);
                 }
+                Ok(Update::Page(page, append)) => self.show_page(page, append),
                 Ok(Update::Games(query, games)) => {
                     if self.query.read(cx).value().as_str() != query {
                         cx.notify();
@@ -551,6 +563,31 @@ impl Recommendations {
             cx.notify();
         }
     }
+    fn show_page(&mut self, page: rec::FeedPage, append: bool) {
+        if !append {
+            self.cards.clear();
+            self.visible = 12;
+            self.total = page.total;
+        }
+        for card in page.items {
+            if let Some(old) = self.cards.iter_mut().find(|v| v.id == card.id) {
+                *old = card;
+            } else {
+                self.cards.push(card);
+            }
+        }
+        self.sort.rank(&mut self.cards);
+        self.next = page.next;
+        self.loaded = true;
+        self.cached = page.notice.is_some();
+        if append {
+            self.visible += 12;
+        }
+        if let Some(message) = page.notice {
+            self.message = self.t(message);
+        }
+    }
+
     fn refresh(&mut self, append: bool) {
         let (Some(client), Some(id)) = (self.client.clone(), self.browse_identity()) else {
             return;

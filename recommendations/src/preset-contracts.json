@@ -3400,5 +3400,188 @@
         }
       }
     }
+  },
+  "optiscaler-nr-presr-mfg": {
+    "profile": "optiscaler_nr_ini",
+    "fields": {
+      "nr_enabled": {
+        "values": [
+          "auto",
+          "true",
+          "false"
+        ],
+        "label": "DLSS 神经渲染",
+        "labels": {
+          "auto": "自动",
+          "true": "开启",
+          "false": "关闭"
+        }
+      },
+      "nr_before_sr": {
+        "values": [
+          "auto",
+          "true",
+          "false"
+        ],
+        "label": "在超分辨率前运行",
+        "labels": {
+          "auto": "自动",
+          "true": "开启",
+          "false": "关闭"
+        }
+      },
+      "nr_passes": {
+        "values": [
+          "auto",
+          "1",
+          "2",
+          "3"
+        ],
+        "label": "模型运行次数",
+        "labels": {
+          "auto": "自动",
+          "1": "1",
+          "2": "2",
+          "3": "3"
+        }
+      },
+      "nr_model": {
+        "values": [
+          "auto",
+          "0",
+          "1",
+          "2"
+        ],
+        "label": "神经渲染模型",
+        "labels": {
+          "auto": "自动",
+          "0": "默认",
+          "1": "原始模型",
+          "2": "轻量模型（FP8）"
+        }
+      },
+      "nr_style": {
+        "values": [
+          "auto",
+          "0",
+          "1",
+          "2"
+        ],
+        "label": "画面风格",
+        "labels": {
+          "auto": "自动",
+          "0": "标准",
+          "1": "自然",
+          "2": "电影"
+        }
+      },
+      "nr_scale": {
+        "values": [
+          "auto",
+          "0.5",
+          "0.75",
+          "1.0"
+        ],
+        "label": "模型分辨率",
+        "labels": {
+          "auto": "自动",
+          "0.5": "50%",
+          "0.75": "75%",
+          "1.0": "100%"
+        }
+      },
+      "fg_enabled": {
+        "values": [
+          "auto",
+          "true",
+          "false"
+        ],
+        "label": "帧生成",
+        "labels": {
+          "auto": "自动",
+          "true": "开启",
+          "false": "关闭"
+        }
+      },
+      "fg_input": {
+        "values": [
+          "auto",
+          "nofg",
+          "dlssg",
+          "nvngxfg",
+          "fsrfg",
+          "upscaler",
+          "fsrfg30"
+        ],
+        "label": "帧生成输入",
+        "labels": {
+          "auto": "自动",
+          "nofg": "关闭",
+          "dlssg": "DLSS-G",
+          "nvngxfg": "NGX FG",
+          "fsrfg": "FSR FG",
+          "upscaler": "超分辨率",
+          "fsrfg30": "FSR 3.0 FG"
+        }
+      },
+      "fg_output": {
+        "values": [
+          "auto",
+          "nofg",
+          "dlssg",
+          "xefg",
+          "fsrfg"
+        ],
+        "label": "帧生成输出",
+        "labels": {
+          "auto": "自动",
+          "nofg": "关闭",
+          "dlssg": "DLSS-G",
+          "xefg": "XeFG",
+          "fsrfg": "FSR FG"
+        }
+      },
+      "xe_enabled": {
+        "values": [
+          "auto",
+          "true",
+          "false"
+        ],
+        "label": "XeSS 多帧生成",
+        "labels": {
+          "auto": "自动",
+          "true": "开启",
+          "false": "关闭"
+        }
+      },
+      "xe_source": {
+        "values": [
+          "Game",
+          "OptiScaler"
+        ],
+        "label": "XeSS 帧生成输入",
+        "labels": {
+          "Game": "游戏",
+          "OptiScaler": "OptiScaler"
+        }
+      },
+      "xe_frames": {
+        "values": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "label": "XeSS 倍率上限",
+        "labels": {
+          "1": "2X",
+          "2": "3X",
+          "3": "4X",
+          "4": "5X",
+          "5": "6X"
+        }
+      }
+    }
   }
 }
