@@ -378,10 +378,11 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(verify.call_count,2) # one index, one complete archive
         anr = {**package, 'scheme_id':'anr-fg', 'archive_prefix':'',
                'files':[{'name':'OptiScaler.ini','bytes':1,'sha256':'b'*64}]}
-        review,after=metadata([anr])
-        with patch.object(pub,'verify') as verify:
-            pub.verify_metadata_changes(Path('.'),review,{},after)
-            self.assertEqual(verify.call_count,2)
+        for scheme in ('anr-fg', 'optiscaler-nr-presr-mfg'):
+            with self.subTest(scheme=scheme), patch.object(pub,'verify') as verify:
+                review,after=metadata([{**anr,'scheme_id':scheme}])
+                pub.verify_metadata_changes(Path('.'),review,{},after)
+                self.assertEqual(verify.call_count,2)
         for invalid in [{k:v for k,v in anr.items() if k!='archive_prefix'},
                         {**anr,'archive_prefix':None}, {**anr,'files':[]},
                         {**anr,'scheme_id':'other'}]:

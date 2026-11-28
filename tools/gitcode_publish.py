@@ -518,13 +518,11 @@ def verify_metadata_changes(root, review, before, after):
         verify_metadata_artifact(expected, len(raw), index['sha256'], metadata_digest)
         seen = {}
         for p in json.loads(raw)['packages']:
-            # ANR's complete upstream package is rooted at the archive root.
-            # Distinguish that explicit layout from a missing prefix; keep
-            # the existing prefix requirement for all other schemes.
-            root_anr = (p.get('scheme_id') == 'anr-fg'
-                        and p.get('archive_prefix') == ''
-                        and isinstance(p.get('files'), list) and bool(p['files']))
-            if not p.get('archive_prefix') and not root_anr:
+            # Both formats declare their members relative to the ZIP root.
+            root_layout = (p.get('scheme_id') in ('anr-fg', 'optiscaler-nr-presr-mfg')
+                           and p.get('archive_prefix') == ''
+                           and isinstance(p.get('files'), list) and bool(p['files']))
+            if not p.get('archive_prefix') and not root_layout:
                 raise RuntimeError('Complete bundle requires an explicit package prefix')
             url = asset_url(PAYLOAD_REPO, 'payloads', p['archive'])
             if p.get('urls', {}).get('domestic') != url:
