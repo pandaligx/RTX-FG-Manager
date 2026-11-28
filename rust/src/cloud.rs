@@ -1739,7 +1739,21 @@ mod tests {
                 .contains_key(crate::upstream040::PIPO_SCHEME)
         );
         let cache = tempfile::tempdir()?;
-        core::atomic_json(&cache.path().join("cloud-catalog-bundles.json"), &old)?;
+        let cache_file = cache.path().join("cloud-catalog-bundles.json");
+        // A later index owns its exclusions, even when this binary has a fallback.
+        let mut future = old.clone();
+        future.revision = "future-reviewed-catalog".into();
+        core::atomic_json(&cache_file, &future)?;
+        assert!(!cached_at(cache.path()).is_installable(crate::upstream040::PIPO_SCHEME));
+
+        // Before OptiScaler was registered, the cached index had no entry for it.
+        // Use that predecessor's revision when exercising the offline migration.
+        let mut predecessor = old;
+        predecessor.revision = bundled().revision;
+        predecessor
+            .skipped_schemes
+            .remove(crate::optiscaler_nr::SCHEME);
+        core::atomic_json(&cache_file, &predecessor)?;
         let offline = cached_at(cache.path());
         assert!(offline.is_installable(crate::upstream040::PIPO_SCHEME));
         assert!(!offline.is_installable(crate::upstream040::PIPO_VULKAN_SCHEME));
