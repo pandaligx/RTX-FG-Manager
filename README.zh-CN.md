@@ -19,14 +19,14 @@
 
 [下载软件](#下载) · [选择方案](#方案怎么选) · [更新日志](CHANGELOG.zh-CN.md) · [English](README.md)
 
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.46/RTXManager.exe"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="232" height="64"></a>
-<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage"><img src="docs/download-linux-zh.svg" alt="下载 Linux x86_64 AppImage（实验性）" width="232" height="64"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.47/RTXManager.exe"><img src="docs/download-zh.svg" alt="下载 Windows x64 版" width="232" height="64"></a>
+<a href="https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.47/RTXManager-4.3.47-x86_64.AppImage"><img src="docs/download-linux-zh.svg" alt="下载 Linux x86_64 AppImage（实验性）" width="232" height="64"></a>
 
 </div>
 
 ---
 
-> **4.3.46 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
+> **4.3.47 · Windows x64 便携版 / Linux x86_64 实验版。按系统选择 EXE 或 AppImage。管理器与各补丁的版本分别管理。**
 
 ![RTX-FG-Manager 游戏库](docs/screenshot-home-zh.png)
 
@@ -42,38 +42,39 @@
 | :--- | :--- | :--- |
 | 扫描或手动添加游戏，支持单个与批量操作 | 每款游戏一份配置，自由选择受支持 DLL | 卸载时恢复原文件，安装失败可回退 |
 | 每方案一个完整包，下载缓存可复用 | 折叠侧栏、可拖动右栏、12–18 字号调节 | 保留未知文件、原始 Bink 文件及其他插件 |
-| 默认 GitCode，失败回退 GitHub | 明暗主题、38 套配色、五种界面语言 | 更新管理器不会自动替换游戏补丁 |
+| 首次按系统地区选源，国内优先 GitCode，海外优先 GitHub。可在设置中切换 | 明暗主题、38 套配色、五种界面语言 | 更新管理器不会自动替换游戏补丁 |
 
 ## 下载
 
-**版本 4.3.46** · Windows 10 / 11 x64 · Linux x86_64（实验性）
+**版本 4.3.47** · Windows 10 / 11 x64 · Linux x86_64（实验性）
 
 | 来源 | 下载入口 | 用途 |
 | :--- | :--- | :--- |
-| **GitCode** | [打开 4.3.46 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.46) | 国内默认下载源 |
-| **GitHub** | [打开 4.3.46 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.46) | 主项目与备用源 |
-| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage) | Linux x86_64 国内下载 |
-| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage) | Linux x86_64 备用下载 |
+| **GitCode** | [打开 4.3.47 发行页](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.47) | 国内默认下载源 |
+| **GitHub** | [打开 4.3.47 发行页](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.47) | 主项目与备用源 |
+| **Linux · GitCode** | [下载 AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.47/RTXManager-4.3.47-x86_64.AppImage) | Linux x86_64 国内下载 |
+| **Linux · GitHub** | [下载 AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.47/RTXManager-4.3.47-x86_64.AppImage) | Linux x86_64 备用下载 |
 
 Windows 用户下载 **`RTXManager.exe`** 后运行，无需另装 Python、Rust或 CUDA Toolkit。补丁按需下载，完整且校验通过的缓存可离线复用；发行附件提供签名 EXE 与校验摘要。
 
 ### Linux（实验性）
 
-下载上方 **`RTXManager-4.3.46-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
+下载上方 **`RTXManager-4.3.47-x86_64.AppImage`** 即可，无需自行编译。要求 x86_64、glibc 2.35 或更新版本（构建基线 Ubuntu 22.04），以及系统图形驱动和桌面运行库。赋予执行权限后启动：
 
 ```sh
-chmod +x RTXManager-4.3.46-x86_64.AppImage
-./RTXManager-4.3.46-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.47-x86_64.AppImage
+./RTXManager-4.3.47-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 将前缀路径替换为游戏实际使用的 Wine 目录；Steam Proton 通常选择 `steamapps/compatdata/<AppID>/pfx`。再添加游戏的 Windows EXE，不用于原生 Linux ELF 游戏，也不自动配置 Proton 启动参数。发行页提供独立的 `SHA256SUMS-linux.txt`；依赖、免 FUSE 启动和源码构建见[Linux 说明](BUILDING.md#linux-appimage-experimental--实验性)。
 
 AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改、EXE 自动更新、DPAPI 登录存储及进程占用修复不适用于 Linux。下方显卡支持范围主要面向 Windows，不能直接视为 Wine / Proton 游戏兼容性保证。
 
-## 4.3.46 更新亮点
+## 4.3.47 更新亮点
 
-- Windows 版会按《燕云十六声》国服或国际服写入对应的神经渲染套件配置。已装过国际服套件的玩家可退出游戏，重新勾选套件并安装，原画质设置会保留。
-- 分享或编辑方案时，分享者名字、主页和视频教程等选填信息移到了适配方案上方。
+- 新增 OptiScaler-NR-PreSR-MFG 0.9.97 和简体中文游戏菜单。安装时会自动配齐专用的 Streamline 2.14.16 插件，无需手动下载 ZIP。游戏内按 `Insert` 调整帧生成后，点**保存设置**即可在重启后保留。DLSS 神经渲染 310.9.16 可选装，默认关闭。
+- 从玩家分享安装 RTX Encore 时，会跟随分享者选择的运行库。即使游戏原本没有帧生成，也能安装对方选择的配套组件。选择「仅安装补丁」可跳过可选运行库。
+- 手动添加的游戏现在也能直接显示同名的公开玩家方案，修复了 AzurPromilia 需要再次查找的问题。
 
 [查看完整更新日志 →](CHANGELOG.zh-CN.md)
 
@@ -89,6 +90,7 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | **MFG-Unlocker · 1.6.1** | 兼容备用版本；XeMFG 仅用于已有 OptiScaler 的插件模式。 | 独立模式 **Backspace**；插件模式用 OptiScaler 菜单 |
 | **RTX Encore · 2.5.0** | 提供 SR/RR/FG、DLSSNR、Smooth Motion、XeSS/XeFG。无原生 DLSS 的游戏也可选 MWSR 空间超分。 | 默认 **Insert** |
 | **ANR FG · V.B20** | 包含 OptiScaler 和 23 个模型程序，支持 scRGB HDR 和 Blackwell 显卡。选一个入口，默认最高 6X。 | **Insert（Ins）** 或管理器预设 |
+| **OptiScaler-NR-PreSR-MFG · 0.9.97** | 安装时选一个入口。神经渲染、模型和帧生成可在管理器的中文预设里调整。 | 游戏内按 **Insert** 打开简体中文菜单 |
 
 显卡检测仅供参考，不限制方案安装。各补丁仍受上游硬件、驱动、图形 API 和游戏要求约束，能选择不等于必定兼容。
 
@@ -102,6 +104,7 @@ AppImage 支持独立自动更新。Windows 专属的 GPU 调度、驱动修改�
 | MFG-Unlocker · 1.7.2 / 1.6.1 | 支持 | 支持 | 支持 | 支持 |
 | RTX Encore · 2.5.0 | 支持 | 支持 | 支持 | 支持 |
 | ANR FG · V.B20 | 支持 | 支持 | 支持 | 支持 |
+| OptiScaler-NR-PreSR-MFG · 0.9.97 | 支持 | 支持 | 支持 | 支持 |
 
 Pipo 作者使用 RTX 3070 测试 DX12 版，RTX 20 的兼容性仍待确认。游戏已装旧版 Pipo Vulkan 时，先点「卸载并恢复」，再切换到 DX12。[sm86-10 发布说明](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-10)
 

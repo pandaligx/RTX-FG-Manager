@@ -19,14 +19,14 @@
 
 [Download](#download) · [Patch guide](#choose-a-patch) · [Changelog](CHANGELOG.md) · [中文文档](README.zh-CN.md)
 
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.46/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
-<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.47/RTXManager.exe"><img src="docs/download-en.svg" alt="Download Windows x64" width="232" height="64"></a>
+<a href="https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.47/RTXManager-4.3.47-x86_64.AppImage"><img src="docs/download-linux-en.svg" alt="Download Linux x86_64 AppImage (experimental)" width="232" height="64"></a>
 
 </div>
 
 ---
 
-> **4.3.46 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
+> **4.3.47 · Portable Windows x64 / experimental Linux x86_64. Choose the EXE or AppImage for your system. The manager and its patches have separate release versions.**
 
 ![RTX-FG-Manager game library](docs/screenshot-home.png)
 
@@ -42,38 +42,39 @@
 | :--- | :--- | :--- |
 | Scan or add games; individual and batch operations | A single configuration per game; supported DLL entry selection | Restore original files when removing a patch; roll back failed installs |
 | One complete download per scheme, reused from cache | Collapsible navigation, resizable inspector, 12–18 font sizes | Preserve unknown files, original Bink components and unrelated plugins |
-| GitCode first, GitHub fallback | Light/dark themes, 38 color schemes, five interface languages | No automatic replacement of game patches when the manager updates |
+| First launch uses the system region: GitCode for mainland China, GitHub elsewhere. Change the source in Settings | Light/dark themes, 38 color schemes, five interface languages | No automatic replacement of game patches when the manager updates |
 
 ## Download
 
-**Version 4.3.46** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
+**Version 4.3.47** · Windows 10 / 11 x64 · Linux x86_64 (experimental)
 
 | Source | Download | Purpose |
 | :--- | :--- | :--- |
-| **GitCode** | [Open 4.3.46 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.46) | Default domestic source |
-| **GitHub** | [Open 4.3.46 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.46) | Primary project and fallback |
-| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage) | Linux x86_64 domestic mirror |
-| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.46/RTXManager-4.3.46-x86_64.AppImage) | Linux x86_64 download |
+| **GitCode** | [Open 4.3.47 release](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/v4.3.47) | Default domestic source |
+| **GitHub** | [Open 4.3.47 release](https://github.com/pandaligx/RTX-FG-Manager/releases/tag/v4.3.47) | Primary project and fallback |
+| **Linux · GitCode** | [Download AppImage](https://gitcode.com/gcw_qWIjmve7/RTX-FG-Manager/releases/download/v4.3.47/RTXManager-4.3.47-x86_64.AppImage) | Linux x86_64 domestic mirror |
+| **Linux · GitHub** | [Download AppImage](https://github.com/pandaligx/RTX-FG-Manager/releases/download/v4.3.47/RTXManager-4.3.47-x86_64.AppImage) | Linux x86_64 download |
 
 On Windows, download **`RTXManager.exe`** and run it. No separate Python, Rust or CUDA Toolkit installation is needed. Patch files download when selected; a verified complete cache can be reused offline. The release includes the signed executable and checksums.
 
 ### Linux (experimental)
 
-Download **`RTXManager-4.3.46-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
+Download **`RTXManager-4.3.47-x86_64.AppImage`** above; no compilation is needed. It requires x86_64, glibc 2.35 or newer (built on Ubuntu 22.04), system graphics drivers and desktop libraries. Make it executable, then launch:
 
 ```sh
-chmod +x RTXManager-4.3.46-x86_64.AppImage
-./RTXManager-4.3.46-x86_64.AppImage --wine-prefix "/path/to/prefix"
+chmod +x RTXManager-4.3.47-x86_64.AppImage
+./RTXManager-4.3.47-x86_64.AppImage --wine-prefix "/path/to/prefix"
 ```
 
 Replace the prefix with the game's actual Wine directory; Steam Proton normally uses `steamapps/compatdata/<AppID>/pfx`. Add the game's Windows EXE. Native Linux ELF games and automatic Proton launch configuration are outside this port's scope. Releases include a separate `SHA256SUMS-linux.txt`; see the [Linux instructions](BUILDING.md#linux-appimage-experimental--实验性) for dependencies, running without FUSE and source builds.
 
 AppImage has its own automatic update channel. Windows-only GPU scheduling, driver modification, EXE self-updates, DPAPI login storage and process-handle repair are unavailable on Linux. The GPU guide below primarily describes upstream Windows support, not verified Wine / Proton compatibility.
 
-## 4.3.46 highlights
+## 4.3.47 highlights
 
-- Where Winds Meet now gets the Neural Rendering kit configuration for its edition on Windows. To repair a previous global installation, exit the game and reinstall with the kit selected. Your graphics settings are preserved.
-- When sharing or editing a setup, the optional author, profile and video fields now appear above the patch details.
+- Added OptiScaler-NR-PreSR-MFG 0.9.97 with a Simplified Chinese in-game menu. The manager installs the private Streamline 2.14.16 plugins automatically. Press `Insert` and choose **Save Settings** to keep changes after restarting the game. DLSS Neural Rendering 310.9.16 is optional and off by default.
+- Shared RTX Encore setups install the runtimes the author selected, including frame generation components for games that ship without them. Choose the patch alone to skip optional runtimes.
+- Opening player setups for a manually added game such as AzurPromilia now shows its matching public setups immediately.
 
 [Full changelog →](CHANGELOG.md)
 
@@ -89,6 +90,7 @@ AppImage has its own automatic update channel. Windows-only GPU scheduling, driv
 | **MFG-Unlocker · 1.6.1** | Compatibility fallback; XeMFG requires the existing OptiScaler plugin route. | **Backspace** standalone; OptiScaler menu in plugin mode |
 | **RTX Encore · 2.5.0** | SR/RR/FG, DLSSNR, Smooth Motion and XeSS/XeFG. Games without native DLSS can also use MWSR spatial upscaling. | **Insert** by default |
 | **ANR FG · V.B20** | Includes OptiScaler and 23 model programs for different GPUs and output formats, including Blackwell and scRGB HDR. Choose one entry. Default cap is 6X. | **Insert (Ins)** or manager settings |
+| **OptiScaler-NR-PreSR-MFG · 0.9.97** | Choose one entry point. Adjust neural rendering, the model and frame generation in the manager’s presets. | **Insert** opens the Simplified Chinese in-game menu |
 
 GPU detection provides information, not an installation gate. Each upstream patch still has its own hardware, driver, graphics API and game requirements. A selectable scheme does not guarantee compatibility.
 
@@ -102,6 +104,7 @@ GPU detection provides information, not an installation gate. Each upstream patc
 | MFG-Unlocker · 1.7.2 / 1.6.1 | Supported | Supported | Supported | Supported |
 | RTX Encore · 2.5.0 | Supported | Supported | Supported | Supported |
 | ANR FG · V.B20 | Supported | Supported | Supported | Supported |
+| OptiScaler-NR-PreSR-MFG · 0.9.97 | Supported | Supported | Supported | Supported |
 
 The Pipo author tested the DX12 build on an RTX 3070. RTX 20 support is unconfirmed. If a game has the older Pipo Vulkan build, use **Uninstall and restore** before switching it to DX12. [sm86-10 release](https://github.com/pipotoufikxyz-lgtm/dlssg_for_sm86-MFG-version/releases/tag/sm86-10)
 

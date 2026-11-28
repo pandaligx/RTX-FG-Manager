@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.3.47 — 2026-11-28
+
+- Added OptiScaler-NR-PreSR-MFG 0.9.97 with a Simplified Chinese in-game menu. The manager installs the private Streamline 2.14.16 plugins automatically. Press `Insert` and choose **Save Settings** to keep changes after restarting the game. DLSS Neural Rendering 310.9.16 is optional and off by default.
+- When selected, the Neural Rendering runtime is installed beside the game executable. If the game already has an identical file, the manager reuses it and keeps it on uninstall.
+- Shared RTX Encore setups install the runtimes the author selected, including frame generation components for games that ship without them. Choose the patch alone to skip optional runtimes.
+- Opening player setups for a manually added game such as AzurPromilia now shows its matching public setups immediately.
+
 ## 4.3.46 — 2026-11-27
 
 - Where Winds Meet now gets the Neural Rendering kit configuration for its edition on Windows. To repair a previous global installation, exit the game and reinstall with the kit selected. Your graphics settings are preserved.
